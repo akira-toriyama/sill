@@ -308,9 +308,10 @@ extension ThemeSpec {
     /// Chomp — arcade Pac-Man look (pellet yellow on a black maze, neon-
     /// blue walls, ghost-red error). A CROSS-APP playful theme: facet's
     /// tree, halo's border ring, and wand's gesture trail all adopt
-    /// `theme = chomp`, each drawing its OWN signature motion (see
-    /// `Effects.ThemeMotion`) over this shared palette + the matching
-    /// `EffectSpec.chomp` animated border. Light/dark: a dark theme, so
+    /// `theme = chomp`, each drawing its OWN signature motion over this
+    /// shared palette + the matching `EffectSpec.chomp` animated border
+    /// (the motion drawing stays app-side; sill owns identity + colour).
+    /// Light/dark: a dark theme, so
     /// hover derives normally; divider/selFill are explicit (wall-blue +
     /// pellet) because the arcade identity needs those exact hues.
     public static let chomp = ThemeSpec(
