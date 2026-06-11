@@ -251,9 +251,11 @@ the common alpha case only.
 - **perch**: `ThemePalette` → `ThemeSpec` (already pure UInt32 in Core);
   `ResolvedPalette` → `PaletteKit.resolve`. `missHex` → `error`,
   `pillBgAlpha` → `bgAlpha`. Catalog drift → facet hex (Q1).
-- **wand**: `CastThemePalette` / `TomeThemePalette` (String) → `ThemeSpec`;
-  chomp/splatoon become wand `ThemeMotion`s over shared specs; `.menu`
-  font + tertiary helper cover the native launcher tiers.
+- **wand**: `CastThemePalette` / `TomeThemePalette` (String) → `ThemeSpec`
+  (deriving hex from the shared spec via `parseColorToken`); chomp/splatoon
+  stay wand-local **motion** over the shared `ThemeSpec.chomp` +
+  `EffectSpec.chomp` (no `ThemeMotion` — removed Phase A); `.menu` font +
+  the `tertiary` field cover the native launcher tiers.
 - **halo**: `BorderEffect` → `Effects.EffectSpec` / `borderEffectFor` /
   `blendThrough` (its 5 effects already match sill's hex).
 - **glance**: adopt `PaletteKit` for bg/text/accent; keep `--code-theme`

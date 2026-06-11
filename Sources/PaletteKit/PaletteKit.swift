@@ -2,8 +2,8 @@
 // AppKit. Turns a pure `ThemeSpec` into a `ResolvedPalette` of
 // `NSColor`s, applying the DERIVE RECIPE for any field the spec left
 // nil. Also provides the `@MainActor` module-level `pal` var (facet's
-// invariant), the `uiFont` factory (incl. `.menu`), `tertiary()`, and
-// `blendThrough`.
+// invariant), the `uiFont` factory (incl. `.menu`), the derive
+// accessors (`tertiary` field, `ink`, `onAccent`), and `blendThrough`.
 //
 // Layer rule: a consumer that wants only the pure spec depends on
 // `Palette` and never links this module → never links AppKit.
@@ -150,7 +150,8 @@ func bestContrast(on c: NSColor) -> NSColor {
 ///   * divider   → override, else neutral@0.10.
 ///   * hoverFill → override, else neutral@0.05.
 ///   * selFill   → override, else accent@0.18.
-///   * tertiary  → text@0.55 (via ResolvedPalette.tertiary()).
+///   * tertiary  → spec.tertiary if set, else `.tertiaryLabelColor`
+///     (OS-ink themes) / text@0.55 — now a stored `pal.tertiary` field.
 ///
 /// `system` is special-cased: bg nil, dynamic system colors for
 /// text/dim/divider/hover/sel, vibrancy + dark-aqua hints emitted.

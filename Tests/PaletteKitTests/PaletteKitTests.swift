@@ -134,6 +134,7 @@ final class PaletteKitTests: XCTestCase {
         XCTAssertEqual(subtle.r, CGFloat(0xC0) / 255, accuracy: 0.01)
         XCTAssertEqual(subtle.a, 0.16, accuracy: 0.001)
         XCTAssertEqual(comps(p.ink(.faint, of: .accent)).a, 0.06, accuracy: 0.001)
+        XCTAssertEqual(comps(p.ink(.wash, of: .accent)).a, 0.30, accuracy: 0.001)
         XCTAssertEqual(comps(p.ink(.strong, of: .dim)).a, 0.55, accuracy: 0.001)
     }
 
