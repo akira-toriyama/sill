@@ -26,6 +26,13 @@ final class EffectsTests: XCTestCase {
         XCTAssertTrue(canonicalEffectNames.contains("chomp"))
     }
 
+    func testIsAnimatableTheme() {
+        XCTAssertTrue(isAnimatableTheme("rainbow"))   // cycles
+        XCTAssertTrue(isAnimatableTheme("chomp"))     // flashes
+        XCTAssertFalse(isAnimatableTheme("terminal")) // static theme
+        XCTAssertFalse(isAnimatableTheme("dracula"))  // static theme
+    }
+
     // --- Pure: blendThrough ---
 
     func testBlendThroughEndpoints() {

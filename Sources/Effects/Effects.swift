@@ -117,6 +117,16 @@ public func borderEffectFor(_ name: String) -> EffectSpec? {
     }
 }
 
+/// True when a THEME animates — i.e. its name has an entry in the effect
+/// catalog (rainbow cycles, chomp flashes). Lets a consumer DERIVE its
+/// "animatable themes" set from sill instead of hand-listing it. Pass a
+/// resolved THEME name; post-rebuild that is only ever a catalog theme, so
+/// `rainbow` / `chomp` are the animatable ones. (Border-effect-only names
+/// like `neon` also answer true here, but they never reach this as a theme.)
+public func isAnimatableTheme(_ name: String) -> Bool {
+    borderEffectFor(name) != nil
+}
+
 // MARK: - Pure blend (UInt32)
 
 /// Smoothly loop through `colors` (each `0xRRGGBB`) by `phase` (0…1),

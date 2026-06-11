@@ -181,4 +181,21 @@ final class PaletteTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(lightA, 0.30)      // clamped floor
         XCTAssertLessThanOrEqual(darkA, 0.92)          // clamped ceil
     }
+
+    // MARK: - validation (canonical / suggest)
+
+    func testCanonicalResolvesAndRejects() {
+        XCTAssertEqual(canonical("DRACULA"), "dracula")        // case-insensitive
+        XCTAssertEqual(canonical("  github-light "), "github-light")  // trimmed
+        XCTAssertEqual(canonical("random"), "random")          // meta-name kept
+        XCTAssertNil(canonical("nord"))                        // cut in Phase V
+        XCTAssertNil(canonical("nonsense"))
+    }
+
+    func testSuggestNearestOrNil() {
+        XCTAssertEqual(suggest("dracua"), "dracula")           // 1 edit
+        XCTAssertEqual(suggest("terminl"), "terminal")
+        XCTAssertNil(suggest(""))
+        XCTAssertNil(suggest("zzzzzzzzzz"))                    // nothing close
+    }
 }

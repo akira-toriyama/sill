@@ -358,6 +358,54 @@ public func paletteFor(_ raw: String) -> ThemeSpec {
     }
 }
 
+// MARK: - Validation (pure, opt-in — shared MECHANISM; policy stays app-side)
+
+/// Canonicalize a raw `--theme=` value: the matched canonical name
+/// (case-insensitive, trimmed) or `nil` if unknown. The shared mechanism
+/// behind both a silent config-clamp (`canonical(x) ?? "terminal"`) and a
+/// loud CLI reject (`canonical(x)` nil ⇒ exit + `suggest`). Replaces each
+/// app's hand-kept theme-name list so there is one source of truth.
+public func canonical(_ raw: String) -> String? {
+    let s = raw.trimmingCharacters(in: .whitespaces).lowercased()
+    return canonicalThemeNames.contains(s) ? s : nil
+}
+
+/// Nearest canonical theme name to a typo'd `raw` (Levenshtein), or `nil`
+/// when nothing is plausibly close — a did-you-mean hint for a loud CLI
+/// reject. Excludes the `random` meta-name.
+public func suggest(_ raw: String) -> String? {
+    let s = raw.trimmingCharacters(in: .whitespaces).lowercased()
+    guard !s.isEmpty else { return nil }
+    var best: String?
+    var bestDist = Int.max
+    for name in canonicalThemeNames where name != "random" {
+        let d = levenshtein(s, name)
+        if d < bestDist { bestDist = d; best = name }
+    }
+    // Only hint when it reads like a typo, not a wildly different string.
+    guard bestDist <= max(2, s.count / 2) else { return nil }
+    return best
+}
+
+/// Classic Levenshtein edit distance (pure). Theme names are short, so the
+/// two-row DP is plenty.
+func levenshtein(_ lhs: String, _ rhs: String) -> Int {
+    let a = Array(lhs), b = Array(rhs)
+    if a.isEmpty { return b.count }
+    if b.isEmpty { return a.count }
+    var prev = Array(0...b.count)
+    var cur = [Int](repeating: 0, count: b.count + 1)
+    for i in 1...a.count {
+        cur[0] = i
+        for j in 1...b.count {
+            let cost = a[i - 1] == b[j - 1] ? 0 : 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+        }
+        swap(&prev, &cur)
+    }
+    return prev[b.count]
+}
+
 // MARK: - Contrast (shared value logic, pure)
 
 /// Luminance at/above which a fill reads as "light" and wants a DARK
