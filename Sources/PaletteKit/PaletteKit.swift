@@ -195,7 +195,11 @@ public func resolve(
             // Vibrancy needs a material; a concrete systemDynamic fill
             // does not (no NSVisualEffectView). Don't start emitting a
             // material for fixed/systemDynamic — the call site owns it.
-            vibrancyMaterial: spec.backgroundMode == .vibrancy ? (material ?? .underWindowBackground) : material,
+            // Default `.menu` — the native CONTEXT-MENU material, so the
+            // `system` theme reads as a real macOS menu (matches its
+            // `font: .menu`): crisp + legible, light by day / dark by
+            // night. A caller can override via `material:`.
+            vibrancyMaterial: spec.backgroundMode == .vibrancy ? (material ?? .menu) : material,
             forceDarkAqua: forceDark ?? false)
     }
 

@@ -59,7 +59,7 @@ final class PaletteKitTests: XCTestCase {
         XCTAssertNil(p.background)                   // vibrancy
         XCTAssertEqual(p.foreground, NSColor.labelColor)
         XCTAssertEqual(p.primary, NSColor.controlAccentColor)
-        XCTAssertNotNil(p.vibrancyMaterial)         // hint emitted
+        XCTAssertEqual(p.vibrancyMaterial, .menu)   // native context-menu material
     }
 
     func testSystemPresetMaterialOverride() {
