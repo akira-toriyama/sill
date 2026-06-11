@@ -130,16 +130,19 @@ struct Swatch: View {
     var body: some View {
         VStack(spacing: 3) {
             ZStack {
-                // Checker hint behind so a nil/transparent swatch reads.
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(Color(nsColor: .quaternaryLabelColor))
+                // Checkerboard behind every swatch so a TRANSLUCENT role
+                // (border @0.10, hover @0.05) and a nil/transparent
+                // background read as see-through — the alpha is visible
+                // against both the light and dark checker cells.
+                Checker()
                 if let c = color {
-                    RoundedRectangle(cornerRadius: 5).fill(Color(nsColor: c))
+                    Rectangle().fill(Color(nsColor: c))
                 }
             }
             .frame(width: 50, height: 32)
+            .clipShape(RoundedRectangle(cornerRadius: 5))
             .overlay(RoundedRectangle(cornerRadius: 5)
-                .stroke(Color(nsColor: ink).opacity(0.18), lineWidth: 1))
+                .stroke(Color(nsColor: ink).opacity(0.30), lineWidth: 1))
 
             Text(label)
                 .font(.system(size: 8.5, weight: .medium))
@@ -149,6 +152,27 @@ struct Swatch: View {
                 .font(.system(size: 8, design: .monospaced))
                 .foregroundColor(Color(nsColor: muted))
                 .lineLimit(1).minimumScaleFactor(0.6).frame(width: 52)
+        }
+    }
+}
+
+/// A small grey checkerboard — the universal "transparent" backdrop so a
+/// translucent swatch's alpha is legible on any theme background.
+struct Checker: View {
+    var body: some View {
+        Canvas { ctx, size in
+            ctx.fill(Path(CGRect(origin: .zero, size: size)),
+                     with: .color(Color(white: 0.80)))
+            let cell: CGFloat = 5
+            let cols = Int(ceil(size.width / cell))
+            let rows = Int(ceil(size.height / cell))
+            for r in 0..<rows {
+                for c in 0..<cols where (r + c) % 2 == 1 {
+                    ctx.fill(Path(CGRect(x: CGFloat(c) * cell, y: CGFloat(r) * cell,
+                                         width: cell, height: cell)),
+                             with: .color(Color(white: 0.52)))
+                }
+            }
         }
     }
 }
