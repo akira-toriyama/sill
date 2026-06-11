@@ -170,8 +170,13 @@ final class PaletteTests: XCTestCase {
     // MARK: - contrast + pill alpha (pure)
 
     func testBestForeground() {
-        XCTAssertEqual(HexColor(0xFFE000).bestForeground.rgb, 0x000000)  // light → black
-        XCTAssertEqual(HexColor(0x202060).bestForeground.rgb, 0xFFFFFF)  // dark → white
+        XCTAssertEqual(HexColor(0xFFE000).bestForeground.rgb, 0x000000)  // bright yellow → black
+        XCTAssertEqual(HexColor(0x202060).bestForeground.rgb, 0xFFFFFF)  // deep navy → white
+        // Mid-luminance fills: WCAG max-contrast picks BLACK where the old
+        // binary 0.6 cut returned low-contrast (~3.5:1) white.
+        XCTAssertEqual(HexColor(0xFF2D95).bestForeground.rgb, 0x000000)  // hot pink (rainbow primary)
+        XCTAssertEqual(HexColor(0xE84B3C).bestForeground.rgb, 0x000000)  // red-orange (tokyo-hack)
+        XCTAssertEqual(HexColor(0x2F81F7).bestForeground.rgb, 0x000000)  // medium blue (github-dark)
     }
 
     func testSuggestedPillAlphaMonotoneAndClamped() {

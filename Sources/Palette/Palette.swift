@@ -408,17 +408,39 @@ func levenshtein(_ lhs: String, _ rhs: String) -> Int {
 
 // MARK: - Contrast (shared value logic, pure)
 
-/// Luminance at/above which a fill reads as "light" and wants a DARK
-/// foreground. Single source so PaletteKit's NSColor `onPrimary` and a
-/// pure (Palette-only) consumer like perch can't drift apart.
-public let lightFillLuminanceThreshold: Double = 0.6
+/// WCAG 2.x relative luminance of an sRGB channel triple (each `0...1`),
+/// gamma-decoded. Distinct from `HexColor.luminance` (a cheap Rec.601
+/// approximation that drives the light/dark THEME branch); the
+/// foreground-contrast choice needs the perceptually-correct curve to
+/// pick the legible ink.
+public func wcagRelativeLuminance(r: Double, g: Double, b: Double) -> Double {
+    func lin(_ c: Double) -> Double {
+        c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+}
+
+/// True when BLACK text contrasts a fill of WCAG relative luminance `L`
+/// at least as well as white — the actual contrast-ratio crossover
+/// (≈ L 0.18), NOT a perceptual-midpoint guess. A binary luminance
+/// threshold (the old 0.6 cut) left mid-luminance fills (L≈0.35–0.50)
+/// with white text at only ~2:1; this picks the higher-contrast ink.
+/// Shared so PaletteKit's NSColor `onPrimary` and the pure
+/// `HexColor.bestForeground` can't drift apart.
+public func prefersBlackForeground(fillRelLuminance L: Double) -> Bool {
+    let contrastBlack = (L + 0.05) / 0.05
+    let contrastWhite = 1.05 / (L + 0.05)
+    return contrastBlack >= contrastWhite
+}
 
 public extension HexColor {
     /// Black or white — whichever best contrasts THIS color used as a
-    /// fill. The pure half of `onPrimary`; PaletteKit reuses the same
-    /// threshold for the resolved-`NSColor` (incl. OS controlAccent) case.
+    /// fill, by WCAG contrast ratio. The pure half of `onPrimary`;
+    /// PaletteKit reuses the same logic for the resolved-`NSColor`
+    /// (incl. OS controlAccent) case so they can't drift.
     var bestForeground: HexColor {
-        luminance >= lightFillLuminanceThreshold ? HexColor(0x000000) : HexColor(0xFFFFFF)
+        prefersBlackForeground(fillRelLuminance: wcagRelativeLuminance(r: r, g: g, b: b))
+            ? HexColor(0x000000) : HexColor(0xFFFFFF)
     }
 }
 

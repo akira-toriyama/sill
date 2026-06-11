@@ -124,15 +124,17 @@ public extension ResolvedPalette {
     var onPrimaryStroke: NSColor { onPrimary(0.4) }
 }
 
-/// Black or white, whichever best contrasts `c` used as a fill. Uses the
-/// same `lightFillLuminanceThreshold` as the pure `HexColor.bestForeground`
-/// so the resolved-`NSColor` path (incl. OS controlAccent, whose hex the
+/// Black or white, whichever best contrasts `c` used as a fill. Reuses
+/// the pure `prefersBlackForeground` (WCAG contrast-ratio crossover) so
+/// the resolved-`NSColor` path (incl. OS controlAccent, whose hex the
 /// pure layer can't see) can't drift from a Palette-only consumer.
 @MainActor
 func bestContrast(on c: NSColor) -> NSColor {
     let s = c.usingColorSpace(.sRGB) ?? c
-    let lum = 0.299 * s.redComponent + 0.587 * s.greenComponent + 0.114 * s.blueComponent
-    return Double(lum) >= lightFillLuminanceThreshold ? .black : .white
+    let L = wcagRelativeLuminance(r: Double(s.redComponent),
+                                  g: Double(s.greenComponent),
+                                  b: Double(s.blueComponent))
+    return prefersBlackForeground(fillRelLuminance: L) ? .black : .white
 }
 
 // MARK: - Derive recipe
