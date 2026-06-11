@@ -198,4 +198,20 @@ final class PaletteTests: XCTestCase {
         XCTAssertNil(suggest(""))
         XCTAssertNil(suggest("zzzzzzzzzz"))                    // nothing close
     }
+
+    // MARK: - EffectIntensity (pure, shared knob)
+
+    func testEffectIntensityMultipliers() {
+        XCTAssertEqual(EffectIntensity.subtle.multiplier, 0.6, accuracy: 0.0001)
+        XCTAssertEqual(EffectIntensity.normal.multiplier, 1.0, accuracy: 0.0001)
+        XCTAssertEqual(EffectIntensity.bold.multiplier, 1.6, accuracy: 0.0001)
+        XCTAssertEqual(EffectIntensity.wild.multiplier, 2.5, accuracy: 0.0001)
+    }
+
+    func testEffectIntensityParse() {
+        XCTAssertEqual(EffectIntensity.parse("BOLD"), .bold)      // case-insensitive
+        XCTAssertEqual(EffectIntensity.parse("  wild "), .wild)   // trimmed
+        XCTAssertNil(EffectIntensity.parse("loud"))               // unknown → nil
+        XCTAssertEqual(EffectIntensity.allCases.count, 4)
+    }
 }

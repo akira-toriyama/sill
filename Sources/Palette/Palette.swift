@@ -476,3 +476,43 @@ public func suggestedPillAlpha(luminance: Double) -> Double {
     let a = 0.92 - luminance * 0.55      // dark ≈ 0.92 … light ≈ 0.37
     return min(0.92, max(0.30, a))
 }
+
+// MARK: - EffectIntensity (pure, shared)
+
+/// How strongly a dynamic effect renders — a magnitude multiplier the
+/// consuming app applies to spatial dimensions (scale / distance /
+/// vibration amplitude) and particle birth-rate, NOT to duration. The
+/// four-tier vocabulary (`subtle` 0.6× … `wild` 2.5×) was hand-copied
+/// identically in wand (`Intensity`) and perch (`EffectIntensity`); the
+/// rule-of-three trigger (halo is the third effects consumer) earned the
+/// promotion to one shared enum.
+///
+/// Lives in `Palette` — not `Effects` — because it is a pure `Sendable`
+/// `Double` knob with no AppKit, so a `Palette`-only consumer (perch)
+/// can adopt it without linking `Effects`. (The `Double` multiplier
+/// keeps the module CoreGraphics-free; callers wanting `CGFloat` wrap at
+/// the use site.)
+public enum EffectIntensity: String, Sendable, Hashable, CaseIterable {
+    case subtle
+    case normal
+    case bold
+    case wild
+
+    /// Magnitude scale applied to an effect's spatial dimensions and
+    /// particle counts. `1.0` = the authored baseline.
+    public var multiplier: Double {
+        switch self {
+        case .subtle: return 0.6
+        case .normal: return 1.0
+        case .bold:   return 1.6
+        case .wild:   return 2.5
+        }
+    }
+
+    /// Parse a config token (case-insensitive, trimmed) into an
+    /// `EffectIntensity`, or `nil` if unrecognized so the caller can
+    /// clamp + log per its own policy.
+    public static func parse(_ raw: String) -> EffectIntensity? {
+        EffectIntensity(rawValue: raw.trimmingCharacters(in: .whitespaces).lowercased())
+    }
+}
