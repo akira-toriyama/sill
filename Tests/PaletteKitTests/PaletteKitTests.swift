@@ -86,10 +86,71 @@ final class PaletteKitTests: XCTestCase {
         XCTAssertNotEqual(comps(p.accent2).r, comps(p.accent).r, accuracy: 0.001)
     }
 
-    func testTertiaryIsFadedText() {
-        let p = resolve(.terminal)
-        XCTAssertEqual(comps(p.tertiary()).a, 0.55, accuracy: 0.001)
-        XCTAssertEqual(comps(p.tertiary(0.4)).a, 0.40, accuracy: 0.001)
+    /// tertiary (now a first-class field) derives text@0.55 when the spec
+    /// doesn't author it.
+    func testTertiaryDerivesFadedText() {
+        let p = resolve(.terminal)               // text 0xC0CAF5, no tertiary
+        let t = comps(p.tertiary)
+        XCTAssertEqual(t.a, 0.55, accuracy: 0.001)
+        XCTAssertEqual(t.r, CGFloat(0xC0) / 255, accuracy: 0.01)
+    }
+
+    /// An authored tertiary wins over the derive.
+    func testTertiaryOverrideWins() {
+        let spec = ThemeSpec(
+            bg: HexColor(0x101010), text: HexColor(0xEEEEEE),
+            dim: HexColor(0x888888), accent: HexColor(0x3B82F6), font: .mono,
+            tertiary: HexColor(0x40C0FF, 0.7))
+        let t = comps(resolve(spec).tertiary)
+        XCTAssertEqual(t.r, CGFloat(0x40) / 255, accuracy: 0.01)
+        XCTAssertEqual(t.a, 0.70, accuracy: 0.001)
+    }
+
+    /// GQ8: the `system` preset's selFill is now the unified 0.18
+    /// (was 0.22 — the static/animated split that drove the fix).
+    func testSystemSelFillIsUnified018() {
+        XCTAssertEqual(comps(resolve(.system).selFill).a, 0.18, accuracy: 0.001)
+    }
+
+    /// GQ3: `.systemDynamic` = a concrete bg with live OS inks — the case
+    /// the old `bg == nil` gate could not express.
+    func testSystemDynamicKeepsConcreteBgWithOSInks() {
+        let pill = ThemeSpec(
+            bg: HexColor(0x000000), text: HexColor(0x000000),
+            dim: HexColor(0x000000), accent: HexColor(systemAccentSentinel),
+            font: .menu, bgMode: .systemDynamic)
+        let p = resolve(pill)
+        XCTAssertNotNil(p.bg)                                 // concrete fill kept
+        XCTAssertEqual(comps(p.bg!).r, 0, accuracy: 0.01)
+        XCTAssertEqual(p.text, NSColor.labelColor)            // OS ink, not 0x000000
+        XCTAssertEqual(p.accent, NSColor.controlAccentColor)
+        XCTAssertNil(p.vibrancyMaterial)                      // no vibrancy for a fill
+    }
+
+    /// GQ2: ink(tier, root) is an alpha-over tint of the named base.
+    func testInkTiers() {
+        let p = resolve(.terminal)                            // text 0xC0CAF5
+        let subtle = comps(p.ink(.subtle, of: .text))
+        XCTAssertEqual(subtle.r, CGFloat(0xC0) / 255, accuracy: 0.01)
+        XCTAssertEqual(subtle.a, 0.16, accuracy: 0.001)
+        XCTAssertEqual(comps(p.ink(.faint, of: .accent)).a, 0.06, accuracy: 0.001)
+        XCTAssertEqual(comps(p.ink(.wash, of: .accent)).a, 0.30, accuracy: 0.001)
+        XCTAssertEqual(comps(p.ink(.strong, of: .dim)).a, 0.55, accuracy: 0.001)
+    }
+
+    /// GQ4: onAccent picks the higher-contrast foreground off the OPAQUE
+    /// accent; onAccentStroke is the same ink @0.4.
+    func testOnAccentContrast() {
+        // light accent → black foreground
+        let light = ThemeSpec(bg: HexColor(0x101010), text: HexColor(0xEEEEEE),
+            dim: HexColor(0x888888), accent: HexColor(0xFFE000), font: .mono)
+        XCTAssertEqual(resolve(light).onAccent(), NSColor.black)
+        // dark accent → white foreground, stroke @0.4
+        let dark = ThemeSpec(bg: HexColor(0xF0F0F0), text: HexColor(0x111111),
+            dim: HexColor(0x888888), accent: HexColor(0x202060), font: .mono)
+        let dp = resolve(dark)
+        XCTAssertEqual(comps(dp.onAccent()).r, 1, accuracy: 0.01)
+        XCTAssertEqual(comps(dp.onAccentStroke).a, 0.40, accuracy: 0.001)
     }
 
     func testPalInstallAndRead() {

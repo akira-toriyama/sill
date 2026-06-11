@@ -84,9 +84,10 @@ extension EffectSpec {
 
     /// Chomp — arcade maze: neon-blue walls at rest, blinking through
     /// pellet-yellow + ghost-red. The shared animated border for the
-    /// cross-app `chomp` theme (facet tree / halo ring / wand trail each
-    /// layer their own `ThemeMotion` over this). Not a `cycles` effect —
-    /// it blinks a FIXED arcade palette rather than rotating the spectrum.
+    /// cross-app `chomp` theme; facet's tree, halo's ring, and wand's
+    /// trail each draw their OWN signature motion over this shared spec.
+    /// Not a `cycles` effect — it blinks a FIXED arcade palette rather
+    /// than rotating the spectrum.
     public static let chomp = EffectSpec(
         steady: 0x2121FF,
         flash: [0xFFEA00, 0x2121FF, 0xFF0000, 0x2121FF])
@@ -100,8 +101,7 @@ public let canonicalEffectNames: [String] = [
 
 /// Map a BUILT-IN effect name to its `EffectSpec`, or `nil` for "off" /
 /// unknown. Pure — `UInt32` hex, no AppKit. `random` picks a concrete
-/// built-in each call (matches facet). For app-registered effects use
-/// `EffectRegistry.shared.spec(for:)`, which is a superset of this.
+/// built-in each call (matches facet).
 public func borderEffectFor(_ name: String) -> EffectSpec? {
     switch name.lowercased() {
     case "neon":    return .neon
@@ -114,47 +114,6 @@ public func borderEffectFor(_ name: String) -> EffectSpec? {
         let pool: [EffectSpec] = [.neon, .cyber, .vapor, .kawaii, .rainbow, .chomp]
         return pool.randomElement()
     default:        return nil   // "off" or unknown
-    }
-}
-
-// MARK: - Extensible effect registry
-
-/// A mutable, app-extensible registry mapping effect NAMES to specs.
-/// sill ships the built-ins (neon/cyber/vapor/kawaii/rainbow/chomp); an
-/// app registers its OWN at startup — a chomp sibling, a wand-private
-/// effect — via `register`, without modifying sill. Lookups fall back to
-/// the built-ins, so `spec(for:)` is a superset of `borderEffectFor`.
-/// This is the "extensible registry" half of the Q4-A decision (the
-/// per-surface motion is `ThemeMotion`).
-///
-/// `@MainActor` because apps register/read it from their main-thread
-/// startup; the stored `EffectSpec`s are themselves `Sendable`. No
-/// AppKit — a headless consumer can register + look up specs too.
-@MainActor
-public final class EffectRegistry {
-    public static let shared = EffectRegistry()
-    private var custom: [String: EffectSpec] = [:]
-    private init() {}
-
-    /// Register (or override) an effect by name (lowercased).
-    public func register(_ name: String, _ spec: EffectSpec) {
-        custom[name.lowercased()] = spec
-    }
-
-    /// Look up an effect: custom registrations first, then the built-ins.
-    /// `nil` for "off" / unknown.
-    public func spec(for name: String) -> EffectSpec? {
-        custom[name.lowercased()] ?? borderEffectFor(name)
-    }
-
-    /// Whether a name resolves to any effect (built-in or registered).
-    public func has(_ name: String) -> Bool { spec(for: name) != nil }
-
-    /// All concrete effect names known right now (built-ins + custom),
-    /// excluding the `random` / `off` meta-names.
-    public var names: [String] {
-        let builtin = canonicalEffectNames.filter { $0 != "random" && $0 != "off" }
-        return Array(Set(builtin).union(custom.keys)).sorted()
     }
 }
 
@@ -198,17 +157,20 @@ public func blendThrough(_ colors: [UInt32], at phase: Double)
 public struct AnimatedFrame {
     public let accent: NSColor
     public let accent2: NSColor
-    /// selFill keyed to the live accent (accent@0.22) for visible motion.
+    /// selFill keyed to the LIVE animated accent, at the theme's own
+    /// selFill alpha — the authored value (rainbow = 0.22) or the family
+    /// default 0.18, matching PaletteKit's static derive so the selected-
+    /// row wash doesn't jump when animation engages.
     public let selFill: NSColor
 }
 
-/// Cycle a theme to `phase` (0…1). A `cycles` effect (rainbow, and any
-/// custom cycling sibling) rotates the accent through the full spectrum;
-/// a flash effect (neon/cyber/vapor/kawaii/chomp) cycles through that
-/// effect's own flash palette (keeping its identity). Resolves the
-/// effect through `EffectRegistry` so app-registered siblings animate
-/// too. Returns nil for a non-animatable theme. `accent2` trails half a
-/// turn. Generalizes facet's `animatedPalette`.
+/// Cycle a theme to `phase` (0…1). A `cycles` effect (rainbow) rotates
+/// the accent through the full spectrum; a flash effect
+/// (neon/cyber/vapor/kawaii/chomp) cycles through that effect's own
+/// flash palette (keeping its identity). Resolves the effect by name
+/// through the built-in catalog (`borderEffectFor`). Returns nil for a
+/// non-animatable theme. `accent2` trails half a turn. Generalizes
+/// facet's `animatedPalette`.
 ///
 /// Callers blend the result into a fresh `ResolvedPalette` (or assign
 /// the three fields onto a copy) — Effects deliberately doesn't depend
@@ -216,7 +178,7 @@ public struct AnimatedFrame {
 /// `ResolvedPalette`, keeping the layer graph acyclic.
 @MainActor
 public func animatedPalette(theme name: String, at phase: CGFloat) -> AnimatedFrame? {
-    guard let fx = EffectRegistry.shared.spec(for: name) else { return nil }
+    guard let fx = borderEffectFor(name) else { return nil }
     let h = phase - floor(phase)
     let h2 = (h + 0.5).truncatingRemainder(dividingBy: 1)
 
@@ -235,51 +197,13 @@ public func animatedPalette(theme name: String, at phase: CGFloat) -> AnimatedFr
     } else {
         return nil
     }
+    // Honor the theme's AUTHORED selFill alpha (rainbow explicitly sets
+    // 0.22); otherwise the family default 0.18 — same value PaletteKit's
+    // static resolve derives, so the wash doesn't shift 0.18→0.22 the
+    // instant the animator engages.
+    let selAlpha = paletteFor(name).selFill.map { CGFloat($0.alpha) } ?? 0.18
     return AnimatedFrame(accent: accent, accent2: accent2,
-                         selFill: accent.withAlphaComponent(0.22))
-}
-
-// MARK: - ThemeMotion (per-surface signature motion)
-
-/// A theme that carries its OWN signature MOTION on an app's surface:
-/// wand's Pac-Man cursor trail, facet's tree flourish, halo's border
-/// ring. sill standardizes only the SHARED parts — the theme IDENTITY
-/// (`themeName`, so `theme = chomp` routes everywhere) and the per-phase
-/// animated COLORS (`frame(at:)`, so every app cycles identically off the
-/// same `EffectSpec`). The DRAWING stays app-side: each app conforms and
-/// renders into its own surface. Intentionally THIN — a surface-agnostic
-/// contract can't know about cursor trails vs tree rows, so sill owns
-/// identity + colour, the app owns geometry (this is the Q4-A "shared
-/// data + registry + motion protocol" boundary).
-@MainActor
-public protocol ThemeMotion {
-    /// The theme name this motion belongs to (e.g. "chomp"). Apps route
-    /// `theme = <name>` to the matching motion.
-    var themeName: String { get }
-    /// The shared effect whose flash/steady this motion cycles.
-    var effect: EffectSpec { get }
-    /// The animated colours at `phase` (0…1). Defaulted from the shared
-    /// `animatedPalette`, so conformers cycle identically for free.
-    func frame(at phase: CGFloat) -> AnimatedFrame
-}
-
-public extension ThemeMotion {
-    func frame(at phase: CGFloat) -> AnimatedFrame {
-        if let f = animatedPalette(theme: themeName, at: phase) { return f }
-        let steady = effectNSColor(effect.steady)
-        return AnimatedFrame(accent: steady, accent2: steady,
-                             selFill: steady.withAlphaComponent(0.22))
-    }
-}
-
-/// `NSColor` from `0xRRGGBB` — internal to Effects so it doesn't depend
-/// on PaletteKit (and doesn't clash with PaletteKit's public
-/// `NSColor(hex:)` when an app imports both modules).
-func effectNSColor(_ hex: UInt32, _ a: CGFloat = 1) -> NSColor {
-    NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
-            green:   CGFloat((hex >> 8)  & 0xFF) / 255,
-            blue:    CGFloat( hex        & 0xFF) / 255,
-            alpha:   a)
+                         selFill: accent.withAlphaComponent(selAlpha))
 }
 
 #endif

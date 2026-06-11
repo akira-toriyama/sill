@@ -1,6 +1,6 @@
 // Effects tests — the shared dynamic atom: EffectSpec catalog, pure
-// blendThrough, the extensible registry, and the ThemeMotion contract
-// (Q4-A). Pure parts need no AppKit; registry/motion are @MainActor.
+// blendThrough, and the AppKit animatedPalette. Pure parts need no
+// AppKit; animatedPalette is @MainActor.
 
 import XCTest
 import AppKit
@@ -47,21 +47,6 @@ final class EffectsTests: XCTestCase {
         XCTAssertEqual(c.b, 1, accuracy: 0.001)
     }
 
-    // --- Registry (extensible) ---
-
-    func testRegistryFallsBackToBuiltins() {
-        XCTAssertEqual(EffectRegistry.shared.spec(for: "neon")?.steady, 0x7AA2F7)
-        XCTAssertTrue(EffectRegistry.shared.has("chomp"))
-        XCTAssertFalse(EffectRegistry.shared.has("off"))
-    }
-
-    func testRegistryCustomRegistration() {
-        let sibling = EffectSpec(steady: 0x123456, flash: [0x111111, 0x222222])
-        EffectRegistry.shared.register("chomp-noir", sibling)
-        XCTAssertEqual(EffectRegistry.shared.spec(for: "chomp-noir")?.steady, 0x123456)
-        XCTAssertTrue(EffectRegistry.shared.names.contains("chomp-noir"))
-    }
-
     // --- Animated palette ---
 
     func testAnimatedFlashEffect() {
@@ -85,19 +70,16 @@ final class EffectsTests: XCTestCase {
         XCTAssertNil(animatedPalette(theme: "off", at: 0.5))
     }
 
-    // --- ThemeMotion contract ---
-
-    struct ChompTestMotion: ThemeMotion {
-        let themeName = "chomp"
-        let effect = EffectSpec.chomp
-    }
-
-    func testThemeMotionDefaultFrameCycles() {
-        let m = ChompTestMotion()
-        let f = m.frame(at: 0.0)
-        // default frame routes through animatedPalette → pellet yellow.
-        let s = f.accent.usingColorSpace(.sRGB)!
-        XCTAssertEqual(s.redComponent, 1, accuracy: 0.01)
-        XCTAssertEqual(s.greenComponent, CGFloat(0xEA) / 255, accuracy: 0.01)
+    /// GQ8: the animated selFill alpha must match the theme's static
+    /// selFill — 0.18 for the derived themes (neon), the authored 0.22 for
+    /// rainbow — so the selected-row wash doesn't jump when animation
+    /// engages, AND rainbow's explicit 0.22 is preserved.
+    func testAnimatedSelFillHonorsAuthoredAlpha() {
+        let neon = animatedPalette(theme: "neon", at: 0.3)!
+        XCTAssertEqual(neon.selFill.usingColorSpace(.sRGB)!.alphaComponent,
+                       0.18, accuracy: 0.001)
+        let rainbow = animatedPalette(theme: "rainbow", at: 0.3)!
+        XCTAssertEqual(rainbow.selFill.usingColorSpace(.sRGB)!.alphaComponent,
+                       0.22, accuracy: 0.001)
     }
 }
