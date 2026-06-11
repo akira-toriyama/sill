@@ -103,4 +103,71 @@ final class PaletteTests: XCTestCase {
         XCTAssertEqual(paletteFor("chomp").accent.rgb, 0xFFEA00)
         XCTAssertEqual(paletteFor("chomp").error.rgb, 0xFF0000)
     }
+
+    // MARK: - v2: bgMode
+
+    /// bgMode defaults from bg: nil → vibrancy, concrete → fixed.
+    func testBgModeDefaultsFromBg() {
+        XCTAssertEqual(ThemeSpec.system.bgMode, .vibrancy)     // bg nil
+        XCTAssertEqual(ThemeSpec.terminal.bgMode, .fixed)      // concrete bg
+        XCTAssertEqual(ThemeSpec.paper.bgMode, .fixed)
+    }
+
+    /// usesSystemColors is true for vibrancy + systemDynamic, false for fixed.
+    func testUsesSystemColors() {
+        XCTAssertTrue(ThemeSpec.system.usesSystemColors)       // vibrancy
+        XCTAssertFalse(ThemeSpec.terminal.usesSystemColors)    // fixed
+        let sysDyn = ThemeSpec(bg: HexColor(0x000000), text: HexColor(0x111111),
+            dim: HexColor(0x222222), accent: HexColor(systemAccentSentinel),
+            font: .menu, bgMode: .systemDynamic)
+        XCTAssertTrue(sysDyn.usesSystemColors)
+    }
+
+    /// tertiary is nil on every catalog preset (derive is the default).
+    func testTertiaryUnsetOnPresets() {
+        for n in canonicalThemeNames where n != "random" {
+            XCTAssertNil(paletteFor(n).tertiary, "\(n) should not author tertiary")
+        }
+    }
+
+    // MARK: - v2: parseColorToken (pure, opt-in)
+
+    func testParseColorTokenNamed() {
+        XCTAssertEqual(parseColorToken("red")?.rgb, 0xFF0000)
+        XCTAssertEqual(parseColorToken("  BLUE ")?.rgb, 0x0000FF)
+        XCTAssertEqual(parseColorToken("grey")?.rgb, 0x808080)
+        XCTAssertEqual(parseColorToken("gray")?.rgb, 0x808080)
+    }
+
+    func testParseColorTokenHexForms() {
+        XCTAssertEqual(parseColorToken("#9ECE6A")?.rgb, 0x9ECE6A)
+        XCTAssertEqual(parseColorToken("9ECE6A")?.rgb, 0x9ECE6A)   // # optional
+        XCTAssertEqual(parseColorToken("#abc")?.rgb, 0xAABBCC)     // 3-digit expand
+        let withA = parseColorToken("#11223344")                  // 8-digit
+        XCTAssertEqual(withA?.rgb, 0x112233)
+        XCTAssertEqual(withA?.alpha ?? -1, Double(0x44) / 255, accuracy: 0.001)
+    }
+
+    func testParseColorTokenRejectsGarbage() {
+        XCTAssertNil(parseColorToken(""))
+        XCTAssertNil(parseColorToken("notacolor"))
+        XCTAssertNil(parseColorToken("#12"))       // wrong length
+        XCTAssertNil(parseColorToken("#xyzxyz"))   // non-hex
+        XCTAssertNil(parseColorToken("accent"))    // semantic, not a literal
+    }
+
+    // MARK: - v2: contrast + pill alpha (pure)
+
+    func testBestForeground() {
+        XCTAssertEqual(HexColor(0xFFE000).bestForeground.rgb, 0x000000)  // light → black
+        XCTAssertEqual(HexColor(0x202060).bestForeground.rgb, 0xFFFFFF)  // dark → white
+    }
+
+    func testSuggestedPillAlphaMonotoneAndClamped() {
+        let darkA = suggestedPillAlpha(luminance: 0.05)
+        let lightA = suggestedPillAlpha(luminance: 0.95)
+        XCTAssertGreaterThan(darkA, lightA)            // darker → more opaque
+        XCTAssertGreaterThanOrEqual(lightA, 0.30)      // clamped floor
+        XCTAssertLessThanOrEqual(darkA, 0.92)          // clamped ceil
+    }
 }

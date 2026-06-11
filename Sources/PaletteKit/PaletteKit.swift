@@ -38,6 +38,11 @@ public struct ResolvedPalette {
     public let bg: NSColor?
     public let text: NSColor
     public let dim: NSColor
+    /// Third (least-emphasis) text tier. Resolved from `spec.tertiary`,
+    /// else derived (`text @ 0.55`, or `.tertiaryLabelColor` for
+    /// OS-ink themes). A promoted first-class field — read it as
+    /// `pal.tertiary` like the other roles.
+    public let tertiary: NSColor
     public let accent: NSColor
     public let accent2: NSColor
     public let divider: NSColor
@@ -53,14 +58,15 @@ public struct ResolvedPalette {
     public let forceDarkAqua: Bool
 
     public init(
-        bg: NSColor?, text: NSColor, dim: NSColor, accent: NSColor,
-        accent2: NSColor, divider: NSColor, hoverFill: NSColor,
-        selFill: NSColor, error: NSColor, font: FontKind,
-        bgAlpha: CGFloat?,
+        bg: NSColor?, text: NSColor, dim: NSColor, tertiary: NSColor,
+        accent: NSColor, accent2: NSColor, divider: NSColor,
+        hoverFill: NSColor, selFill: NSColor, error: NSColor,
+        font: FontKind, bgAlpha: CGFloat?,
         vibrancyMaterial: NSVisualEffectView.Material?,
         forceDarkAqua: Bool
     ) {
         self.bg = bg; self.text = text; self.dim = dim
+        self.tertiary = tertiary
         self.accent = accent; self.accent2 = accent2
         self.divider = divider; self.hoverFill = hoverFill
         self.selFill = selFill; self.error = error; self.font = font
@@ -68,12 +74,64 @@ public struct ResolvedPalette {
         self.vibrancyMaterial = vibrancyMaterial
         self.forceDarkAqua = forceDarkAqua
     }
+}
 
-    /// A faded variant of `text` for least-emphasis captions — the
-    /// shared "tertiary" tier between `text` and `dim`.
-    public func tertiary(_ alpha: CGFloat = 0.55) -> NSColor {
-        text.withAlphaComponent(alpha)
+// MARK: - Derived accessors (shared defaults; apps override per surface)
+
+public extension ResolvedPalette {
+    /// Which base ink an `ink(_:of:)` tint is rooted on.
+    enum InkRoot { case text, dim, accent }
+
+    /// A named alpha tier for the dominant per-surface-tint pattern. A
+    /// SHARED DEFAULT, not a complete solution: an app with finer needs
+    /// (facet's ~21 distinct stops) still tints at the draw site; `ink`
+    /// only de-dups the common 4-tier case.
+    enum InkTier {
+        case faint, subtle, wash, strong
+        public var alpha: CGFloat {
+            switch self {
+            case .faint:  return 0.06
+            case .subtle: return 0.16
+            case .wash:   return 0.30
+            case .strong: return 0.55
+            }
+        }
     }
+
+    /// An alpha-over tint of a base ink at a named tier. Alpha-over ONLY —
+    /// base+delta (perch) and blend-toward-white (facet) stay app-local.
+    func ink(_ tier: InkTier, of root: InkRoot = .text) -> NSColor {
+        let base: NSColor
+        switch root {
+        case .text:   base = text
+        case .dim:    base = dim
+        case .accent: base = accent
+        }
+        return base.withAlphaComponent(tier.alpha)
+    }
+
+    /// Foreground (black/white) that best contrasts the OPAQUE accent —
+    /// for text / icons drawn ON an accent fill. Rooted on the opaque
+    /// accent, NOT the selFill wash. Opt-in.
+    func onAccent(_ alpha: CGFloat = 1) -> NSColor {
+        bestContrast(on: accent).withAlphaComponent(alpha)
+    }
+
+    /// The hairline-stroke axis of `onAccent` (the contrast ink @ 0.4) —
+    /// for outlines on an accent fill. A second, distinct axis from the
+    /// text foreground.
+    var onAccentStroke: NSColor { onAccent(0.4) }
+}
+
+/// Black or white, whichever best contrasts `c` used as a fill. Uses the
+/// same `lightFillLuminanceThreshold` as the pure `HexColor.bestForeground`
+/// so the resolved-`NSColor` path (incl. OS controlAccent, whose hex the
+/// pure layer can't see) can't drift from a Palette-only consumer.
+@MainActor
+func bestContrast(on c: NSColor) -> NSColor {
+    let s = c.usingColorSpace(.sRGB) ?? c
+    let lum = 0.299 * s.redComponent + 0.587 * s.greenComponent + 0.114 * s.blueComponent
+    return Double(lum) >= lightFillLuminanceThreshold ? .black : .white
 }
 
 // MARK: - Derive recipe
@@ -109,26 +167,36 @@ public func resolve(
     forceDark: Bool? = nil
 ) -> ResolvedPalette {
 
-    // --- system preset: dynamic colors + vibrancy ---
-    if spec.bg == nil && spec.usesSystemAccent {
-        let bg = bgOverride.map { NSColor($0) }   // usually nil → vibrancy
+    // --- OS-dynamic inks: `.vibrancy` (no fill) or `.systemDynamic`
+    //     (concrete fill, live OS inks). Gate keys on bgMode, not on
+    //     `bg == nil`, so a concrete-bg-with-system-inks theme is now
+    //     expressible (the case the old gate dropped).
+    if spec.usesSystemColors {
+        // vibrancy: no opaque fill unless overridden. systemDynamic:
+        // the spec's concrete bg.
+        let bgHex = bgOverride ?? (spec.bgMode == .systemDynamic ? spec.bg : nil)
+        let tertiaryNS = spec.tertiary.map { NSColor($0) } ?? .tertiaryLabelColor
         return ResolvedPalette(
-            bg: bg,
+            bg: bgHex.map { NSColor($0) },
             text: .labelColor,
             dim: .secondaryLabelColor,
+            tertiary: tertiaryNS,
             accent: .controlAccentColor,
             accent2: .systemPurple,
             divider: NSColor.labelColor.withAlphaComponent(0.22),
             hoverFill: NSColor.secondaryLabelColor.withAlphaComponent(0.12),
-            selFill: NSColor.controlAccentColor.withAlphaComponent(0.22),
+            selFill: NSColor.controlAccentColor.withAlphaComponent(0.18),
             error: NSColor(spec.error),
             font: spec.font,
             bgAlpha: spec.bgAlpha.map { CGFloat($0) },
-            vibrancyMaterial: material ?? .underWindowBackground,
+            // Vibrancy needs a material; a concrete systemDynamic fill
+            // does not (no NSVisualEffectView). Don't start emitting a
+            // material for fixed/systemDynamic — the call site owns it.
+            vibrancyMaterial: spec.bgMode == .vibrancy ? (material ?? .underWindowBackground) : material,
             forceDarkAqua: forceDark ?? false)
     }
 
-    // --- concrete spec: apply derive recipe ---
+    // --- .fixed: authored static inks + derive recipe ---
     let accentNS: NSColor = spec.usesSystemAccent
         ? .controlAccentColor
         : NSColor(spec.accent)
@@ -146,6 +214,8 @@ public func resolve(
         ?? neutral.withAlphaComponent(0.05)
     let selNS: NSColor = spec.selFill.map { NSColor($0) }
         ?? accentNS.withAlphaComponent(0.18)
+    let tertiaryNS: NSColor = spec.tertiary.map { NSColor($0) }
+        ?? NSColor(spec.text).withAlphaComponent(0.55)
 
     let bgHex = bgOverride ?? spec.bg
     let bgNS: NSColor? = bgHex.map { NSColor($0) }
@@ -154,6 +224,7 @@ public func resolve(
         bg: bgNS,
         text: NSColor(spec.text),
         dim: NSColor(spec.dim),
+        tertiary: tertiaryNS,
         accent: accentNS,
         accent2: accent2NS,
         divider: dividerNS,

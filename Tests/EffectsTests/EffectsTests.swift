@@ -69,4 +69,17 @@ final class EffectsTests: XCTestCase {
         XCTAssertNil(animatedPalette(theme: "terminal", at: 0.5))
         XCTAssertNil(animatedPalette(theme: "off", at: 0.5))
     }
+
+    /// GQ8: the animated selFill alpha must match the theme's static
+    /// selFill — 0.18 for the derived themes (neon), the authored 0.22 for
+    /// rainbow — so the selected-row wash doesn't jump when animation
+    /// engages, AND rainbow's explicit 0.22 is preserved.
+    func testAnimatedSelFillHonorsAuthoredAlpha() {
+        let neon = animatedPalette(theme: "neon", at: 0.3)!
+        XCTAssertEqual(neon.selFill.usingColorSpace(.sRGB)!.alphaComponent,
+                       0.18, accuracy: 0.001)
+        let rainbow = animatedPalette(theme: "rainbow", at: 0.3)!
+        XCTAssertEqual(rainbow.selFill.usingColorSpace(.sRGB)!.alphaComponent,
+                       0.22, accuracy: 0.001)
+    }
 }

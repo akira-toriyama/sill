@@ -53,6 +53,26 @@ public enum FontKind: Sendable, Hashable, CaseIterable {
     case system, mono, rounded, menu
 }
 
+// MARK: - BgMode
+
+/// How a theme's background + base inks are sourced. Replaces the old
+/// `bg == nil && usesSystemAccent` resolve gate with an explicit mode so
+/// the real cases are distinct — and a case the old gate could not
+/// express (concrete fill BUT live OS inks) becomes representable.
+///
+///   * `.vibrancy`      — no opaque fill (`bg == nil`); an
+///     `NSVisualEffectView` shows through and the base inks come from the
+///     OS (label / secondaryLabel / controlAccent). The `system` preset.
+///   * `.fixed`         — a concrete authored `bg` with static authored
+///     inks. Every editor preset (terminal / nord / dracula / …).
+///   * `.systemDynamic` — a concrete authored `bg` BUT live OS inks
+///     (label / controlAccent), non-adaptive. perch's translucent system
+///     pill (a fixed dark fill whose accent tracks the OS) is the witness;
+///     unexpressible under the `bg == nil` gate.
+public enum BgMode: Sendable, Hashable, CaseIterable {
+    case vibrancy, fixed, systemDynamic
+}
+
 // MARK: - System sentinels
 
 /// `accent == systemAccentSentinel` (0) means "use the OS
@@ -98,6 +118,15 @@ public struct ThemeSpec: Sendable, Hashable {
     /// translucent pill and facet's opaque panel share one spec.
     public var bgAlpha: Double?
 
+    /// How `bg` + base inks are sourced. Defaults from `bg`: `.vibrancy`
+    /// when `bg == nil`, else `.fixed`. Set `.systemDynamic` for a
+    /// concrete fill that still wants live OS inks (perch's system pill).
+    public var bgMode: BgMode
+    /// Optional third text tier (least-emphasis captions). `nil` ⇒
+    /// PaletteKit derives `text @ 0.55` (or `.tertiaryLabelColor` when the
+    /// inks are OS-dynamic).
+    public var tertiary: HexColor?
+
     public init(
         bg: HexColor?,
         text: HexColor,
@@ -109,7 +138,9 @@ public struct ThemeSpec: Sendable, Hashable {
         divider: HexColor? = nil,
         hoverFill: HexColor? = nil,
         selFill: HexColor? = nil,
-        bgAlpha: Double? = nil
+        bgAlpha: Double? = nil,
+        bgMode: BgMode? = nil,
+        tertiary: HexColor? = nil
     ) {
         self.bg = bg
         self.text = text
@@ -122,10 +153,15 @@ public struct ThemeSpec: Sendable, Hashable {
         self.hoverFill = hoverFill
         self.selFill = selFill
         self.bgAlpha = bgAlpha
+        self.bgMode = bgMode ?? (bg == nil ? .vibrancy : .fixed)
+        self.tertiary = tertiary
     }
 
     /// True when `accent` is the OS-control-accent sentinel.
     public var usesSystemAccent: Bool { accent.rgb == systemAccentSentinel }
+    /// True when base inks should come from the OS rather than the spec
+    /// (`.vibrancy` or `.systemDynamic`). Drives PaletteKit's resolve gate.
+    public var usesSystemColors: Bool { bgMode != .fixed }
     /// True when `bg` is treated as light by the derive recipe.
     /// `nil` bg (vibrancy) is treated as dark.
     public var isLight: Bool { (bg?.luminance ?? 0) > 0.5 }
@@ -369,4 +405,74 @@ public func paletteFor(_ raw: String) -> ThemeSpec {
         return paletteFor(pool.randomElement() ?? "terminal")
     default:           return .terminal
     }
+}
+
+// MARK: - Contrast (shared value logic, pure)
+
+/// Luminance at/above which a fill reads as "light" and wants a DARK
+/// foreground. Single source so PaletteKit's NSColor `onAccent` and a
+/// pure (Palette-only) consumer like perch can't drift apart.
+public let lightFillLuminanceThreshold: Double = 0.6
+
+public extension HexColor {
+    /// Black or white — whichever best contrasts THIS color used as a
+    /// fill. The pure half of `onAccent`; PaletteKit reuses the same
+    /// threshold for the resolved-`NSColor` (incl. OS controlAccent) case.
+    var bestForeground: HexColor {
+        luminance >= lightFillLuminanceThreshold ? HexColor(0x000000) : HexColor(0xFFFFFF)
+    }
+}
+
+// MARK: - Color-token parsing (pure, opt-in)
+
+/// Parse a config-edge color token into a `HexColor`, or `nil` if it
+/// isn't a recognized literal. Accepts a small named-color set plus
+/// `#rgb` / `#rrggbb` / `#rrggbbaa` (the leading `#` optional). Opt-in:
+/// an app wanting a stricter grammar (halo's 6-digit-only) keeps its own
+/// parser; this lets wand dedup its token grammar. Semantic tokens like
+/// `accent` / `system` are NOT handled here — they are app-level
+/// sentinels, not literal colors.
+public func parseColorToken(_ raw: String) -> HexColor? {
+    let s = raw.trimmingCharacters(in: .whitespaces).lowercased()
+    guard !s.isEmpty else { return nil }
+
+    let named: [String: UInt32] = [
+        "black": 0x000000, "white": 0xFFFFFF, "red": 0xFF0000,
+        "green": 0x00FF00, "blue": 0x0000FF, "yellow": 0xFFFF00,
+        "orange": 0xFFA500, "purple": 0x800080, "pink": 0xFFC0CB,
+        "cyan": 0x00FFFF, "magenta": 0xFF00FF,
+        "gray": 0x808080, "grey": 0x808080,
+    ]
+    if let rgb = named[s] { return HexColor(rgb) }
+
+    var hex = s
+    if hex.hasPrefix("#") { hex.removeFirst() }
+    guard !hex.isEmpty, hex.allSatisfy({ $0.isHexDigit }) else { return nil }
+
+    switch hex.count {
+    case 3:   // #rgb → #rrggbb
+        let c = Array(hex)
+        guard let v = UInt32(String([c[0], c[0], c[1], c[1], c[2], c[2]]), radix: 16)
+        else { return nil }
+        return HexColor(v)
+    case 6:
+        guard let v = UInt32(hex, radix: 16) else { return nil }
+        return HexColor(v)
+    case 8:   // #rrggbbaa
+        guard let v = UInt32(hex, radix: 16) else { return nil }
+        return HexColor((v >> 8) & 0xFF_FFFF, Double(v & 0xFF) / 255)
+    default:
+        return nil
+    }
+}
+
+// MARK: - Pill alpha suggestion (pure, opt-in)
+
+/// A suggested translucent-pill background alpha for a theme of the given
+/// `bg` luminance — darker themes get a more opaque pill. Opt-in: perch
+/// MAY call this instead of hand-maintaining its per-preset table; it is
+/// NOT applied by the derive recipe (a nil `bgAlpha` still means opaque).
+public func suggestedPillAlpha(luminance: Double) -> Double {
+    let a = 0.92 - luminance * 0.55      // dark ≈ 0.92 … light ≈ 0.37
+    return min(0.92, max(0.30, a))
 }

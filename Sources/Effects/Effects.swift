@@ -157,7 +157,10 @@ public func blendThrough(_ colors: [UInt32], at phase: Double)
 public struct AnimatedFrame {
     public let accent: NSColor
     public let accent2: NSColor
-    /// selFill keyed to the live accent (accent@0.22) for visible motion.
+    /// selFill keyed to the LIVE animated accent, at the theme's own
+    /// selFill alpha — the authored value (rainbow = 0.22) or the family
+    /// default 0.18, matching PaletteKit's static derive so the selected-
+    /// row wash doesn't jump when animation engages.
     public let selFill: NSColor
 }
 
@@ -194,8 +197,13 @@ public func animatedPalette(theme name: String, at phase: CGFloat) -> AnimatedFr
     } else {
         return nil
     }
+    // Honor the theme's AUTHORED selFill alpha (rainbow explicitly sets
+    // 0.22); otherwise the family default 0.18 — same value PaletteKit's
+    // static resolve derives, so the wash doesn't shift 0.18→0.22 the
+    // instant the animator engages.
+    let selAlpha = paletteFor(name).selFill.map { CGFloat($0.alpha) } ?? 0.18
     return AnimatedFrame(accent: accent, accent2: accent2,
-                         selFill: accent.withAlphaComponent(0.22))
+                         selFill: accent.withAlphaComponent(selAlpha))
 }
 
 #endif
