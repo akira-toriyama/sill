@@ -42,6 +42,12 @@ let package = Package(
         // Dynamic atom: Sendable EffectSpec + (macOS) AppKit animator.
         .target(name: "Effects", dependencies: ["Palette"]),
 
+        // `still` — the theme PREVIEW app. The one place in sill with a
+        // config.toml. Renders every catalog theme (all roles + font +
+        // its OWN mock chrome specimens — never imports an app's View, so
+        // no drift debt). The visual verification bench for the catalog.
+        .executableTarget(name: "still", dependencies: ["Palette", "PaletteKit", "Effects"]),
+
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit"]),
         .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette"]),

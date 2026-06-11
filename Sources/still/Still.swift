@@ -1,0 +1,74 @@
+// still — the sill theme PREVIEW app.
+//
+// The one executable in sill, and the one place with a `config.toml`.
+// It renders every catalog theme: all resolved roles as swatches, a font
+// specimen, the effect flash palette, and a row of MOCK chrome (a fake
+// perch pill / facet tree / wand tome / glance markdown) drawn ENTIRELY
+// inside still — it never imports an app's View layer, so the preview
+// can't drift from the apps and the apps never depend on still.
+//
+// Run it:  swift run still      (reads ./still.toml if present)
+//
+// An AppKit bootstrap (not the SwiftUI `App` lifecycle) so a terminal
+// `swift run` reliably shows + activates a window without an .app bundle.
+
+import AppKit
+import SwiftUI
+
+@main
+enum Still {
+    static func main() {
+        let config = StillConfig.load()
+        let app = NSApplication.shared
+        app.setActivationPolicy(.regular)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1120, height: 820),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered, defer: false)
+        window.title = "still — sill theme preview"
+        window.center()
+        window.contentView = NSHostingView(rootView: Gallery(config: config))
+        window.makeKeyAndOrderFront(nil)
+
+        app.activate(ignoringOtherApps: true)
+        app.run()
+    }
+}
+
+// MARK: - Config (still-local minimal TOML reader)
+
+/// still's tiny config. NOT a general TOML parser — just `key = value`
+/// lines (so the library modules stay parser-free). Looks for
+/// `$STILL_CONFIG` then `./still.toml`; missing file ⇒ defaults.
+struct StillConfig {
+    /// `"all"` = the full gallery, or a single canonical theme name.
+    var theme: String = "all"
+    /// Specimen text scale.
+    var fontScale: CGFloat = 1.0
+    /// Show the effect flash palette strip for animatable themes.
+    var showEffects: Bool = true
+
+    static func load() -> StillConfig {
+        var c = StillConfig()
+        let path = ProcessInfo.processInfo.environment["STILL_CONFIG"]
+            ?? FileManager.default.currentDirectoryPath + "/still.toml"
+        guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return c }
+
+        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: true) {
+            var line = Substring(rawLine)
+            if let hash = line.firstIndex(of: "#") { line = line[..<hash] }
+            guard let eq = line.firstIndex(of: "=") else { continue }
+            let key = line[..<eq].trimmingCharacters(in: .whitespaces).lowercased()
+            var val = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+            val = val.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            switch key {
+            case "theme":        if !val.isEmpty { c.theme = val.lowercased() }
+            case "font-scale":   if let d = Double(val) { c.fontScale = CGFloat(d) }
+            case "show-effects": c.showEffects = (val.lowercased() == "true")
+            default: break
+            }
+        }
+        return c
+    }
+}
