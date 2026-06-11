@@ -1,6 +1,6 @@
 // Pure-spec tests — no AppKit. Validate HexColor math, the lean
 // store/derive split (dark presets omit the trio; light/special store
-// it), sentinels, and name resolution.
+// it), sentinels, and name resolution against the Phase V catalog.
 
 import XCTest
 @testable import Palette
@@ -27,67 +27,77 @@ final class PaletteTests: XCTestCase {
     }
 
     func testLuminanceDarkVsLight() {
-        XCTAssertLessThan(HexColor(0x0E0F14).luminance, 0.5)    // terminal bg
-        XCTAssertGreaterThan(HexColor(0xFFF1F6).luminance, 0.5) // cute bg
+        XCTAssertLessThan(HexColor(0x050805).luminance, 0.5)    // terminal bg
+        XCTAssertGreaterThan(HexColor(0xFFFFFF).luminance, 0.5) // github-light bg
     }
 
     func testIsLight() {
         XCTAssertFalse(ThemeSpec.terminal.isLight)
-        XCTAssertTrue(ThemeSpec.cute.isLight)
-        XCTAssertTrue(ThemeSpec.paper.isLight)
+        XCTAssertTrue(ThemeSpec.githubLight.isLight)
+        XCTAssertTrue(ThemeSpec.catppuccinLatte.isLight)
         XCTAssertFalse(ThemeSpec.system.isLight)   // nil bg → treated dark
     }
 
-    /// Lean core: the 15 dark editor presets store NONE of the trio —
+    /// Lean core: the dark editor presets store NONE of the trio —
     /// PaletteKit derives them. (Regression guard: if someone "fills
     /// them in", the lean contract silently breaks.)
     func testDarkPresetsOmitTrio() {
         let dark: [ThemeSpec] = [
-            .terminal, .nord, .dracula, .gruvbox, .catppuccin, .rosepine,
-            .everforest, .solarized, .onedark, .monokai, .hacker, .monotone,
-            .neon, .cyber, .vapor,
+            .terminal, .cobalt2, .shadesOfPurple, .tokyoHack,
+            .githubDark, .dracula, .catppuccinMocha, .gruvbox,
         ]
         for s in dark {
-            XCTAssertNil(s.divider)
-            XCTAssertNil(s.hoverFill)
-            XCTAssertNil(s.selFill)
+            XCTAssertNil(s.border)
+            XCTAssertNil(s.hover)
+            XCTAssertNil(s.selection)
         }
     }
 
-    /// Light / monochrome / special presets DO store the trio (they
-    /// deviate from the dark-ink recipe).
+    /// Light / special presets DO store the trio (they deviate from the
+    /// dark-ink recipe).
     func testSpecialPresetsStoreTrio() {
-        for s in [ThemeSpec.cute, .paper, .kawaii, .monoLight, .monoDark, .rainbow] {
-            XCTAssertNotNil(s.divider)
-            XCTAssertNotNil(s.hoverFill)
-            XCTAssertNotNil(s.selFill)
+        for s in [ThemeSpec.githubLight, .catppuccinLatte, .rainbow] {
+            XCTAssertNotNil(s.border)
+            XCTAssertNotNil(s.hover)
+            XCTAssertNotNil(s.selection)
         }
     }
 
     func testSystemSentinel() {
-        XCTAssertTrue(ThemeSpec.system.usesSystemAccent)
-        XCTAssertNil(ThemeSpec.system.bg)
-        XCTAssertFalse(ThemeSpec.terminal.usesSystemAccent)
+        XCTAssertTrue(ThemeSpec.system.usesSystemPrimary)
+        XCTAssertNil(ThemeSpec.system.background)
+        XCTAssertFalse(ThemeSpec.terminal.usesSystemPrimary)
     }
 
+    /// A preset without an error override falls back to the canonical red.
     func testErrorDefaultsToCanonicalRed() {
-        XCTAssertEqual(ThemeSpec.terminal.error.rgb, defaultErrorHex)
+        XCTAssertEqual(ThemeSpec.gruvbox.error.rgb, defaultErrorHex)
         XCTAssertEqual(defaultErrorHex, 0xEF4444)
     }
 
-    func testFacetAuthoritativeHex() {
-        // Q1: facet's hex is canonical for the drifted house themes.
-        XCTAssertEqual(ThemeSpec.terminal.accent.rgb, 0x9ECE6A)
-        XCTAssertEqual(ThemeSpec.terminal.text.rgb,   0xC0CAF5)
-        XCTAssertEqual(ThemeSpec.hacker.accent.rgb,   0x33FF66)  // not perch's 0x00FF41
-        XCTAssertEqual(ThemeSpec.hacker.bg?.rgb,      0x0A0F0A)  // not perch's 0x000000
+    /// The blessed Phase V catalog hex (regression guard against drift).
+    func testCatalogAuthoritativeHex() {
+        XCTAssertEqual(ThemeSpec.terminal.primary.rgb,     0x33FF66)  // green-on-black
+        XCTAssertEqual(ThemeSpec.terminal.foreground.rgb,  0x9BFEDA)
+        XCTAssertEqual(ThemeSpec.terminal.background?.rgb,  0x050805)
+        XCTAssertEqual(ThemeSpec.dracula.background?.rgb,   0x282A36) // carry-forward
+        XCTAssertEqual(ThemeSpec.dracula.primary.rgb,       0xBD93F9)
+        XCTAssertEqual(ThemeSpec.dracula.secondary?.rgb,    0xFF79C6) // brand pink
     }
 
     func testPaletteForCaseInsensitiveAndFallback() {
-        XCTAssertEqual(paletteFor("nord").accent.rgb, 0x88C0D0)
-        XCTAssertEqual(paletteFor("NORD").accent.rgb, 0x88C0D0)
-        XCTAssertEqual(paletteFor("no-such-theme").accent.rgb,
-                       ThemeSpec.terminal.accent.rgb)
+        XCTAssertEqual(paletteFor("dracula").primary.rgb, 0xBD93F9)
+        XCTAssertEqual(paletteFor("DRACULA").primary.rgb, 0xBD93F9)
+        XCTAssertEqual(paletteFor("no-such-theme").primary.rgb,
+                       ThemeSpec.terminal.primary.rgb)
+    }
+
+    /// Hyphenated canonical names map to their concrete spec.
+    func testHyphenatedNamesResolve() {
+        XCTAssertEqual(paletteFor("shades-of-purple").primary.rgb, 0xFAD000)
+        XCTAssertEqual(paletteFor("tokyo-hack").primary.rgb,       0xE84B3C)
+        XCTAssertEqual(paletteFor("github-dark").primary.rgb,      0x2F81F7)
+        XCTAssertEqual(paletteFor("catppuccin-latte").primary.rgb, 0x8839EF)
     }
 
     func testEveryCanonicalNameResolves() {
@@ -99,27 +109,28 @@ final class PaletteTests: XCTestCase {
 
     func testChompIsCanonicalCrossAppTheme() {
         XCTAssertTrue(canonicalThemeNames.contains("chomp"))
-        XCTAssertEqual(paletteFor("chomp").bg?.rgb, 0x000000)
-        XCTAssertEqual(paletteFor("chomp").accent.rgb, 0xFFEA00)
+        XCTAssertEqual(paletteFor("chomp").background?.rgb, 0x000000)
+        XCTAssertEqual(paletteFor("chomp").primary.rgb, 0xFFEA00)
         XCTAssertEqual(paletteFor("chomp").error.rgb, 0xFF0000)
     }
 
-    // MARK: - v2: bgMode
+    // MARK: - backgroundMode
 
-    /// bgMode defaults from bg: nil → vibrancy, concrete → fixed.
-    func testBgModeDefaultsFromBg() {
-        XCTAssertEqual(ThemeSpec.system.bgMode, .vibrancy)     // bg nil
-        XCTAssertEqual(ThemeSpec.terminal.bgMode, .fixed)      // concrete bg
-        XCTAssertEqual(ThemeSpec.paper.bgMode, .fixed)
+    /// backgroundMode defaults from background: nil → vibrancy, concrete → fixed.
+    func testBackgroundModeDefaultsFromBackground() {
+        XCTAssertEqual(ThemeSpec.system.backgroundMode, .vibrancy)     // bg nil
+        XCTAssertEqual(ThemeSpec.terminal.backgroundMode, .fixed)      // concrete bg
+        XCTAssertEqual(ThemeSpec.githubLight.backgroundMode, .fixed)
     }
 
     /// usesSystemColors is true for vibrancy + systemDynamic, false for fixed.
     func testUsesSystemColors() {
         XCTAssertTrue(ThemeSpec.system.usesSystemColors)       // vibrancy
         XCTAssertFalse(ThemeSpec.terminal.usesSystemColors)    // fixed
-        let sysDyn = ThemeSpec(bg: HexColor(0x000000), text: HexColor(0x111111),
-            dim: HexColor(0x222222), accent: HexColor(systemAccentSentinel),
-            font: .menu, bgMode: .systemDynamic)
+        let sysDyn = ThemeSpec(
+            background: HexColor(0x000000), foreground: HexColor(0x111111),
+            muted: HexColor(0x222222), primary: HexColor(systemPrimarySentinel),
+            font: .menu, backgroundMode: .systemDynamic)
         XCTAssertTrue(sysDyn.usesSystemColors)
     }
 
@@ -130,7 +141,7 @@ final class PaletteTests: XCTestCase {
         }
     }
 
-    // MARK: - v2: parseColorToken (pure, opt-in)
+    // MARK: - parseColorToken (pure, opt-in)
 
     func testParseColorTokenNamed() {
         XCTAssertEqual(parseColorToken("red")?.rgb, 0xFF0000)
@@ -153,10 +164,10 @@ final class PaletteTests: XCTestCase {
         XCTAssertNil(parseColorToken("notacolor"))
         XCTAssertNil(parseColorToken("#12"))       // wrong length
         XCTAssertNil(parseColorToken("#xyzxyz"))   // non-hex
-        XCTAssertNil(parseColorToken("accent"))    // semantic, not a literal
+        XCTAssertNil(parseColorToken("primary"))   // semantic, not a literal
     }
 
-    // MARK: - v2: contrast + pill alpha (pure)
+    // MARK: - contrast + pill alpha (pure)
 
     func testBestForeground() {
         XCTAssertEqual(HexColor(0xFFE000).bestForeground.rgb, 0x000000)  // light → black

@@ -12,8 +12,8 @@ import Effects      // dynamic, color-only — EffectSpec, animated themes
 
 | module | what | layer |
 |---|---|---|
-| `Palette` | `HexColor` · `FontKind` · `BgMode` · `ThemeSpec` · presets · `paletteFor` · `parseColorToken` | pure (any `*Core`) |
-| `PaletteKit` | `resolve` + derive recipe · `pal` · `ink`/`onAccent` · `uiFont` · `NSColor(hex:)` | AppKit / `@MainActor` |
+| `Palette` | `HexColor` · `FontKind` · `BackgroundMode` · `ThemeSpec` · presets · `paletteFor` · `parseColorToken` | pure (any `*Core`) |
+| `PaletteKit` | `resolve` + derive recipe · `pal` · `ink`/`onPrimary` · `uiFont` · `NSColor(hex:)` | AppKit / `@MainActor` |
 | `Effects` | `EffectSpec` · `borderEffectFor` · `blendThrough` · `animatedPalette` | dynamic atom (color-only) |
 
 A consumer that depends on **only `Palette`** links zero AppKit.
@@ -23,8 +23,8 @@ per-app migration plan.
 
 > Part of plan **atelier** — exists so "facet の theme 真似て" never has to
 > be said twice. Status: shipped into facet (#189) + perch (#108) on `0.1.0`;
-> `ThemeSpec v2` (bgMode + tertiary + derive accessors) on branch
-> `feat/theme-spec-v2` toward `0.2.0`.
+> `ThemeSpec v2` shipped on `0.2.0`. Phase V (Tailwind-style role names +
+> 12-theme catalog rebuild) on branch `feat/phase-v-catalog`.
 
 ## Build
 

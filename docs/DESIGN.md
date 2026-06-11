@@ -9,9 +9,11 @@ for one reason — the **north star**:
 
 This is the first module of plan **atelier** (lib = `sill`, dev workbench
 = `bench`). Status: **shipped into facet (#189) + perch (#108) on tag
-`0.1.0`. `ThemeSpec v2` (Phase T) implemented on branch `feat/theme-spec-v2`
-toward `0.2.0`; builds + 34-check runtime smoke ALL PASS.** See
-§4b for the v2 locked decisions.
+`0.1.0`. `ThemeSpec v2` (Phase T) shipped on `0.2.0`. Phase V (value
+redesign) — role names renamed to a Tailwind-style vocabulary +
+catalog 0-base rebuilt to 12 blessed themes — on branch
+`feat/phase-v-catalog`; `swift build` clean.** See §4b for the Phase T
+decisions and **§4c for the Phase V rename + catalog**.
 
 ---
 
@@ -39,11 +41,14 @@ AppKit** — that is what lets perch's pure `PerchCore` use the spec.
 
 | app | imports | from layer |
 |---|---|---|
-| facet | Palette + PaletteKit + Effects | View (`pal.text`…) |
+| facet | Palette + PaletteKit + Effects | View (`pal.foreground`…) |
 | perch | Palette (Core) + PaletteKit + Effects (Adapter) | the split it already invented |
 | wand | Palette + PaletteKit + Effects | adapter |
 | halo | Palette + Effects (+ PaletteKit if it adds chrome) | the ring |
-| glance | PaletteKit (bg/text/accent now; Effects later) | panel |
+| glance | PaletteKit (background/foreground/primary now; Effects later) | panel |
+
+*(sill role names shown; each app's view call sites adopt them at migration —
+until then an un-migrated app pinned to `0.1.0` keeps the old `pal.text`/`pal.accent` spelling.)*
 | chord | — | headless, zero need |
 
 **Why not one module / monorepo:** see plan-atelier. Pure↔AppKit must be
@@ -53,74 +58,73 @@ separable (perch); `1 repo = 1 version` is SwiftPM's grain.
 
 ## 2. ThemeSpec — the static palette (lean core + derive)
 
-The pure spec. Authors set **~6-7 fields**; PaletteKit derives the rest.
+The pure spec. Authors set **4 required hues + font**; PaletteKit derives
+the rest.
 
-**v2 (Phase T, 2026-06-11)** = the 0.1.0 shape **+ `bgMode` + `tertiary`,
-zero removals** (the first-pass "demote dim/font to derived" was a baseline
-misread — 16 presets author distinct `dim` hues — and was reversed).
+**Role names follow a Tailwind-style semantic vocabulary** (Phase V,
+2026-06-11): `background / foreground / muted / primary / secondary /
+border / hover / selection / backgroundAlpha / backgroundMode`. The shape
+is the Phase T v2 shape with **zero structural change — names only**.
 
 ```swift
 public struct ThemeSpec: Sendable, Hashable {
-    public var bg: HexColor?     // nil = vibrancy fall-through
-    public var text: HexColor    // REQUIRED
-    public var dim: HexColor     // REQUIRED, non-derived (16 presets author it)
-    public var accent: HexColor  // rgb == 0 ⇒ OS control-accent (sentinel)
-    public var error: HexColor   // defaulted 0xEF4444 (perch miss == wand no-match)
-    public var font: FontKind    // REQUIRED — system | mono | rounded | menu
+    public var background: HexColor?  // nil = vibrancy fall-through
+    public var foreground: HexColor   // REQUIRED — primary text ink
+    public var muted: HexColor        // REQUIRED — secondary text / comments
+    public var primary: HexColor      // REQUIRED — signature accent (rgb 0 ⇒ OS)
+    public var error: HexColor        // defaulted 0xEF4444 (perch miss == wand no-match)
+    public var font: FontKind         // REQUIRED — system | mono | rounded | menu
 
-    public var accent2: HexColor?    // nil ⇒ derived complement
-    public var divider: HexColor?    // nil ⇒ derived neutral @ 0.10
-    public var hoverFill: HexColor?  // nil ⇒ derived neutral @ 0.05
-    public var selFill: HexColor?    // nil ⇒ derived accent @ 0.18
-    public var bgAlpha: Double?      // nil ⇒ opaque (perch pill vs facet panel)
-    public var bgMode: BgMode        // NEW — vibrancy | fixed | systemDynamic
-    public var tertiary: HexColor?   // NEW — nil ⇒ derived text@0.55 / OS tertiary
+    public var secondary: HexColor?       // nil ⇒ derived complement
+    public var border: HexColor?          // nil ⇒ derived neutral @ 0.10
+    public var hover: HexColor?           // nil ⇒ derived neutral @ 0.05
+    public var selection: HexColor?       // nil ⇒ derived primary @ 0.18
+    public var backgroundAlpha: Double?   // nil ⇒ opaque (perch pill vs facet panel)
+    public var backgroundMode: BackgroundMode  // vibrancy | fixed | systemDynamic
+    public var tertiary: HexColor?        // nil ⇒ derived foreground@0.55 / OS tertiary
 }
 ```
 
 13 stored fields. Colors are a pure `HexColor { rgb: UInt32; alpha: Double }`
 value type (no CoreGraphics → portable + Sendable). `FontKind` adds `.menu`
-(wand's native menu typeface). `bgMode` defaults from `bg` (nil → `.vibrancy`,
-else `.fixed`); **`.systemDynamic`** is the new case = a concrete fill with
-live OS inks (perch's system pill) — the case the old `bg == nil` gate could
-not express.
+(wand's native menu typeface). `backgroundMode` defaults from `background`
+(nil → `.vibrancy`, else `.fixed`); **`.systemDynamic`** is a concrete fill
+with live OS inks (perch's system pill) — the case the old
+`background == nil` gate could not express.
 
-### The derive recipe (PaletteKit) — reproduces facet exactly
-
-Verified at runtime against all facet presets (34-check smoke ALL PASS):
+### The derive recipe (PaletteKit)
 
 ```
-inks source  = bgMode == .fixed            →  authored spec inks
-             = .vibrancy / .systemDynamic  →  OS inks (label / controlAccent)
-neutral ink  = (bg luminance < 0.5  →  white  :  black)   // nil bg = dark
-divider      = override ?? neutral @ 0.10
-hoverFill    = override ?? neutral @ 0.05
-selFill      = override ?? accent  @ 0.18   // static AND animated (unified)
-accent2      = override ?? complement(accent)            // grey for sat < 0.05
-tertiary     = override ?? (OS .tertiaryLabelColor / text @ 0.55)   // now a FIELD
+inks source  = backgroundMode == .fixed         →  authored spec inks
+             = .vibrancy / .systemDynamic        →  OS inks (label / controlAccent)
+neutral ink  = (background luminance < 0.5 → white : black)   // nil bg = dark
+border       = override ?? neutral  @ 0.10
+hover        = override ?? neutral  @ 0.05
+selection    = override ?? primary  @ 0.18   // static AND animated (unified)
+secondary    = override ?? complement(primary)           // grey for sat < 0.05
+tertiary     = override ?? (OS .tertiaryLabelColor / foreground @ 0.55)
 ```
 
-The resolve **gate keys on `bgMode`** (not `bg == nil && usesSystemAccent`).
-`tertiary` is a first-class resolved field (`pal.tertiary`), promoted from
-the old method. `selFill` is **unified to 0.18 across the static and animated
-paths** (the animator previously hardcoded 0.22, shifting facet's selected
-row when animation engaged); rainbow's authored `accent@0.22` is preserved.
+The resolve **gate keys on `backgroundMode`** (not
+`background == nil && usesSystemPrimary`). `tertiary` is a first-class
+resolved field (`pal.tertiary`). `selection` is **unified to 0.18 across the
+static and animated paths**; rainbow's authored `primary@0.22` is preserved.
 
-- **15 dark editor presets store NO trio** — derived bit-for-bit
-  (terminal/nord/dracula/gruvbox/catppuccin/rosepine/everforest/solarized/
-  onedark/monokai/hacker/monotone/neon/cyber/vapor).
-- **7 store explicit overrides** because they deviate:
-  cute · kawaii (accent-tinted, light) · paper · mono-light · mono-dark ·
-  rainbow · system (dynamic colors, special-cased in `resolve`).
+The Phase V catalog (§4c) is **lean**:
 
-> ⚠️ The first synthesis proposed `divider = text@0.12 / hover = accent@0.10`.
-> A triple-check against the real presets found that wrong — facet uses
-> **neutral ink** (white-on-dark / black-on-light) @ 0.10 / 0.05. The recipe
-> above is the corrected, verified one.
+- **8 dark editor presets store NO trio** — derived from their dark bg
+  (terminal/cobalt2/shades-of-purple/tokyo-hack/github-dark/dracula/
+  catppuccin-mocha/gruvbox).
+- **chomp** stores `border` + `selection` (arcade hues), `hover` derives.
+- **rainbow / github-light / catppuccin-latte** store the full trio
+  (light/special — the dark-ink recipe would derive wrong).
+- **system** resolves dynamic OS colors (special-cased in `resolve`).
 
 `pal` stays a short `@MainActor` module-level var (facet's invariant) —
-now owned by PaletteKit as a `ResolvedPalette` with the **same field
-names**, so view call sites (`pal.text` / `pal.accent` / …) don't change.
+owned by PaletteKit as a `ResolvedPalette`. The role **fields are renamed**
+(Phase V), so migrating apps update view call sites (`pal.text` →
+`pal.foreground`, `pal.accent` → `pal.primary`, …) at migration time; apps
+pinned to `0.1.0` are untouched until they bump.
 
 ---
 
@@ -211,14 +215,17 @@ extension model**.
 
 ### New surface (v2)
 
-- **`ThemeSpec`**: `+ bgMode: BgMode`, `+ tertiary: HexColor?`,
+*(role names shown below are the Phase V names — see §4c. Phase T shipped
+these under the older `bg/text/dim/accent` spelling.)*
+
+- **`ThemeSpec`**: `+ backgroundMode: BackgroundMode`, `+ tertiary: HexColor?`,
   `+ usesSystemColors`.
 - **pure `Palette`** (link-safe for PerchCore): `parseColorToken`,
   `suggestedPillAlpha(luminance:)`, `HexColor.bestForeground`,
   `lightFillLuminanceThreshold`.
 - **`ResolvedPalette`** (AppKit): `tertiary` (now a stored field),
   `ink(_:of:)` with `InkTier{faint,subtle,wash,strong}` ×
-  `InkRoot{text,dim,accent}`, `onAccent(_:)`, `onAccentStroke`.
+  `InkRoot{foreground,muted,primary}`, `onPrimary(_:)`, `onPrimaryStroke`.
 
 ### Extension model (the hybrid)
 
@@ -241,16 +248,79 @@ the common alpha case only.
 
 ---
 
+## 4c. Phase V — role rename + catalog rebuild (grill complete, 2026-06-11)
+
+A 0-base value redesign: rename the roles to a Tailwind-style semantic
+vocabulary, then rebuild the catalog — retiring the drifted/duplicate
+presets (the 17 listed below) — down to **12 blessed themes + `system`**
+(web-researched + 4-axis adversarially verified, Tommy-blessed).
+Structural shape unchanged — names + values only.
+
+### Role rename (Q1/Q2 — locked)
+
+| old (Phase T) | new (Phase V) | | old | new |
+|---|---|---|---|---|
+| `bg` | `background` | | `accent2` | `secondary` |
+| `text` | `foreground` | | `divider` | `border` |
+| `dim` | `muted` | | `hoverFill` | `hover` |
+| `accent` | `primary` | | `selFill` | `selection` |
+| `error` | `error` (kept) | | `bgAlpha` | `backgroundAlpha` |
+| `font` | `font` (kept) | | `bgMode` | `backgroundMode` |
+| `tertiary` | `tertiary` (kept) | | `BgMode` | `BackgroundMode` |
+
+Accessors follow: `onAccent`→`onPrimary`, `onAccentStroke`→`onPrimaryStroke`,
+`InkRoot{text,dim,accent}`→`{foreground,muted,primary}`,
+`usesSystemAccent`→`usesSystemPrimary`,
+`systemAccentSentinel`→`systemPrimarySentinel`. The module var **`pal`
+keeps its name** (facet invariant); only its fields rename.
+
+### The 12-theme catalog (+ system)
+
+| theme | axis | bg | fg | primary | secondary |
+|---|---|---|---|---|---|
+| terminal | favorite (green-on-black; merges old `hacker`) | `050805` | `9BFEDA` | `33FF66` | `FFB000` |
+| chomp | favorite (arcade; +EffectSpec.chomp) | `000000` | `FFEA00` | `FFEA00` | `2121FF` |
+| rainbow | favorite (loud dynamic) | `0D0B14` | `FFFFFF` | `FF2D95` | `2BE0FF` |
+| cobalt2 | ref | `193549` | `FFFFFF` | `FFC600` | `0088FF` |
+| shades-of-purple | ref | `2D2B55` | `FFFFFF` | `FAD000` | `9EFFFF` |
+| tokyo-hack | ref (Tokyo-Night lineage) | `18173E` | `FFFFFF` | `E84B3C` | `F08DF0` |
+| github-dark | popular | `0D1117` | `E6EDF3` | `2F81F7` | `3FB950` |
+| dracula | popular | `282A36` | `F8F8F2` | `BD93F9` | `FF79C6` |
+| catppuccin-mocha | distinctive | `1E1E2E` | `CDD6F4` | `CBA6F7` | `89B4FA` |
+| gruvbox | distinctive | `282828` | `EBDBB2` | `FE8019` | `8EC07C` |
+| github-light | light | `FFFFFF` | `1F2328` | `0969DA` | `8250DF` |
+| catppuccin-latte | light | `EFF1F5` | `4C4F69` | `8839EF` | `209FB5` |
+| **system** | structural | vibrancy | OS | OS accent | systemPurple |
+
+Retired in the 0-base cut: the old Tokyo-Night `terminal`, `hacker` (merged
+into the green `terminal`), `nord`, `rosepine`, `everforest`, `solarized`,
+`onedark`, `monokai`, `monotone`, `neon`, `cyber`, `vapor`, `cute`, `paper`,
+`kawaii`, `mono-light`, `mono-dark` (each a near-dup of a stronger keeper or
+a utility preset not needed in a tight set; revive individually if wanted).
+**EffectSpec border catalog is a separate axis** (neon/cyber/vapor/kawaii
+survive there as `[border] effect` values even though cut as themes).
+
+Still deferred (block 2c, not in this pass): `Intensity` shared enum (Q9),
+`canonical(_:)`/`suggest(_:)` validation helpers (Q10), `TypeScale` font-size
+scale (Q7 — held until rule-of-three).
+
+---
+
 ## 5. Per-app migration (next phase, not done yet)
 
 - **facet** (biggest): delete `FacetView/Palette.swift` preset bodies +
   `BorderEffect.swift`; depend on the 3 modules; `paletteFor` now returns
-  `ThemeSpec`; `pal` moves to PaletteKit (same spelling, `ResolvedPalette`,
-  same field names). `uiFont` / `borderEffectFor` / `blendThrough` /
-  `animatedPalette` come from sill. View call sites unchanged.
+  `ThemeSpec`; `pal` moves to PaletteKit (`ResolvedPalette`). **Phase V
+  renames the role fields**, so view call sites update at this step
+  (`pal.text`→`pal.foreground`, `pal.accent`→`pal.primary`, …) — the one
+  spot that touches "hundreds of lines" per facet's CLAUDE.md note. `uiFont`
+  / `borderEffectFor` / `blendThrough` / `animatedPalette` come from sill.
+  Also resolve the FacetCore name-list + `animatableThemes` Set duplication
+  against sill (Q8/Q10).
 - **perch**: `ThemePalette` → `ThemeSpec` (already pure UInt32 in Core);
   `ResolvedPalette` → `PaletteKit.resolve`. `missHex` → `error`,
-  `pillBgAlpha` → `bgAlpha`. Catalog drift → facet hex (Q1).
+  `pillBgAlpha` → `backgroundAlpha`; perch `system` fork folds into
+  `.fixed` + `primary = 0` (Q6).
 - **wand**: `CastThemePalette` / `TomeThemePalette` (String) → `ThemeSpec`
   (deriving hex from the shared spec via `parseColorToken`); chomp/splatoon
   stay wand-local **motion** over the shared `ThemeSpec.chomp` +
@@ -295,8 +365,8 @@ v2 (Phase T) residual risks — carried, not blocking:
   existing `bgOverride:` param so the two mechanisms don't overlap.
 - **system-preset material is doubly-specified** (resolve emits
   `.underWindowBackground`; facet's PanelHost hardcodes `.sidebar`). The
-  bgMode work kept the call-site owner — do **not** start making facet honor
-  `pal.vibrancyMaterial` or the panel material regresses.
+  backgroundMode work kept the call-site owner — do **not** start making
+  facet honor `pal.vibrancyMaterial` or the panel material regresses.
 - **derive primitives**: `ink()` is alpha-over only; perch's base+delta and
   facet's blend-toward-white are different operations, still app-local.
 

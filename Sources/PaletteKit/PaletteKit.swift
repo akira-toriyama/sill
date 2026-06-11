@@ -3,7 +3,7 @@
 // `NSColor`s, applying the DERIVE RECIPE for any field the spec left
 // nil. Also provides the `@MainActor` module-level `pal` var (facet's
 // invariant), the `uiFont` factory (incl. `.menu`), the derive
-// accessors (`tertiary` field, `ink`, `onAccent`), and `blendThrough`.
+// accessors (`tertiary` field, `ink`, `onPrimary`), and `blendThrough`.
 //
 // Layer rule: a consumer that wants only the pure spec depends on
 // `Palette` and never links this module → never links AppKit.
@@ -31,46 +31,47 @@ public extension NSColor {
 // MARK: - ResolvedPalette
 
 /// A fully-resolved theme: every field is a concrete `NSColor` (or nil
-/// bg for vibrancy). This is what views read via `pal`. `@MainActor`
-/// because `NSColor` isn't `Sendable` under Swift 6 strict concurrency.
+/// background for vibrancy). This is what views read via `pal`.
+/// `@MainActor` because `NSColor` isn't `Sendable` under Swift 6 strict
+/// concurrency.
 @MainActor
 public struct ResolvedPalette {
-    public let bg: NSColor?
-    public let text: NSColor
-    public let dim: NSColor
+    public let background: NSColor?
+    public let foreground: NSColor
+    public let muted: NSColor
     /// Third (least-emphasis) text tier. Resolved from `spec.tertiary`,
-    /// else derived (`text @ 0.55`, or `.tertiaryLabelColor` for
+    /// else derived (`foreground @ 0.55`, or `.tertiaryLabelColor` for
     /// OS-ink themes). A promoted first-class field — read it as
     /// `pal.tertiary` like the other roles.
     public let tertiary: NSColor
-    public let accent: NSColor
-    public let accent2: NSColor
-    public let divider: NSColor
-    public let hoverFill: NSColor
-    public let selFill: NSColor
+    public let primary: NSColor
+    public let secondary: NSColor
+    public let border: NSColor
+    public let hover: NSColor
+    public let selection: NSColor
     public let error: NSColor
     public let font: FontKind
-    /// `bgAlpha` from the spec (nil ⇒ opaque) — the panel/pill knob.
-    public let bgAlpha: CGFloat?
+    /// `backgroundAlpha` from the spec (nil ⇒ opaque) — the panel/pill knob.
+    public let backgroundAlpha: CGFloat?
     /// Rendering hints for the `system` preset (vibrancy). Not part of
     /// the pure spec — pure logic shouldn't know about NSVisualEffect.
     public let vibrancyMaterial: NSVisualEffectView.Material?
     public let forceDarkAqua: Bool
 
     public init(
-        bg: NSColor?, text: NSColor, dim: NSColor, tertiary: NSColor,
-        accent: NSColor, accent2: NSColor, divider: NSColor,
-        hoverFill: NSColor, selFill: NSColor, error: NSColor,
-        font: FontKind, bgAlpha: CGFloat?,
+        background: NSColor?, foreground: NSColor, muted: NSColor, tertiary: NSColor,
+        primary: NSColor, secondary: NSColor, border: NSColor,
+        hover: NSColor, selection: NSColor, error: NSColor,
+        font: FontKind, backgroundAlpha: CGFloat?,
         vibrancyMaterial: NSVisualEffectView.Material?,
         forceDarkAqua: Bool
     ) {
-        self.bg = bg; self.text = text; self.dim = dim
+        self.background = background; self.foreground = foreground; self.muted = muted
         self.tertiary = tertiary
-        self.accent = accent; self.accent2 = accent2
-        self.divider = divider; self.hoverFill = hoverFill
-        self.selFill = selFill; self.error = error; self.font = font
-        self.bgAlpha = bgAlpha
+        self.primary = primary; self.secondary = secondary
+        self.border = border; self.hover = hover
+        self.selection = selection; self.error = error; self.font = font
+        self.backgroundAlpha = backgroundAlpha
         self.vibrancyMaterial = vibrancyMaterial
         self.forceDarkAqua = forceDarkAqua
     }
@@ -80,7 +81,7 @@ public struct ResolvedPalette {
 
 public extension ResolvedPalette {
     /// Which base ink an `ink(_:of:)` tint is rooted on.
-    enum InkRoot { case text, dim, accent }
+    enum InkRoot { case foreground, muted, primary }
 
     /// A named alpha tier for the dominant per-surface-tint pattern. A
     /// SHARED DEFAULT, not a complete solution: an app with finer needs
@@ -100,27 +101,27 @@ public extension ResolvedPalette {
 
     /// An alpha-over tint of a base ink at a named tier. Alpha-over ONLY —
     /// base+delta (perch) and blend-toward-white (facet) stay app-local.
-    func ink(_ tier: InkTier, of root: InkRoot = .text) -> NSColor {
+    func ink(_ tier: InkTier, of root: InkRoot = .foreground) -> NSColor {
         let base: NSColor
         switch root {
-        case .text:   base = text
-        case .dim:    base = dim
-        case .accent: base = accent
+        case .foreground: base = foreground
+        case .muted:      base = muted
+        case .primary:    base = primary
         }
         return base.withAlphaComponent(tier.alpha)
     }
 
-    /// Foreground (black/white) that best contrasts the OPAQUE accent —
-    /// for text / icons drawn ON an accent fill. Rooted on the opaque
-    /// accent, NOT the selFill wash. Opt-in.
-    func onAccent(_ alpha: CGFloat = 1) -> NSColor {
-        bestContrast(on: accent).withAlphaComponent(alpha)
+    /// Foreground (black/white) that best contrasts the OPAQUE primary —
+    /// for text / icons drawn ON a primary fill. Rooted on the opaque
+    /// primary, NOT the selection wash. Opt-in.
+    func onPrimary(_ alpha: CGFloat = 1) -> NSColor {
+        bestContrast(on: primary).withAlphaComponent(alpha)
     }
 
-    /// The hairline-stroke axis of `onAccent` (the contrast ink @ 0.4) —
-    /// for outlines on an accent fill. A second, distinct axis from the
+    /// The hairline-stroke axis of `onPrimary` (the contrast ink @ 0.4) —
+    /// for outlines on a primary fill. A second, distinct axis from the
     /// text foreground.
-    var onAccentStroke: NSColor { onAccent(0.4) }
+    var onPrimaryStroke: NSColor { onPrimary(0.4) }
 }
 
 /// Black or white, whichever best contrasts `c` used as a fill. Uses the
@@ -138,28 +139,29 @@ func bestContrast(on c: NSColor) -> NSColor {
 
 /// Resolve a pure `ThemeSpec` into `NSColor`s, deriving any nil field.
 ///
-/// DERIVE RECIPE (matches facet's 16 dark editor presets exactly, and
-/// supplies sane light-theme equivalents when a light spec omits the
-/// trio):
-///   * accent  → spec.accent, OR `controlAccentColor` when the
+/// DERIVE RECIPE (the dark editor presets author only
+/// background/foreground/muted/primary; the trio derives):
+///   * primary   → spec.primary, OR `controlAccentColor` when the
 ///     sentinel (0) is set (the `system` preset).
-///   * accent2 → spec.accent2 if set, else the accent's hue rotated
-///     +180° (complement) at the accent's saturation/brightness.
-///   * neutral base = white on a dark bg, black on a light bg (the
-///     `isLight` branch). `nil` bg (vibrancy) is treated as dark.
-///   * divider   → override, else neutral@0.10.
-///   * hoverFill → override, else neutral@0.05.
-///   * selFill   → override, else accent@0.18.
+///   * secondary → spec.secondary if set, else the primary's hue rotated
+///     +180° (complement) at the primary's saturation/brightness.
+///   * neutral base = white on a dark background, black on a light
+///     background (the `isLight` branch). `nil` background (vibrancy) is
+///     treated as dark.
+///   * border    → override, else neutral@0.10.
+///   * hover     → override, else neutral@0.05.
+///   * selection → override, else primary@0.18.
 ///   * tertiary  → spec.tertiary if set, else `.tertiaryLabelColor`
-///     (OS-ink themes) / text@0.55 — now a stored `pal.tertiary` field.
+///     (OS-ink themes) / foreground@0.55 — a stored `pal.tertiary` field.
 ///
-/// `system` is special-cased: bg nil, dynamic system colors for
-/// text/dim/divider/hover/sel, vibrancy + dark-aqua hints emitted.
+/// `system` is special-cased: background nil, dynamic system colors for
+/// foreground/muted/border/hover/selection, vibrancy + dark-aqua hints
+/// emitted.
 ///
-/// `bgOverride` lets an app substitute its own panel/pill bg (perch's
-/// translucent pill vs facet's opaque panel) while keeping the
-/// canonical accent/text/dim/font. `material` / `forceDark` override
-/// the system-preset rendering hints when supplied.
+/// `bgOverride` lets an app substitute its own panel/pill background
+/// (perch's translucent pill vs facet's opaque panel) while keeping the
+/// canonical primary/foreground/muted/font. `material` / `forceDark`
+/// override the system-preset rendering hints when supplied.
 @MainActor
 public func resolve(
     _ spec: ThemeSpec,
@@ -169,83 +171,83 @@ public func resolve(
 ) -> ResolvedPalette {
 
     // --- OS-dynamic inks: `.vibrancy` (no fill) or `.systemDynamic`
-    //     (concrete fill, live OS inks). Gate keys on bgMode, not on
-    //     `bg == nil`, so a concrete-bg-with-system-inks theme is now
-    //     expressible (the case the old gate dropped).
+    //     (concrete fill, live OS inks). Gate keys on backgroundMode, not
+    //     on `background == nil`, so a concrete-bg-with-system-inks theme
+    //     is now expressible (the case the old gate dropped).
     if spec.usesSystemColors {
         // vibrancy: no opaque fill unless overridden. systemDynamic:
-        // the spec's concrete bg.
-        let bgHex = bgOverride ?? (spec.bgMode == .systemDynamic ? spec.bg : nil)
+        // the spec's concrete background.
+        let bgHex = bgOverride ?? (spec.backgroundMode == .systemDynamic ? spec.background : nil)
         let tertiaryNS = spec.tertiary.map { NSColor($0) } ?? .tertiaryLabelColor
         return ResolvedPalette(
-            bg: bgHex.map { NSColor($0) },
-            text: .labelColor,
-            dim: .secondaryLabelColor,
+            background: bgHex.map { NSColor($0) },
+            foreground: .labelColor,
+            muted: .secondaryLabelColor,
             tertiary: tertiaryNS,
-            accent: .controlAccentColor,
-            accent2: .systemPurple,
-            divider: NSColor.labelColor.withAlphaComponent(0.22),
-            hoverFill: NSColor.secondaryLabelColor.withAlphaComponent(0.12),
-            selFill: NSColor.controlAccentColor.withAlphaComponent(0.18),
+            primary: .controlAccentColor,
+            secondary: .systemPurple,
+            border: NSColor.labelColor.withAlphaComponent(0.22),
+            hover: NSColor.secondaryLabelColor.withAlphaComponent(0.12),
+            selection: NSColor.controlAccentColor.withAlphaComponent(0.18),
             error: NSColor(spec.error),
             font: spec.font,
-            bgAlpha: spec.bgAlpha.map { CGFloat($0) },
+            backgroundAlpha: spec.backgroundAlpha.map { CGFloat($0) },
             // Vibrancy needs a material; a concrete systemDynamic fill
             // does not (no NSVisualEffectView). Don't start emitting a
             // material for fixed/systemDynamic — the call site owns it.
-            vibrancyMaterial: spec.bgMode == .vibrancy ? (material ?? .underWindowBackground) : material,
+            vibrancyMaterial: spec.backgroundMode == .vibrancy ? (material ?? .underWindowBackground) : material,
             forceDarkAqua: forceDark ?? false)
     }
 
     // --- .fixed: authored static inks + derive recipe ---
-    let accentNS: NSColor = spec.usesSystemAccent
+    let primaryNS: NSColor = spec.usesSystemPrimary
         ? .controlAccentColor
-        : NSColor(spec.accent)
+        : NSColor(spec.primary)
 
-    let accent2NS: NSColor = spec.accent2.map { NSColor($0) }
-        ?? complement(of: accentNS)
+    let secondaryNS: NSColor = spec.secondary.map { NSColor($0) }
+        ?? complement(of: primaryNS)
 
-    // Neutral base for derived divider / hover. White on dark, black on
-    // light. nil bg counts as dark (vibrancy overlay reads dark).
+    // Neutral base for derived border / hover. White on dark, black on
+    // light. nil background counts as dark (vibrancy overlay reads dark).
     let neutral: NSColor = spec.isLight ? .black : .white
 
-    let dividerNS: NSColor = spec.divider.map { NSColor($0) }
+    let borderNS: NSColor = spec.border.map { NSColor($0) }
         ?? neutral.withAlphaComponent(0.10)
-    let hoverNS: NSColor = spec.hoverFill.map { NSColor($0) }
+    let hoverNS: NSColor = spec.hover.map { NSColor($0) }
         ?? neutral.withAlphaComponent(0.05)
-    let selNS: NSColor = spec.selFill.map { NSColor($0) }
-        ?? accentNS.withAlphaComponent(0.18)
+    let selectionNS: NSColor = spec.selection.map { NSColor($0) }
+        ?? primaryNS.withAlphaComponent(0.18)
     let tertiaryNS: NSColor = spec.tertiary.map { NSColor($0) }
-        ?? NSColor(spec.text).withAlphaComponent(0.55)
+        ?? NSColor(spec.foreground).withAlphaComponent(0.55)
 
-    let bgHex = bgOverride ?? spec.bg
+    let bgHex = bgOverride ?? spec.background
     let bgNS: NSColor? = bgHex.map { NSColor($0) }
 
     return ResolvedPalette(
-        bg: bgNS,
-        text: NSColor(spec.text),
-        dim: NSColor(spec.dim),
+        background: bgNS,
+        foreground: NSColor(spec.foreground),
+        muted: NSColor(spec.muted),
         tertiary: tertiaryNS,
-        accent: accentNS,
-        accent2: accent2NS,
-        divider: dividerNS,
-        hoverFill: hoverNS,
-        selFill: selNS,
+        primary: primaryNS,
+        secondary: secondaryNS,
+        border: borderNS,
+        hover: hoverNS,
+        selection: selectionNS,
         error: NSColor(spec.error),
         font: spec.font,
-        bgAlpha: spec.bgAlpha.map { CGFloat($0) },
+        backgroundAlpha: spec.backgroundAlpha.map { CGFloat($0) },
         vibrancyMaterial: material,
         forceDarkAqua: forceDark ?? false)
 }
 
 /// Complement of a color: hue + 0.5 (wrapping), same saturation /
-/// brightness. Used when a spec omits `accent2`.
+/// brightness. Used when a spec omits `secondary`.
 @MainActor
 private func complement(of c: NSColor) -> NSColor {
     let s = c.usingColorSpace(.sRGB) ?? c
     var h: CGFloat = 0, sat: CGFloat = 0, br: CGFloat = 0, a: CGFloat = 0
     s.getHue(&h, saturation: &sat, brightness: &br, alpha: &a)
-    // Greyscale accent (sat≈0, e.g. mono / monotone) has no meaningful
+    // Greyscale primary (sat≈0, e.g. monochrome) has no meaningful
     // complement — return a slightly lighter grey instead of a hue flip.
     if sat < 0.05 {
         return NSColor(white: min(1, br * 0.7 + 0.15), alpha: a)
@@ -257,9 +259,9 @@ private func complement(of c: NSColor) -> NSColor {
 // MARK: - Module-level `pal`
 
 /// Current resolved theme. facet's invariant: a short `@MainActor`
-/// module-level var read as `pal.text` etc. at hundreds of view-side
-/// call sites. PaletteKit owns it (the View layer no longer defines it).
-/// Seeded from the `terminal` preset.
+/// module-level var read as `pal.foreground` etc. at hundreds of
+/// view-side call sites. PaletteKit owns it (the View layer no longer
+/// defines it). Seeded from the `terminal` preset.
 @MainActor
 public var pal: ResolvedPalette = resolve(.terminal)
 
@@ -268,7 +270,7 @@ public var pal: ResolvedPalette = resolve(.terminal)
 @MainActor
 public func setPalette(_ p: ResolvedPalette) { pal = p }
 
-/// Convenience: resolve a name + optional bg override and install it.
+/// Convenience: resolve a name + optional background override and install it.
 @MainActor
 public func setPalette(named name: String, bgOverride: HexColor? = nil) {
     pal = resolve(paletteFor(name), bgOverride: bgOverride)

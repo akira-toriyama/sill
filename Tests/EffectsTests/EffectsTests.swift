@@ -53,7 +53,7 @@ final class EffectsTests: XCTestCase {
         // chomp at phase 0 = flash[0] = pellet yellow 0xFFEA00.
         let f = animatedPalette(theme: "chomp", at: 0.0)
         XCTAssertNotNil(f)
-        let s = f!.accent.usingColorSpace(.sRGB)!
+        let s = f!.primary.usingColorSpace(.sRGB)!
         XCTAssertEqual(s.redComponent, 1, accuracy: 0.01)
         XCTAssertEqual(s.greenComponent, CGFloat(0xEA) / 255, accuracy: 0.01)
         XCTAssertEqual(s.blueComponent, 0, accuracy: 0.01)
@@ -70,16 +70,16 @@ final class EffectsTests: XCTestCase {
         XCTAssertNil(animatedPalette(theme: "off", at: 0.5))
     }
 
-    /// GQ8: the animated selFill alpha must match the theme's static
-    /// selFill — 0.18 for the derived themes (neon), the authored 0.22 for
+    /// The animated selection alpha must match the theme's static
+    /// selection — 0.18 for chomp (authored), the authored 0.22 for
     /// rainbow — so the selected-row wash doesn't jump when animation
     /// engages, AND rainbow's explicit 0.22 is preserved.
-    func testAnimatedSelFillHonorsAuthoredAlpha() {
-        let neon = animatedPalette(theme: "neon", at: 0.3)!
-        XCTAssertEqual(neon.selFill.usingColorSpace(.sRGB)!.alphaComponent,
+    func testAnimatedSelectionHonorsAuthoredAlpha() {
+        let chomp = animatedPalette(theme: "chomp", at: 0.3)!
+        XCTAssertEqual(chomp.selection.usingColorSpace(.sRGB)!.alphaComponent,
                        0.18, accuracy: 0.001)
         let rainbow = animatedPalette(theme: "rainbow", at: 0.3)!
-        XCTAssertEqual(rainbow.selFill.usingColorSpace(.sRGB)!.alphaComponent,
+        XCTAssertEqual(rainbow.selection.usingColorSpace(.sRGB)!.alphaComponent,
                        0.22, accuracy: 0.001)
     }
 }

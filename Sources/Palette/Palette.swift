@@ -2,8 +2,12 @@
 //
 // A `ThemeSpec` is a value-type description of a theme: hex colors as
 // `UInt32` (0xRRGGBB), a `FontKind` enum, and OPTIONAL overrides of the
-// derived trio (divider / hoverFill / selFill) + accent2. PaletteKit
+// derived trio (border / hover / selection) + secondary. PaletteKit
 // turns a `ThemeSpec` into resolved `NSColor`s with the derive recipe.
+//
+// Role names follow a Tailwind-style semantic vocabulary
+// (background / foreground / muted / primary / secondary / …) so the
+// shared theme contract reads the same across the app family.
 //
 // This module imports nothing platform-specific, so a consumer that
 // only wants the spec (CLI validation, tests, a non-AppKit renderer)
@@ -53,310 +57,267 @@ public enum FontKind: Sendable, Hashable, CaseIterable {
     case system, mono, rounded, menu
 }
 
-// MARK: - BgMode
+// MARK: - BackgroundMode
 
 /// How a theme's background + base inks are sourced. Replaces the old
-/// `bg == nil && usesSystemAccent` resolve gate with an explicit mode so
-/// the real cases are distinct — and a case the old gate could not
-/// express (concrete fill BUT live OS inks) becomes representable.
+/// `background == nil && usesSystemPrimary` resolve gate with an explicit
+/// mode so the real cases are distinct — and a case the old gate could
+/// not express (concrete fill BUT live OS inks) becomes representable.
 ///
-///   * `.vibrancy`      — no opaque fill (`bg == nil`); an
+///   * `.vibrancy`      — no opaque fill (`background == nil`); an
 ///     `NSVisualEffectView` shows through and the base inks come from the
 ///     OS (label / secondaryLabel / controlAccent). The `system` preset.
-///   * `.fixed`         — a concrete authored `bg` with static authored
-///     inks. Every editor preset (terminal / nord / dracula / …).
-///   * `.systemDynamic` — a concrete authored `bg` BUT live OS inks
-///     (label / controlAccent), non-adaptive. perch's translucent system
-///     pill (a fixed dark fill whose accent tracks the OS) is the witness;
-///     unexpressible under the `bg == nil` gate.
-public enum BgMode: Sendable, Hashable, CaseIterable {
+///   * `.fixed`         — a concrete authored `background` with static
+///     authored inks. Every editor preset (terminal / dracula / …).
+///   * `.systemDynamic` — a concrete authored `background` BUT live OS
+///     inks (label / controlAccent), non-adaptive. perch's translucent
+///     system pill (a fixed dark fill whose accent tracks the OS) is the
+///     witness; unexpressible under the `background == nil` gate.
+public enum BackgroundMode: Sendable, Hashable, CaseIterable {
     case vibrancy, fixed, systemDynamic
 }
 
 // MARK: - System sentinels
 
-/// `accent == systemAccentSentinel` (0) means "use the OS
+/// `primary == systemPrimarySentinel` (0) means "use the OS
 /// `controlAccentColor`" — resolved in PaletteKit, kept out of the pure
-/// spec. No real theme uses pure black as an accent, so 0 is safe as a
-/// sentinel.
-public let systemAccentSentinel: UInt32 = 0
+/// spec. No real theme uses pure black as a primary accent, so 0 is safe
+/// as a sentinel.
+public let systemPrimarySentinel: UInt32 = 0
 
 /// Default error/destructive hue when a theme doesn't override it.
 public let defaultErrorHex: UInt32 = 0xEF4444
 
 // MARK: - ThemeSpec
 
-/// One theme, described purely. Theme authors set the SIX required hues
-/// (bg / text / dim / accent / error / font) plus optional knobs;
-/// PaletteKit derives divider / hoverFill / selFill / accent2 / tertiary
-/// from bg-luminance + accent unless the matching override is set.
+/// One theme, described purely. Theme authors set the FOUR required hues
+/// (background / foreground / muted / primary) + font plus optional
+/// knobs; PaletteKit derives border / hover / selection / secondary /
+/// tertiary from background-luminance + primary unless the matching
+/// override is set.
 ///
-/// `bg == nil` means "fall through to system vibrancy" (the `system`
-/// preset). `accent == systemAccentSentinel` (0) means
-/// "OS control-accent". `bgAlpha == nil` means opaque.
+/// `background == nil` means "fall through to system vibrancy" (the
+/// `system` preset). `primary == systemPrimarySentinel` (0) means
+/// "OS control-accent". `backgroundAlpha == nil` means opaque.
 public struct ThemeSpec: Sendable, Hashable {
     /// `nil` = vibrancy fall-through (no opaque fill).
-    public var bg: HexColor?
-    public var text: HexColor
-    public var dim: HexColor
-    /// `rgb == systemAccentSentinel` (0) ⇒ OS control-accent.
-    public var accent: HexColor
+    public var background: HexColor?
+    /// Primary text ink.
+    public var foreground: HexColor
+    /// Secondary text / comments / line numbers.
+    public var muted: HexColor
+    /// Signature accent. `rgb == systemPrimarySentinel` (0) ⇒ OS control-accent.
+    public var primary: HexColor
     /// Destructive / error hue.
     public var error: HexColor
     public var font: FontKind
 
     /// Optional secondary accent. `nil` ⇒ PaletteKit derives a
-    /// complementary hue from `accent`.
-    public var accent2: HexColor?
-    /// Optional override of the derived divider.
-    public var divider: HexColor?
+    /// complementary hue from `primary`.
+    public var secondary: HexColor?
+    /// Optional override of the derived divider/hairline.
+    public var border: HexColor?
     /// Optional override of the derived hover fill.
-    public var hoverFill: HexColor?
+    public var hover: HexColor?
     /// Optional override of the derived selection fill.
-    public var selFill: HexColor?
+    public var selection: HexColor?
     /// Optional panel-background alpha (`nil` ⇒ opaque). Lets perch's
     /// translucent pill and facet's opaque panel share one spec.
-    public var bgAlpha: Double?
+    public var backgroundAlpha: Double?
 
-    /// How `bg` + base inks are sourced. Defaults from `bg`: `.vibrancy`
-    /// when `bg == nil`, else `.fixed`. Set `.systemDynamic` for a
-    /// concrete fill that still wants live OS inks (perch's system pill).
-    public var bgMode: BgMode
+    /// How `background` + base inks are sourced. Defaults from
+    /// `background`: `.vibrancy` when nil, else `.fixed`. Set
+    /// `.systemDynamic` for a concrete fill that still wants live OS inks
+    /// (perch's system pill).
+    public var backgroundMode: BackgroundMode
     /// Optional third text tier (least-emphasis captions). `nil` ⇒
-    /// PaletteKit derives `text @ 0.55` (or `.tertiaryLabelColor` when the
-    /// inks are OS-dynamic).
+    /// PaletteKit derives `foreground @ 0.55` (or `.tertiaryLabelColor`
+    /// when the inks are OS-dynamic).
     public var tertiary: HexColor?
 
     public init(
-        bg: HexColor?,
-        text: HexColor,
-        dim: HexColor,
-        accent: HexColor,
+        background: HexColor?,
+        foreground: HexColor,
+        muted: HexColor,
+        primary: HexColor,
         font: FontKind,
         error: HexColor = HexColor(defaultErrorHex),
-        accent2: HexColor? = nil,
-        divider: HexColor? = nil,
-        hoverFill: HexColor? = nil,
-        selFill: HexColor? = nil,
-        bgAlpha: Double? = nil,
-        bgMode: BgMode? = nil,
+        secondary: HexColor? = nil,
+        border: HexColor? = nil,
+        hover: HexColor? = nil,
+        selection: HexColor? = nil,
+        backgroundAlpha: Double? = nil,
+        backgroundMode: BackgroundMode? = nil,
         tertiary: HexColor? = nil
     ) {
-        self.bg = bg
-        self.text = text
-        self.dim = dim
-        self.accent = accent
+        self.background = background
+        self.foreground = foreground
+        self.muted = muted
+        self.primary = primary
         self.font = font
         self.error = error
-        self.accent2 = accent2
-        self.divider = divider
-        self.hoverFill = hoverFill
-        self.selFill = selFill
-        self.bgAlpha = bgAlpha
-        self.bgMode = bgMode ?? (bg == nil ? .vibrancy : .fixed)
+        self.secondary = secondary
+        self.border = border
+        self.hover = hover
+        self.selection = selection
+        self.backgroundAlpha = backgroundAlpha
+        self.backgroundMode = backgroundMode ?? (background == nil ? .vibrancy : .fixed)
         self.tertiary = tertiary
     }
 
-    /// True when `accent` is the OS-control-accent sentinel.
-    public var usesSystemAccent: Bool { accent.rgb == systemAccentSentinel }
+    /// True when `primary` is the OS-control-accent sentinel.
+    public var usesSystemPrimary: Bool { primary.rgb == systemPrimarySentinel }
     /// True when base inks should come from the OS rather than the spec
     /// (`.vibrancy` or `.systemDynamic`). Drives PaletteKit's resolve gate.
-    public var usesSystemColors: Bool { bgMode != .fixed }
-    /// True when `bg` is treated as light by the derive recipe.
-    /// `nil` bg (vibrancy) is treated as dark.
-    public var isLight: Bool { (bg?.luminance ?? 0) > 0.5 }
+    public var usesSystemColors: Bool { backgroundMode != .fixed }
+    /// True when `background` is treated as light by the derive recipe.
+    /// `nil` background (vibrancy) is treated as dark.
+    public var isLight: Bool { (background?.luminance ?? 0) > 0.5 }
 }
 
 // MARK: - Canonical presets
 //
-// Ported from facet's 22 presets with facet-AUTHORITATIVE hex for
-// accent / text / dim / font. LEAN: a preset only stores divider /
-// hoverFill / selFill / accent2 when it DEVIATES from the derive recipe
-// (light themes, monochrome, system, rainbow). The 16 dark editor
-// presets store NONE of the trio — PaletteKit derives the exact facet
-// values (white@0.10 / white@0.05 / accent@0.18) from their dark bg.
+// The Phase V curated catalog: 12 user-facing color themes + the
+// structural `system` preset. LEAN: a dark preset only stores border /
+// hover / selection / tertiary when it DEVIATES from the derive recipe.
+// The dark editor presets store NONE of the trio — PaletteKit derives the
+// exact values (neutral@0.10 / neutral@0.05 / primary@0.18) from their
+// dark background. Light / special presets store the trio explicitly
+// (the dark-ink recipe would derive invisible white-alpha on a light bg).
 //
-// `system` is special: bg nil (vibrancy), accent sentinel 0, font menu.
+// `system` is special: background nil (vibrancy), primary sentinel 0,
+// font menu.
 
 extension ThemeSpec {
 
-    // --- Dark editor presets (recipe-derived trio) -------------------
+    // --- Favorites / special ------------------------------------------
 
-    /// Tokyo-Night-ish default. Green primary, purple secondary, mono.
+    /// terminal — classic phosphor green-on-near-black. Vivid green
+    /// primary, warm amber secondary, soft green-tinted foreground.
+    /// (Merges the old `hacker` preset; the old Tokyo-Night `terminal`
+    /// is retired — Tokyo Night now lives in `tokyo-hack`.)
     public static let terminal = ThemeSpec(
-        bg: HexColor(0x0E0F14), text: HexColor(0xC0CAF5),
-        dim: HexColor(0x6B7394), accent: HexColor(0x9ECE6A), font: .mono,
-        accent2: HexColor(0xBB9AF7))
+        background: HexColor(0x050805), foreground: HexColor(0x9BFEDA),
+        muted: HexColor(0x3E7D5C), primary: HexColor(0x33FF66), font: .mono,
+        error: HexColor(0xFF3B3B),
+        secondary: HexColor(0xFFB000))
 
-    /// Nord — cool polar-night blue-grey. Frost-cyan / aurora-sand.
-    public static let nord = ThemeSpec(
-        bg: HexColor(0x2E3440), text: HexColor(0xECEFF4),
-        dim: HexColor(0x7B88A1), accent: HexColor(0x88C0D0), font: .mono,
-        accent2: HexColor(0xEBCB8B))
-
-    /// Dracula — vivid dark. Purple / green.
-    public static let dracula = ThemeSpec(
-        bg: HexColor(0x282A36), text: HexColor(0xF8F8F2),
-        dim: HexColor(0x6272A4), accent: HexColor(0xBD93F9), font: .mono,
-        accent2: HexColor(0x50FA7B))
-
-    /// Gruvbox — retro warm dark. Orange / aqua.
-    public static let gruvbox = ThemeSpec(
-        bg: HexColor(0x282828), text: HexColor(0xEBDBB2),
-        dim: HexColor(0x928374), accent: HexColor(0xFE8019), font: .mono,
-        accent2: HexColor(0x8EC07C))
-
-    /// Catppuccin Mocha — soft pastel dark. Mauve / green.
-    public static let catppuccin = ThemeSpec(
-        bg: HexColor(0x1E1E2E), text: HexColor(0xCDD6F4),
-        dim: HexColor(0x7F849C), accent: HexColor(0xCBA6F7), font: .mono,
-        accent2: HexColor(0xA6E3A1))
-
-    /// Rosé Pine — muted aubergine dark. Iris / rose.
-    public static let rosepine = ThemeSpec(
-        bg: HexColor(0x191724), text: HexColor(0xE0DEF4),
-        dim: HexColor(0x908CAA), accent: HexColor(0xC4A7E7), font: .mono,
-        accent2: HexColor(0xEBBCBA))
-
-    /// Everforest — soft forest dark. Green / orange.
-    public static let everforest = ThemeSpec(
-        bg: HexColor(0x2D353B), text: HexColor(0xD3C6AA),
-        dim: HexColor(0x859289), accent: HexColor(0xA7C080), font: .mono,
-        accent2: HexColor(0xE69875))
-
-    /// Solarized Dark — classic teal-base. Blue / orange.
-    public static let solarized = ThemeSpec(
-        bg: HexColor(0x002B36), text: HexColor(0x93A1A1),
-        dim: HexColor(0x586E75), accent: HexColor(0x268BD2), font: .mono,
-        accent2: HexColor(0xCB4B16))
-
-    /// One Dark — Atom's signature dark. Blue / yellow.
-    public static let onedark = ThemeSpec(
-        bg: HexColor(0x282C34), text: HexColor(0xABB2BF),
-        dim: HexColor(0x5C6370), accent: HexColor(0x61AFEF), font: .mono,
-        accent2: HexColor(0xE5C07B))
-
-    /// Monokai — high-energy dark. Lime / magenta.
-    public static let monokai = ThemeSpec(
-        bg: HexColor(0x272822), text: HexColor(0xF8F8F2),
-        dim: HexColor(0x75715E), accent: HexColor(0xA6E22E), font: .mono,
-        accent2: HexColor(0xF92672))
-
-    /// Hacker — green-on-black terminal. Neon-green / amber.
-    public static let hacker = ThemeSpec(
-        bg: HexColor(0x0A0F0A), text: HexColor(0xCFE0CF),
-        dim: HexColor(0x5F715F), accent: HexColor(0x33FF66), font: .mono,
-        accent2: HexColor(0xFFC857))
-
-    /// モノトーン — soft graphite greyscale, system font.
-    public static let monotone = ThemeSpec(
-        bg: HexColor(0x1E1E1E), text: HexColor(0xC8C8C8),
-        dim: HexColor(0x7A7A7A), accent: HexColor(0xB0B0B0), font: .system,
-        accent2: HexColor(0x888888))
-
-    /// Neon — electric cyan on blue-black; hot-magenta secondary.
-    public static let neon = ThemeSpec(
-        bg: HexColor(0x0A0A14), text: HexColor(0xC0CAF5),
-        dim: HexColor(0x6B7394), accent: HexColor(0x00E5FF), font: .mono,
-        accent2: HexColor(0xFF2EC4))
-
-    /// Cyber — aqua/teal on teal-black; hot-pink secondary.
-    public static let cyber = ThemeSpec(
-        bg: HexColor(0x001410), text: HexColor(0xC8F0E4),
-        dim: HexColor(0x5F8076), accent: HexColor(0x00FFD0), font: .mono,
-        accent2: HexColor(0xFF3DCE))
-
-    /// Vapor — synthwave pink on purple-black; electric-cyan secondary.
-    public static let vapor = ThemeSpec(
-        bg: HexColor(0x1A0E26), text: HexColor(0xEAD9F5),
-        dim: HexColor(0x8A6FA6), accent: HexColor(0xFF6AD5), font: .mono,
-        accent2: HexColor(0x05D9E8))
-
-    // --- Light / special presets (explicit trio) ---------------------
-
-    /// Soft pastel cute. Pink primary, peach secondary, accent-tinted
-    /// neutrals, rounded. Light ⇒ trio is explicit (recipe would derive
-    /// dark-theme white-alpha, wrong on a light bg).
-    public static let cute = ThemeSpec(
-        bg: HexColor(0xFFF1F6), text: HexColor(0x6B5566),
-        dim: HexColor(0xB892A6), accent: HexColor(0xF2789F), font: .rounded,
-        accent2: HexColor(0xFFB48F),
-        divider: HexColor(0xF2789F, 0.22),
-        hoverFill: HexColor(0xF2789F, 0.10),
-        selFill: HexColor(0xF2789F, 0.20))
-
-    /// Paper — clean daytime light. Blue / amber, black-alpha neutrals.
-    public static let paper = ThemeSpec(
-        bg: HexColor(0xFAFAF8), text: HexColor(0x1C1C1E),
-        dim: HexColor(0x8A8A8E), accent: HexColor(0x3B82F6), font: .system,
-        accent2: HexColor(0xF59E0B),
-        divider: HexColor(0x000000, 0.10),
-        hoverFill: HexColor(0x000000, 0.04),
-        selFill: HexColor(0x3B82F6, 0.14))
-
-    /// Kawaii — candy lavender light. Purple / mint, rounded.
-    public static let kawaii = ThemeSpec(
-        bg: HexColor(0xFAF0FF), text: HexColor(0x5E5470),
-        dim: HexColor(0xA99BC0), accent: HexColor(0xB661E8), font: .rounded,
-        accent2: HexColor(0x7DD9C0),
-        divider: HexColor(0xB661E8, 0.20),
-        hoverFill: HexColor(0xB661E8, 0.10),
-        selFill: HexColor(0xB661E8, 0.18))
-
-    /// 白黒 — stark black-on-white, mono. Monochrome ⇒ explicit trio.
-    public static let monoLight = ThemeSpec(
-        bg: HexColor(0xFFFFFF), text: HexColor(0x111111),
-        dim: HexColor(0x8A8A8A), accent: HexColor(0x000000), font: .mono,
-        accent2: HexColor(0x555555),
-        divider: HexColor(0x000000, 0.14),
-        hoverFill: HexColor(0x000000, 0.05),
-        selFill: HexColor(0x000000, 0.10))
-
-    /// 黒白 — stark white-on-black (OLED), mono. Monochrome exception:
-    /// selFill is white@0.16 (not accent@0.18), so explicit.
-    public static let monoDark = ThemeSpec(
-        bg: HexColor(0x000000), text: HexColor(0xF5F5F5),
-        dim: HexColor(0x777777), accent: HexColor(0xFFFFFF), font: .mono,
-        accent2: HexColor(0xAAAAAA),
-        divider: HexColor(0xFFFFFF, 0.14),
-        hoverFill: HexColor(0xFFFFFF, 0.06),
-        selFill: HexColor(0xFFFFFF, 0.16))
-
-    /// Rainbow — loud max-saturation set. White on near-black violet;
-    /// high-contrast neutrals (white@0.14 / 0.07) + selFill accent@0.22,
-    /// all of which deviate from the recipe ⇒ explicit.
-    public static let rainbow = ThemeSpec(
-        bg: HexColor(0x0D0B14), text: HexColor(0xFFFFFF),
-        dim: HexColor(0x8C84B0), accent: HexColor(0xFF2D95), font: .rounded,
-        accent2: HexColor(0x2BE0FF),
-        divider: HexColor(0xFFFFFF, 0.14),
-        hoverFill: HexColor(0xFFFFFF, 0.07),
-        selFill: HexColor(0xFF2D95, 0.22))
-
-    /// Native vibrancy + dynamic system colors. bg nil (vibrancy),
-    /// accent sentinel 0 (OS control-accent), font menu. The trio is
-    /// resolved against system colors in PaletteKit (it can't be a hex
-    /// here), so it stays nil and PaletteKit special-cases `system`.
-    public static let system = ThemeSpec(
-        bg: nil, text: HexColor(0x000000), dim: HexColor(0x000000),
-        accent: HexColor(systemAccentSentinel), font: .menu)
-
-    /// Chomp — arcade Pac-Man look (pellet yellow on a black maze, neon-
+    /// chomp — arcade Pac-Man look (pellet yellow on a black maze, neon-
     /// blue walls, ghost-red error). A CROSS-APP playful theme: facet's
     /// tree, halo's border ring, and wand's gesture trail all adopt
     /// `theme = chomp`, each drawing its OWN signature motion over this
     /// shared palette + the matching `EffectSpec.chomp` animated border
     /// (the motion drawing stays app-side; sill owns identity + colour).
-    /// Light/dark: a dark theme, so
-    /// hover derives normally; divider/selFill are explicit (wall-blue +
-    /// pellet) because the arcade identity needs those exact hues.
+    /// A dark theme, so hover derives normally; border (wall-blue) and
+    /// selection (pellet) are explicit because the arcade identity needs
+    /// those exact hues.
     public static let chomp = ThemeSpec(
-        bg: HexColor(0x000000), text: HexColor(0xFFEA00),
-        dim: HexColor(0xB39C1A), accent: HexColor(0xFFEA00), font: .mono,
+        background: HexColor(0x000000), foreground: HexColor(0xFFEA00),
+        muted: HexColor(0xB39C1A), primary: HexColor(0xFFEA00), font: .mono,
         error: HexColor(0xFF0000),
-        accent2: HexColor(0x2121FF),
-        divider: HexColor(0x2121FF, 0.55),
-        selFill: HexColor(0xFFEA00, 0.18))
+        secondary: HexColor(0x2121FF),
+        border: HexColor(0x2121FF, 0.55),
+        selection: HexColor(0xFFEA00, 0.18))
+
+    /// rainbow — loud max-saturation set. White on near-black violet;
+    /// high-contrast neutrals (white@0.14 / 0.07) + selection primary@0.22,
+    /// all of which deviate from the recipe ⇒ explicit. Owns the loud
+    /// full-spectrum neon slot.
+    public static let rainbow = ThemeSpec(
+        background: HexColor(0x0D0B14), foreground: HexColor(0xFFFFFF),
+        muted: HexColor(0x8C84B0), primary: HexColor(0xFF2D95), font: .rounded,
+        secondary: HexColor(0x2BE0FF),
+        border: HexColor(0xFFFFFF, 0.14),
+        hover: HexColor(0xFFFFFF, 0.07),
+        selection: HexColor(0xFF2D95, 0.22))
+
+    // --- Reference themes (Tommy-linked) ------------------------------
+
+    /// Cobalt2 (Wes Bos) — deep cobalt-blue, signature bright gold.
+    public static let cobalt2 = ThemeSpec(
+        background: HexColor(0x193549), foreground: HexColor(0xFFFFFF),
+        muted: HexColor(0xAAAAAA), primary: HexColor(0xFFC600), font: .mono,
+        error: HexColor(0xFF5C57),
+        secondary: HexColor(0x0088FF))
+
+    /// Shades of Purple (ahmadawais) — purple-indigo, golden-yellow accent.
+    public static let shadesOfPurple = ThemeSpec(
+        background: HexColor(0x2D2B55), foreground: HexColor(0xFFFFFF),
+        muted: HexColor(0xA599E9), primary: HexColor(0xFAD000), font: .mono,
+        error: HexColor(0xEC3A37),
+        secondary: HexColor(0x9EFFFF))
+
+    /// Tokyo Hack (ajshortt) — midnight-indigo, red-orange chrome. The
+    /// catalog's Tokyo-Night lineage (old `terminal` retired).
+    public static let tokyoHack = ThemeSpec(
+        background: HexColor(0x18173E), foreground: HexColor(0xFFFFFF),
+        muted: HexColor(0x6470B0), primary: HexColor(0xE84B3C), font: .mono,
+        error: HexColor(0xFA6771),
+        secondary: HexColor(0xF08DF0))
+
+    // --- Popular ------------------------------------------------------
+
+    /// GitHub Dark — the most-installed theme. Link-blue, success-green.
+    public static let githubDark = ThemeSpec(
+        background: HexColor(0x0D1117), foreground: HexColor(0xE6EDF3),
+        muted: HexColor(0x8B949E), primary: HexColor(0x2F81F7), font: .mono,
+        error: HexColor(0xF85149),
+        secondary: HexColor(0x3FB950))
+
+    /// Dracula — vivid dark. Signature purple, brand-iconic pink secondary.
+    public static let dracula = ThemeSpec(
+        background: HexColor(0x282A36), foreground: HexColor(0xF8F8F2),
+        muted: HexColor(0x6272A4), primary: HexColor(0xBD93F9), font: .mono,
+        error: HexColor(0xFF5555),
+        secondary: HexColor(0xFF79C6))
+
+    /// Catppuccin Mocha — soft pastel dark. Mauve primary, pastel-blue
+    /// secondary; muted deepened to widen the gap from dracula.
+    public static let catppuccinMocha = ThemeSpec(
+        background: HexColor(0x1E1E2E), foreground: HexColor(0xCDD6F4),
+        muted: HexColor(0x6C7086), primary: HexColor(0xCBA6F7), font: .mono,
+        error: HexColor(0xF38BA8),
+        secondary: HexColor(0x89B4FA))
+
+    /// Gruvbox — retro warm dark. Orange primary, aqua secondary.
+    public static let gruvbox = ThemeSpec(
+        background: HexColor(0x282828), foreground: HexColor(0xEBDBB2),
+        muted: HexColor(0x928374), primary: HexColor(0xFE8019), font: .mono,
+        secondary: HexColor(0x8EC07C))
+
+    // --- Light --------------------------------------------------------
+
+    /// GitHub Light — clean daytime white. Link-blue / purple, ink-alpha
+    /// neutrals (explicit because the dark recipe derives wrong on light).
+    public static let githubLight = ThemeSpec(
+        background: HexColor(0xFFFFFF), foreground: HexColor(0x1F2328),
+        muted: HexColor(0x6E7781), primary: HexColor(0x0969DA), font: .system,
+        error: HexColor(0xCF222E),
+        secondary: HexColor(0x8250DF),
+        border: HexColor(0x1F2328, 0.10),
+        hover: HexColor(0x1F2328, 0.05),
+        selection: HexColor(0x0969DA, 0.18))
+
+    /// Catppuccin Latte — warm-grey lavender light. Purple primary, teal
+    /// secondary; explicit trio (light theme).
+    public static let catppuccinLatte = ThemeSpec(
+        background: HexColor(0xEFF1F5), foreground: HexColor(0x4C4F69),
+        muted: HexColor(0x8C8FA1), primary: HexColor(0x8839EF), font: .mono,
+        error: HexColor(0xD20F39),
+        secondary: HexColor(0x209FB5),
+        border: HexColor(0x4C4F69, 0.10),
+        hover: HexColor(0x4C4F69, 0.05),
+        selection: HexColor(0x8839EF, 0.18))
+
+    // --- Structural ---------------------------------------------------
+
+    /// Native vibrancy + dynamic system colors. background nil (vibrancy),
+    /// primary sentinel 0 (OS control-accent), font menu. The trio is
+    /// resolved against system colors in PaletteKit (it can't be a hex
+    /// here), so it stays nil and PaletteKit special-cases `system`.
+    public static let system = ThemeSpec(
+        background: nil, foreground: HexColor(0x000000), muted: HexColor(0x000000),
+        primary: HexColor(systemPrimarySentinel), font: .menu)
 }
 
 // MARK: - Name resolution
@@ -364,59 +325,49 @@ extension ThemeSpec {
 /// Canonical theme names accepted by `--theme=`. Single source of truth
 /// so a CLI can reject typos. Includes the `random` meta-name.
 public let canonicalThemeNames: [String] = [
-    "terminal", "cute", "system",
-    "nord", "dracula", "gruvbox", "catppuccin", "rosepine",
-    "everforest", "solarized", "onedark", "monokai", "hacker", "paper",
-    "mono-light", "mono-dark", "monotone",
-    "neon", "cyber", "vapor", "kawaii", "rainbow",
-    "chomp",
+    "terminal", "chomp", "rainbow",
+    "cobalt2", "shades-of-purple", "tokyo-hack",
+    "github-dark", "dracula", "catppuccin-mocha", "gruvbox",
+    "github-light", "catppuccin-latte",
+    "system",
     "random",
 ]
 
 /// Map a raw `--theme=…` value to a `ThemeSpec`. Case-insensitive;
 /// unknown names fall through to `terminal`. `random` picks a concrete
-/// non-system theme each call (matches facet). Pure — no AppKit.
+/// non-system theme each call. Pure — no AppKit.
 public func paletteFor(_ raw: String) -> ThemeSpec {
     switch raw.lowercased() {
-    case "cute":       return .cute
-    case "system":     return .system
-    case "nord":       return .nord
-    case "dracula":    return .dracula
-    case "gruvbox":    return .gruvbox
-    case "catppuccin": return .catppuccin
-    case "rosepine":   return .rosepine
-    case "everforest": return .everforest
-    case "solarized":  return .solarized
-    case "onedark":    return .onedark
-    case "monokai":    return .monokai
-    case "hacker":     return .hacker
-    case "neon":       return .neon
-    case "cyber":      return .cyber
-    case "vapor":      return .vapor
-    case "kawaii":     return .kawaii
-    case "rainbow":    return .rainbow
-    case "chomp":      return .chomp
-    case "paper":      return .paper
-    case "mono-light": return .monoLight
-    case "mono-dark":  return .monoDark
-    case "monotone":   return .monotone
+    case "terminal":          return .terminal
+    case "chomp":             return .chomp
+    case "rainbow":           return .rainbow
+    case "cobalt2":           return .cobalt2
+    case "shades-of-purple":  return .shadesOfPurple
+    case "tokyo-hack":        return .tokyoHack
+    case "github-dark":       return .githubDark
+    case "dracula":           return .dracula
+    case "catppuccin-mocha":  return .catppuccinMocha
+    case "gruvbox":           return .gruvbox
+    case "github-light":      return .githubLight
+    case "catppuccin-latte":  return .catppuccinLatte
+    case "system":            return .system
     case "random":
         let pool = canonicalThemeNames.filter { $0 != "random" && $0 != "system" }
         return paletteFor(pool.randomElement() ?? "terminal")
-    default:           return .terminal
+    default:                  return .terminal
     }
 }
 
 // MARK: - Contrast (shared value logic, pure)
 
 /// Luminance at/above which a fill reads as "light" and wants a DARK
-/// foreground. Single source so PaletteKit's NSColor `onAccent` and a
+/// foreground. Single source so PaletteKit's NSColor `onPrimary` and a
 /// pure (Palette-only) consumer like perch can't drift apart.
 public let lightFillLuminanceThreshold: Double = 0.6
 
 public extension HexColor {
     /// Black or white — whichever best contrasts THIS color used as a
-    /// fill. The pure half of `onAccent`; PaletteKit reuses the same
+    /// fill. The pure half of `onPrimary`; PaletteKit reuses the same
     /// threshold for the resolved-`NSColor` (incl. OS controlAccent) case.
     var bestForeground: HexColor {
         luminance >= lightFillLuminanceThreshold ? HexColor(0x000000) : HexColor(0xFFFFFF)
@@ -430,7 +381,7 @@ public extension HexColor {
 /// `#rgb` / `#rrggbb` / `#rrggbbaa` (the leading `#` optional). Opt-in:
 /// an app wanting a stricter grammar (halo's 6-digit-only) keeps its own
 /// parser; this lets wand dedup its token grammar. Semantic tokens like
-/// `accent` / `system` are NOT handled here — they are app-level
+/// `primary` / `system` are NOT handled here — they are app-level
 /// sentinels, not literal colors.
 public func parseColorToken(_ raw: String) -> HexColor? {
     let s = raw.trimmingCharacters(in: .whitespaces).lowercased()
@@ -469,9 +420,10 @@ public func parseColorToken(_ raw: String) -> HexColor? {
 // MARK: - Pill alpha suggestion (pure, opt-in)
 
 /// A suggested translucent-pill background alpha for a theme of the given
-/// `bg` luminance — darker themes get a more opaque pill. Opt-in: perch
-/// MAY call this instead of hand-maintaining its per-preset table; it is
-/// NOT applied by the derive recipe (a nil `bgAlpha` still means opaque).
+/// `background` luminance — darker themes get a more opaque pill. Opt-in:
+/// perch MAY call this instead of hand-maintaining its per-preset table;
+/// it is NOT applied by the derive recipe (a nil `backgroundAlpha` still
+/// means opaque).
 public func suggestedPillAlpha(luminance: Double) -> Double {
     let a = 0.92 - luminance * 0.55      // dark ≈ 0.92 … light ≈ 0.37
     return min(0.92, max(0.30, a))

@@ -149,19 +149,19 @@ public func blendThrough(_ colors: [UInt32], at phase: Double)
 
 #if canImport(AppKit)
 
-/// A point-in-time animated frame: the spec's accent/accent2 rotated to
-/// `phase`, with bg/text/dim held steady so the UI stays usable. Returns
-/// resolved `NSColor`s ready to install as the live `pal`. `@MainActor`
-/// because `NSColor` isn't `Sendable`.
+/// A point-in-time animated frame: the spec's primary/secondary rotated
+/// to `phase`, with background/foreground/muted held steady so the UI
+/// stays usable. Returns resolved `NSColor`s ready to install as the live
+/// `pal`. `@MainActor` because `NSColor` isn't `Sendable`.
 @MainActor
 public struct AnimatedFrame {
-    public let accent: NSColor
-    public let accent2: NSColor
-    /// selFill keyed to the LIVE animated accent, at the theme's own
-    /// selFill alpha — the authored value (rainbow = 0.22) or the family
+    public let primary: NSColor
+    public let secondary: NSColor
+    /// selection keyed to the LIVE animated primary, at the theme's own
+    /// selection alpha — the authored value (rainbow = 0.22) or the family
     /// default 0.18, matching PaletteKit's static derive so the selected-
     /// row wash doesn't jump when animation engages.
-    public let selFill: NSColor
+    public let selection: NSColor
 }
 
 /// Cycle a theme to `phase` (0…1). A `cycles` effect (rainbow) rotates
@@ -169,7 +169,7 @@ public struct AnimatedFrame {
 /// (neon/cyber/vapor/kawaii/chomp) cycles through that effect's own
 /// flash palette (keeping its identity). Resolves the effect by name
 /// through the built-in catalog (`borderEffectFor`). Returns nil for a
-/// non-animatable theme. `accent2` trails half a turn. Generalizes
+/// non-animatable theme. `secondary` trails half a turn. Generalizes
 /// facet's `animatedPalette`.
 ///
 /// Callers blend the result into a fresh `ResolvedPalette` (or assign
@@ -187,23 +187,23 @@ public func animatedPalette(theme name: String, at phase: CGFloat) -> AnimatedFr
                 blue: CGFloat(t.b), alpha: 1)
     }
 
-    let accent: NSColor, accent2: NSColor
+    let primary: NSColor, secondary: NSColor
     if fx.cycles {
-        accent  = NSColor(hue: h,  saturation: 0.95, brightness: 1, alpha: 1)
-        accent2 = NSColor(hue: h2, saturation: 0.95, brightness: 1, alpha: 1)
+        primary   = NSColor(hue: h,  saturation: 0.95, brightness: 1, alpha: 1)
+        secondary = NSColor(hue: h2, saturation: 0.95, brightness: 1, alpha: 1)
     } else if !fx.flash.isEmpty {
-        accent  = ns(blendThrough(fx.flash, at: Double(h)))
-        accent2 = ns(blendThrough(fx.flash, at: Double(h2)))
+        primary   = ns(blendThrough(fx.flash, at: Double(h)))
+        secondary = ns(blendThrough(fx.flash, at: Double(h2)))
     } else {
         return nil
     }
-    // Honor the theme's AUTHORED selFill alpha (rainbow explicitly sets
+    // Honor the theme's AUTHORED selection alpha (rainbow explicitly sets
     // 0.22); otherwise the family default 0.18 — same value PaletteKit's
     // static resolve derives, so the wash doesn't shift 0.18→0.22 the
     // instant the animator engages.
-    let selAlpha = paletteFor(name).selFill.map { CGFloat($0.alpha) } ?? 0.18
-    return AnimatedFrame(accent: accent, accent2: accent2,
-                         selFill: accent.withAlphaComponent(selAlpha))
+    let selAlpha = paletteFor(name).selection.map { CGFloat($0.alpha) } ?? 0.18
+    return AnimatedFrame(primary: primary, secondary: secondary,
+                         selection: primary.withAlphaComponent(selAlpha))
 }
 
 #endif
