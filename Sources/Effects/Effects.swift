@@ -12,7 +12,13 @@
 //     output. Gated by `#if canImport(AppKit)` so the spec stays
 //     cross-platform.
 
-import Palette
+// Re-exported: an Effects-only consumer (halo) sees the pure vocabulary —
+// `canonicalEffectNames` / `LinePet` / `canonicalLinePetNames` /
+// `EffectIntensity` / `parseColorToken` / `HexColor` — without adding a
+// second dependency. Also keeps source compatibility for the name lists
+// and `LinePet`, which moved from this module into `Palette` in 0.6.0
+// (a no-AppKit Core must validate config tokens without linking Effects).
+@_exported import Palette
 
 #if canImport(AppKit)
 import AppKit
@@ -93,11 +99,8 @@ extension EffectSpec {
         flash: [0xFFEA00, 0x2121FF, 0xFF0000, 0x2121FF])
 }
 
-/// Canonical effect names accepted by `[border] effect` (+ `off` /
-/// `random`). Single source of truth so a CLI can reject typos.
-public let canonicalEffectNames: [String] = [
-    "neon", "cyber", "vapor", "kawaii", "rainbow", "chomp", "random", "off",
-]
+// (`canonicalEffectNames` lives in `Palette` since 0.6.0 — pure
+// vocabulary a no-AppKit Core can link — and is re-exported here.)
 
 /// Map a BUILT-IN effect name to its `EffectSpec`, or `nil` for "off" /
 /// unknown. Pure — `UInt32` hex, no AppKit. `random` picks a concrete
@@ -156,25 +159,11 @@ public func blendThrough(_ colors: [UInt32], at phase: Double)
 }
 
 // MARK: - Line-pets (pure identity)
-
-/// One of the small arcade "pets" that walk a surface's outline — a
-/// shared decoration across facet's tree, halo's ring, and wand's cast /
-/// tome cards. Multiple pets chase each other around the rim in array
-/// order (first leads, the rest trail at a fixed gap). Theme-AGNOSTIC:
-/// each pet's colours are baked into its silhouette, so it reads the
-/// same under any theme. The drawing lives behind `#if canImport(AppKit)`
-/// (`drawLinePets`); this identity enum is pure so configs can persist /
-/// validate against it with no AppKit.
-public enum LinePet: String, Sendable, Hashable, CaseIterable {
-    /// Classic yellow chomping wedge.
-    case chomp
-    /// Red Blinky-style ghost — dome top, two eyes, scalloped skirt.
-    case ghost
-}
-
-/// Canonical pet names accepted by a `line-pets` config list. Single
-/// source of truth so a consumer can drop + report typos.
-public let canonicalLinePetNames: [String] = LinePet.allCases.map(\.rawValue)
+//
+// (`LinePet` + `canonicalLinePetNames` live in `Palette` since 0.6.0 —
+// pure identity a no-AppKit Core can persist / validate against without
+// linking this module — and are re-exported here. The drawing below
+// stays Effects-side behind `#if canImport(AppKit)`.)
 
 // MARK: - Animated palette (AppKit)
 
@@ -237,6 +226,20 @@ public func animatedPalette(theme name: String, at phase: CGFloat) -> AnimatedFr
                          selection: primary.withAlphaComponent(selAlpha))
 }
 
+// MARK: - HexColor → NSColor bridge
+
+public extension NSColor {
+    /// Materialize a pure `HexColor` (rgb + alpha) as an sRGB `NSColor`.
+    /// Lives HERE — not PaletteKit — so an Effects-only consumer (halo)
+    /// can bridge `parseColorToken` output without linking PaletteKit.
+    /// Deliberately a DISTINCT signature from PaletteKit's
+    /// `NSColor(hex: UInt32)` so importing both modules stays unambiguous.
+    convenience init(_ hex: HexColor) {
+        self.init(srgbRed: CGFloat(hex.r), green: CGFloat(hex.g),
+                  blue: CGFloat(hex.b), alpha: CGFloat(hex.alpha))
+    }
+}
+
 // MARK: - Line-pets (AppKit drawing)
 
 /// Draw `pets` walking `rect`'s perimeter at wall-clock `now`, scaled by
@@ -246,14 +249,19 @@ public func animatedPalette(theme name: String, at phase: CGFloat) -> AnimatedFr
 /// `maxY`). Generalizes wand's `drawCardLinePets` / `TomePetsView` into
 /// ONE shared shape for every surface (facet tree, halo ring, wand cards).
 /// Each pet's silhouette colours are baked in (theme-agnostic).
+///
+/// `chaseGap` is the trailing distance between consecutive pets, in
+/// points (already scaled — pass `28 * scale` etc.). `nil` keeps the
+/// default `24 * scale` (~2× ghost width); wand's tome card runs a
+/// slightly looser 28-pt chase, which this preserves through the dedup.
 @MainActor
 public func drawLinePets(_ pets: [LinePet], on rect: CGRect,
                          now: CFTimeInterval, scale: CGFloat = 1,
-                         speed: CGFloat = 120) {
+                         speed: CGFloat = 120, chaseGap: CGFloat? = nil) {
     guard rect.width > 0, rect.height > 0, !pets.isEmpty, speed > 0 else { return }
     let perim = 2 * (rect.width + rect.height)
     let leader = CGFloat(now).truncatingRemainder(dividingBy: perim / speed) * speed
-    let chaseGap: CGFloat = 24 * scale   // ~2× ghost width
+    let chaseGap: CGFloat = chaseGap ?? 24 * scale   // ~2× ghost width
     for (i, pet) in pets.enumerated() {
         var pos = leader - CGFloat(i) * chaseGap
         pos = pos.truncatingRemainder(dividingBy: perim)

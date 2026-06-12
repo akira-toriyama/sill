@@ -322,41 +322,71 @@ extension ThemeSpec {
 
 // MARK: - Name resolution
 
+/// Single source of truth for the catalog: ordered (name, spec) pairs.
+/// `canonicalThemeNames` and `paletteFor` both derive from this table, so
+/// adding a theme is ONE edit (the old layout needed the static, the
+/// `paletteFor` switch, AND the name array kept in sync by hand — sill's
+/// own little hand-copy, now retired). Order is the user-facing catalog
+/// order (favorites → reference → popular → light → structural).
+private let themeCatalog: [(name: String, spec: ThemeSpec)] = [
+    ("terminal", .terminal), ("chomp", .chomp), ("rainbow", .rainbow),
+    ("cobalt2", .cobalt2), ("shades-of-purple", .shadesOfPurple),
+    ("tokyo-hack", .tokyoHack),
+    ("github-dark", .githubDark), ("dracula", .dracula),
+    ("catppuccin-mocha", .catppuccinMocha), ("gruvbox", .gruvbox),
+    ("github-light", .githubLight), ("catppuccin-latte", .catppuccinLatte),
+    ("system", .system),
+]
+
 /// Canonical theme names accepted by `--theme=`. Single source of truth
 /// so a CLI can reject typos. Includes the `random` meta-name.
-public let canonicalThemeNames: [String] = [
-    "terminal", "chomp", "rainbow",
-    "cobalt2", "shades-of-purple", "tokyo-hack",
-    "github-dark", "dracula", "catppuccin-mocha", "gruvbox",
-    "github-light", "catppuccin-latte",
-    "system",
-    "random",
-]
+public let canonicalThemeNames: [String] = themeCatalog.map(\.name) + ["random"]
 
 /// Map a raw `--theme=…` value to a `ThemeSpec`. Case-insensitive;
 /// unknown names fall through to `terminal`. `random` picks a concrete
 /// non-system theme each call. Pure — no AppKit.
 public func paletteFor(_ raw: String) -> ThemeSpec {
-    switch raw.lowercased() {
-    case "terminal":          return .terminal
-    case "chomp":             return .chomp
-    case "rainbow":           return .rainbow
-    case "cobalt2":           return .cobalt2
-    case "shades-of-purple":  return .shadesOfPurple
-    case "tokyo-hack":        return .tokyoHack
-    case "github-dark":       return .githubDark
-    case "dracula":           return .dracula
-    case "catppuccin-mocha":  return .catppuccinMocha
-    case "gruvbox":           return .gruvbox
-    case "github-light":      return .githubLight
-    case "catppuccin-latte":  return .catppuccinLatte
-    case "system":            return .system
-    case "random":
-        let pool = canonicalThemeNames.filter { $0 != "random" && $0 != "system" }
+    let s = raw.lowercased()
+    if s == "random" {
+        let pool = themeCatalog.map(\.name).filter { $0 != "system" }
         return paletteFor(pool.randomElement() ?? "terminal")
-    default:                  return .terminal
     }
+    return themeCatalog.first { $0.name == s }?.spec ?? .terminal
 }
+
+// MARK: - Pure effect / pet vocabulary
+//
+// The NAME lists for the dynamic-effect catalog live HERE — not in
+// `Effects` — because a no-AppKit Core (FacetCore, WandCore) must be able
+// to validate config tokens without linking a module that compiles AppKit
+// code on macOS. The `EffectSpec` catalog + animators stay in `Effects`
+// (which `@_exported import`s Palette, so Effects-only consumers still
+// see these names unqualified).
+
+/// Canonical effect names accepted by `[border] effect` (+ `off` /
+/// `random`). Single source of truth so a CLI can reject typos.
+public let canonicalEffectNames: [String] = [
+    "neon", "cyber", "vapor", "kawaii", "rainbow", "chomp", "random", "off",
+]
+
+/// One of the small arcade "pets" that walk a surface's outline — a
+/// shared decoration across facet's tree, halo's ring, and wand's cast /
+/// tome cards. Multiple pets chase each other around the rim in array
+/// order (first leads, the rest trail at a fixed gap). Theme-AGNOSTIC:
+/// each pet's colours are baked into its silhouette, so it reads the
+/// same under any theme. Pure identity — configs persist / validate
+/// against it with no AppKit; the drawing (`drawLinePets`) lives in
+/// `Effects` behind `#if canImport(AppKit)`.
+public enum LinePet: String, Sendable, Hashable, CaseIterable {
+    /// Classic yellow chomping wedge.
+    case chomp
+    /// Red Blinky-style ghost — dome top, two eyes, scalloped skirt.
+    case ghost
+}
+
+/// Canonical pet names accepted by a `line-pets` config list. Single
+/// source of truth so a consumer can drop + report typos.
+public let canonicalLinePetNames: [String] = LinePet.allCases.map(\.rawValue)
 
 // MARK: - Validation (pure, opt-in — shared MECHANISM; policy stays app-side)
 
