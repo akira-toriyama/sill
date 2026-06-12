@@ -89,4 +89,22 @@ final class EffectsTests: XCTestCase {
         XCTAssertEqual(rainbow.selection.usingColorSpace(.sRGB)!.alphaComponent,
                        0.22, accuracy: 0.001)
     }
+
+    // --- Line-pets (pure identity) ---
+
+    func testLinePetRawValues() {
+        XCTAssertEqual(LinePet.chomp.rawValue, "chomp")
+        XCTAssertEqual(LinePet.ghost.rawValue, "ghost")
+    }
+
+    func testLinePetParsesFromName() {
+        XCTAssertEqual(LinePet(rawValue: "chomp"), .chomp)
+        XCTAssertEqual(LinePet(rawValue: "ghost"), .ghost)
+        XCTAssertNil(LinePet(rawValue: "pacman"))
+    }
+
+    func testCanonicalLinePetNames() {
+        XCTAssertEqual(canonicalLinePetNames, ["chomp", "ghost"])
+        XCTAssertEqual(LinePet.allCases.count, 2)
+    }
 }

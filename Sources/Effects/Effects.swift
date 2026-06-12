@@ -155,6 +155,27 @@ public func blendThrough(_ colors: [UInt32], at phase: Double)
             b0 + (b1 - b0) * t)
 }
 
+// MARK: - Line-pets (pure identity)
+
+/// One of the small arcade "pets" that walk a surface's outline — a
+/// shared decoration across facet's tree, halo's ring, and wand's cast /
+/// tome cards. Multiple pets chase each other around the rim in array
+/// order (first leads, the rest trail at a fixed gap). Theme-AGNOSTIC:
+/// each pet's colours are baked into its silhouette, so it reads the
+/// same under any theme. The drawing lives behind `#if canImport(AppKit)`
+/// (`drawLinePets`); this identity enum is pure so configs can persist /
+/// validate against it with no AppKit.
+public enum LinePet: String, Sendable, Hashable, CaseIterable {
+    /// Classic yellow chomping wedge.
+    case chomp
+    /// Red Blinky-style ghost — dome top, two eyes, scalloped skirt.
+    case ghost
+}
+
+/// Canonical pet names accepted by a `line-pets` config list. Single
+/// source of truth so a consumer can drop + report typos.
+public let canonicalLinePetNames: [String] = LinePet.allCases.map(\.rawValue)
+
 // MARK: - Animated palette (AppKit)
 
 #if canImport(AppKit)
@@ -214,6 +235,127 @@ public func animatedPalette(theme name: String, at phase: CGFloat) -> AnimatedFr
     let selAlpha = paletteFor(name).selection.map { CGFloat($0.alpha) } ?? 0.18
     return AnimatedFrame(primary: primary, secondary: secondary,
                          selection: primary.withAlphaComponent(selAlpha))
+}
+
+// MARK: - Line-pets (AppKit drawing)
+
+/// Draw `pets` walking `rect`'s perimeter at wall-clock `now`, scaled by
+/// `scale`, chasing each other at `speed` pt/s. The caller owns the view,
+/// the redraw timer, and `rect` (in its own coordinate space — the walk
+/// is coordinate-agnostic; pass a NON-flipped rect so "top" reads as
+/// `maxY`). Generalizes wand's `drawCardLinePets` / `TomePetsView` into
+/// ONE shared shape for every surface (facet tree, halo ring, wand cards).
+/// Each pet's silhouette colours are baked in (theme-agnostic).
+@MainActor
+public func drawLinePets(_ pets: [LinePet], on rect: CGRect,
+                         now: CFTimeInterval, scale: CGFloat = 1,
+                         speed: CGFloat = 120) {
+    guard rect.width > 0, rect.height > 0, !pets.isEmpty, speed > 0 else { return }
+    let perim = 2 * (rect.width + rect.height)
+    let leader = CGFloat(now).truncatingRemainder(dividingBy: perim / speed) * speed
+    let chaseGap: CGFloat = 24 * scale   // ~2× ghost width
+    for (i, pet) in pets.enumerated() {
+        var pos = leader - CGFloat(i) * chaseGap
+        pos = pos.truncatingRemainder(dividingBy: perim)
+        if pos < 0 { pos += perim }
+        let (px, py, rot) = linePetPosition(on: rect, distance: pos)
+        NSGraphicsContext.saveGraphicsState()
+        let tx = NSAffineTransform()
+        tx.translateX(by: px, yBy: py)
+        tx.rotate(byRadians: rot)
+        tx.concat()
+        switch pet {
+        case .chomp: drawChompPet(now: now, scale: scale)
+        case .ghost: drawGhostPet(now: now, scale: scale)
+        }
+        NSGraphicsContext.restoreGraphicsState()
+    }
+}
+
+/// Walk `rect`'s perimeter linearly (top → right → bottom → left) and
+/// return the centre + travel-direction rotation at `distance`. Each
+/// pet's draw code stays in a canonical "facing-right" frame; the
+/// transform supplies the lap-aware orientation.
+private func linePetPosition(on r: CGRect, distance t: CGFloat)
+    -> (x: CGFloat, y: CGFloat, rot: CGFloat) {
+    let topLen = r.width, rightLen = r.height, bottomLen = r.width
+    if t < topLen {
+        return (r.minX + t, r.maxY, 0)
+    } else if t < topLen + rightLen {
+        return (r.maxX, r.maxY - (t - topLen), -.pi / 2)
+    } else if t < topLen + rightLen + bottomLen {
+        return (r.maxX - (t - topLen - rightLen), r.minY, .pi)
+    } else {
+        return (r.minX, r.minY + (t - topLen - rightLen - bottomLen), .pi / 2)
+    }
+}
+
+/// Yellow chomp wedge with the mouth opening / closing on a ~0.25 s
+/// cycle, centred on the current transform origin. `scale` keeps it
+/// proportional to the host surface.
+private func drawChompPet(now: CFTimeInterval, scale: CGFloat) {
+    let r: CGFloat = 7 * scale
+    let chompPhase = 0.5 - 0.5 * cos(now * (2 * .pi / 0.25))
+    let openRad = chompPhase * (35.0 * .pi / 180.0)
+    let yellow = NSColor(calibratedRed: 1.0, green: 0.85, blue: 0.0, alpha: 1.0)
+    let p = NSBezierPath()
+    p.move(to: .zero)
+    p.appendArc(withCenter: .zero, radius: r,
+                startAngle: CGFloat(openRad * 180 / .pi),
+                endAngle: CGFloat(360 - openRad * 180 / .pi),
+                clockwise: false)
+    p.close()
+    yellow.setFill(); p.fill()
+    NSColor.black.withAlphaComponent(0.35).setStroke()
+    p.lineWidth = 0.5; p.stroke()
+}
+
+/// Red Blinky-style ghost: dome + 3-wave skirt + eyes pointing along
+/// travel direction, centred on the current transform origin.
+private func drawGhostPet(now: CFTimeInterval, scale: CGFloat) {
+    let w: CGFloat = 14 * scale
+    let h: CGFloat = 16 * scale
+    let bob = CGFloat(sin(now * (2 * .pi / 0.4))) * 0.6 * scale
+    let halfW = w / 2
+    let halfH = h / 2
+    let red = NSColor(calibratedRed: 1.0, green: 0.0, blue: 0.10, alpha: 1.0)
+    let body = NSBezierPath()
+    body.move(to: CGPoint(x: -halfW, y: 0))
+    body.appendArc(withCenter: CGPoint(x: 0, y: 0), radius: halfW,
+                   startAngle: 180, endAngle: 0, clockwise: false)
+    body.line(to: CGPoint(x: halfW, y: -halfH + bob))
+    let segments = 3
+    let segW = w / CGFloat(segments)
+    let waveDepth: CGFloat = 1.5 * scale
+    for i in (0..<segments).reversed() {
+        let startX = -halfW + CGFloat(i + 1) * segW
+        let endX = -halfW + CGFloat(i) * segW
+        let midX = (startX + endX) / 2
+        body.curve(to: CGPoint(x: endX, y: -halfH + bob),
+                   controlPoint1: CGPoint(x: midX, y: -halfH - waveDepth - bob),
+                   controlPoint2: CGPoint(x: midX, y: -halfH - waveDepth - bob))
+    }
+    body.line(to: CGPoint(x: -halfW, y: 0))
+    body.close()
+    red.setFill(); body.fill()
+    NSColor.black.withAlphaComponent(0.35).setStroke()
+    body.lineWidth = 0.5 * scale; body.stroke()
+    let eyeR: CGFloat = 2.0 * scale
+    let pupilR: CGFloat = 1.0 * scale
+    let eyeY: CGFloat = halfH * 0.35
+    let eyeDx: CGFloat = 2.6 * scale
+    let pupilOffset: CGFloat = 0.7 * scale
+    let eyeShift: CGFloat = 1.0 * scale
+    for sign in [-1.0, 1.0] {
+        let cx = CGFloat(sign) * eyeDx + eyeShift
+        let sclera = NSBezierPath(ovalIn: CGRect(x: cx - eyeR, y: eyeY - eyeR,
+                                                 width: 2 * eyeR, height: 2 * eyeR))
+        NSColor.white.setFill(); sclera.fill()
+        let pupil = NSBezierPath(ovalIn: CGRect(x: cx - pupilR + pupilOffset, y: eyeY - pupilR,
+                                                width: 2 * pupilR, height: 2 * pupilR))
+        NSColor(calibratedRed: 0.10, green: 0.18, blue: 0.95, alpha: 1.0).setFill()
+        pupil.fill()
+    }
 }
 
 #endif
