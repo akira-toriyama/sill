@@ -189,6 +189,52 @@ final class TomlTests: XCTestCase {
         XCTAssertEqual(doc.tables["c"]?["url"]?.asString, "https://x/#frag")
     }
 
+    /// An escaped quote `\"` inside a BASIC string must not close it, so
+    /// a `#` that follows the *real* closing quote is the comment — not
+    /// swallowed as string interior (which would leave the value with an
+    /// unbalanced quote and drop the whole binding). Regression guard:
+    /// perch's old in-tree parser tracked escape state in its comment
+    /// stripper; the shared parser must too (else a shell `action-cmd`
+    /// like `"echo \"hi\""  # greet` silently vanishes).
+    func testEscapedQuoteBeforeTrailingComment() {
+        let doc = Toml.parseFlat(#"""
+        [s]
+        say = "echo \"hi\""   # greet
+        plain = "no escapes"   # comment
+        """#)
+        XCTAssertEqual(doc.tables["s"]?["say"]?.asString, #"echo "hi""#)
+        XCTAssertEqual(doc.tables["s"]?["plain"]?.asString, "no escapes")
+    }
+
+    /// Escaped quotes inside an array element must not desync the
+    /// comma/bracket split (the element boundary is the unescaped quote,
+    /// not the escaped one) — and the trailing comment after `]` still
+    /// strips.
+    func testEscapedQuoteInsideArrayElement() {
+        let doc = Toml.parseFlat(#"""
+        [s]
+        xs = ["a, \"b\"", "c"]   # two elements, not three
+        """#)
+        XCTAssertEqual(doc.tables["s"]?["xs"]?.asStringArray, [#"a, "b""#, "c"])
+    }
+
+    /// Multi-line array whose element contains an escaped quote: the
+    /// bracket-balance accumulator must keep the basic string open across
+    /// the `\"` so it doesn't think the array closed early.
+    func testEscapedQuoteInMultilineArray() {
+        let doc = Toml.parseFlat(#"""
+        [s]
+        xs = [
+            "plain",
+            "with \"quote\" inside",
+        ]
+        after = 1
+        """#)
+        XCTAssertEqual(doc.tables["s"]?["xs"]?.asStringArray,
+                       ["plain", #"with "quote" inside"#])
+        XCTAssertEqual(doc.tables["s"]?["after"]?.asInt, 1)
+    }
+
     func testEmptyAndTrailingCommaArrays() {
         let doc = Toml.parseFlat("""
         [a]

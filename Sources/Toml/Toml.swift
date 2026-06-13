@@ -42,7 +42,8 @@
 //     `'…'` literal (verbatim, no escapes), int (Int64), hex int
 //     `0x…`, float (Double), bool. Int is tried before float so a bare
 //     `2` stays `.int`.
-//   • `#` comments to end of line, quote-aware. CRLF tolerated.
+//   • `#` comments to end of line, quote- AND escape-aware (an
+//     escaped `\"` inside a basic string doesn't end it). CRLF tolerated.
 //
 // NOT supported (by design — none of the four configs need them):
 //   • multi-line strings (`"""…"""`), multi-line *inline tables*
@@ -225,14 +226,26 @@ public enum Toml {
     // MARK: - Shared scalar / line helpers
 
     /// Strip an unquoted `#` comment to end of line. A `#` inside a
-    /// `"…"` or `'…'` body is preserved (quote-aware).
+    /// `"…"` or `'…'` body is preserved (quote-aware), and an escaped
+    /// quote `\"` inside a BASIC string does not close it — so a `#`
+    /// after a string like `"a \" b"` is still the real comment, not
+    /// swallowed as string interior. Literal `'…'` strings process no
+    /// escapes (a `\` is verbatim), so escape tracking is gated on the
+    /// active quote being `"`.
     private static func stripComment(_ s: String) -> String {
         var inStr = false
         var quote: Character = "\""
+        var escaped = false
         var out = ""
         for c in s {
             if inStr {
-                if c == quote { inStr = false }
+                if escaped {
+                    escaped = false                  // this char is literal
+                } else if c == "\\" && quote == "\"" {
+                    escaped = true                   // only basic strings escape
+                } else if c == quote {
+                    inStr = false
+                }
                 out.append(c)
             } else if c == "\"" || c == "'" {
                 inStr = true; quote = c; out.append(c)
@@ -266,14 +279,18 @@ public enum Toml {
     }
 
     /// Net bracket/brace depth, quote-aware (brackets inside `"…"`/`'…'`
-    /// don't count). > 0 means an array/table is still open.
+    /// don't count, and an escaped `\"` doesn't close a basic string).
+    /// > 0 means an array/table is still open.
     private static func bracketDepth(_ s: String) -> Int {
         var depth = 0
         var inStr = false
         var quote: Character = "\""
+        var escaped = false
         for c in s {
             if inStr {
-                if c == quote { inStr = false }
+                if escaped { escaped = false }
+                else if c == "\\" && quote == "\"" { escaped = true }
+                else if c == quote { inStr = false }
             } else if c == "\"" || c == "'" {
                 inStr = true; quote = c
             } else if c == "[" || c == "{" {
@@ -339,11 +356,14 @@ public enum Toml {
         var depth = 0
         var inStr = false
         var quote: Character = "\""
+        var escaped = false
         var cur = ""
         for c in raw {
             if inStr {
                 cur.append(c)
-                if c == quote { inStr = false }
+                if escaped { escaped = false }
+                else if c == "\\" && quote == "\"" { escaped = true }
+                else if c == quote { inStr = false }
             } else if c == "\"" || c == "'" {
                 inStr = true; quote = c; cur.append(c)
             } else if c == "[" || c == "{" {
@@ -372,10 +392,13 @@ public enum Toml {
         var cur = ""
         var inStr = false
         var quote: Character = "\""
+        var escaped = false
         for c in s {
             if inStr {
                 cur.append(c)
-                if c == quote { inStr = false }
+                if escaped { escaped = false }
+                else if c == "\\" && quote == "\"" { escaped = true }
+                else if c == quote { inStr = false }
             } else if c == "\"" || c == "'" {
                 inStr = true; quote = c; cur.append(c)
             } else if c == "." {
