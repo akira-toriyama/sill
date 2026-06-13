@@ -31,10 +31,16 @@ let package = Package(
         .library(name: "Palette", targets: ["Palette"]),
         .library(name: "PaletteKit", targets: ["PaletteKit"]),
         .library(name: "Effects", targets: ["Effects"]),
+        .library(name: "Toml", targets: ["Toml"]),
     ],
     targets: [
         // Pure, Sendable, AppKit-free. The shared base.
         .target(name: "Palette"),
+
+        // Pure, Sendable, AppKit-free TOML subset parser — the family's
+        // ONE hand-rolled parser (replaces four in-tree copies). A second
+        // pure atom alongside Palette: links zero AppKit and zero Palette.
+        .target(name: "Toml"),
 
         // AppKit resolver. The ONLY target that `import AppKit`.
         .target(name: "PaletteKit", dependencies: ["Palette"]),
@@ -51,5 +57,7 @@ let package = Package(
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit"]),
         .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette"]),
+        .testTarget(name: "TomlTests", dependencies: ["Toml"],
+                    resources: [.copy("Fixtures")]),
     ]
 )
