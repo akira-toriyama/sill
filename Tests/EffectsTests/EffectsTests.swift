@@ -54,6 +54,115 @@ final class EffectsTests: XCTestCase {
         XCTAssertEqual(c.b, 1, accuracy: 0.001)
     }
 
+    // --- Pure border resolve (reconciles halo+facet BorderFX.color/.width) ---
+
+    func testResolveBorderOff() {
+        // No effect → .off (the app paints its own pal.primary / baseColor),
+        // fixed base width, not flashing.
+        let f = resolveBorder(spec: nil, baseWidth: 3, minWidth: nil, maxWidth: nil,
+                              cycleSeconds: 6, cycleColors: false, now: 1.23, flash: nil)
+        XCTAssertEqual(f.color, .off)
+        XCTAssertEqual(f.width, 3, accuracy: 1e-12)
+        XCTAssertFalse(f.flashing)
+    }
+
+    func testResolveBorderSteady() {
+        // neon, no cycle → steady hex as sRGB rgb.
+        let h = HexColor(EffectSpec.neon.steady)
+        let f = resolveBorder(spec: .neon, baseWidth: 2, minWidth: nil, maxWidth: nil,
+                              cycleSeconds: 6, cycleColors: false, now: 0.4, flash: nil)
+        XCTAssertEqual(f.color, .rgb(r: h.r, g: h.g, b: h.b))
+    }
+
+    func testResolveBorderRainbowIsBareHue() {
+        // cycles → bare hue == phase (app builds NSColor(hue:) — calibrated).
+        let cs = 1.0, now = 0.137
+        let f = resolveBorder(spec: .rainbow, baseWidth: 2, minWidth: nil, maxWidth: nil,
+                              cycleSeconds: cs, cycleColors: false, now: now, flash: nil)
+        let phase = (now / cs).truncatingRemainder(dividingBy: 1)
+        XCTAssertEqual(f.color, .rainbowHue(phase))
+    }
+
+    func testResolveBorderCycleColorsBlend() {
+        // cycleColors → blendThrough(spec.flash, phase) as rgb.
+        let cs = 1.0, now = 0.3
+        let phase = (now / cs).truncatingRemainder(dividingBy: 1)
+        let c = blendThrough(EffectSpec.cyber.flash, at: phase)
+        let f = resolveBorder(spec: .cyber, baseWidth: 2, minWidth: nil, maxWidth: nil,
+                              cycleSeconds: cs, cycleColors: true, now: now, flash: nil)
+        XCTAssertEqual(f.color, .rgb(r: c.r, g: c.g, b: c.b))
+    }
+
+    func testResolveBorderBreathingRaisedCosine() {
+        // width breathes lo↔hi over phase (raised cosine); +1.5 only on flash.
+        // phase 0 → pulse 0 → lo; phase 0.5 → pulse 1 → hi.
+        let lo = 1.0, hi = 5.0, cs = 1.0
+        let at0 = resolveBorder(spec: .neon, baseWidth: 3, minWidth: lo, maxWidth: hi,
+                                cycleSeconds: cs, cycleColors: false, now: 0.0, flash: nil)
+        let atHalf = resolveBorder(spec: .neon, baseWidth: 3, minWidth: lo, maxWidth: hi,
+                                   cycleSeconds: cs, cycleColors: false, now: 0.5, flash: nil)
+        XCTAssertEqual(at0.width, lo, accuracy: 1e-9)
+        XCTAssertEqual(atHalf.width, hi, accuracy: 1e-9)
+    }
+
+    func testResolveBorderNoBreathWhenBoundsInverted() {
+        // hi <= lo → no breathing, fixed base width.
+        let f = resolveBorder(spec: .neon, baseWidth: 3, minWidth: 5, maxWidth: 1,
+                              cycleSeconds: 1, cycleColors: false, now: 0.5, flash: nil)
+        XCTAssertEqual(f.width, 3, accuracy: 1e-12)
+    }
+
+    func testResolveBorderFlashWinsAndPopsWidth() {
+        // Mid-burst: color is the blink, width gets the +1.5 pop, flashing true.
+        let seq: [UInt32] = [0x00E5FF, 0xFF00FF, 0x39FF14, 0xFE019A, 0x04D9FF]
+        let fs = FlashState(seq: seq, startedAt: 0)
+        let now = (2.0 + 0.5) / 30.0                 // → index 2
+        let f = resolveBorder(spec: .neon, baseWidth: 3, minWidth: nil, maxWidth: nil,
+                              cycleSeconds: 1, cycleColors: false, now: now, flash: fs)
+        let h = HexColor(seq[2])
+        XCTAssertEqual(f.color, .rgb(r: h.r, g: h.g, b: h.b))
+        XCTAssertEqual(f.width, 3 + 1.5, accuracy: 1e-12)
+        XCTAssertTrue(f.flashing)
+    }
+
+    func testResolveBorderFlashSettlesToSteady() {
+        // Past the 5-blink burst → falls back to steady, no width pop.
+        let seq: [UInt32] = [0x00E5FF, 0xFF00FF]
+        let fs = FlashState(seq: seq, startedAt: 0)
+        let f = resolveBorder(spec: .neon, baseWidth: 3, minWidth: nil, maxWidth: nil,
+                              cycleSeconds: 1, cycleColors: false, now: 10.0, flash: fs)
+        let h = HexColor(EffectSpec.neon.steady)
+        XCTAssertEqual(f.color, .rgb(r: h.r, g: h.g, b: h.b))
+        XCTAssertEqual(f.width, 3, accuracy: 1e-12)
+        XCTAssertFalse(f.flashing)
+    }
+
+    func testRollFlashShapeAndNoConsecutiveRepeat() {
+        let palette: [UInt32] = [0x00E5FF, 0xFF00FF, 0x39FF14, 0xFE019A, 0x04D9FF]
+        for _ in 0..<500 {
+            guard let r = rollFlash(palette, now: 0) else { return XCTFail("nil on non-empty") }
+            XCTAssertEqual(r.seq.count, 5)
+            XCTAssertTrue(r.seq.allSatisfy { palette.contains($0) })
+            for i in 1..<r.seq.count { XCTAssertNotEqual(r.seq[i], r.seq[i-1]) }
+        }
+    }
+
+    func testRollFlashEmptyAndSingle() {
+        XCTAssertNil(rollFlash([], now: 0))
+        // single-color palette must not spin: 5 copies of the one color.
+        XCTAssertEqual(rollFlash([0xABCDEF], now: 0)?.seq, Array(repeating: UInt32(0xABCDEF), count: 5))
+    }
+
+    func testFlashStateIndexDecay() {
+        let d = FlashState(seq: [1, 2, 3, 4, 5], startedAt: 10)
+        XCTAssertEqual(d.index(now: 10), 0)
+        XCTAssertEqual(d.index(now: 10 + 4.9 / 30), 4)
+        XCTAssertNil(d.index(now: 10 + 5.5 / 30))     // settled
+        XCTAssertNil(d.index(now: 9))                 // before start
+        XCTAssertTrue(d.isActive(now: 10))
+        XCTAssertFalse(d.isActive(now: 11))
+    }
+
     // --- Animated palette ---
 
     func testAnimatedFlashEffect() {

@@ -158,6 +158,163 @@ public func blendThrough(_ colors: [UInt32], at phase: Double)
             b0 + (b1 - b0) * t)
 }
 
+// MARK: - Border frame (pure resolve)
+//
+// The shared border ANIMATOR, reconciled from halo's & facet's byte-identical
+// `BorderFX.color` / `.width` / `.flash` into ONE clockless resolve — a PURE
+// function of wall-clock `now` + a small `FlashState` value, NOT a stateful
+// timer-owning class. Mirrors how sill already ships the time-varying border
+// as pure `f(phase)` (`blendThrough`, `animatedPalette`): sill keeps its
+// no-mutable-animation-state invariant, and the app owns the clock — exactly
+// as halo's `RingView` already drives `drawLinePets` off `CACurrentMediaTime()`.
+//
+// Each consumer (halo's ring, facet's 3 surfaces) keeps its OWN redraw cadence
+// (a dumb 30 Hz `needsDisplay` / `apply(to:layer)` heartbeat) and calls
+// `resolveBorder` each frame. What stays APP-SIDE on purpose: the redraw timer,
+// the NSColor materialization, the "off" fallback color (halo `baseColor` vs
+// facet per-surface `pal.primary`), and the glow compositing (halo `NSShadow`
+// vs facet `CALayer.shadow` — genuinely different glow models).
+
+/// A focus / WS-switch flash burst, pre-rolled ONCE at the trigger and decayed
+/// by wall-clock. The crux of the border unification: the ONLY genuinely
+/// stateful piece of the old animator (`flashSeq` + `flashStep`) reduces to
+/// this value, so the resolve stays pure. The app stores one `FlashState?`
+/// cell and sets it via `rollFlash` on a focus change.
+public struct FlashState: Sendable, Equatable {
+    /// The pre-rolled blink colors (`0xRRGGBB` each), in play order.
+    public let seq: [UInt32]
+    /// Wall-clock stamp (`CACurrentMediaTime()`-style seconds) at the roll.
+    public let startedAt: Double
+
+    public init(seq: [UInt32], startedAt: Double) {
+        self.seq = seq
+        self.startedAt = startedAt
+    }
+
+    /// The current blink index at `now`, or nil once the burst has settled (or
+    /// hasn't started). `hz` is the blink rate — 30 reproduces the old "5 ticks
+    /// at 30 Hz ≈ 167 ms" burst. Wall-clock, so a dropped frame no longer
+    /// stretches the burst (the one behavior shift from the old frame-counted
+    /// `flashStep += 1`; cosmetically identical at a steady cadence).
+    public func index(now: Double, hz: Double = 30) -> Int? {
+        guard hz > 0 else { return nil }
+        let i = Int((now - startedAt) * hz)
+        return (i >= 0 && i < seq.count) ? i : nil
+    }
+
+    /// True while the burst is mid-flight at `now`. The app's redraw-clock gate
+    /// uses this (keep ticking while flashing), as does `resolveBorder`.
+    public func isActive(now: Double, hz: Double = 30) -> Bool {
+        index(now: now, hz: hz) != nil
+    }
+}
+
+/// Roll a fresh `count`-blink focus flash through `palette` (`0xRRGGBB` each),
+/// stamped at `now`. Each pick is uniform-random with NO consecutive repeat
+/// (re-rolled while equal to the previous — guarded on count > 1 so a 1-color
+/// palette doesn't spin). Returns nil for an empty palette (the old
+/// `guard !flash.isEmpty` no-op: an effect-less border just re-hugs silently).
+/// This is halo & facet's `flash()` roll, lifted verbatim — pass `EffectSpec.flash`.
+public func rollFlash(_ palette: [UInt32], now: Double, count: Int = 5) -> FlashState? {
+    guard !palette.isEmpty else { return nil }
+    var idxs: [Int] = []
+    var last = -1
+    for _ in 0..<count {
+        var i = Int.random(in: 0..<palette.count)
+        if palette.count > 1 { while i == last { i = Int.random(in: 0..<palette.count) } }
+        idxs.append(i); last = i
+    }
+    return FlashState(seq: idxs.map { palette[$0] }, startedAt: now)
+}
+
+/// The resolved border color for one frame. `off` carries no color — the app
+/// paints its OWN fallback (halo `baseColor` / facet per-surface `pal.primary`),
+/// keeping sill palette-agnostic. `rainbowHue` is returned as a BARE hue (not
+/// pre-converted to RGB) so the app materializes it via
+/// `NSColor(hue:saturation:0.9:brightness:1:)` EXACTLY as before — that uses the
+/// calibrated color space, so pre-converting to sRGB here would shift the
+/// rainbow's gamut and break halo's byte-parity.
+public enum BorderColor: Sendable, Equatable {
+    /// Effect off — the app paints its own fallback color.
+    case off
+    /// A concrete sRGB color (steady / flash blink / `cycleColors` blend).
+    case rgb(r: Double, g: Double, b: Double)
+    /// Rainbow: a bare hue `0...1`; the app builds `NSColor(hue:…)` (calibrated).
+    case rainbowHue(Double)
+}
+
+/// A point-in-time border frame: the resolved color, the current stroke width
+/// (breathing + flash pop already applied), and whether a flash is mid-flight
+/// (the app uses it to boost its OWN glow). Glow geometry is deliberately NOT
+/// here — halo (`NSShadow` blur `max(6, w*4)`, no flash bump) and facet
+/// (`CALayer.shadow`, flash-conditional `max(5,w*5)`/`0.95`) are different glow
+/// models, so each composes its own from `width` + `flashing`.
+public struct BorderFrame: Sendable, Equatable {
+    public let color: BorderColor
+    public let width: Double
+    public let flashing: Bool
+
+    public init(color: BorderColor, width: Double, flashing: Bool) {
+        self.color = color
+        self.width = width
+        self.flashing = flashing
+    }
+}
+
+/// Resolve the shared border animator for wall-clock `now`. PURE — no timer, no
+/// mutable state, no AppKit. Reconciles the (formerly duplicated) halo/facet
+/// `BorderFX.color` + `.width`:
+///   * width: breathing raised-cosine min↔max over the cycle phase when an
+///     effect is active and both bounds are set with max > min, else the fixed
+///     `baseWidth`; `+1.5` while flashing.
+///   * color: flash blink → rainbow hue → `cycleColors` blend → steady → off
+///     (the same 5-way priority as the old `BorderFX.color`).
+/// `phase` derives from `now` (`(now / cycleSeconds) mod 1`) instead of an
+/// accumulator — frame-rate-independent and stateless (the cycle is phase-offset
+/// invariant in appearance, so an absolute clock animates identically). `flash`
+/// is the value rolled by `rollFlash`; pass the app's stored cell (nil = none).
+public func resolveBorder(
+    spec: EffectSpec?,
+    baseWidth: Double,
+    minWidth: Double?,
+    maxWidth: Double?,
+    cycleSeconds: Double,
+    cycleColors: Bool,
+    now: Double,
+    flash: FlashState?
+) -> BorderFrame {
+    let flashIdx = flash?.index(now: now)
+    let flashing = flashIdx != nil
+    let phase = (now / max(1, cycleSeconds)).truncatingRemainder(dividingBy: 1)
+
+    // Width — breathing needs an active effect + both bounds with max > min.
+    var width = baseWidth
+    if spec != nil, let lo = minWidth, let hi = maxWidth, hi > lo {
+        let pulse = (1 - cos(2 * Double.pi * phase)) / 2
+        width = lo + (hi - lo) * pulse
+    }
+    if flashing { width += 1.5 }
+
+    // Color — same 5-way priority as the old `BorderFX.color`.
+    let color: BorderColor
+    if let idx = flashIdx, let f = flash {
+        let h = HexColor(f.seq[idx]); color = .rgb(r: h.r, g: h.g, b: h.b)
+    } else if let fx = spec {
+        if fx.cycles {
+            color = .rainbowHue(phase)
+        } else if cycleColors, !fx.flash.isEmpty {
+            let c = blendThrough(fx.flash, at: phase)
+            color = .rgb(r: c.r, g: c.g, b: c.b)
+        } else {
+            let h = HexColor(fx.steady); color = .rgb(r: h.r, g: h.g, b: h.b)
+        }
+    } else {
+        color = .off
+    }
+
+    return BorderFrame(color: color, width: width, flashing: flashing)
+}
+
 // MARK: - Line-pets (pure identity)
 //
 // (`LinePet` + `canonicalLinePetNames` live in `Palette` since 0.6.0 —
