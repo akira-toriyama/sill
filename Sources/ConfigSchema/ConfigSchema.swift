@@ -157,55 +157,112 @@ public extension ConfigSchema.Spec {
 
 // MARK: - JSON Schema emission (drives `--emit-schema`)
 
+/// A mutable object-schema node while folding the spec's (possibly
+/// dotted) section headers into a tree. `permissive` flips
+/// `additionalProperties` to `true` for dynamic-name tables (custom
+/// palettes / per-app overrides / synonym maps) whose keys can't be
+/// enumerated; otherwise it stays `false` so taplo flags typo'd keys.
+private final class SchemaNode {
+    var properties: [String: Any] = [:]   // scalar/array field schemas
+    var children: [String: SchemaNode] = [:]
+    var description: String?
+    var permissive = false
+}
+
 public extension ConfigSchema.Spec {
     /// A stable, pretty-printed Draft-07 JSON Schema. Deterministic
     /// (sorted keys) so a committed copy can be drift-checked against this
     /// output in CI. Known sections/keys get type + enum + range + default
-    /// + description; `additionalProperties: false` flags typo'd keys in
-    /// the editor (the app itself stays lenient at runtime).
+    /// + description; `additionalProperties: false` flags typo'd keys.
+    ///
+    /// Section headers fold into a NESTED object tree on `.` — so a flat
+    /// `Toml.parseFlat` header like `cast.overlay.trail` (what `decode`
+    /// reads) becomes the `cast → overlay → trail` object tree that taplo
+    /// validates the raw TOML against. Single-segment headers (no dot)
+    /// stay top-level, byte-identical to a flat emission. A section's own
+    /// leaf keys merge with its nested children (e.g. `[cast]` scalars +
+    /// `[cast.overlay]`). One source (`sections`) ⇒ schema can't drift
+    /// from the decode.
     func jsonSchema() -> String {
-        var properties: [String: Any] = [:]
+        let root = SchemaNode()
         for section in sections {
             switch section.kind {
-            case .table where section.header.isEmpty:
-                // Top-level scalar keys live directly on the root object.
-                for field in section.fields {
-                    properties[field.key] = Self.fieldSchema(field)
-                }
             case .table:
-                properties[section.header] = Self.objectSchema(section)
+                let node = Self.descend(root, Self.pathComponents(section.header))
+                node.description = node.description ?? section.doc
+                for field in section.fields {
+                    node.properties[field.key] = Self.fieldSchema(field)
+                }
             case .arrayOfTables:
-                properties[section.header] = [
-                    "type": "array",
-                    "items": Self.objectSchema(section),
-                ] as [String: Any]
+                // `[[a.b.name]]` → an array of objects at `a → b → name`.
+                let path = Self.pathComponents(section.header)
+                guard let last = path.last else { break }
+                let parent = Self.descend(root, Array(path.dropLast()))
+                var props: [String: Any] = [:]
+                for field in section.fields { props[field.key] = Self.fieldSchema(field) }
+                var items: [String: Any] = ["type": "object", "additionalProperties": false]
+                if !props.isEmpty { items["properties"] = props }
+                if let doc = section.doc { items["description"] = doc }
+                parent.properties[last] = ["type": "array", "items": items] as [String: Any]
             case .dynamicTable:
-                // Permissive: allow `[header.*]` without enumerating the
-                // dynamic names, so top-level strictness doesn't reject it.
-                var obj: [String: Any] = ["type": "object", "additionalProperties": true]
-                if let doc = section.doc { obj["description"] = doc }
-                properties[section.header] = obj
+                if section.header.contains("\"") {
+                    // A literal-quote header (`behavior."<bundle-id>"`) marks
+                    // its PARENT table as accepting arbitrary sub-tables —
+                    // fold permissive onto the parent, not a `"<id>"` child.
+                    let parent = String(section.header.prefix { $0 != "." })
+                    let node = Self.descend(root, parent.isEmpty ? [] : [parent])
+                    node.permissive = true
+                    if let doc = section.doc { node.description = doc }
+                } else {
+                    // A named dynamic sub-table (`overlay.themes`,
+                    // `search.synonyms`, facet's `desktop`): permissive object.
+                    let node = Self.descend(root, Self.pathComponents(section.header))
+                    node.permissive = true
+                    node.description = section.doc ?? node.description
+                }
             }
         }
-        let root: [String: Any] = [
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "title": title,
-            "type": "object",
-            "properties": properties,
-            "additionalProperties": false,
-        ]
-        return Self.serialize(root)
+        var schema = Self.objectSchema(root)
+        schema["$schema"] = "http://json-schema.org/draft-07/schema#"
+        schema["title"] = title
+        return Self.serialize(schema)
     }
 
-    private static func objectSchema(_ section: ConfigSchema.Section<Root>) -> [String: Any] {
-        var props: [String: Any] = [:]
-        for field in section.fields { props[field.key] = fieldSchema(field) }
+    /// Split a (possibly dotted) section header into path components.
+    /// `""` → `[]` (the root scope); `"overlay.effect"` → `["overlay",
+    /// "effect"]`. Quote-bearing dynamic headers are handled before this.
+    private static func pathComponents(_ header: String) -> [String] {
+        header.split(separator: ".").map(String.init)
+    }
+
+    /// Walk (creating as needed) child nodes down `path`, returning the
+    /// leaf node. An empty path returns `root`.
+    private static func descend(_ root: SchemaNode, _ path: [String]) -> SchemaNode {
+        var cur = root
+        for name in path {
+            if let next = cur.children[name] {
+                cur = next
+            } else {
+                let next = SchemaNode()
+                cur.children[name] = next
+                cur = next
+            }
+        }
+        return cur
+    }
+
+    /// Serialize a node to a JSON-Schema object. Child sub-objects merge
+    /// into `properties` alongside the node's own scalar fields; an empty
+    /// `properties` is omitted (a bare permissive/dynamic object).
+    private static func objectSchema(_ node: SchemaNode) -> [String: Any] {
+        var props = node.properties
+        for (name, child) in node.children { props[name] = objectSchema(child) }
         var obj: [String: Any] = [
             "type": "object",
-            "properties": props,
-            "additionalProperties": false,
+            "additionalProperties": node.permissive,
         ]
-        if let doc = section.doc { obj["description"] = doc }
+        if !props.isEmpty { obj["properties"] = props }
+        if let doc = node.description { obj["description"] = doc }
         return obj
     }
 
