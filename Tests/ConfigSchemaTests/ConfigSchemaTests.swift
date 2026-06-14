@@ -112,4 +112,61 @@ final class ConfigSchemaTests: XCTestCase {
         // Deterministic: same spec → byte-identical output.
         XCTAssertEqual(text, demoSpec.jsonSchema())
     }
+
+    func testDottedHeadersFoldIntoNestedTree() throws {
+        // Dotted `.table` headers nest; a section's own leaf keys merge
+        // with its nested children; dotted `[[arrays]]` and `.dynamicTable`
+        // land at their path; a quoted dynamic header marks its parent
+        // permissive. (Covers perch/wand's nested-section needs.)
+        let spec = ConfigSchema.Spec<Demo>(
+            title: "nested",
+            sections: [
+                ConfigSchema.Section("cast", fields: [
+                    ConfigSchema.Field(key: "button", kind: .scalar(.string),
+                                       apply: { _, _ in })
+                ]),
+                ConfigSchema.Section("cast.overlay", fields: [
+                    ConfigSchema.Field(key: "enabled", kind: .scalar(.boolean),
+                                       apply: { _, _ in })
+                ]),
+                ConfigSchema.Section("cast.cursor.rule", kind: .arrayOfTables, fields: [
+                    ConfigSchema.Field(key: "name", kind: .scalar(.string),
+                                       apply: { _, _ in })
+                ]),
+                ConfigSchema.Section("overlay.themes", kind: .dynamicTable),
+                ConfigSchema.Section("behavior.\"<id>\"", kind: .dynamicTable),
+                ConfigSchema.Section("behavior", fields: [
+                    ConfigSchema.Field(key: "roles", kind: .stringArray(item: nil),
+                                       apply: { _, _ in })
+                ]),
+            ]
+        )
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: Data(spec.jsonSchema().utf8)) as? [String: Any])
+        let props = try XCTUnwrap(root["properties"] as? [String: Any])
+
+        // cast → { button (own leaf), overlay (nested table),
+        //          cursor → rule (array) }
+        let cast = try XCTUnwrap(props["cast"] as? [String: Any])
+        let castProps = try XCTUnwrap(cast["properties"] as? [String: Any])
+        XCTAssertNotNil(castProps["button"])
+        let overlay = try XCTUnwrap(castProps["overlay"] as? [String: Any])
+        XCTAssertNotNil((overlay["properties"] as? [String: Any])?["enabled"])
+        let cursor = try XCTUnwrap(castProps["cursor"] as? [String: Any])
+        let rule = try XCTUnwrap((cursor["properties"] as? [String: Any])?["rule"] as? [String: Any])
+        XCTAssertEqual(rule["type"] as? String, "array")
+
+        // overlay.themes → permissive object at overlay → themes.
+        let ov = try XCTUnwrap(props["overlay"] as? [String: Any])
+        let themes = try XCTUnwrap((ov["properties"] as? [String: Any])?["themes"] as? [String: Any])
+        XCTAssertEqual(themes["additionalProperties"] as? Bool, true)
+
+        // behavior: own `roles` key + permissive (quoted bundle-id child).
+        let behavior = try XCTUnwrap(props["behavior"] as? [String: Any])
+        XCTAssertEqual(behavior["additionalProperties"] as? Bool, true)
+        XCTAssertNotNil((behavior["properties"] as? [String: Any])?["roles"])
+
+        // Single-segment headers stay top-level (no spurious nesting).
+        XCTAssertNil(props["cast.overlay"])
+    }
 }
