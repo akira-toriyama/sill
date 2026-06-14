@@ -33,6 +33,7 @@ let package = Package(
         .library(name: "Effects", targets: ["Effects"]),
         .library(name: "Toml", targets: ["Toml"]),
         .library(name: "ConfigSchema", targets: ["ConfigSchema"]),
+        .library(name: "CLIKit", targets: ["CLIKit"]),
     ],
     targets: [
         // Pure, Sendable, AppKit-free. The shared base.
@@ -42,6 +43,13 @@ let package = Package(
         // ONE hand-rolled parser (replaces four in-tree copies). A second
         // pure atom alongside Palette: links zero AppKit and zero Palette.
         .target(name: "Toml"),
+
+        // Pure, Sendable, AppKit-free CLI argv tokenizer — the family's
+        // ONE arity-driven parser for the yabai-style grammar (Phase 3),
+        // replacing four hand-rolled argv loops. A pure atom alongside
+        // Palette / Toml: zero AppKit, zero Palette. Mechanism only — the
+        // app supplies the verb arity table; CLIKit owns no vocabulary.
+        .target(name: "CLIKit"),
 
         // AppKit resolver. The ONLY target that `import AppKit`.
         .target(name: "PaletteKit", dependencies: ["Palette"]),
@@ -67,5 +75,6 @@ let package = Package(
         .testTarget(name: "TomlTests", dependencies: ["Toml"],
                     resources: [.copy("Fixtures")]),
         .testTarget(name: "ConfigSchemaTests", dependencies: ["ConfigSchema", "Toml"]),
+        .testTarget(name: "CLIKitTests", dependencies: ["CLIKit"]),
     ]
 )
