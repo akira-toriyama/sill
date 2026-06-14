@@ -32,6 +32,7 @@ let package = Package(
         .library(name: "PaletteKit", targets: ["PaletteKit"]),
         .library(name: "Effects", targets: ["Effects"]),
         .library(name: "Toml", targets: ["Toml"]),
+        .library(name: "ConfigSchema", targets: ["ConfigSchema"]),
     ],
     targets: [
         // Pure, Sendable, AppKit-free. The shared base.
@@ -48,6 +49,12 @@ let package = Package(
         // Dynamic atom: Sendable EffectSpec + (macOS) AppKit animator.
         .target(name: "Effects", dependencies: ["Palette"]),
 
+        // Pure, Sendable, AppKit-free. One declarative `Spec<Root>` that
+        // BOTH decodes a `config.toml` (over `Toml`) and emits its JSON
+        // Schema for taplo — so the two can never drift. A third pure atom
+        // alongside Palette / Toml (zero AppKit, zero Palette).
+        .target(name: "ConfigSchema", dependencies: ["Toml"]),
+
         // `still` — the theme PREVIEW app. The one place in sill with a
         // config.toml. Renders every catalog theme (all roles + font +
         // its OWN mock chrome specimens — never imports an app's View, so
@@ -59,5 +66,6 @@ let package = Package(
         .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette"]),
         .testTarget(name: "TomlTests", dependencies: ["Toml"],
                     resources: [.copy("Fixtures")]),
+        .testTarget(name: "ConfigSchemaTests", dependencies: ["ConfigSchema", "Toml"]),
     ]
 )
