@@ -22,14 +22,30 @@ import PaletteKit
     return nil
 }
 
-/// A search / query field fill: the theme background nudged 6 % toward
-/// white — the same lift facet's tree field and wand's tome panel both
-/// give their input surfaces. Falls back to the system text background
-/// for the `system` (vibrancy, nil-background) theme.
-@MainActor func fieldFill(_ p: ResolvedPalette) -> NSColor {
-    let base = p.background ?? .textBackgroundColor
-    return base.blended(withFraction: 0.06, of: .white) ?? base
+/// Lift `p.background` toward its contrasting end — white on a dark theme,
+/// black on a light one — by `fraction`. A neutral, hue-free elevation used
+/// to stack surfaces off the card: card (0) < panel < field. The `system`
+/// (vibrancy, nil-background) theme has no fixed base, so fall back to the
+/// standard control surface.
+@MainActor func elevate(_ p: ResolvedPalette, by fraction: Double) -> NSColor {
+    guard let bg = p.background?.usingColorSpace(.sRGB) else {
+        return .controlBackgroundColor
+    }
+    let lum = 0.299 * bg.redComponent + 0.587 * bg.greenComponent
+        + 0.114 * bg.blueComponent
+    let towards: NSColor = lum > 0.55 ? .black : .white
+    return bg.blended(withFraction: fraction, of: towards) ?? bg
 }
+
+/// The mock panel border — a clearly-visible outline elevated well off the
+/// card. A panel is filled in the SAME theme `background` as the card (so it
+/// matches the `background` swatch), so the faint theme `border` vanished
+/// where panel met card; this definite outline is what separates the two.
+@MainActor func panelStroke(_ p: ResolvedPalette) -> NSColor { elevate(p, by: 0.24) }
+
+/// A search / query field fill — elevated off the panel so the input reads as
+/// a distinct surface (with its border) on any theme.
+@MainActor func fieldFill(_ p: ResolvedPalette) -> NSColor { elevate(p, by: 0.16) }
 
 // MARK: - Shared container
 
@@ -47,14 +63,14 @@ struct SpecimenBox<Content: View>: View {
         }
         .padding(10)
         .frame(width: 246, alignment: .leading)
-        // The panel fill IS the theme `background` (the same colour the
-        // `background` swatch shows and the real app surfaces paint) — not a
-        // lifted `hover`; the border alone separates the panel from the card.
+        // The panel fill IS the theme `background` (same as the `background`
+        // swatch + the card), so a clearly-visible `panelStroke` outline — not
+        // the faint theme `border` — is what separates the panel from the card.
         .background(p.background.map { Color(nsColor: $0) }
             ?? Color(nsColor: .underPageBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8)
-            .stroke(Color(nsColor: p.border), lineWidth: 1))
+            .stroke(Color(nsColor: panelStroke(p)), lineWidth: 1))
     }
 }
 
