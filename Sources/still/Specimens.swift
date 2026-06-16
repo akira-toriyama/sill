@@ -47,7 +47,11 @@ struct SpecimenBox<Content: View>: View {
         }
         .padding(10)
         .frame(width: 246, alignment: .leading)
-        .background(Color(nsColor: p.hover))
+        // The panel fill IS the theme `background` (the same colour the
+        // `background` swatch shows and the real app surfaces paint) — not a
+        // lifted `hover`; the border alone separates the panel from the card.
+        .background(p.background.map { Color(nsColor: $0) }
+            ?? Color(nsColor: .underPageBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8)
             .stroke(Color(nsColor: p.border), lineWidth: 1))
