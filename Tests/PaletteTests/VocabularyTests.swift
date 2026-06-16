@@ -30,6 +30,7 @@ final class VocabularyTests: XCTestCase {
     func testCanonicalThemeNamesMembership() {
         let expected: Set<String> = [
             "terminal", "chomp", "rainbow",
+            "aurora-flux", "acidwave", "neon-noir", "outrun", "blacklight",
             "cobalt2", "shades-of-purple", "tokyo-hack",
             "github-dark", "dracula", "catppuccin-mocha", "gruvbox",
             "github-light", "catppuccin-latte",

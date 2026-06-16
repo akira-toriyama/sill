@@ -231,6 +231,51 @@ extension ThemeSpec {
         hover: HexColor(0xFFFFFF, 0.07),
         selection: HexColor(0xFF2D95, 0.22))
 
+    // --- Neon-on-black candidates (proposals) -------------------------
+    // High-visibility neon primary/secondary on a near-pure-black base,
+    // in the terminal/chomp family. Dark presets: only bg/fg/muted/primary/
+    // secondary/error stored; the border/hover/selection trio derives.
+
+    /// Aurora Flux — neon emerald-mint + electric violet on void black
+    /// (Night Owl / Aura lineage; Tailwind emerald→teal + purple/fuchsia).
+    public static let auroraFlux = ThemeSpec(
+        background: HexColor(0x03070A), foreground: HexColor(0xCDFBEF),
+        muted: HexColor(0x4E6F69), primary: HexColor(0x1EFFB0), font: .mono,
+        error: HexColor(0xFF456B),
+        secondary: HexColor(0xCE5BFF))
+
+    /// Acidwave — fuchsia magenta + jade emerald (Tailwind 400s), rounded
+    /// (SynthWave '84 / Aura).
+    public static let acidwave = ThemeSpec(
+        background: HexColor(0x06030A), foreground: HexColor(0xE8DDF5),
+        muted: HexColor(0x7A6B8F), primary: HexColor(0xE879F9), font: .rounded,
+        error: HexColor(0xFB4D6A),
+        secondary: HexColor(0x34D399))
+
+    /// Neon Noir — cyberpunk electric cyan + hot magenta on true black
+    /// (Cyberpunk 2077 / Bluloco; Tailwind cyan-400).
+    public static let neonNoir = ThemeSpec(
+        background: HexColor(0x04060A), foreground: HexColor(0xD6FBFF),
+        muted: HexColor(0x4A6E7A), primary: HexColor(0x22D3EE), font: .mono,
+        error: HexColor(0xFF3355),
+        secondary: HexColor(0xFF2EC4))
+
+    /// Outrun — SynthWave violet-magenta + sunset coral, rounded
+    /// (SynthWave '84 / Outrun sun-gradient).
+    public static let outrun = ThemeSpec(
+        background: HexColor(0x040208), foreground: HexColor(0xF2E9FF),
+        muted: HexColor(0x7A5C9E), primary: HexColor(0xC724FF), font: .rounded,
+        error: HexColor(0xFF3B6B),
+        secondary: HexColor(0xFF7847))
+
+    /// Blacklight — UV proton-violet + acid-lime hazard pair on void black
+    /// (SynthWave '84 / Andromeda; Tailwind violet + lime-400).
+    public static let blacklight = ThemeSpec(
+        background: HexColor(0x030206), foreground: HexColor(0xF3E8FF),
+        muted: HexColor(0x6B5B95), primary: HexColor(0xBD3FFF), font: .mono,
+        error: HexColor(0xFF2D55),
+        secondary: HexColor(0xCCFF00))
+
     // --- Reference themes (Tommy-linked) ------------------------------
 
     /// Cobalt2 (Wes Bos) — deep cobalt-blue, signature bright gold.
@@ -330,6 +375,8 @@ extension ThemeSpec {
 /// order (favorites → reference → popular → light → structural).
 private let themeCatalog: [(name: String, spec: ThemeSpec)] = [
     ("terminal", .terminal), ("chomp", .chomp), ("rainbow", .rainbow),
+    ("aurora-flux", .auroraFlux), ("acidwave", .acidwave),
+    ("neon-noir", .neonNoir), ("outrun", .outrun), ("blacklight", .blacklight),
     ("cobalt2", .cobalt2), ("shades-of-purple", .shadesOfPurple),
     ("tokyo-hack", .tokyoHack),
     ("github-dark", .githubDark), ("dracula", .dracula),
