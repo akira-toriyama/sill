@@ -11,31 +11,156 @@ import Effects
 struct Gallery: View {
     let config: StillConfig
 
-    private var names: [String] {
-        if config.theme == "all" {
-            return canonicalThemeNames.filter { $0 != "random" }
-        }
-        // A single named theme (paletteFor falls back to terminal on typo).
-        return [config.theme]
+    /// Catalog names the header switcher offers — the `random` meta-name is
+    /// a roll action, not a persistent selection, so it's excluded.
+    private static let switchable = canonicalThemeNames.filter { $0 != "random" }
+
+    /// Live selection: `"all"` (the full gallery) or one canonical theme.
+    /// Seeded from the config so `theme = "dracula"` still opens on dracula;
+    /// the header chips then drive it at runtime — no relaunch, no file edit.
+    @State private var selected: String
+
+    init(config: StillConfig) {
+        self.config = config
+        let t = config.theme
+        _selected = State(initialValue:
+            (t == "all" || Gallery.switchable.contains(t)) ? t : "all")
+    }
+
+    /// The card(s) currently rendered: every theme when "all", else the one.
+    private var shown: [String] {
+        selected == "all" ? Gallery.switchable : [selected]
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 18) {
-                Text("still — \(names.count == 1 ? names[0] : "\(names.count) themes")")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                ForEach(names, id: \.self) { name in
-                    ThemeCard(name: name, scale: config.fontScale,
-                              showEffects: config.showEffects)
+        VStack(spacing: 0) {
+            header                       // pinned — stays put as the cards scroll
+            Divider()
+            ScrollView {
+                LazyVStack(spacing: 18) {
+                    ForEach(shown, id: \.self) { name in
+                        ThemeCard(name: name, scale: config.fontScale,
+                                  showEffects: config.showEffects)
+                    }
                 }
+                .padding(18)
             }
-            .padding(18)
         }
         .frame(minWidth: 920, minHeight: 600)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    // MARK: header — title + the theme-switch chip row
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("still — \(selected == "all" ? "\(Gallery.switchable.count) themes" : selected)")
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundColor(.secondary)
+            // A wrapping flow of theme buttons — "All" first, then the catalog
+            // in order. Each chip is tinted in its own theme colours, so the
+            // switch row doubles as an at-a-glance colour preview.
+            FlowLayout(spacing: 6, lineSpacing: 6) {
+                ThemeChip(name: "all", label: "All",
+                          selected: selected == "all") { selected = "all" }
+                ForEach(Gallery.switchable, id: \.self) { name in
+                    ThemeChip(name: name, label: name,
+                              selected: selected == name) { selected = name }
+                }
+            }
+        }
+        .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - Theme chip (one header switch button)
+
+/// One header button: the theme name on a tile tinted with that theme's
+/// OWN resolved colours (bg / foreground / primary), so the switch row is
+/// itself a colour preview. `"all"` renders in neutral app chrome. The
+/// selected chip gets a 2.5 px primary ring + bold label + a soft accent
+/// glow; clicking it switches the gallery live (no relaunch).
+struct ThemeChip: View {
+    let name: String          // "all" or a canonical theme name
+    let label: String
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        let isAll = (name == "all")
+        let p = isAll ? nil : resolve(paletteFor(name))
+        let bg = p?.background.map { Color(nsColor: $0) }
+            ?? Color(nsColor: .controlColor)
+        let fg = p.map { Color(nsColor: $0.foreground) }
+            ?? Color(nsColor: .labelColor)
+        let accent = p.map { Color(nsColor: $0.primary) }
+            ?? Color(nsColor: .controlAccentColor)
+
+        Button(action: action) {
+            HStack(spacing: 5) {
+                // A dot in the theme's accent so two same-background themes
+                // still read apart at the chip's leading edge.
+                if !isAll {
+                    Circle().fill(accent).frame(width: 6, height: 6)
+                }
+                Text(label)
+                    .font(.system(size: 11, weight: selected ? .bold : .medium,
+                                  design: .monospaced))
+                    .foregroundColor(fg)
+            }
+            .padding(.horizontal, 9).padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 7).fill(bg))
+            .overlay(RoundedRectangle(cornerRadius: 7)
+                .stroke(accent, lineWidth: selected ? 2.5 : 1)
+                .opacity(selected ? 1 : 0.6))
+            .shadow(color: accent.opacity(selected ? 0.5 : 0),
+                    radius: selected ? 4 : 0)
+        }
+        .buttonStyle(.plain)
+        .help(isAll ? "Show every theme" : "Switch to \(name)")
+    }
+}
+
+// MARK: - Flow layout (wrapping row of chips)
+
+/// A minimal left-to-right wrapping layout (macOS 13's `Layout` protocol):
+/// lays subviews along a line at their natural width, wrapping to the next
+/// line when the next subview would overflow. Used for the variable-width
+/// theme chips, which a `LazyVGrid` would force to a uniform column width.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+    var lineSpacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews,
+                      cache: inout ()) -> CGSize {
+        let maxW = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, lineH: CGFloat = 0, widest: CGFloat = 0
+        for sv in subviews {
+            let s = sv.sizeThatFits(.unspecified)
+            if x > 0, x + s.width > maxW {        // wrap before this subview
+                y += lineH + lineSpacing; x = 0; lineH = 0
+            }
+            x += s.width + spacing
+            lineH = max(lineH, s.height)
+            widest = max(widest, x - spacing)
+        }
+        return CGSize(width: min(maxW, widest), height: y + lineH)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize,
+                       subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, lineH: CGFloat = 0
+        for sv in subviews {
+            let s = sv.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + s.width > bounds.maxX {   // wrap
+                y += lineH + lineSpacing; x = bounds.minX; lineH = 0
+            }
+            sv.place(at: CGPoint(x: x, y: y), anchor: .topLeading,
+                     proposal: ProposedViewSize(s))
+            x += s.width + spacing
+            lineH = max(lineH, s.height)
+        }
     }
 }
 
@@ -86,10 +211,10 @@ struct ThemeCard: View {
 
             // Mock chrome — drawn by still, never imported from an app.
             HStack(alignment: .top, spacing: 12) {
-                MockTree(p: p, scale: scale)
-                MockPill(p: p, scale: scale)
-                MockTome(p: p, scale: scale)
-                MockMarkdown(p: p, scale: scale)
+                MockTree(p: p)
+                MockPill(p: p)
+                MockTome(p: p)
+                MockMarkdown(p: p)
             }
         }
         .padding(16)
