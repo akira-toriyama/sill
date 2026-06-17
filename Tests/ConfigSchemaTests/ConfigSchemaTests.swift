@@ -13,7 +13,11 @@ private struct Demo: Equatable {
     var pets: [String]?
 }
 
-private let demoSpec = ConfigSchema.Spec<Demo>(
+// Immutable shared fixture, only ever READ by the tests. `Spec` carries
+// `apply` closures so it isn't `Sendable`; `nonisolated(unsafe)` is the right
+// Swift 6 escape for an immutable global let — surfaced the first time CI
+// actually compiled these tests (local dev is CommandLineTools-only, no XCTest).
+private nonisolated(unsafe) let demoSpec = ConfigSchema.Spec<Demo>(
     title: "demo config",
     sections: [
         ConfigSchema.Section("", fields: [
