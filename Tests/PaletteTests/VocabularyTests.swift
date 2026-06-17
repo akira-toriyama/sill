@@ -34,6 +34,7 @@ final class VocabularyTests: XCTestCase {
             "synthwave", "ghostwire", "cyberpunk", "tron",
             "voltage", "toxic", "ember",
             "solar-veil", "molten-vein", "coin-op", "arcane",
+            "dusk", "clay", "gemstone", "graphite",
             "cobalt2", "shades-of-purple", "tokyo-hack",
             "github-dark", "dracula", "catppuccin-mocha", "gruvbox",
             "github-light", "catppuccin-latte",

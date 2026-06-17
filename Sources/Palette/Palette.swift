@@ -390,6 +390,47 @@ extension ThemeSpec {
         error: HexColor(0xFF4D6D),
         secondary: HexColor(0xFFC83D))
 
+    // --- Muted black-based family (calm, NON-neon) --------------------
+    // The counterpoint to the animated neon family: deep near-black bases
+    // with DESATURATED, sophisticated accents — static + quiet, no effect.
+    // Fills the catalog's "black but calm" gap (everything black-based was
+    // loud neon; the editor darks are grey-ish, not black). Dark presets:
+    // bg/fg/muted/primary/secondary/error only; the border/hover/selection
+    // trio derives from the near-black base.
+
+    /// dusk — muted dusty-rose + sage pastel on a plum-tinted near-black.
+    /// Desaturated and elegant (solar-veil's rose, cooled and quieted).
+    public static let dusk = ThemeSpec(
+        background: HexColor(0x0C0A0E), foreground: HexColor(0xE8E2E6),
+        muted: HexColor(0x6E6470), primary: HexColor(0xD69BA8), font: .rounded,
+        error: HexColor(0xD98A8A),
+        secondary: HexColor(0x9DBF9E))
+
+    /// clay — earthy terracotta + olive on a warm near-black. Organic,
+    /// craft, grounded; muted where gruvbox/tron oranges are saturated.
+    public static let clay = ThemeSpec(
+        background: HexColor(0x0E0A07), foreground: HexColor(0xEDE3D6),
+        muted: HexColor(0x7A6655), primary: HexColor(0xC97B5A), font: .system,
+        error: HexColor(0xC85A4A),
+        secondary: HexColor(0xA8A05E))
+
+    /// gemstone — deep emerald + amethyst on velvet black, garnet error.
+    /// Jewel-rich but NOT neon: lower-value, velvet saturation.
+    public static let gemstone = ThemeSpec(
+        background: HexColor(0x08070C), foreground: HexColor(0xE6E0EC),
+        muted: HexColor(0x5E5870), primary: HexColor(0x2FA37C), font: .system,
+        error: HexColor(0xC0445E),
+        secondary: HexColor(0x9E6BC4))
+
+    /// graphite — monochrome ink: a cool-silver primary + warm-taupe
+    /// secondary (a warm/cool grey duo, identity without colour) on ink
+    /// black. The catalog's only near-achromatic theme; minimal + modern.
+    public static let graphite = ThemeSpec(
+        background: HexColor(0x0A0A0B), foreground: HexColor(0xDDE0E3),
+        muted: HexColor(0x5A6068), primary: HexColor(0x9FB0C0), font: .mono,
+        error: HexColor(0xC77B7B),
+        secondary: HexColor(0xC0A98E))
+
     // --- Reference themes (Tommy-linked) ------------------------------
 
     /// Cobalt2 (Wes Bos) — deep cobalt-blue, signature bright gold.
@@ -496,6 +537,7 @@ private let themeCatalog: [(name: String, spec: ThemeSpec)] = [
     ("voltage", .voltage), ("toxic", .toxic), ("ember", .ember),
     ("solar-veil", .solarVeil), ("molten-vein", .moltenVein),
     ("coin-op", .coinOp), ("arcane", .arcane),
+    ("dusk", .dusk), ("clay", .clay), ("gemstone", .gemstone), ("graphite", .graphite),
     ("cobalt2", .cobalt2), ("shades-of-purple", .shadesOfPurple),
     ("tokyo-hack", .tokyoHack),
     ("github-dark", .githubDark), ("dracula", .dracula),
