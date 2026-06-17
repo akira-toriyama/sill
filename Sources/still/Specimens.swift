@@ -129,7 +129,7 @@ struct MockTree: View {
     }
 
     private var searchBar: some View {
-        // The REAL FieldKit field (outlined, leading magnifier), themed to
+        // The REAL ThemeKit field (outlined, leading magnifier), themed to
         // this panel — replacing the hand-drawn approximation.
         ThemedFieldView(palette: p, placeholder: "type to filter…",
                         leading: "magnifyingglass", surface: p.background)
@@ -330,7 +330,7 @@ struct MockTome: View {
     var body: some View {
         SpecimenBox(title: "wand · tome", p: p) {
             VStack(alignment: .leading, spacing: 6) {
-                // Launcher query field — the REAL FieldKit field (replacing the
+                // Launcher query field — the REAL ThemeKit field (replacing the
                 // hand-drawn one) so the tome mirrors the shared component.
                 ThemedFieldView(palette: p, placeholder: "open…",
                                 leading: "magnifyingglass", surface: p.background)

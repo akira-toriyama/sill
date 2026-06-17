@@ -1,14 +1,16 @@
-// FieldKit — shared themed UI widgets for the swift app family
-// (facet / wand / perch / halo / glance).
+// ThemeKit — shared themed AppKit widgets for the swift app family
+// (facet / wand / perch / halo / glance). PaletteKit resolves the theme;
+// ThemeKit draws in it.
 //
-// `ThemedTextField` is a Material-UI–style single-line text field rendered
-// in a `ResolvedPalette`: a rounded OUTLINED box (default) — or FILLED /
-// STANDARD (underline) — with an animated FLOATING LABEL, optional leading /
-// trailing SF-Symbol adornments, a focus-accent transition (border + label
-// go `primary` while editing), helper / error text, and IME-safe editing.
+// `ThemedTextField` (the first widget) is a Material-UI–style single-line
+// text field rendered in a `ResolvedPalette`: a rounded OUTLINED box
+// (default) — or FILLED / STANDARD (underline) — with an animated FLOATING
+// LABEL, optional leading / trailing SF-Symbol adornments, a focus-accent
+// transition (border + label go `primary` while editing), helper / error
+// text, and IME-safe editing.
 //
 // The family hand-draws this today (facet's tree filter + tag-rename
-// fields); FieldKit makes it ONE part. Themed by assignment — set
+// fields); ThemeKit makes it ONE part. Themed by assignment — set
 // `palette` and the field repaints. AppKit / @MainActor.
 
 import AppKit

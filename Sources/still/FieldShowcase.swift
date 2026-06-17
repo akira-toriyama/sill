@@ -1,13 +1,13 @@
-// still — FieldKit bench. Hosts the REAL shared `ThemedTextField`
-// (FieldKit) inside the SwiftUI gallery, both as the mock search fields
+// still — ThemeKit text-field bench. Hosts the REAL shared `ThemedTextField`
+// (ThemeKit) inside the SwiftUI gallery, both as the mock search fields
 // (facet tree / wand tome) and a dedicated variant/state showcase, so the
 // component can be evaluated live in every theme.
 
 import SwiftUI
 import PaletteKit
-import FieldKit
+import ThemeKit
 
-// MARK: - SwiftUI bridge for FieldKit's ThemedTextField
+// MARK: - SwiftUI bridge for ThemeKit's ThemedTextField
 
 struct ThemedFieldView: NSViewRepresentable {
     let palette: ResolvedPalette
@@ -58,7 +58,7 @@ struct MockField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("FieldKit · text field — the real shared component (live, editable)")
+            Text("ThemeKit · text field — the real shared component (live, editable)")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 

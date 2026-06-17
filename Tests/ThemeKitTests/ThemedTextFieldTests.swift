@@ -1,4 +1,4 @@
-// FieldKit tests — pin the behaviours the adversarial review surfaced:
+// ThemeKit / ThemedTextField tests — pin the behaviours the review surfaced:
 //  • the BARE-focus highlight (the long-open question) — proven by driving
 //    the real first-responder edge, NOT flaky synthetic clicks;
 //  • the symmetric focus-OFF edge;
@@ -9,7 +9,7 @@ import XCTest
 import AppKit
 import Palette
 import PaletteKit
-@testable import FieldKit   // for the DEBUG `focusProbe`
+@testable import ThemeKit   // for the DEBUG `focusProbe`
 
 @MainActor
 final class ThemedTextFieldTests: XCTestCase {
