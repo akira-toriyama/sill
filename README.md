@@ -26,6 +26,13 @@ per-app migration plan.
 > `ThemeSpec v2` shipped on `0.2.0`. Phase V (Tailwind-style role names +
 > 12-theme catalog rebuild) on branch `feat/phase-v-catalog`.
 
+> **Family TOML lib**: sill's config-schema layer (`ConfigSchema`) decodes
+> over [swift-toml-edit](https://github.com/akira-toriyama/swift-toml-edit) —
+> the swift app family's one TOML implementation (the `Toml` module · Sill-1 ·
+> a Swift `toml_edit`). sill's former in-tree `Toml` moved into that standalone
+> repo at `0.11.0`; consumers `import Toml` from there. Design notes:
+> atelier [`docs/swift-toml-edit.md`](https://github.com/akira-toriyama/atelier/blob/main/docs/swift-toml-edit.md).
+
 ## Build
 
 ```sh
