@@ -1,0 +1,26 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  # Cancel in-flight builds on the same PR / branch when a new push
+  # arrives — only the latest commit matters for the required check.
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    # Bounded so a hung `swift build` can't burn 6 h of free macOS minutes.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      # Shared Swift build (setup-xcode + SPM cache + build + test). sill is
+      # LIBRARY-ONLY (no .app) so — unlike facet — there is no ./package.sh
+      # step. This is the FIRST place the XCTest targets actually run: local
+      # dev is CommandLineTools-only, which has no XCTest module.
+      - uses: akira-toriyama/.github/actions/swift-build@main

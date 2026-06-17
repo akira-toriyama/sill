@@ -33,7 +33,7 @@ let package = Package(
         .library(name: "Effects", targets: ["Effects"]),
         .library(name: "ConfigSchema", targets: ["ConfigSchema"]),
         .library(name: "CLIKit", targets: ["CLIKit"]),
-        .library(name: "FieldKit", targets: ["FieldKit"]),
+        .library(name: "ThemeKit", targets: ["ThemeKit"]),
     ],
     dependencies: [
         // The family's ONE TOML implementation now lives in its own repo
@@ -62,13 +62,14 @@ let package = Package(
         // Dynamic atom: Sendable EffectSpec + (macOS) AppKit animator.
         .target(name: "Effects", dependencies: ["Palette"]),
 
-        // AppKit shared WIDGETS — themed UI parts the family draws by hand
-        // today (facet's tree filter + tag-rename fields). `ThemedTextField`
-        // is a MUI-style rounded/outlined (+ filled / standard) text field:
-        // floating label, leading/trailing SF adornments, focus-accent
-        // transition, helper/error text, IME-aware. Themed via PaletteKit's
-        // `ResolvedPalette`. @MainActor / AppKit.
-        .target(name: "FieldKit", dependencies: ["PaletteKit", "Palette"]),
+        // AppKit shared WIDGET KIT — MUI-style themed UI parts the family
+        // draws by hand today (facet's tree filter / tag-rename fields, popup
+        // menus, …). PaletteKit resolves the theme; ThemeKit draws in it.
+        // `ThemedTextField` (the first widget) is a rounded/outlined (+ filled
+        // / standard) text field: floating label, leading/trailing SF
+        // adornments, focus-accent transition, helper/error, IME-aware. Themed
+        // by assigning `palette`. @MainActor / AppKit.
+        .target(name: "ThemeKit", dependencies: ["PaletteKit", "Palette"]),
 
         // Pure, Sendable, AppKit-free. One declarative `Spec<Root>` that
         // BOTH decodes a `config.toml` (over `Toml`) and emits its JSON
@@ -82,11 +83,11 @@ let package = Package(
         // config.toml. Renders every catalog theme (all roles + font +
         // its OWN mock chrome specimens — never imports an app's View, so
         // no drift debt). The visual verification bench for the catalog.
-        .executableTarget(name: "still", dependencies: ["Palette", "PaletteKit", "Effects", "FieldKit"]),
+        .executableTarget(name: "still", dependencies: ["Palette", "PaletteKit", "Effects", "ThemeKit"]),
 
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit"]),
-        .testTarget(name: "FieldKitTests", dependencies: ["FieldKit", "PaletteKit", "Palette"]),
+        .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", "PaletteKit", "Palette"]),
         .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette"]),
         .testTarget(name: "ConfigSchemaTests",
                     dependencies: ["ConfigSchema",

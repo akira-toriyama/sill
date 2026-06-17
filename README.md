@@ -18,8 +18,9 @@ import Effects      // dynamic, color-only — EffectSpec, animated themes
 
 A consumer that depends on **only `Palette`** links zero AppKit.
 
-The table is the theming core; sill also ships CLI / config / field helpers
-(`CLIKit`, `ConfigSchema`, `FieldKit`) plus the `still` dev bench. The full
+The table is the theming core; sill also ships CLI / config helpers + the
+shared widget kit (`CLIKit`, `ConfigSchema`, `ThemeKit`) plus the `still` dev
+bench. The full
 module set and target wiring is authoritative in [Package.swift](Package.swift)
 — this list is orientation, not a contract. See [docs/DESIGN.md](docs/DESIGN.md)
 for the full design, decisions, and per-app migration plan.

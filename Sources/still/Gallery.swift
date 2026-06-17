@@ -231,7 +231,7 @@ struct ThemeCard: View {
                 MockMarkdown(p: p)
             }
 
-            // FieldKit — the REAL shared text-field component, in this theme.
+            // ThemeKit — the REAL shared text-field component, in this theme.
             MockField(p: p)
         }
         .padding(16)
