@@ -272,4 +272,75 @@ final class ThemedComboBoxTests: XCTestCase {
         XCTAssertTrue(vf.contains(c.comboProbe.popupFrame), "the flipped popup stays on screen")
         _ = w
     }
+
+    // MARK: - Actionable empty state (emptyActionRow / onEmptyAction)
+
+    func testEmptyStateInertByDefault() {
+        let (w, c) = hosted(["Apple", "Banana"])
+        type(c, "zzz")
+        let pr = c.comboProbe
+        XCTAssertTrue(pr.noOptions, "0 matches")
+        XCTAssertFalse(pr.emptyActionActive, "no emptyActionRow ⇒ inert No options")
+        XCTAssertNil(pr.emptyActionLabel)
+        _ = w
+    }
+
+    func testEmptyActionRowOffersActionableRow() {
+        let (w, c) = hosted(["Apple", "Banana"])
+        c.emptyActionRow = { $0.isEmpty ? nil : "Create “\($0)”" }
+        type(c, "kiwi")
+        let pr = c.comboProbe
+        XCTAssertTrue(pr.emptyActionActive, "0 matches + emptyActionRow ⇒ actionable row")
+        XCTAssertEqual(pr.emptyActionLabel, "Create “kiwi”")
+        // With matches present the hook is NOT consulted.
+        type(c, "ap")
+        XCTAssertFalse(c.comboProbe.emptyActionActive, "matches present ⇒ no action row")
+        _ = w
+    }
+
+    func testEmptyActionRowReturningNilStaysInert() {
+        let (w, c) = hosted(["Apple", "Banana"])
+        c.emptyActionRow = { _ in nil }      // e.g. an invalid/empty normalized name
+        type(c, "zzz")
+        XCTAssertFalse(c.comboProbe.emptyActionActive, "nil from the hook ⇒ inert")
+        XCTAssertTrue(c.comboProbe.noOptions)
+        _ = w
+    }
+
+    func testArrowHighlightsActionRow() {
+        let (w, c) = hosted(["Apple", "Banana"])
+        c.emptyActionRow = { "Create \($0)" }
+        type(c, "kiwi")                       // opens; action row present, not yet highlighted
+        XCTAssertNil(c.comboProbe.highlightedIndex)
+        _ = c.field.onMoveDown?()
+        XCTAssertEqual(c.comboProbe.highlightedIndex, 0, "arrow highlights the single action row")
+        _ = w
+    }
+
+    func testEnterCommitsEmptyActionWithQuery() {
+        let (w, c) = hosted(["Apple", "Banana"])
+        c.emptyActionRow = { "Create \($0)" }
+        var created: String?
+        c.onEmptyAction = { created = $0 }
+        var picked: Bool = false
+        c.onSelect = { _ in picked = true }
+        type(c, "kiwi")                       // opens with the action row
+        let consumed = c.field.onReturn?()
+        XCTAssertEqual(consumed, true, "Return is consumed by the action row")
+        XCTAssertEqual(created, "kiwi", "Enter fires onEmptyAction with the live query")
+        XCTAssertFalse(picked, "the empty action is NOT a normal onSelect")
+        XCTAssertFalse(c.comboProbe.isOpen, "the popup closes after the action")
+        _ = w
+    }
+
+    func testEmptyActionDoesNotFireWhenInert() {
+        let (w, c) = hosted(["Apple", "Banana"])
+        var fired = false
+        c.onEmptyAction = { _ in fired = true }   // no emptyActionRow ⇒ inert
+        type(c, "zzz")
+        _ = c.field.onReturn?()
+        XCTAssertFalse(fired, "Enter on an inert No-options row never fires onEmptyAction")
+        XCTAssertFalse(c.comboProbe.isOpen, "Enter still closes the popup")
+        _ = w
+    }
 }

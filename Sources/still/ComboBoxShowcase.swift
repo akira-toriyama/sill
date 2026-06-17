@@ -22,6 +22,9 @@ struct ThemedComboBoxView: NSViewRepresentable {
     var placeholder: String = ""
     var leading: String? = "magnifyingglass"
     var freeText: Bool = false
+    /// Demo the OPT-IN actionable empty state (facet's "Create a new tag"): on a
+    /// no-match, offer a "Create …" row that, when committed, appends + selects it.
+    var createOnEmpty: Bool = false
 
     final class Coordinator { var combo: ThemedComboBox? }
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -46,6 +49,14 @@ struct ThemedComboBoxView: NSViewRepresentable {
         combo.allowsFreeText = freeText
         combo.field.leadingSymbol = leading
         combo.surfaceColor = palette.background
+        if createOnEmpty {
+            combo.emptyActionRow = { q in q.isEmpty ? nil : "Create “\(q)”" }
+            combo.onEmptyAction = { [weak combo] q in
+                guard let combo, !q.isEmpty else { return }
+                combo.options.append(ThemedComboBox.Item(q))     // the consumer (facet) owns the create
+                combo.selectedIndex = combo.options.count - 1
+            }
+        }
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedTextField,
@@ -132,6 +143,11 @@ struct MockComboBox: View {
                                        label: "Fruit (free)", placeholder: "type anything…",
                                        freeText: true)
                 }
+                liveCell("create on no-match") {
+                    ThemedComboBoxView(palette: p, options: fruits,
+                                       label: "Tag", placeholder: "type a new tag…",
+                                       leading: "tag", createOnEmpty: true)
+                }
                 Spacer(minLength: 0)
             }
 
@@ -141,8 +157,11 @@ struct MockComboBox: View {
                     DropdownMock(p: p, rows: ["Apple", "Apricot", "Banana", "Grape", "Mango"],
                                  highlight: 1, disabledIndex: 3)
                 }
-                mockCell("no match") {
+                mockCell("no match · inert") {
                     DropdownMock(p: p, rows: [], highlight: nil)
+                }
+                mockCell("no match · actionable") {
+                    DropdownMock(p: p, rows: ["Create “kiwi”"], highlight: 0)
                 }
                 Spacer(minLength: 0)
             }
