@@ -6,6 +6,20 @@ import Palette
 import PaletteKit
 import Effects
 
+// MARK: - UI scale
+
+/// One knob for the whole still preview's type + metrics. Every font goes
+/// through `sysFont`, and the fixed panel / swatch / icon / window sizes are
+/// multiplied by this, so bumping it enlarges the entire gallery uniformly.
+let uiScale: CGFloat = 1.25
+
+/// A SwiftUI system font at the global `uiScale`. Drop-in for
+/// `.system(size:weight:design:)` — same labels, just scaled.
+func sysFont(_ size: CGFloat, weight: Font.Weight = .regular,
+             design: Font.Design = .default) -> Font {
+    .system(size: size * uiScale, weight: weight, design: design)
+}
+
 // MARK: - Gallery
 
 struct Gallery: View {
@@ -46,7 +60,7 @@ struct Gallery: View {
                 .padding(18)
             }
         }
-        .frame(minWidth: 920, minHeight: 600)
+        .frame(minWidth: 920 * uiScale, minHeight: 600 * uiScale)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -55,7 +69,7 @@ struct Gallery: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("still — \(selected == "all" ? "\(Gallery.switchable.count) themes" : selected)")
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(sysFont(12, weight: .semibold, design: .monospaced))
                 .foregroundColor(.secondary)
             // A wrapping flow of theme buttons — "All" first, then the catalog
             // in order. Each chip is tinted in its own theme colours, so the
@@ -105,7 +119,7 @@ struct ThemeChip: View {
                     Circle().fill(accent).frame(width: 6, height: 6)
                 }
                 Text(label)
-                    .font(.system(size: 11, weight: selected ? .bold : .medium,
+                    .font(sysFont(11, weight: selected ? .bold : .medium,
                                   design: .monospaced))
                     .foregroundColor(fg)
             }
@@ -185,14 +199,14 @@ struct ThemeCard: View {
                     .font(themeFont(spec.font, size: 16 * scale).weight(.bold))
                     .foregroundColor(fg)
                 Text(spec.font.label.uppercased())
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .font(sysFont(9, weight: .semibold, design: .monospaced))
                     .foregroundColor(Color(nsColor: p.muted))
                     .padding(.horizontal, 5).padding(.vertical, 2)
                     .overlay(RoundedRectangle(cornerRadius: 4)
                         .stroke(Color(nsColor: p.border), lineWidth: 1))
                 if spec.background == nil {
                     Text("VIBRANCY")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .font(sysFont(9, weight: .semibold, design: .monospaced))
                         .foregroundColor(Color(nsColor: p.muted))
                 }
                 Spacer()
@@ -264,19 +278,19 @@ struct Swatch: View {
                     Rectangle().fill(Color(nsColor: c))
                 }
             }
-            .frame(width: 50, height: 32)
+            .frame(width: 50 * uiScale, height: 32 * uiScale)
             .clipShape(RoundedRectangle(cornerRadius: 5))
             .overlay(RoundedRectangle(cornerRadius: 5)
                 .stroke(Color(nsColor: ink).opacity(0.30), lineWidth: 1))
 
             Text(label)
-                .font(.system(size: 8.5, weight: .medium))
+                .font(sysFont(8.5, weight: .medium))
                 .foregroundColor(Color(nsColor: ink)).opacity(0.9)
-                .lineLimit(1).minimumScaleFactor(0.7).frame(width: 52)
+                .lineLimit(1).minimumScaleFactor(0.7).frame(width: 52 * uiScale)
             Text(color.map(hexString) ?? "nil")
-                .font(.system(size: 8, design: .monospaced))
+                .font(sysFont(8, design: .monospaced))
                 .foregroundColor(Color(nsColor: muted))
-                .lineLimit(1).minimumScaleFactor(0.6).frame(width: 52)
+                .lineLimit(1).minimumScaleFactor(0.6).frame(width: 52 * uiScale)
         }
     }
 }
@@ -310,12 +324,12 @@ struct EffectStrip: View {
     var body: some View {
         HStack(spacing: 6) {
             Text(fx.cycles ? "effect · spectrum" : "effect · flash")
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .font(sysFont(9, weight: .medium, design: .monospaced))
                 .foregroundColor(Color(nsColor: NSColor(hex: fx.steady)))
             ForEach(Array(fx.flash.enumerated()), id: \.offset) { _, hex in
                 RoundedRectangle(cornerRadius: 3)
                     .fill(Color(nsColor: NSColor(hex: hex)))
-                    .frame(width: 22, height: 12)
+                    .frame(width: 22 * uiScale, height: 12 * uiScale)
             }
         }
     }
@@ -327,9 +341,9 @@ struct EffectStrip: View {
 /// without touching the global `pal`). `.menu` ≈ system for a specimen.
 func themeFont(_ kind: FontKind, size: CGFloat) -> Font {
     switch kind {
-    case .mono:    return .system(size: size, design: .monospaced)
-    case .rounded: return .system(size: size, design: .rounded)
-    case .menu, .system: return .system(size: size)
+    case .mono:    return sysFont(size, design: .monospaced)
+    case .rounded: return sysFont(size, design: .rounded)
+    case .menu, .system: return sysFont(size)
     }
 }
 

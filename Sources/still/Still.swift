@@ -23,7 +23,7 @@ enum Still {
         app.setActivationPolicy(.regular)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1120, height: 820),
+            contentRect: NSRect(x: 0, y: 0, width: 1120 * uiScale, height: 820 * uiScale),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered, defer: false)
         window.title = "still — sill theme preview"

@@ -57,12 +57,12 @@ struct SpecimenBox<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(title)
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
             content()
         }
         .padding(10)
-        .frame(width: 246, alignment: .leading)
+        .frame(width: 246 * uiScale, alignment: .leading)
         // The panel fill IS the theme `background` (same as the `background`
         // swatch + the card), so a clearly-visible `panelStroke` outline — not
         // the faint theme `border` — is what separates the panel from the card.
@@ -124,7 +124,7 @@ struct MockTree: View {
             HStack(spacing: 7) {
                 GripDots(color: p.muted)
                 Text("Desktop 1")
-                    .font(.system(size: 12, weight: .bold)).kerning(0.5)
+                    .font(sysFont(12, weight: .bold)).kerning(0.5)
                     .foregroundColor(Color(nsColor: p.foreground))
                 Spacer(minLength: 0)
             }
@@ -134,8 +134,8 @@ struct MockTree: View {
 
     private var searchBar: some View {
         HStack(spacing: 7) {
-            Image(systemName: "magnifyingglass").font(.system(size: 11))
-            Text("type to filter…").font(.system(size: 11))
+            Image(systemName: "magnifyingglass").font(sysFont(11))
+            Text("type to filter…").font(sysFont(11))
             Spacer(minLength: 0)
         }
         .foregroundColor(Color(nsColor: p.muted))
@@ -160,12 +160,12 @@ struct MockTree: View {
                 GripDots(color: accent).padding(.top, 2)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(ws)            // line 1: WS name (bold; accent when active)
-                        .font(.system(size: 12, weight: active ? .bold : .semibold))
+                        .font(sysFont(12, weight: active ? .bold : .semibold))
                         .kerning(0.6)
                         .foregroundColor(Color(nsColor: accent))
                     HStack(spacing: 4) {   // line 2: layout mode (icon + label)
-                        Image(systemName: modeIcon).font(.system(size: 10))
-                        Text(mode).font(.system(size: 11, weight: active ? .semibold : .medium))
+                        Image(systemName: modeIcon).font(sysFont(10))
+                        Text(mode).font(sysFont(11, weight: active ? .semibold : .medium))
                     }
                     .foregroundColor(Color(nsColor: accent))
                 }
@@ -192,20 +192,20 @@ struct MockTree: View {
             // back to a theme-tinted tile when the app isn't installed.
             if let img = appIcon(bundleIDs) {
                 Image(nsImage: img).resizable().interpolation(.high)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 22 * uiScale, height: 22 * uiScale)
                     .opacity(hidden ? 0.4 : 1)
             } else {
                 RoundedRectangle(cornerRadius: 5)
                     .fill(Color(nsColor: tile).opacity(hidden ? 0.4 : 0.9))
-                    .frame(width: 22, height: 22)
+                    .frame(width: 22 * uiScale, height: 22 * uiScale)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(app)
-                    .font(.system(size: 12, weight: selected ? .semibold : .regular))
+                    .font(sysFont(12, weight: selected ? .semibold : .regular))
                     .foregroundColor(Color(nsColor: ink).opacity(dim ? 0.45 : 1))
                     .lineLimit(1)
                 Text(title)
-                    .font(.system(size: 11))
+                    .font(sysFont(11))
                     .foregroundColor(Color(nsColor: p.muted).opacity(dim ? 0.45 : 1))
                     .lineLimit(1)
                 if hasBadge {
@@ -249,7 +249,7 @@ struct MockTree: View {
     /// The user's own `mark` handle — a rounded outline in the primary accent.
     private func markPill(_ s: String) -> some View {
         Text(s)
-            .font(.system(size: 11, weight: .medium))
+            .font(sysFont(11, weight: .medium))
             .foregroundColor(Color(nsColor: p.primary))
             .padding(.horizontal, 6).padding(.vertical, 1)
             .overlay(RoundedRectangle(cornerRadius: 5)
@@ -260,8 +260,8 @@ struct MockTree: View {
     /// glyph + colour carry the meaning, matching the real tree's clean look.
     private func badge(_ icon: String, _ text: String, _ color: NSColor) -> some View {
         HStack(spacing: 3) {
-            Image(systemName: icon).font(.system(size: 10))
-            Text(text).font(.system(size: 11, weight: .medium))
+            Image(systemName: icon).font(sysFont(10))
+            Text(text).font(sysFont(11, weight: .medium))
         }
         .foregroundColor(Color(nsColor: color))
     }
@@ -305,7 +305,7 @@ struct MockPill: View {
                 HStack(spacing: 6) {
                     pill("⌫", fill: p.error)          // no-match / cancel
                     Text("type to filter")
-                        .font(.system(size: 10))
+                        .font(sysFont(10))
                         .foregroundColor(Color(nsColor: p.muted))
                 }
             }
@@ -315,7 +315,7 @@ struct MockPill: View {
     @ViewBuilder private func pill(_ key: String, fill: NSColor?) -> some View {
         let matched = fill != nil
         Text(key)
-            .font(.system(size: 12, weight: .bold, design: .monospaced))
+            .font(sysFont(12, weight: .bold, design: .monospaced))
             .foregroundColor(Color(nsColor: matched ? p.onPrimary() : p.foreground))
             .frame(width: 26, height: 22)
             .background(Color(nsColor: fill ?? p.background ?? .clear).opacity(matched ? 1 : 0.9))
@@ -343,8 +343,8 @@ struct MockTome: View {
                 // Launcher query field — magnifier + prompt on a faint
                 // theme-tinted fill (the real tome panel paints its own bg).
                 HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass").font(.system(size: 11))
-                    Text("open…").font(.system(size: 11))
+                    Image(systemName: "magnifyingglass").font(sysFont(11))
+                    Text("open…").font(sysFont(11))
                     Spacer(minLength: 0)
                 }
                 .foregroundColor(Color(nsColor: p.muted))
@@ -369,11 +369,11 @@ struct MockTome: View {
     @ViewBuilder private func row(_ icon: RowIcon, title: String, sub: String,
                                   selected: Bool) -> some View {
         HStack(spacing: 8) {
-            iconView(icon).frame(width: 18, height: 18)
+            iconView(icon).frame(width: 18 * uiScale, height: 18 * uiScale)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 11, weight: .medium))
+                Text(title).font(sysFont(11, weight: .medium))
                     .foregroundColor(Color(nsColor: selected ? p.primary : p.foreground))
-                Text(sub).font(.system(size: 9, design: .monospaced))
+                Text(sub).font(sysFont(9, design: .monospaced))
                     .foregroundColor(Color(nsColor: p.muted))
             }
             Spacer(minLength: 0)
@@ -392,7 +392,7 @@ struct MockTome: View {
                 RoundedRectangle(cornerRadius: 4).fill(Color(nsColor: p.secondary))
             }
         case .symbol(let name, let tint):
-            Image(systemName: name).font(.system(size: 14))
+            Image(systemName: name).font(sysFont(14))
                 .foregroundColor(Color(nsColor: tint))
         }
     }
@@ -407,25 +407,25 @@ struct MockMarkdown: View {
         SpecimenBox(title: "glance · markdown", p: p) {
             VStack(alignment: .leading, spacing: 5) {
                 Text("# Heading")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(sysFont(13, weight: .bold))
                     .foregroundColor(Color(nsColor: p.primary))
                 Text("Body text with a")
-                    .font(.system(size: 11))
+                    .font(sysFont(11))
                     .foregroundColor(Color(nsColor: p.foreground))
                 + Text(" link")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(sysFont(11, weight: .medium))
                     .foregroundColor(Color(nsColor: p.primary))
                 Text("inline_code()")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(sysFont(10, design: .monospaced))
                     .foregroundColor(Color(nsColor: p.foreground))
                     .padding(.horizontal, 4).padding(.vertical, 1)
                     .background(Color(nsColor: p.selection))
                     .clipShape(RoundedRectangle(cornerRadius: 3))
                 Text("error: not found")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(sysFont(10, design: .monospaced))
                     .foregroundColor(Color(nsColor: p.error))
                 Text("caption · least emphasis")
-                    .font(.system(size: 9))
+                    .font(sysFont(9))
                     .foregroundColor(Color(nsColor: p.tertiary))
             }
         }
