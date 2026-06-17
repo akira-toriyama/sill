@@ -97,6 +97,47 @@ extension EffectSpec {
     public static let chomp = EffectSpec(
         steady: 0x2121FF,
         flash: [0xFFEA00, 0x2121FF, 0xFF0000, 0x2121FF])
+
+    // --- Animated neon family (paired with the same-named ThemeSpec) ---
+    // Each animates its catalog theme (still cycles the card border; apps
+    // cycle the accent via `animatedPalette`) AND is a standalone
+    // `[border] effect` value. None `cycles` — they blink/blend a FIXED
+    // neon palette (like neon/cyber/vapor), not rotate the spectrum.
+
+    /// Voltage — arc-cyan at rest; white-lightning strobe through violet.
+    public static let voltage = EffectSpec(
+        steady: 0x18D7FF,
+        flash: [0x18D7FF, 0xFFFFFF, 0xB86BFF, 0x6FE9FF, 0xFFFFFF, 0x2E5BFF])
+
+    /// Toxic — radioactive pulse through the green/lime spectrum.
+    public static let toxic = EffectSpec(
+        steady: 0x9EFF00,
+        flash: [0x9EFF00, 0x00FFA3, 0xCCFF00, 0x39FF14, 0x00FF6E, 0xDFFF1A])
+
+    /// Ember — forge-fire flicker through orange/gold/red.
+    public static let ember = EffectSpec(
+        steady: 0xFF7A1A,
+        flash: [0xFF3D00, 0xFF7A1A, 0xFFC400, 0xFF5E00, 0xFFD45E, 0xFF2200])
+
+    /// Solar-veil — a warm sunset sweep (rose → coral → apricot → rose).
+    public static let solarVeil = EffectSpec(
+        steady: 0xFF7A5C,
+        flash: [0xFF4D6D, 0xFF7A5C, 0xFFA64A, 0xFFD27A, 0xFF6F91])
+
+    /// Molten-vein — cooling-magma ramp from incandescent red to sulfur gold.
+    public static let moltenVein = EffectSpec(
+        steady: 0xFF3D14,
+        flash: [0xFF3D14, 0xFF6A00, 0xE5E219, 0xFFE45C, 0xE01000])
+
+    /// Coin-op — arcade-marquee strobe alternating siren-red / CRT-blue / white.
+    public static let coinOp = EffectSpec(
+        steady: 0xFF2A1A,
+        flash: [0xFF2A1A, 0x1565FF, 0xFF2A1A, 0xFFFFFF, 0x1565FF])
+
+    /// Arcane — a spell-shimmer through indigo-violet and rune-gold.
+    public static let arcane = EffectSpec(
+        steady: 0x7B3FF2,
+        flash: [0x7B3FF2, 0xB58BFF, 0xFFC83D, 0x9D6BFF, 0xFFE27A])
 }
 
 // (`canonicalEffectNames` lives in `Palette` since 0.6.0 — pure
@@ -113,8 +154,17 @@ public func borderEffectFor(_ name: String) -> EffectSpec? {
     case "kawaii":  return .kawaii
     case "rainbow": return .rainbow
     case "chomp":   return .chomp
+    case "voltage":     return .voltage
+    case "toxic":       return .toxic
+    case "ember":       return .ember
+    case "solar-veil":  return .solarVeil
+    case "molten-vein": return .moltenVein
+    case "coin-op":     return .coinOp
+    case "arcane":      return .arcane
     case "random":
-        let pool: [EffectSpec] = [.neon, .cyber, .vapor, .kawaii, .rainbow, .chomp]
+        let pool: [EffectSpec] = [.neon, .cyber, .vapor, .kawaii, .rainbow, .chomp,
+                                  .voltage, .toxic, .ember, .solarVeil, .moltenVein,
+                                  .coinOp, .arcane]
         return pool.randomElement()
     default:        return nil   // "off" or unknown
     }

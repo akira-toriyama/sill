@@ -32,6 +32,8 @@ final class VocabularyTests: XCTestCase {
             "terminal", "chomp", "rainbow",
             "aurora-flux", "acidwave", "neon-noir", "outrun", "blacklight",
             "synthwave", "ghostwire", "cyberpunk", "tron",
+            "voltage", "toxic", "ember",
+            "solar-veil", "molten-vein", "coin-op", "arcane",
             "cobalt2", "shades-of-purple", "tokyo-hack",
             "github-dark", "dracula", "catppuccin-mocha", "gruvbox",
             "github-light", "catppuccin-latte",
@@ -64,6 +66,8 @@ final class VocabularyTests: XCTestCase {
         XCTAssertEqual(
             Set(canonicalEffectNames),
             ["neon", "cyber", "vapor", "kawaii", "rainbow", "chomp",
+             "voltage", "toxic", "ember", "solar-veil", "molten-vein",
+             "coin-op", "arcane",
              "random", "off"])
     }
 

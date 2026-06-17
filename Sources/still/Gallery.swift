@@ -220,7 +220,7 @@ struct ThemeCard: View {
                 .foregroundColor(fg)
 
             if showEffects, let fx = borderEffectFor(name) {
-                EffectStrip(fx: fx)
+                LiveEffectStrip(fx: fx, name: name, fallback: p.primary)
             }
 
             // Mock chrome — drawn by still, never imported from an app.
@@ -244,8 +244,17 @@ struct ThemeCard: View {
         .padding(16)
         .background(cardBG)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12)
-            .stroke(Color(nsColor: p.border), lineWidth: 1))
+        // An animatable theme gets a LIVE glowing, breathing, colour-cycling
+        // border (the shared `resolveBorder` animator) so the effect is
+        // visible at gallery scale; every other theme keeps the flat hairline.
+        .overlay {
+            if showEffects, isAnimatableTheme(name) {
+                AnimatedCardBorder(name: name, cornerRadius: 12, fallback: p.primary)
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(nsColor: p.border), lineWidth: 1)
+            }
+        }
     }
 }
 
@@ -326,24 +335,12 @@ struct Checker: View {
     }
 }
 
-// MARK: - Effect flash palette (the dynamic atom, shown statically)
-
-struct EffectStrip: View {
-    let fx: EffectSpec
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text(fx.cycles ? "effect · spectrum" : "effect · flash")
-                .font(sysFont(9, weight: .medium, design: .monospaced))
-                .foregroundColor(Color(nsColor: NSColor(hex: fx.steady)))
-            ForEach(Array(fx.flash.enumerated()), id: \.offset) { _, hex in
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color(nsColor: NSColor(hex: hex)))
-                    .frame(width: 22 * uiScale, height: 12 * uiScale)
-            }
-        }
-    }
-}
+// MARK: - Effect flash palette
+//
+// The effect preview moved to EffectShowcase.swift's `LiveEffectStrip` — the
+// old static `EffectStrip` only listed the flash palette, so the dynamic atom
+// looked disabled. The live version drives `resolveBorder` off a clock, so the
+// effect actually animates (cycling chip + glowing card border + a "live" dot).
 
 // MARK: - Helpers
 
