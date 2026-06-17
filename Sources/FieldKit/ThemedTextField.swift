@@ -166,9 +166,13 @@ public final class ThemedTextField: NSView {
         let box = FieldDelegate(owner: self)
         delegateBox = box
         field.delegate = box
-        // Focus-on via becomeFirstResponder (reliable on click, unlike the
-        // begin-editing notification); focus-off + commit via the delegate.
-        field.onFocusChange = { [weak self] in self?.setFocused($0) }
+        // Focus is DERIVED from the settled first-responder state, never from a
+        // single edge: begin/become/resign/end all just schedule a reconcile on
+        // the next tick (see `scheduleFocusReconcile`). A bare click thrashes
+        // through become→spurious-end within one runloop; reconciling AFTER it
+        // settles collapses that to the real final state, so the highlight is
+        // reliable (the earlier edge-driven approach blurred instantly).
+        field.onResponderEdge = { [weak self] in self?.scheduleFocusReconcile() }
 
         // Order (bottom→top): stroke, notch, label — so the floated label sits
         // over the (notched) border. drawRect content (fill/icons/helper) is
@@ -282,7 +286,26 @@ public final class ThemedTextField: NSView {
 
     // MARK: - Focus
 
-    fileprivate func setFocused(_ on: Bool) {
+    /// True when the field (or its field editor) is the window's first
+    /// responder — the GROUND TRUTH for focus, checked after edges settle.
+    private var isFieldFirstResponder: Bool {
+        guard let w = field.window else { return false }
+        if w.firstResponder === field { return true }
+        if let ed = field.currentEditor(), w.firstResponder === ed { return true }
+        return false
+    }
+
+    /// Re-derive focus from the settled responder state on the NEXT runloop
+    /// tick. Multiple edges in one turn (become → spurious end on a bare click)
+    /// coalesce into a single correct result instead of a visible flicker.
+    fileprivate func scheduleFocusReconcile() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.setFocused(self.isFieldFirstResponder)
+        }
+    }
+
+    private func setFocused(_ on: Bool) {
         guard focused != on else { return }
         focused = on
         syncFloat(animated: true)        // label floats / colours
@@ -364,7 +387,11 @@ public final class ThemedTextField: NSView {
     }
 
     /// The surface-coloured rect that cuts the outlined top rule under the
-    /// floated label — faded in/out with the float (MUI's "notch").
+    /// floated label — faded in/out with the float (MUI's "notch"). It must be
+    /// centred on the BORDER (the stroke path runs along `box.insetBy(dx:1,dy:1)`,
+    /// i.e. its centre line is at `box.maxY - 1`, NOT `box.maxY`) and be tall
+    /// enough to cover the focused 2 pt stroke — otherwise a sliver of the rule
+    /// shows through behind the label text (the "line behind Filter").
     private func layoutNotch() {
         guard variant == .outlined, let lbl = label, floated else {
             notchLayer.opacity = 0; return
@@ -373,9 +400,11 @@ public final class ThemedTextField: NSView {
         let f = floatSize / bodySize
         let w = ceil((lbl as NSString)
             .size(withAttributes: [.font: themedFont(bodySize)]).width) * f + 8
+        let ruleY = geo.box.maxY - 1            // stroke centre line
+        let h: CGFloat = 6                       // ≥ 2 pt stroke + margin both sides
         notchLayer.backgroundColor = surface.cgColor
-        notchLayer.frame = CGRect(x: geo.labelStartX - 4, y: geo.box.maxY - 1.5,
-                                  width: w, height: 3)
+        notchLayer.frame = CGRect(x: geo.labelStartX - 4, y: ruleY - h / 2,
+                                  width: w, height: h)
         notchLayer.opacity = 1
     }
 
@@ -531,11 +560,11 @@ private final class FieldDelegate: NSObject, NSTextFieldDelegate {
     weak var owner: ThemedTextField?
     init(owner: ThemedTextField) { self.owner = owner }
 
-    // Focus-ON is reported by FocusReportingTextField.becomeFirstResponder;
-    // keep begin-editing too as a harmless backup (setFocused is idempotent).
-    func controlTextDidBeginEditing(_ obj: Notification) { owner?.setFocused(true) }
+    // Every editing edge just reconciles focus from the settled responder
+    // state (see scheduleFocusReconcile); end-editing additionally commits.
+    func controlTextDidBeginEditing(_ obj: Notification) { owner?.scheduleFocusReconcile() }
     func controlTextDidEndEditing(_ obj: Notification) {
-        owner?.setFocused(false); owner?.endedEditing()
+        owner?.scheduleFocusReconcile(); owner?.endedEditing()
     }
     func controlTextDidChange(_ obj: Notification) { owner?.textChanged() }
 
@@ -558,27 +587,23 @@ private final class FieldDelegate: NSObject, NSTextFieldDelegate {
     }
 }
 
-/// An `NSTextField` that reports gaining focus the instant it becomes first
-/// responder — `controlTextDidBeginEditing` doesn't reliably fire on a bare
-/// click, so the focus highlight needs this hook to match MUI.
+/// An `NSTextField` that pings on EVERY first-responder edge (gain AND loss).
+/// The owner doesn't trust the edge's direction — it reconciles focus from the
+/// settled responder state afterwards — so this only needs to say "something
+/// changed", which `controlTextDidBeginEditing` doesn't reliably do on a bare
+/// click (and the editable field redirects to its field editor, so `super`'s
+/// return is unreliable too).
 @MainActor
 private final class FocusReportingTextField: NSTextField {
-    var onFocusChange: ((Bool) -> Void)?
+    var onResponderEdge: (() -> Void)?
     override func becomeFirstResponder() -> Bool {
         let ok = super.becomeFirstResponder()
-        // Fire regardless of the return: an editable field often redirects to
-        // its field editor and returns false, yet focus DID move here.
-        onFocusChange?(true)
+        onResponderEdge?()
         return ok
     }
-    // Symmetric OFF edge. Focus-OFF used to ride ONLY on
-    // controlTextDidEndEditing, which never posts if no editing session ever
-    // began (e.g. focus taken in a non-key window) — leaving the accent stuck
-    // on. resignFirstResponder always fires when focus leaves; setFocused is
-    // idempotent, so the duplicate after a normal end-editing is a no-op.
     override func resignFirstResponder() -> Bool {
         let ok = super.resignFirstResponder()
-        onFocusChange?(false)
+        onResponderEdge?()
         return ok
     }
 }

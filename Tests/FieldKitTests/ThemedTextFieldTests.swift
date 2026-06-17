@@ -16,6 +16,13 @@ final class ThemedTextFieldTests: XCTestCase {
 
     private func palette() -> ResolvedPalette { resolve(.terminal) }   // dark, primary 0x33FF66
 
+    /// Focus is reconciled from the SETTLED first-responder state on the next
+    /// runloop tick (so a bare click's become→spurious-end thrash collapses to
+    /// the real result). Pump the runloop so that deferred reconcile runs.
+    private func pump(_ s: TimeInterval = 0.2) {
+        RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(s))
+    }
+
     /// A field installed in a key window, laid out, ready to focus.
     private func fieldInKeyWindow(label: String? = "Filter")
         -> (field: ThemedTextField, window: NSWindow) {
@@ -43,6 +50,7 @@ final class ThemedTextFieldTests: XCTestCase {
         XCTAssertEqual(before.borderWidth, 1, "resting border is 1pt")
 
         _ = win.makeFirstResponder(f)        // bare focus — NO text typed
+        pump()                               // let the deferred reconcile settle
         f.layoutSubtreeIfNeeded()
 
         let after = f.focusProbe
@@ -56,10 +64,10 @@ final class ThemedTextFieldTests: XCTestCase {
     /// (whether via controlTextDidEndEditing or the resignFirstResponder edge).
     func testLosingFirstResponderClearsFocus() {
         let (f, win) = fieldInKeyWindow()
-        _ = win.makeFirstResponder(f)
+        _ = win.makeFirstResponder(f); pump()
         XCTAssertTrue(f.focusProbe.focused)
 
-        _ = win.makeFirstResponder(nil)      // drop first responder
+        _ = win.makeFirstResponder(nil); pump()   // drop first responder
         f.layoutSubtreeIfNeeded()
         XCTAssertFalse(f.focusProbe.focused, "focus look must clear on resign")
         XCTAssertEqual(f.focusProbe.borderWidth, 1)
@@ -82,15 +90,16 @@ final class ThemedTextFieldTests: XCTestCase {
     /// focus look — the host's seam instead of reaching for the inner field.
     func testProgrammaticFocusEngages() {
         let (f, _) = fieldInKeyWindow()
-        var events: [Bool] = []
-        f.onFocusChange = { events.append($0) }
+        var lastFocus: Bool?
+        f.onFocusChange = { lastFocus = $0 }
 
-        f.window?.makeFirstResponder(nil)   // neutralise order-front auto-focus
-        events.removeAll()
+        f.window?.makeFirstResponder(nil); pump()   // neutralise order-front auto-focus
+        lastFocus = nil
 
         XCTAssertTrue(f.focus(selectingAll: true), "focus() should move first responder")
+        pump()
         XCTAssertTrue(f.focusProbe.focused, "focus() engages the focused appearance")
-        XCTAssertEqual(events, [true])
+        XCTAssertEqual(lastFocus, true, "onFocusChange settles to true")
     }
 
     /// The plain `stringValue` setter stays SILENT (no onChange) to avoid
