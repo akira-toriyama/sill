@@ -164,7 +164,7 @@ public final class ThemedComboBox: NSObject {
     private var committedValue = ""             // last committed label; the blur-revert target
     private var filtered: [Item] = []
 
-    private var panel: ComboPanel?
+    private var panel: PopupPanel?
     private let container = NSView()             // rounded, bordered popup surface
     private let scrollView = NSScrollView()
     private var listView: ComboListView!         // flipped document view (custom-drawn rows)
@@ -182,8 +182,10 @@ public final class ThemedComboBox: NSObject {
 
     private var fadeGen = 0                       // monotonic fade token (tooltip discipline)
     nonisolated(unsafe) private var localMon: Any?
-    private var glueWindow: NSWindow?
-    private weak var glueClip: NSClipView?
+
+    /// The shared 0.12 s fade + host glue (combo dismisses on the host resigning key).
+    private let fade = PopupFade(duration: 0.12)
+    private let glue = PopupGlue()
 
     // Probe state (set by reframe()).
     private var lastPopupFrame: CGRect = .zero
@@ -194,7 +196,7 @@ public final class ThemedComboBox: NSObject {
     private let maxVisibleRows = 8
     private let gap: CGFloat = 4
     private let cornerRadius: CGFloat = 8
-    private let screenMargin: CGFloat = 4
+    // (the visible-frame margin now lives in the shared `popupScreenMargin`)
     private let rowInset: CGFloat = 12
     private let bodySize: CGFloat = 13
     private let accentBarWidth: CGFloat = 3
@@ -529,19 +531,9 @@ public final class ThemedComboBox: NSObject {
 
     private func ensurePanel() {
         guard panel == nil else { return }
-        let p = ComboPanel(contentRect: .zero,
-                           styleMask: [.borderless, .nonactivatingPanel],
-                           backing: .buffered, defer: false)
-        p.isFloatingPanel = true
-        p.becomesKeyOnlyIfNeeded = true
-        p.hidesOnDeactivate = true
-        p.level = .popUpMenu
-        p.ignoresMouseEvents = false                 // INTERACTIVE — the key delta vs the tooltip
-        p.hasShadow = true
-        p.isOpaque = false
-        p.backgroundColor = .clear
-        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary,
-                                .ignoresCycle, .stationary]
+        // INTERACTIVE (receives row clicks) + a `.list` AX role — the key deltas vs
+        // the passive tooltip. The shared factory configures the rest of the panel.
+        let p = themedPopupPanel(interactive: true, role: .list)
 
         container.wantsLayer = true
         container.layer?.cornerRadius = cornerRadius
@@ -561,8 +553,7 @@ public final class ThemedComboBox: NSObject {
         scrollView.documentView = lv
         container.addSubview(scrollView)
         p.contentView = container
-        p.contentView?.setAccessibilityElement(true)
-        p.setAccessibilityRole(.list)                // the popup IS a listbox (not hidden like the tooltip)
+        p.contentView?.setAccessibilityElement(true)  // the popup IS a listbox (role set by the factory)
         // NOTE (BASIC limitation): individual rows are custom-drawn and do NOT
         // yet vend per-row AX elements. The field is marked .comboBox (see init)
         // so VoiceOver announces the control + reads the committed value; vending
@@ -579,29 +570,17 @@ public final class ThemedComboBox: NSObject {
         guard let panel, let win = field.window else { return }
         let onScreen = win.convertToScreen(field.convert(field.bounds, to: nil))
 
-        let centre = CGPoint(x: onScreen.midX, y: onScreen.midY)
-        let screen = NSScreen.screens.first { $0.frame.contains(centre) }
-            ?? NSScreen.main ?? NSScreen.screens.first
-        guard let vf = screen?.visibleFrame else { return }
-
         let rowCount = filtered.isEmpty ? 1 : filtered.count
         let visibleRows = max(1, min(rowCount, maxVisibleRows))
         let height = CGFloat(visibleRows) * rowHeight + 2     // +2 for the 1pt border top/bottom
-        let width = onScreen.width
 
-        var origin = CGPoint(x: onScreen.minX, y: onScreen.minY - gap - height)   // prefer below
-        flippedAbove = false
-        if origin.y < vf.minY + screenMargin {
-            origin.y = onScreen.maxY + gap                    // flip above
-            flippedAbove = true
-        }
-        let m = screenMargin
-        origin.x = min(max(origin.x, vf.minX + m), max(vf.minX + m, vf.maxX - m - width))
-        origin.y = min(max(origin.y, vf.minY + m), max(vf.minY + m, vf.maxY - m - height))
-
-        let frame = CGRect(origin: origin, size: CGSize(width: width, height: height))
-        panel.setFrame(frame, display: true)
-        panel.invalidateShadow()                              // cached silhouette goes stale on resize
+        // Shared engine: width = the field's on-screen width, sits `gap` below,
+        // flips above only on underflow, clamp + setFrame + invalidateShadow.
+        guard case let .anchorWidthBelow(frame, flipped)? =
+                placePopup(panel, anchorRectOnScreen: onScreen,
+                           .anchorWidthBelow(gap: gap, height: height))
+        else { return }
+        flippedAbove = flipped
 
         // Lay out the inner tree (panel content is NOT flipped → y-up).
         container.frame = CGRect(origin: .zero, size: frame.size)
@@ -692,45 +671,18 @@ public final class ThemedComboBox: NSObject {
     // MARK: - Fade (tooltip discipline: monotonic fadeGen guards the orderOut)
 
     private func fadeIn(animated: Bool) {
-        guard let panel, let cl = container.layer else { return }
-        if animated {
-            cl.opacity = 0
-            layerTxn(animated: true) { cl.opacity = 1 }
-        } else {
-            layerTxn(animated: false) { cl.opacity = 1 }
-        }
-        _ = panel
+        guard panel != nil, let cl = container.layer else { return }
+        fade.fadeIn(cl, animated: animated)
     }
 
     private func fadeOut(animated: Bool) {
         guard let panel, let cl = container.layer else { return }
-        if animated {
-            let gen = fadeGen
-            CATransaction.begin()
-            CATransaction.setAnimationDuration(0.12)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
-            CATransaction.setCompletionBlock { [weak self] in
-                guard let self, self.fadeGen == gen, !self.isOpen else { return }
-                panel.orderOut(nil)
-            }
-            cl.opacity = 0
-            CATransaction.commit()
-        } else {
-            layerTxn(animated: false) { cl.opacity = 0 }
-            panel.orderOut(nil)
+        // Order out only if this fade still stands (same generation, still closed).
+        let gen = fadeGen
+        fade.fadeOut(cl, panel: panel, animated: animated) { [weak self] in
+            guard let self else { return false }
+            return self.fadeGen == gen && !self.isOpen
         }
-    }
-
-    private func layerTxn(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(0.12)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
     }
 
     // MARK: - Outside-click dismiss (single LOCAL monitor + key-window glue)
@@ -765,47 +717,24 @@ public final class ThemedComboBox: NSObject {
 
     private func startGlue() {
         guard let win = field.window else { return }
-        glueWindow = win
-        let nc = NotificationCenter.default
-        nc.addObserver(self, selector: #selector(hostGeometryChanged),
-                       name: NSWindow.didMoveNotification, object: win)
-        nc.addObserver(self, selector: #selector(hostGeometryChanged),
-                       name: NSWindow.didResizeNotification, object: win)
-        nc.addObserver(self, selector: #selector(hostWillClose),
-                       name: NSWindow.willCloseNotification, object: win)
-        nc.addObserver(self, selector: #selector(hostResignedKey),
-                       name: NSWindow.didResignKeyNotification, object: win)
-        if let clip = field.enclosingScrollView?.contentView {
-            clip.postsBoundsChangedNotifications = true
-            nc.addObserver(self, selector: #selector(hostGeometryChanged),
-                           name: NSView.boundsDidChangeNotification, object: clip)
-            glueClip = clip
-        }
+        // Unlike the tooltip, the combo ALSO dismisses on the host resigning key
+        // (a cross-app / desktop click) — the opt-in `onResignKey`.
+        glue.start(window: win, clip: field.enclosingScrollView?.contentView,
+                   onGeometryChange: { [weak self] in self?.hostGeometryChanged() },
+                   onClose: { [weak self] in self?.dismissPopup(animated: false) },
+                   onResignKey: { [weak self] in
+                       guard let self, self.isOpen else { return }
+                       self.dismissPopup(animated: false)
+                   })
     }
 
-    /// Scoped removal (NOT the blunt `removeObserver(self)`) so the combo can hold
-    /// other observers in future without this nuking them.
-    private func stopGlue() {
-        guard let win = glueWindow else { return }
-        let nc = NotificationCenter.default
-        nc.removeObserver(self, name: NSWindow.didMoveNotification, object: win)
-        nc.removeObserver(self, name: NSWindow.didResizeNotification, object: win)
-        nc.removeObserver(self, name: NSWindow.willCloseNotification, object: win)
-        nc.removeObserver(self, name: NSWindow.didResignKeyNotification, object: win)
-        if let clip = glueClip {                     // the CACHED clip (the scroll view may have changed)
-            nc.removeObserver(self, name: NSView.boundsDidChangeNotification, object: clip)
-        }
-        glueWindow = nil
-        glueClip = nil
-    }
+    private func stopGlue() { glue.stop() }
 
-    @objc private func hostGeometryChanged() {
+    private func hostGeometryChanged() {
         guard isOpen else { return }
         if field.visibleRect.isEmpty { dismissPopup(); return }   // scrolled out of a clip → close
         reframe()
     }
-    @objc private func hostWillClose() { dismissPopup(animated: false) }
-    @objc private func hostResignedKey() { if isOpen { dismissPopup(animated: false) } }
 
     // MARK: - Helpers
 
@@ -814,26 +743,10 @@ public final class ThemedComboBox: NSObject {
     }
 
     deinit {
-        NotificationCenter.default.removeObserver(self)
-        guard let m = localMon else { return }
-        if Thread.isMainThread {
-            MainActor.assumeIsolated { NSEvent.removeMonitor(m) }
-        } else {
-            nonisolated(unsafe) let mon = m
-            DispatchQueue.main.async { MainActor.assumeIsolated { NSEvent.removeMonitor(mon) } }
-        }
+        // The glue observers are torn down by `PopupGlue`'s own deinit; only the
+        // outside-click monitor needs the nonisolated-safe removal here.
+        removeMonitorSafely(localMon)
     }
-}
-
-// MARK: - ComboPanel (never key — the KeyablePanel discipline)
-
-/// A borderless non-activating panel that REFUSES to become key, so ordering it
-/// in front cannot resign the main window's key state or the field's first
-/// responder. It still receives mouse events (`ignoresMouseEvents = false`).
-@MainActor
-private final class ComboPanel: NSPanel {
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
 }
 
 // MARK: - ComboListView (flipped, custom-drawn rows, mouse → controller)
