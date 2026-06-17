@@ -106,8 +106,27 @@ public final class ThemedComboBox: NSObject {
         didSet { field.surfaceColor = surfaceColor; applyListTheme() }
     }
 
-    /// Shown as a single non-selectable row when the filter matches nothing.
+    /// Shown as a single non-selectable row when the filter matches nothing AND
+    /// `emptyActionRow` is nil (or returns nil for the query).
     public var noOptionsText = "No options"
+
+    /// OPT-IN actionable empty state. When the filter matches NOTHING, this is
+    /// called with the live query; return a row label (e.g. facet's
+    /// `Create "#tag"`) to show an ACTIONABLE row in place of the inert
+    /// `noOptionsText`, or nil to keep the inert text. The row participates in
+    /// arrow-highlight / Enter / click exactly like a normal row, and committing
+    /// it fires `onEmptyAction(query)`. DEFAULT nil ⇒ the empty state is the inert
+    /// `noOptionsText`, unchanged. sill knows nothing about the domain — the
+    /// consumer (facet) owns the label text, validity (return nil to stay inert),
+    /// and what the action does.
+    public var emptyActionRow: ((_ query: String) -> String?)? {
+        didSet { refilter(); if isOpen { renderRows(); reframe() } }
+    }
+    /// Fired when the `emptyActionRow` row is committed (click / Enter), carrying
+    /// the live query. The popup is dismissed + first responder re-asserted first
+    /// (the synchronous-commit discipline), so the handler runs with the field
+    /// focused and may freely re-drive it (clear, set options, reopen).
+    public var onEmptyAction: ((_ query: String) -> Void)?
 
     // MARK: Callbacks
 
@@ -154,7 +173,12 @@ public final class ThemedComboBox: NSObject {
     private var isInvalidated = false
     fileprivate var pointerInPopup = false       // raised on row mouseEntered/mouseDown, lowered on mouseExited/mouseUp + on any dismiss
     private var isCommitting = false             // raised for the synchronous commit window
-    private var highlightedRow: Int?             // index into `filtered`
+    private var highlightedRow: Int?             // index into `filtered` (or 0 = the action row)
+    private var emptyActionText: String?          // the resolved emptyActionRow label (nil ⇒ inert)
+
+    /// True when the filter is empty AND an actionable empty row is offered — the
+    /// single row 0 is then the action row (highlightable / clickable / Enter).
+    private var isActionRowActive: Bool { filtered.isEmpty && emptyActionText != nil }
 
     private var fadeGen = 0                       // monotonic fade token (tooltip discipline)
     nonisolated(unsafe) private var localMon: Any?
@@ -270,9 +294,15 @@ public final class ThemedComboBox: NSObject {
 
     private func refilter() {
         filtered = filter(options, field.stringValue)
+        // Resolve the actionable empty row (consumer decides per the live query).
+        emptyActionText = filtered.isEmpty ? emptyActionRow?(field.stringValue) : nil
         // A filter change invalidates the old highlight index (MUI clears it;
-        // the user re-arrows). Clamp rather than guess.
-        if let h = highlightedRow, !filtered.indices.contains(h) { highlightedRow = nil }
+        // the user re-arrows). Clamp rather than guess. Row 0 stays valid when the
+        // action row is active (it is the single highlightable row).
+        if let h = highlightedRow {
+            let valid = isActionRowActive ? (h == 0) : filtered.indices.contains(h)
+            if !valid { highlightedRow = nil }
+        }
     }
 
     /// The ONLY internal selection mutator — bypasses the public `didSet` (which
@@ -339,6 +369,7 @@ public final class ThemedComboBox: NSObject {
 
     private func handleReturn() -> Bool {
         guard isOpen else { return false }           // closed → let the host's Return fire
+        if isActionRowActive { fireEmptyAction(); return true }   // Enter commits the action row
         if let h = highlightedRow, filtered.indices.contains(h), !isDisabled(filtered[h]) {
             commitRow(h)
         } else {
@@ -370,6 +401,9 @@ public final class ThemedComboBox: NSObject {
     /// Advance the highlight to the next/previous ENABLED row, WRAPPING (MUI
     /// disableListWrap=false). All-disabled ⇒ no highlight.
     private func moveHighlight(_ delta: Int) {
+        if isActionRowActive {                       // the single action row is the only target
+            highlightedRow = 0; renderRows(); return
+        }
         guard !filtered.isEmpty else { highlightedRow = nil; return }
         let n = filtered.count
         var idx = highlightedRow ?? (delta > 0 ? -1 : 0)
@@ -408,13 +442,32 @@ public final class ThemedComboBox: NSObject {
         onSelect?(Item(id: text, label: text))
     }
 
+    /// Commit the actionable empty row — same synchronous discipline as commitRow
+    /// (beat the field's async focus reconcile), then hand the query to the
+    /// consumer, which may freely re-drive the field (clear / set options / reopen).
+    private func fireEmptyAction() {
+        guard isActionRowActive else { return }
+        let query = field.stringValue
+        isCommitting = true
+        dismissPopup(animated: false)
+        field.focus(selectingAll: false)             // keep first responder
+        isCommitting = false
+        onEmptyAction?(query)
+    }
+
     fileprivate func handleRowClick(_ row: Int) {
-        guard isOpen, !filtered.isEmpty, filtered.indices.contains(row) else { return }
+        guard isOpen else { return }
+        if isActionRowActive { if row == 0 { fireEmptyAction() }; return }
+        guard !filtered.isEmpty, filtered.indices.contains(row) else { return }
         guard !isDisabled(filtered[row]) else { return }   // disabled: no commit, no dismiss
         commitRow(row)
     }
 
     fileprivate func hoverHighlight(_ row: Int?) {
+        if isActionRowActive {                       // only row 0 (the action row) highlights
+            if row == 0, highlightedRow != 0 { highlightedRow = 0; renderRows() }
+            return
+        }
         guard let row, filtered.indices.contains(row), !isDisabled(filtered[row]) else { return }
         guard row != highlightedRow else { return }
         highlightedRow = row
@@ -586,9 +639,20 @@ public final class ThemedComboBox: NSObject {
         }
 
         guard !filtered.isEmpty else {
-            // "No options" — single muted, non-selectable row.
             let r = NSRect(x: 0, y: 0, width: width, height: rowHeight)
-            drawText(noOptionsText, in: r, attrs: textAttrs(palette.muted))
+            if let actionLabel = emptyActionText {
+                // Actionable empty row (e.g. facet "Create #xyz"): foreground text,
+                // highlightable like a normal row (selection wash + primary bar).
+                if effectiveHighlight == 0 {
+                    palette.selection.setFill(); r.fill()
+                    palette.primary.setFill()
+                    NSRect(x: 0, y: r.minY, width: accentBarWidth, height: rowHeight).fill()
+                }
+                drawText(actionLabel, in: r, attrs: textAttrs(palette.foreground))
+            } else {
+                // Inert "No options" — single muted, non-selectable row.
+                drawText(noOptionsText, in: r, attrs: textAttrs(palette.muted))
+            }
             return
         }
 
@@ -610,7 +674,8 @@ public final class ThemedComboBox: NSObject {
     /// The highlight to render — the preview override (clamped) or the live one.
     private var effectiveHighlight: Int? {
         if let pv = previewHighlight {
-            return filtered.isEmpty ? nil : max(0, min(pv, filtered.count - 1))
+            if filtered.isEmpty { return isActionRowActive ? 0 : nil }   // only the action row
+            return max(0, min(pv, filtered.count - 1))
         }
         return highlightedRow
     }
@@ -847,6 +912,8 @@ extension ThemedComboBox {
         // roles directly, so a probe field would just echo the input. The row
         // rendering is proven LIVE in still across light/dark/neon instead.
         let noOptions: Bool
+        let emptyActionActive: Bool     // an actionable empty row is offered (0 matches + emptyActionRow)
+        let emptyActionLabel: String?   // its resolved label
         let hasOpacityAnimation: Bool
         let reduceMotionRespected: Bool
     }
@@ -864,6 +931,8 @@ extension ThemedComboBox {
             surfaceColor: container.layer?.backgroundColor,
             borderColor: container.layer?.borderColor,
             noOptions: filtered.isEmpty,
+            emptyActionActive: isActionRowActive,
+            emptyActionLabel: emptyActionText,
             hasOpacityAnimation: animating,
             reduceMotionRespected: !(reduceMotion && animating))
     }
