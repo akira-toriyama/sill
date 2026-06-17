@@ -452,15 +452,15 @@ public final class ThemedTextField: NSView {
         let textRect = NSRect(x: textMinX, y: box.midY - lineH / 2,
                               width: max(textMaxX - textMinX, 0), height: lineH)
 
-        // Label anchors (anchorPoint is left-centre).
+        // Label anchors (anchorPoint is left-centre). All variants float the
+        // label to the box TOP, clear of the centred value text. Tucking it
+        // inside the box (`box.maxY − 9`) collided with the value on
+        // filled/standard — the 40 pt box is too short to hold a top-floated
+        // label AND centred text — so float to the top edge like outlined
+        // (which straddles the top rule there). No overlap on any variant.
         let startX = textMinX
         let resting = CGPoint(x: startX, y: box.midY)
-        let floatedY: CGFloat
-        switch variant {
-        case .outlined:           floatedY = box.maxY          // straddle the top rule
-        case .filled, .standard:  floatedY = box.maxY - 9       // tuck under the top, inside
-        }
-        let floated = CGPoint(x: startX, y: floatedY)
+        let floated = CGPoint(x: startX, y: box.maxY)
 
         return Geometry(box: box, textRect: textRect, leadingIcon: lead,
                         trailingIcon: trail, labelResting: resting,
