@@ -122,6 +122,18 @@ public extension ResolvedPalette {
     /// for outlines on a primary fill. A second, distinct axis from the
     /// text foreground.
     var onPrimaryStroke: NSColor { onPrimary(0.4) }
+
+    /// Foreground (black/white) that best contrasts the OPAQUE secondary —
+    /// for text / icons drawn ON a secondary fill (e.g. a secondary FAB).
+    /// The secondary mirror of `onPrimary`: rooted on the opaque
+    /// secondary, NOT a wash. Opt-in.
+    func onSecondary(_ alpha: CGFloat = 1) -> NSColor {
+        bestContrast(on: secondary).withAlphaComponent(alpha)
+    }
+
+    /// The hairline-stroke axis of `onSecondary` (the contrast ink @ 0.4) —
+    /// for outlines on a secondary fill. Mirrors `onPrimaryStroke`.
+    var onSecondaryStroke: NSColor { onSecondary(0.4) }
 }
 
 /// Black or white, whichever best contrasts `c` used as a fill. Reuses

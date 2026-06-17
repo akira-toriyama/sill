@@ -238,6 +238,7 @@ struct ThemeCard: View {
             MockButton(p: p)
             MockButtonGroup(p: p)
             MockCheckbox(p: p)
+            MockFAB(p: p)
         }
         .padding(16)
         .background(cardBG)
