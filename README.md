@@ -1,7 +1,7 @@
 # sill
 
 Shared theming foundation for the swift app family
-(**facet · wand · perch · halo · glance**). One repo, three modules, one
+(**facet · wand · perch · halo · glance**). One repo, focused modules, one
 version — the swift-collections layout.
 
 ```swift
@@ -18,8 +18,11 @@ import Effects      // dynamic, color-only — EffectSpec, animated themes
 
 A consumer that depends on **only `Palette`** links zero AppKit.
 
-See [docs/DESIGN.md](docs/DESIGN.md) for the full design, decisions, and
-per-app migration plan.
+The table is the theming core; sill also ships CLI / config / field helpers
+(`CLIKit`, `ConfigSchema`, `FieldKit`) plus the `still` dev bench. The full
+module set and target wiring is authoritative in [Package.swift](Package.swift)
+— this list is orientation, not a contract. See [docs/DESIGN.md](docs/DESIGN.md)
+for the full design, decisions, and per-app migration plan.
 
 > Part of plan **atelier** — exists so "facet の theme 真似て" never has to
 > be said twice. Status: shipped into facet (#189) + perch (#108) on `0.1.0`;
