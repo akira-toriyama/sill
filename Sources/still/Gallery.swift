@@ -240,6 +240,7 @@ struct ThemeCard: View {
             MockCheckbox(p: p)
             MockFAB(p: p)
             MockTooltip(p: p)
+            MockComboBox(p: p)
         }
         .padding(16)
         .background(cardBG)
