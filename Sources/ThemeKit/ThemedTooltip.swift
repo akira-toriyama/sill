@@ -45,8 +45,8 @@ public final class ThemedTooltip: NSObject {
     /// the screen's visible frame.
     public enum Placement { case top, bottom, leading, trailing, auto }
 
-    /// The concrete, post-flip side (never `.auto`). Drives the arrow edge.
-    enum Side { case top, bottom, leading, trailing }
+    // The concrete, post-flip side (never `.auto`) is the shared `PopupSide`
+    // (see PopupPanel.swift) — it drives the arrow edge.
 
     // MARK: - Public configuration
 
@@ -92,7 +92,7 @@ public final class ThemedTooltip: NSObject {
     private let arrowLayer = CAShapeLayer()   // triangle on the anchor-facing edge
     private let textLayer  = CATextLayer()    // wrapped label
 
-    private var panel: NSPanel?
+    private var panel: PopupPanel?
     private var isShown = false
     private var isInvalidated = false
 
@@ -104,18 +104,22 @@ public final class ThemedTooltip: NSObject {
     /// fade can't be clobbered by the stale completion.
     private var fadeGen = 0
 
+    /// The shared 0.16 s fade (MUI Tooltip timing) + host glue.
+    private let fade = PopupFade(duration: 0.16)
+    private let glue = PopupGlue()
+
     /// Last measured fill (surface) size, padding included; arrow excluded.
     private var fillSize: CGSize = .zero
 
     // Probe / glue state (set by reposition()).
-    private var resolvedSide: Side = .bottom
+    private var resolvedSide: PopupSide = .bottom
     private var lastBubbleFrame: CGRect = .zero
     private var lastArrowCross: CGFloat = 0
 
     // MARK: - Metrics (MUI v5 Tooltip values + macOS placement constants)
 
     private let gap: CGFloat = 8            // anchor edge → arrow tip
-    private let screenMargin: CGFloat = 4   // keep this far inside the visible frame
+    // (the visible-frame margin now lives in the shared `popupScreenMargin`)
     private let cornerRadius: CGFloat = 4
     private let hpad: CGFloat = 8           // MUI padding 4×8
     private let vpad: CGFloat = 4
@@ -270,53 +274,27 @@ public final class ThemedTooltip: NSObject {
 
     private func ensurePanel() {
         guard panel == nil else { return }
-        let p = NSPanel(contentRect: .zero,
-                        styleMask: [.borderless, .nonactivatingPanel],
-                        backing: .buffered, defer: false)
-        p.isFloatingPanel = true
-        p.becomesKeyOnlyIfNeeded = true
-        p.hidesOnDeactivate = true          // a borderless panel gets no free hide-on-deactivate
-        p.level = .popUpMenu                 // above .floating
-        p.ignoresMouseEvents = true          // click-through (passive)
-        p.hasShadow = true
-        p.isOpaque = false
-        p.backgroundColor = .clear
-        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary,
-                                .ignoresCycle, .stationary]
+        // Passive bubble: click-through + out of AX (VoiceOver reaches the text via
+        // the anchor's accessibilityHelp instead).
+        let p = themedPopupPanel(interactive: false, role: .unknown)
         p.contentView = bubbleView
         p.contentView?.setAccessibilityElement(false)
-        p.setAccessibilityRole(.unknown)     // keep the panel out of AX
         panel = p
     }
 
     private func fadeIn(animated: Bool) {
         guard let panel, let bl = bubbleView.layer else { return }
         panel.orderFrontRegardless()         // NEVER makeKey — must not steal focus
-        if animated {
-            bl.opacity = 0
-            layerTxn(animated: true) { bl.opacity = 1 }
-        } else {
-            layerTxn(animated: false) { bl.opacity = 1 }
-        }
+        fade.fadeIn(bl, animated: animated)
     }
 
     private func fadeOut(animated: Bool) {
         guard let panel, let bl = bubbleView.layer else { return }
-        if animated {
-            let gen = fadeGen
-            CATransaction.begin()
-            CATransaction.setAnimationDuration(0.16)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
-            // Order out only if this fade still stands (no re-show superseded it).
-            CATransaction.setCompletionBlock { [weak self] in
-                guard let self, self.fadeGen == gen, !self.isShown else { return }
-                panel.orderOut(nil)
-            }
-            bl.opacity = 0
-            CATransaction.commit()
-        } else {
-            layerTxn(animated: false) { bl.opacity = 0 }
-            panel.orderOut(nil)
+        // Order out only if this fade still stands (no re-show superseded it).
+        let gen = fadeGen
+        fade.fadeOut(bl, panel: panel, animated: animated) { [weak self] in
+            guard let self else { return false }
+            return self.fadeGen == gen && !self.isShown
         }
     }
 
@@ -364,7 +342,7 @@ public final class ThemedTooltip: NSObject {
         fillSize = CGSize(width: tw + 2 * hpad, height: th + 2 * vpad)
 
         let s = backingScale
-        layerTxn(animated: false) {
+        fade.transact(animated: false) {
             self.textLayer.string = attr
             self.textLayer.bounds = CGRect(x: 0, y: 0, width: tw, height: th)
             self.textLayer.foregroundColor = self.textColor.cgColor
@@ -384,47 +362,27 @@ public final class ThemedTooltip: NSObject {
         guard let panel, let anchor = _anchor, let win = anchor.window else { return }
         let onScreen = win.convertToScreen(anchor.convert(anchor.bounds, to: nil))
 
-        // Pick the screen by GEOMETRY (not win.screen!) — the anchor's centre.
-        let centre = CGPoint(x: onScreen.midX, y: onScreen.midY)
-        let screen = NSScreen.screens.first { $0.frame.contains(centre) }
-            ?? NSScreen.main ?? NSScreen.screens.first
-        guard let vf = screen?.visibleFrame else { return }
+        // Shared engine: screen-by-geometry pick · side resolve + 4-side edge-flip
+        // (panel size = fill + arrow on the facing axis) · clamp · setFrame +
+        // invalidateShadow. Returns the post-flip side + the committed frame.
+        guard case let .sideRelative(frame, side)? =
+                placePopup(panel, anchorRectOnScreen: onScreen,
+                           .sideRelative(preferred: resolvePreferred(placement),
+                                         fillSize: fillSize, gap: gap, arrowLen: arrowLen))
+        else { return }
 
-        // Resolve preferred side, then edge-flip against the visible frame.
-        var side = resolvePreferred(placement)
-        var size = panelSize(for: side)
-        var origin = originFor(side: side, onScreen: onScreen, size: size)
-        switch side {
-        case .bottom:   if origin.y < vf.minY { side = .top }
-        case .top:      if origin.y + size.height > vf.maxY { side = .bottom }
-        case .leading:  if origin.x < vf.minX { side = .trailing }
-        case .trailing: if origin.x + size.width > vf.maxX { side = .leading }
-        }
-        size = panelSize(for: side)
-        origin = originFor(side: side, onScreen: onScreen, size: size)
-
-        // Clamp BOTH axes into the visible frame (post-flip the opposite side
-        // can still graze an edge); the arrow re-point tracks the anchor except
-        // within (cornerRadius + arrowBase/2) of a corner, where it pins to the
-        // corner-clear inset.
-        let m = screenMargin
-        origin.x = min(max(origin.x, vf.minX + m), max(vf.minX + m, vf.maxX - m - size.width))
-        origin.y = min(max(origin.y, vf.minY + m), max(vf.minY + m, vf.maxY - m - size.height))
-
-        let frame = CGRect(origin: origin, size: size)
-        panel.setFrame(frame, display: true)
-        panel.invalidateShadow()             // the cached silhouette goes stale on resize
-
-        let fill = fillRect(in: size, side: side)
-        let cross = arrowCross(side: side, onScreen: onScreen, panelOrigin: origin, fill: fill)
-        layoutBubble(side: side, panelSize: size, fill: fill, cross: cross)
+        // Lay out the bubble + arrow in the committed frame (tooltip-local; the
+        // arrow re-points at the anchor except within a corner-clear inset).
+        let fill = fillRect(in: frame.size, side: side)
+        let cross = arrowCross(side: side, onScreen: onScreen, panelOrigin: frame.origin, fill: fill)
+        layoutBubble(side: side, panelSize: frame.size, fill: fill, cross: cross)
 
         resolvedSide = side
         lastBubbleFrame = frame
         lastArrowCross = cross
     }
 
-    private func resolvePreferred(_ p: Placement) -> Side {
+    private func resolvePreferred(_ p: Placement) -> PopupSide {
         switch p {
         case .auto, .bottom: return .bottom
         case .top:           return .top
@@ -433,28 +391,9 @@ public final class ThemedTooltip: NSObject {
         }
     }
 
-    /// Panel size = fill surface + the arrow protrusion on the anchor-facing axis.
-    private func panelSize(for side: Side) -> CGSize {
-        switch side {
-        case .top, .bottom:     return CGSize(width: fillSize.width, height: fillSize.height + arrowLen)
-        case .leading, .trailing: return CGSize(width: fillSize.width + arrowLen, height: fillSize.height)
-        }
-    }
-
-    /// Pre-flip / pre-clamp panel origin (Y-up), bubble centred on the cross axis,
-    /// `gap` from the anchor edge to the arrow tip.
-    private func originFor(side: Side, onScreen: CGRect, size: CGSize) -> CGPoint {
-        switch side {
-        case .bottom:   return CGPoint(x: onScreen.midX - size.width / 2, y: onScreen.minY - gap - size.height)
-        case .top:      return CGPoint(x: onScreen.midX - size.width / 2, y: onScreen.maxY + gap)
-        case .leading:  return CGPoint(x: onScreen.minX - gap - size.width, y: onScreen.midY - size.height / 2)
-        case .trailing: return CGPoint(x: onScreen.maxX + gap, y: onScreen.midY - size.height / 2)
-        }
-    }
-
     /// The fill surface within the panel content (Y-up); the arrow occupies the
     /// remaining strip on the anchor-facing edge.
-    private func fillRect(in size: CGSize, side: Side) -> CGRect {
+    private func fillRect(in size: CGSize, side: PopupSide) -> CGRect {
         switch side {
         case .bottom:   return CGRect(x: 0,        y: 0,       width: fillSize.width, height: fillSize.height)  // arrow on top
         case .top:      return CGRect(x: 0,        y: arrowLen, width: fillSize.width, height: fillSize.height) // arrow on bottom
@@ -467,7 +406,7 @@ public final class ThemedTooltip: NSObject {
     /// corners so it always reads as one shape — pointed at the anchor centre, or
     /// as close as the corner-clear inset allows when the anchor sits within
     /// (cornerRadius + arrowBase/2) of a corner.
-    private func arrowCross(side: Side, onScreen: CGRect, panelOrigin: CGPoint, fill: CGRect) -> CGFloat {
+    private func arrowCross(side: PopupSide, onScreen: CGRect, panelOrigin: CGPoint, fill: CGRect) -> CGFloat {
         let inset = cornerRadius + arrowBase / 2
         switch side {
         case .top, .bottom:
@@ -477,8 +416,8 @@ public final class ThemedTooltip: NSObject {
         }
     }
 
-    private func layoutBubble(side: Side, panelSize: CGSize, fill: CGRect, cross: CGFloat) {
-        layerTxn(animated: false) {
+    private func layoutBubble(side: PopupSide, panelSize: CGSize, fill: CGRect, cross: CGFloat) {
+        fade.transact(animated: false) {
             self.fillLayer.frame = fill
             self.fillLayer.cornerRadius = self.cornerRadius
             self.textLayer.position = CGPoint(x: fill.midX, y: fill.midY)
@@ -489,7 +428,7 @@ public final class ThemedTooltip: NSObject {
 
     /// A filled triangle pointing OUTWARD (toward the anchor), its base overlapped
     /// 1 pt into the fill so the rounded surface + arrow read seamlessly.
-    private func arrowPath(side: Side, fill: CGRect, cross: CGFloat) -> CGPath {
+    private func arrowPath(side: PopupSide, fill: CGRect, cross: CGFloat) -> CGPath {
         let b = arrowBase, len = arrowLen, ov: CGFloat = 1
         let path = CGMutablePath()
         switch side {
@@ -518,30 +457,22 @@ public final class ThemedTooltip: NSObject {
 
     private func startGlue() {
         guard let win = _anchor?.window else { return }
-        let nc = NotificationCenter.default
-        nc.addObserver(self, selector: #selector(hostGeometryChanged),
-                       name: NSWindow.didMoveNotification, object: win)
-        nc.addObserver(self, selector: #selector(hostGeometryChanged),
-                       name: NSWindow.didResizeNotification, object: win)
-        nc.addObserver(self, selector: #selector(hostWillClose),
-                       name: NSWindow.willCloseNotification, object: win)
-        if let clip = _anchor?.enclosingScrollView?.contentView {
-            clip.postsBoundsChangedNotifications = true
-            nc.addObserver(self, selector: #selector(hostGeometryChanged),
-                           name: NSView.boundsDidChangeNotification, object: clip)
-        }
+        // No resign-key observer — a tooltip does not dismiss on the host losing
+        // key focus (the combo does; that's the opt-in `onResignKey`).
+        glue.start(window: win, clip: _anchor?.enclosingScrollView?.contentView,
+                   onGeometryChange: { [weak self] in self?.hostGeometryChanged() },
+                   onClose: { [weak self] in self?.hide() })
     }
 
-    private func stopGlue() { NotificationCenter.default.removeObserver(self) }
+    private func stopGlue() { glue.stop() }
 
-    @objc private func hostGeometryChanged() {
+    private func hostGeometryChanged() {
         guard isShown else { return }
         // Scrolled fully out of a clip view (or off the window edge) → dismiss,
         // rather than parking the bubble at a screen edge pointing at nothing.
         if let a = _anchor, a.visibleRect.isEmpty { hide(); return }
         reposition()
     }
-    @objc private func hostWillClose() { hide() }
 
     // MARK: - Helpers
 
@@ -551,18 +482,6 @@ public final class ThemedTooltip: NSObject {
 
     private var reduceMotion: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-    }
-
-    private func layerTxn(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(0.16)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
     }
 }
 
@@ -574,7 +493,7 @@ public final class ThemedTooltip: NSObject {
 extension ThemedTooltip {
     struct TooltipProbe {
         let isVisible: Bool
-        let resolvedSide: Side
+        let resolvedSide: PopupSide
         let fillColor: CGColor?
         let textColor: CGColor?
         let bubbleFrame: CGRect        // screen coords, post-clamp
