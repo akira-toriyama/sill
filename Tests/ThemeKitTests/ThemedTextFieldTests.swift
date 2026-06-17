@@ -142,4 +142,51 @@ final class ThemedTextFieldTests: XCTestCase {
         XCTAssertEqual(inner?.accessibilityLabel(), "type to filter…",
                        "falls back to placeholder when label is nil")
     }
+
+    // MARK: - Additive combo-box seams (default = byte-identical)
+
+    /// The arrow-key seams default to nil so a bare field's arrows fall through
+    /// to the field editor exactly as before (the `?? false` path in doCommandBy).
+    func testArrowSeamsDefaultNil() {
+        let f = ThemedTextField(palette: palette())
+        XCTAssertNil(f.onMoveDown, "no arrow seam by default")
+        XCTAssertNil(f.onMoveUp, "no arrow seam by default")
+    }
+
+    /// With `secondTrailingSymbol` nil (the default), the laid-out geometry is
+    /// IDENTICAL to a field that has only the single `trailingSymbol` — the new
+    /// inner-slot code path is dormant.
+    func testSecondTrailingNilIsGeometryIdentical() {
+        let frame = NSRect(x: 0, y: 0, width: 240, height: 46)
+        let a = ThemedTextField(palette: palette()); a.label = "Fruit"
+        a.trailingSymbol = "chevron.down"; a.frame = frame; a.layoutSubtreeIfNeeded()
+        let b = ThemedTextField(palette: palette()); b.label = "Fruit"
+        b.trailingSymbol = "chevron.down"; b.secondTrailingSymbol = nil
+        b.frame = frame; b.layoutSubtreeIfNeeded()
+
+        let ga = a.geometryProbe, gb = b.geometryProbe
+        XCTAssertNil(gb.secondTrailingIcon, "the inner slot is absent when unset")
+        XCTAssertEqual(ga.textRect, gb.textRect, "text rect unchanged by a nil second slot")
+        XCTAssertEqual(ga.trailingIcon, gb.trailingIcon, "trailing icon unchanged")
+    }
+
+    /// Adding the inner second trailing icon shrinks the text rect by exactly one
+    /// icon + one gap (8) — NOT two gaps — and the inner icon sits left of the
+    /// outer one.
+    func testSecondTrailingShrinksTextRectByOneIconPlusGap() {
+        let frame = NSRect(x: 0, y: 0, width: 240, height: 46)
+        let one = ThemedTextField(palette: palette()); one.label = "Fruit"
+        one.trailingSymbol = "chevron.down"; one.frame = frame; one.layoutSubtreeIfNeeded()
+        let two = ThemedTextField(palette: palette()); two.label = "Fruit"
+        two.trailingSymbol = "chevron.down"; two.secondTrailingSymbol = "xmark.circle.fill"
+        two.frame = frame; two.layoutSubtreeIfNeeded()
+
+        let g1 = one.geometryProbe, g2 = two.geometryProbe
+        let iconW = g1.trailingIcon!.width
+        XCTAssertEqual(g1.textRect.maxX - g2.textRect.maxX, iconW + 8, accuracy: 0.5,
+                       "second icon eats exactly one icon width + one 8pt gap")
+        XCTAssertNotNil(g2.secondTrailingIcon)
+        XCTAssertLessThanOrEqual(g2.secondTrailingIcon!.maxX, g2.trailingIcon!.minX,
+                                 "the inner icon sits left of the outer chevron")
+    }
 }

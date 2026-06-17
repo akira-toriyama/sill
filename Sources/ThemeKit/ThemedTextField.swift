@@ -50,6 +50,16 @@ public final class ThemedTextField: NSView {
     public var trailingSymbol: String? { didSet { invalidate() } }
     public var onTrailingTap: (() -> Void)?
 
+    /// A SECOND trailing SF-Symbol, sitting INNER of `trailingSymbol` (drawn to
+    /// its left), tappable via `onSecondTrailingTap`. `nil` (the default) ⇒ the
+    /// single-trailing-icon geometry is byte-identical; the inner slot only
+    /// engages when BOTH `trailingSymbol` and this are set (so it is always the
+    /// inner of a pair — ThemedComboBox uses it for the clear-× tucked inside
+    /// the disclosure chevron). Setting it without `trailingSymbol` draws no
+    /// inner icon (use `trailingSymbol` for a lone trailing icon).
+    public var secondTrailingSymbol: String? { didSet { invalidate() } }
+    public var onSecondTrailingTap: (() -> Void)?
+
     /// Supporting line below the field. `errorText` (when set) supersedes it
     /// and flips the field into the error palette.
     public var helperText: String? { didSet { invalidate() } }
@@ -80,6 +90,16 @@ public final class ThemedTextField: NSView {
     /// gate. (A search host wires `onReturn` to "accept the selection".)
     public var onReturn: (() -> Bool)?
     public var onEscape: (() -> Bool)?
+
+    /// Down / Up arrow seams for an EMBEDDING widget (e.g. ThemedComboBox driving
+    /// a popup highlight). The host returns `true` to CONSUME the key (suppress
+    /// the field editor's own caret movement), `false` to let it fall through —
+    /// the same contract as `onReturn` / `onEscape`, and suppressed identically
+    /// while the IME holds marked text (`isComposing`) so candidate navigation
+    /// stays with the input method. A bare ThemedTextField leaves both nil, so
+    /// the arrows behave EXACTLY as before (the `?? false` falls through).
+    public var onMoveDown: (() -> Bool)?
+    public var onMoveUp: (() -> Bool)?
 
     /// Force the focused APPEARANCE (accent border + floated accent label)
     /// without being first responder — for previews / screenshots only.
@@ -116,6 +136,12 @@ public final class ThemedTextField: NSView {
     public var isComposing: Bool {
         (field.currentEditor() as? NSTextView)?.hasMarkedText() == true
     }
+
+    /// Mark the inner editable field as an accessibility COMBO BOX, so VoiceOver
+    /// announces an embedding `ThemedComboBox` correctly. A no-op for a plain
+    /// field (which stays a text field). The visible floating label / value are
+    /// already exposed via `syncAccessibility`.
+    public func markAccessibilityComboBox() { field.setAccessibilityRole(.comboBox) }
 
     // MARK: - Internals
 
@@ -417,6 +443,7 @@ public final class ThemedTextField: NSView {
         var textRect: NSRect
         var leadingIcon: NSRect?
         var trailingIcon: NSRect?
+        var secondTrailingIcon: NSRect?
         var labelResting: CGPoint
         var labelFloated: CGPoint
         var labelStartX: CGFloat
@@ -447,6 +474,15 @@ public final class ThemedTextField: NSView {
                            width: iconSize, height: iconSize)
             textMaxX = trail!.minX - 8
         }
+        // Inner second trailing icon — ONLY when BOTH symbols are set (it is the
+        // inner of a pair). When nil the block is skipped and the single-icon
+        // `textMaxX` above is byte-identical to the pre-edit layout.
+        var trail2: NSRect?
+        if trailingSymbol != nil, secondTrailingSymbol != nil, let t = trail {
+            trail2 = NSRect(x: t.minX - 8 - iconSize, y: box.midY - iconSize / 2,
+                            width: iconSize, height: iconSize)
+            textMaxX = trail2!.minX - 8
+        }
 
         let lineH = ceil((field.font ?? themedFont(bodySize)).boundingRectForFont.height)
         let textRect = NSRect(x: textMinX, y: box.midY - lineH / 2,
@@ -463,7 +499,8 @@ public final class ThemedTextField: NSView {
         let floated = CGPoint(x: startX, y: box.maxY)
 
         return Geometry(box: box, textRect: textRect, leadingIcon: lead,
-                        trailingIcon: trail, labelResting: resting,
+                        trailingIcon: trail, secondTrailingIcon: trail2,
+                        labelResting: resting,
                         labelFloated: floated, labelStartX: startX)
     }
 
@@ -506,6 +543,9 @@ public final class ThemedTextField: NSView {
         if let sym = trailingSymbol, let r = geo.trailingIcon {
             drawSymbol(sym, in: r, color: palette.muted)
         }
+        if let sym = secondTrailingSymbol, let r = geo.secondTrailingIcon {
+            drawSymbol(sym, in: r, color: palette.muted)
+        }
 
         // Supporting line.
         if hasSupport {
@@ -541,8 +581,17 @@ public final class ThemedTextField: NSView {
 
     public override func mouseDown(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
+        let geo = geometry()
+        // Inner (second) icon first — its hit rect abuts the outer one, so the
+        // inner must win where they meet. When `secondTrailingSymbol == nil`
+        // this branch is skipped and the path is identical to before.
+        if secondTrailingSymbol != nil,
+           let r = geo.secondTrailingIcon, r.insetBy(dx: -6, dy: -6).contains(p) {
+            onSecondTrailingTap?()
+            return
+        }
         if trailingSymbol != nil,
-           let r = geometry().trailingIcon, r.insetBy(dx: -6, dy: -6).contains(p) {
+           let r = geo.trailingIcon, r.insetBy(dx: -6, dy: -6).contains(p) {
             onTrailingTap?()
             return
         }
@@ -584,6 +633,14 @@ private final class FieldDelegate: NSObject, NSTextFieldDelegate {
         }
         if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
             return o.onEscape?() ?? false
+        }
+        // Arrow-key seams for an embedding combo box. nil ⇒ `?? false` falls
+        // through to the field editor exactly as before (a bare field).
+        if commandSelector == #selector(NSResponder.moveDown(_:)) {
+            return o.onMoveDown?() ?? false
+        }
+        if commandSelector == #selector(NSResponder.moveUp(_:)) {
+            return o.onMoveUp?() ?? false
         }
         return false
     }
@@ -629,5 +686,25 @@ extension ThemedTextField {
                    borderColor: strokeLayer.strokeColor,
                    labelColor: labelLayer.foregroundColor)
     }
+
+    /// Test-only window into the laid-out adornment geometry, so a deterministic
+    /// test can prove the second-trailing-icon slot is dormant (byte-identical)
+    /// when unset and shrinks the text rect by exactly one icon + a gap when set.
+    struct GeometryProbe {
+        let textRect: NSRect
+        let trailingIcon: NSRect?
+        let secondTrailingIcon: NSRect?
+        let labelStartX: CGFloat
+    }
+    var geometryProbe: GeometryProbe {
+        let g = geometry()
+        return GeometryProbe(textRect: g.textRect, trailingIcon: g.trailingIcon,
+                             secondTrailingIcon: g.secondTrailingIcon,
+                             labelStartX: g.labelStartX)
+    }
+
+    /// The GROUND-TRUTH first-responder state (field or its field editor), for an
+    /// embedding ThemedComboBox to assert the popup never stole focus.
+    var isFirstResponderNow: Bool { isFieldFirstResponder }
 }
 #endif
