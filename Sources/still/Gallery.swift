@@ -230,6 +230,9 @@ struct ThemeCard: View {
                 MockTome(p: p)
                 MockMarkdown(p: p)
             }
+
+            // FieldKit — the REAL shared text-field component, in this theme.
+            MockField(p: p)
         }
         .padding(16)
         .background(cardBG)
