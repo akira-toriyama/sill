@@ -317,6 +317,79 @@ extension ThemeSpec {
         error: HexColor(0xFF3355),
         secondary: HexColor(0xFF6A1A))
 
+    // --- Animated neon family (theme + EffectSpec pairs) --------------
+    // The second wave of `chomp`'s "playful animated themes" family (DESIGN
+    // §3): each is a pure-#000000 neon theme that ALSO ships a matching
+    // `EffectSpec.<name>` so `theme = <name>` animates (still's card glows +
+    // cycles; apps cycle the accent via `animatedPalette`). Hues were chosen
+    // to fill the catalog's gaps — the cool space (cyan/violet/magenta/green)
+    // was crowded, so this family leans WARM (the sparse end) plus one
+    // mystical indigo. Dark presets: bg/fg/muted/primary/secondary/error
+    // only; the border/hover/selection trio derives from the black base.
+
+    /// voltage — high-voltage electric storm: an arc-cyan core discharging
+    /// through violet, white lightning in the flash. Cooler/whiter-flashing
+    /// than the saturated catalog cyans (its identity is the white strobe).
+    public static let voltage = ThemeSpec(
+        background: HexColor(0x000000), foreground: HexColor(0xE6FAFF),
+        muted: HexColor(0x3E6E82), primary: HexColor(0x18D7FF), font: .mono,
+        error: HexColor(0xFF3355),
+        secondary: HexColor(0xB86BFF))
+
+    /// toxic — radioactive hazmat rave: a toxic-lime lead (the only catalog
+    /// theme to LEAD with lime) crossed with ultraviolet. Pulses through the
+    /// green spectrum.
+    public static let toxic = ThemeSpec(
+        background: HexColor(0x000000), foreground: HexColor(0xECFFD6),
+        muted: HexColor(0x5A7A2E), primary: HexColor(0x9EFF00), font: .mono,
+        error: HexColor(0xFF3355),
+        secondary: HexColor(0xB14BFF))
+
+    /// ember — molten forge: incandescent orange + gold, the catalog's first
+    /// WARM-lead neon. Flickers like forge-fire.
+    public static let ember = ThemeSpec(
+        background: HexColor(0x000000), foreground: HexColor(0xFFE9D6),
+        muted: HexColor(0x8A5A2E), primary: HexColor(0xFF7A1A), font: .mono,
+        error: HexColor(0xFF2D55),
+        secondary: HexColor(0xFFC400))
+
+    /// solar-veil — sunset afterglow (nature): a ROSE-CORAL primary — a hue
+    /// no other theme leads with — bleeding into apricot. Rounded for a soft
+    /// dusk feel. Distinct from ember (orange) by the pink-shifted lead.
+    public static let solarVeil = ThemeSpec(
+        background: HexColor(0x000000), foreground: HexColor(0xFFEDE4),
+        muted: HexColor(0xA86B5E), primary: HexColor(0xFF5C7A), font: .rounded,
+        error: HexColor(0xFF2D55),
+        secondary: HexColor(0xFFB44A))
+
+    /// molten-vein — fresh lava (nature): a hot RED-orange incandescence
+    /// (near-red, distinct from ember's amber-orange) veined with sulfur
+    /// chartreuse-gold — a red→sulfur heat gradient no warm theme owns.
+    public static let moltenVein = ThemeSpec(
+        background: HexColor(0x000000), foreground: HexColor(0xFFEDDA),
+        muted: HexColor(0x8C4A2E), primary: HexColor(0xFF3D14), font: .mono,
+        error: HexColor(0xFF1744),
+        secondary: HexColor(0xE5E219))
+
+    /// coin-op — arcade cabinet (retro game): siren-scarlet + electric CRT
+    /// blue, a marquee/police-light pairing on pure black, with a white
+    /// strobe in the flash. The catalog's first RED-lead theme.
+    public static let coinOp = ThemeSpec(
+        background: HexColor(0x000000), foreground: HexColor(0xFFF2EC),
+        muted: HexColor(0xA14A3E), primary: HexColor(0xFF2A1A), font: .mono,
+        error: HexColor(0xFF3D6E),
+        secondary: HexColor(0x1565FF))
+
+    /// arcane — mystical spellcraft (magic): a deep indigo-violet plasma
+    /// crowned with rune-gold — the bluest/deepest of the violet cluster
+    /// (clear of blacklight/outrun's magenta-violets), and violet+gold is a
+    /// pairing no catalog theme has. Rounded for a soft ritual glow.
+    public static let arcane = ThemeSpec(
+        background: HexColor(0x000000), foreground: HexColor(0xF0E9FF),
+        muted: HexColor(0x6A5AB0), primary: HexColor(0x7B3FF2), font: .rounded,
+        error: HexColor(0xFF4D6D),
+        secondary: HexColor(0xFFC83D))
+
     // --- Reference themes (Tommy-linked) ------------------------------
 
     /// Cobalt2 (Wes Bos) — deep cobalt-blue, signature bright gold.
@@ -420,6 +493,9 @@ private let themeCatalog: [(name: String, spec: ThemeSpec)] = [
     ("neon-noir", .neonNoir), ("outrun", .outrun), ("blacklight", .blacklight),
     ("synthwave", .synthwave), ("ghostwire", .ghostwire),
     ("cyberpunk", .cyberpunk), ("tron", .tron),
+    ("voltage", .voltage), ("toxic", .toxic), ("ember", .ember),
+    ("solar-veil", .solarVeil), ("molten-vein", .moltenVein),
+    ("coin-op", .coinOp), ("arcane", .arcane),
     ("cobalt2", .cobalt2), ("shades-of-purple", .shadesOfPurple),
     ("tokyo-hack", .tokyoHack),
     ("github-dark", .githubDark), ("dracula", .dracula),
@@ -456,7 +532,11 @@ public func paletteFor(_ raw: String) -> ThemeSpec {
 /// Canonical effect names accepted by `[border] effect` (+ `off` /
 /// `random`). Single source of truth so a CLI can reject typos.
 public let canonicalEffectNames: [String] = [
-    "neon", "cyber", "vapor", "kawaii", "rainbow", "chomp", "random", "off",
+    "neon", "cyber", "vapor", "kawaii", "rainbow", "chomp",
+    // The animated neon family — each is a theme+EffectSpec pair (like
+    // chomp), so its name is ALSO a valid standalone `[border] effect`.
+    "voltage", "toxic", "ember", "solar-veil", "molten-vein", "coin-op", "arcane",
+    "random", "off",
 ]
 
 /// One of the small arcade "pets" that walk a surface's outline — a
