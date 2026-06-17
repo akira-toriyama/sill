@@ -234,6 +234,7 @@ struct ThemeCard: View {
             // ThemeKit — the REAL shared components, in this theme.
             MockField(p: p)
             MockDivider(p: p)
+            MockSkeleton(p: p)
         }
         .padding(16)
         .background(cardBG)
