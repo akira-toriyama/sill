@@ -177,8 +177,8 @@ public struct ThemeSpec: Sendable, Hashable {
 
 // MARK: - Canonical presets
 //
-// The Phase V curated catalog: 12 user-facing color themes + the
-// structural `system` preset. LEAN: a dark preset only stores border /
+// The Phase V curated catalog: a curated set of user-facing color themes
+// + the structural `system` preset. LEAN: a dark preset only stores border /
 // hover / selection / tertiary when it DEVIATES from the derive recipe.
 // The dark editor presets store NONE of the trio — PaletteKit derives the
 // exact values (neutral@0.10 / neutral@0.05 / primary@0.18) from their
@@ -275,6 +275,47 @@ extension ThemeSpec {
         muted: HexColor(0x6B5B95), primary: HexColor(0xBD3FFF), font: .mono,
         error: HexColor(0xFF2D55),
         secondary: HexColor(0xCCFF00))
+
+    // --- Pitch-black cyberpunk quartet (neon-noir lineage) ------------
+    // The same high-visibility neon-on-black recipe as neon-noir, but on a
+    // PURE #000000 base (no blue/violet hint) for the loudest contrast.
+    // Dark presets: bg/fg/muted/primary/secondary/error only; trio derives.
+
+    /// Synthwave — neon-noir's two colours with the lead flipped: HOT
+    /// MAGENTA primary + electric-cyan secondary on pitch black (Hotline
+    /// Miami / SynthWave '84). Keeps neon-noir's visibility, new identity.
+    public static let synthwave = ThemeSpec(
+        background: HexColor(0x000000), foreground: HexColor(0xFFE3FA),
+        muted: HexColor(0x7E5577), primary: HexColor(0xFF2EC4), font: .mono,
+        error: HexColor(0xFF3355),
+        secondary: HexColor(0x22D3EE))
+
+    /// Ghostwire — neon-noir's direct successor: electric-cyan primary + hot
+    /// magenta secondary, but on pitch black with the cyan pushed brighter
+    /// (Ghostwire: Tokyo). neon-noir, blacker and louder.
+    public static let ghostwire = ThemeSpec(
+        background: HexColor(0x000000), foreground: HexColor(0xD6FBFF),
+        muted: HexColor(0x466A78), primary: HexColor(0x00E5FF), font: .mono,
+        error: HexColor(0xFF3355),
+        secondary: HexColor(0xFF2EC4))
+
+    /// Cyberpunk — the franchise's signature acid-yellow primary + electric
+    /// cyan secondary on pitch black (Cyberpunk 2077). The acid (green-
+    /// leaning) yellow keeps it distinct from chomp's pure pellet yellow.
+    public static let cyberpunk = ThemeSpec(
+        background: HexColor(0x000000), foreground: HexColor(0xF3F7E2),
+        muted: HexColor(0x6E7A4A), primary: HexColor(0xFCEE0A), font: .mono,
+        error: HexColor(0xFF3344),
+        secondary: HexColor(0x00E5FF))
+
+    /// Tron — electric-azure primary + neon-orange secondary on pitch black
+    /// (Tron / Blade Runner night). The only blue-primary / orange-secondary
+    /// pair in the catalog — maximally differentiated from the rest.
+    public static let tron = ThemeSpec(
+        background: HexColor(0x000000), foreground: HexColor(0xDCEFFF),
+        muted: HexColor(0x4F6A82), primary: HexColor(0x12A5FF), font: .mono,
+        error: HexColor(0xFF3355),
+        secondary: HexColor(0xFF6A1A))
 
     // --- Reference themes (Tommy-linked) ------------------------------
 
@@ -377,6 +418,8 @@ private let themeCatalog: [(name: String, spec: ThemeSpec)] = [
     ("terminal", .terminal), ("chomp", .chomp), ("rainbow", .rainbow),
     ("aurora-flux", .auroraFlux), ("acidwave", .acidwave),
     ("neon-noir", .neonNoir), ("outrun", .outrun), ("blacklight", .blacklight),
+    ("synthwave", .synthwave), ("ghostwire", .ghostwire),
+    ("cyberpunk", .cyberpunk), ("tron", .tron),
     ("cobalt2", .cobalt2), ("shades-of-purple", .shadesOfPurple),
     ("tokyo-hack", .tokyoHack),
     ("github-dark", .githubDark), ("dracula", .dracula),

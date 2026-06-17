@@ -31,6 +31,7 @@ final class VocabularyTests: XCTestCase {
         let expected: Set<String> = [
             "terminal", "chomp", "rainbow",
             "aurora-flux", "acidwave", "neon-noir", "outrun", "blacklight",
+            "synthwave", "ghostwire", "cyberpunk", "tron",
             "cobalt2", "shades-of-purple", "tokyo-hack",
             "github-dark", "dracula", "catppuccin-mocha", "gruvbox",
             "github-light", "catppuccin-latte",

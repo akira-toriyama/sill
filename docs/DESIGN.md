@@ -274,13 +274,22 @@ Accessors follow: `onAccent`→`onPrimary`, `onAccentStroke`→`onPrimaryStroke`
 `systemAccentSentinel`→`systemPrimarySentinel`. The module var **`pal`
 keeps its name** (facet invariant); only its fields rename.
 
-### The 12-theme catalog (+ system)
+### The theme catalog (+ system)
 
 | theme | axis | bg | fg | primary | secondary |
 |---|---|---|---|---|---|
 | terminal | favorite (green-on-black; merges old `hacker`) | `050805` | `9BFEDA` | `33FF66` | `FFB000` |
 | chomp | favorite (arcade; +EffectSpec.chomp) | `000000` | `FFEA00` | `FFEA00` | `2121FF` |
 | rainbow | favorite (loud dynamic) | `0D0B14` | `FFFFFF` | `FF2D95` | `2BE0FF` |
+| aurora-flux | neon-on-black (emerald+violet) | `03070A` | `CDFBEF` | `1EFFB0` | `CE5BFF` |
+| acidwave | neon-on-black (fuchsia+jade) | `06030A` | `E8DDF5` | `E879F9` | `34D399` |
+| neon-noir | neon-on-black (cyan+magenta) | `04060A` | `D6FBFF` | `22D3EE` | `FF2EC4` |
+| outrun | neon-on-black (violet+coral) | `040208` | `F2E9FF` | `C724FF` | `FF7847` |
+| blacklight | neon-on-black (violet+lime) | `030206` | `F3E8FF` | `BD3FFF` | `CCFF00` |
+| synthwave | pitch-black cyberpunk (magenta+cyan) | `000000` | `FFE3FA` | `FF2EC4` | `22D3EE` |
+| ghostwire | pitch-black cyberpunk (cyan+magenta; neon-noir successor) | `000000` | `D6FBFF` | `00E5FF` | `FF2EC4` |
+| cyberpunk | pitch-black cyberpunk (acid-yellow+cyan) | `000000` | `F3F7E2` | `FCEE0A` | `00E5FF` |
+| tron | pitch-black cyberpunk (azure+orange) | `000000` | `DCEFFF` | `12A5FF` | `FF6A1A` |
 | cobalt2 | ref | `193549` | `FFFFFF` | `FFC600` | `0088FF` |
 | shades-of-purple | ref | `2D2B55` | `FFFFFF` | `FAD000` | `9EFFFF` |
 | tokyo-hack | ref (Tokyo-Night lineage) | `18173E` | `FFFFFF` | `E84B3C` | `F08DF0` |

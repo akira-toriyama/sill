@@ -3,9 +3,9 @@
 # This is the ONE config.toml in sill; the library modules stay config-less.
 
 # Which themes to show. "all" = the full gallery, or a single canonical
-# name (terminal · chomp · rainbow · cobalt2 · shades-of-purple · tokyo-hack
-# · github-dark · dracula · catppuccin-mocha · gruvbox · github-light ·
-# catppuccin-latte · system). Unknown names fall back to terminal.
+# name — e.g. terminal · neon-noir · synthwave · ghostwire · cyberpunk ·
+# tron · dracula · github-light · system (the full list is
+# `Palette.canonicalThemeNames`). Unknown names fall back to terminal.
 theme = "all"
 
 # Specimen text scale (1.0 = default).
