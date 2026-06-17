@@ -43,10 +43,6 @@ import PaletteKit
 /// where panel met card; this definite outline is what separates the two.
 @MainActor func panelStroke(_ p: ResolvedPalette) -> NSColor { elevate(p, by: 0.24) }
 
-/// A search / query field fill — elevated off the panel so the input reads as
-/// a distinct surface (with its border) on any theme.
-@MainActor func fieldFill(_ p: ResolvedPalette) -> NSColor { elevate(p, by: 0.16) }
-
 // MARK: - Shared container
 
 struct SpecimenBox<Content: View>: View {
@@ -133,17 +129,11 @@ struct MockTree: View {
     }
 
     private var searchBar: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "magnifyingglass").font(sysFont(11))
-            Text("type to filter…").font(sysFont(11))
-            Spacer(minLength: 0)
-        }
-        .foregroundColor(Color(nsColor: p.muted))
-        .padding(.horizontal, 8).padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 7)
-            .fill(Color(nsColor: fieldFill(p))))
-        .overlay(RoundedRectangle(cornerRadius: 7)
-            .stroke(Color(nsColor: p.border), lineWidth: 1))
+        // The REAL FieldKit field (outlined, leading magnifier), themed to
+        // this panel — replacing the hand-drawn approximation.
+        ThemedFieldView(palette: p, placeholder: "type to filter…",
+                        leading: "magnifyingglass", surface: p.background)
+            .frame(height: 40)   // ≥ the label-less field's 40pt box, else the top rule clips
     }
 
     // MARK: workspace section — 2-line header + its window rows
@@ -340,19 +330,11 @@ struct MockTome: View {
     var body: some View {
         SpecimenBox(title: "wand · tome", p: p) {
             VStack(alignment: .leading, spacing: 6) {
-                // Launcher query field — magnifier + prompt on a faint
-                // theme-tinted fill (the real tome panel paints its own bg).
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass").font(sysFont(11))
-                    Text("open…").font(sysFont(11))
-                    Spacer(minLength: 0)
-                }
-                .foregroundColor(Color(nsColor: p.muted))
-                .padding(.horizontal, 8).padding(.vertical, 5)
-                .background(RoundedRectangle(cornerRadius: 6)
-                    .fill(Color(nsColor: fieldFill(p))))
-                .overlay(RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color(nsColor: p.border), lineWidth: 1))
+                // Launcher query field — the REAL FieldKit field (replacing the
+                // hand-drawn one) so the tome mirrors the shared component.
+                ThemedFieldView(palette: p, placeholder: "open…",
+                                leading: "magnifyingglass", surface: p.background)
+                    .frame(height: 40)   // ≥ the label-less field's 40pt box, else the top rule clips
 
                 // Rows: an app-launch result (real icon) + two action items
                 // (tinted SF Symbols) — the app:/SF: mix the real tome renders.
