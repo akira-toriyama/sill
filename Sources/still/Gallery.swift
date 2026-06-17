@@ -236,6 +236,7 @@ struct ThemeCard: View {
             MockDivider(p: p)
             MockSkeleton(p: p)
             MockButton(p: p)
+            MockButtonGroup(p: p)
         }
         .padding(16)
         .background(cardBG)

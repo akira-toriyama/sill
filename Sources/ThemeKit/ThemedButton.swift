@@ -46,6 +46,18 @@ public final class ThemedButton: NSControl {
     /// while disabled (MUI greys disabled buttons regardless of colour).
     public enum Role { case primary, secondary, error }
 
+    /// Which edges of the outlined border to stroke — for ThemedButtonGroup
+    /// seams (a grouped member drops its shared edge). Standalone = `.all`.
+    public struct BorderEdges: OptionSet, Sendable {
+        public let rawValue: Int
+        public init(rawValue: Int) { self.rawValue = rawValue }
+        public static let top    = BorderEdges(rawValue: 1 << 0)
+        public static let left   = BorderEdges(rawValue: 1 << 1)
+        public static let bottom = BorderEdges(rawValue: 1 << 2)
+        public static let right  = BorderEdges(rawValue: 1 << 3)
+        public static let all: BorderEdges = [.top, .left, .bottom, .right]
+    }
+
     // MARK: - Public configuration
 
     /// The theme. Assigning re-themes the whole button.
@@ -85,6 +97,24 @@ public final class ThemedButton: NSControl {
     public var previewHovered = false { didSet { applyState(animated: false) } }
     public var previewPressed = false { didSet { applyState(animated: false) } }
     public var previewFocused = false { didSet { applyState(animated: false) } }
+
+    // MARK: - Grouping (ThemedButtonGroup composes these; defaults = standalone)
+
+    /// Which corners get the corner radius; the rest are squared. Default = all
+    /// four (a standalone button). A ButtonGroup member rounds only the group's
+    /// OUTER corners and squares the shared-seam corners.
+    public var roundedCorners: CACornerMask =
+        [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner, .layerMinXMaxYCorner]
+        { didSet { needsLayout = true } }
+
+    /// Which edges of the outlined border to stroke. Default `.all` (a closed
+    /// perimeter). A grouped non-last outlined member drops its shared (trailing)
+    /// edge so two abutting strokes collapse to one hairline seam.
+    public var drawnBorderEdges: BorderEdges = .all { didSet { needsLayout = true } }
+
+    /// Forgo the button's own elevation so a GROUP can own one continuous shadow.
+    /// Default false (a standalone contained button keeps its own shadow).
+    public var groupedShadow = false { didSet { applyState(animated: false) } }
 
     // MARK: - NSControl overrides (custom storage — a cell-less NSControl must
     //         NOT lean on the cell-backed isEnabled / target / action).
@@ -356,7 +386,8 @@ public final class ThemedButton: NSControl {
             self.overlayLayer.backgroundColor = self.overlayColor.cgColor
             self.borderLayer.strokeColor = self.borderColor.cgColor
             let e = self.elevation
-            self.shadowLayer.shadowOpacity = e.opacity
+            // A grouped member forgoes its own shadow — the group owns one.
+            self.shadowLayer.shadowOpacity = self.groupedShadow ? 0 : e.opacity
             self.shadowLayer.shadowRadius  = e.radius
             self.shadowLayer.shadowOffset  = CGSize(width: 0, height: e.offsetY)
             self.focusRingLayer.opacity = self.showFocusRing ? 1 : 0
@@ -435,6 +466,63 @@ public final class ThemedButton: NSControl {
         return (cg, sizePt)
     }
 
+    // MARK: - Corner-aware paths (standalone = a plain rounded rect; a grouped
+    //         member squares the seam corners and drops the shared edge)
+
+    private static let allCorners: CACornerMask =
+        [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner, .layerMinXMaxYCorner]
+
+    /// A CLOSED rounded-rect path rounding only `corners` (the rest squared).
+    /// Byte-identical to `CGPath(roundedRect:)` when all four corners are set, so
+    /// the standalone button's shadow / focus ring are unchanged.
+    private func closedCornerPath(_ rect: CGRect, radius: CGFloat,
+                                  corners: CACornerMask) -> CGPath {
+        if corners == Self.allCorners {
+            return CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        }
+        let r = min(radius, min(rect.width, rect.height) / 2)
+        let bl = CGPoint(x: rect.minX, y: rect.minY), br = CGPoint(x: rect.maxX, y: rect.minY)
+        let tr = CGPoint(x: rect.maxX, y: rect.maxY), tl = CGPoint(x: rect.minX, y: rect.maxY)
+        func rad(_ c: CACornerMask) -> CGFloat { corners.contains(c) ? r : 0 }
+        let p = CGMutablePath()
+        p.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        p.addArc(tangent1End: br, tangent2End: tr, radius: rad(.layerMaxXMinYCorner))
+        p.addArc(tangent1End: tr, tangent2End: tl, radius: rad(.layerMaxXMaxYCorner))
+        p.addArc(tangent1End: tl, tangent2End: bl, radius: rad(.layerMinXMaxYCorner))
+        p.addArc(tangent1End: bl, tangent2End: br, radius: rad(.layerMinXMinYCorner))
+        p.closeSubpath()
+        return p
+    }
+
+    /// The outlined border path: a closed perimeter when `edges == .all`, else an
+    /// OPEN path that strokes only the present edges (a grouped member drops its
+    /// shared seam edge). Only the two seam configs the group produces — gap on
+    /// the trailing edge (`.right` horizontal / `.bottom` vertical) — are handled;
+    /// anything else falls back to the closed path.
+    private func borderPath(_ rect: CGRect, radius: CGFloat,
+                            corners: CACornerMask, edges: BorderEdges) -> CGPath {
+        if edges == .all { return closedCornerPath(rect, radius: radius, corners: corners) }
+        let r = min(radius, min(rect.width, rect.height) / 2)
+        let bl = CGPoint(x: rect.minX, y: rect.minY), br = CGPoint(x: rect.maxX, y: rect.minY)
+        let tr = CGPoint(x: rect.maxX, y: rect.maxY), tl = CGPoint(x: rect.minX, y: rect.maxY)
+        func rad(_ c: CACornerMask) -> CGFloat { corners.contains(c) ? r : 0 }
+        let p = CGMutablePath()
+        if !edges.contains(.right) {        // horizontal seam: open on the right
+            p.move(to: tr)                  // TR (square endpoint) → top → TL → left → BL → bottom → BR
+            p.addArc(tangent1End: tl, tangent2End: bl, radius: rad(.layerMinXMaxYCorner))
+            p.addArc(tangent1End: bl, tangent2End: br, radius: rad(.layerMinXMinYCorner))
+            p.addLine(to: br)
+        } else if !edges.contains(.bottom) { // vertical seam: open on the bottom
+            p.move(to: br)                  // BR → right → TR → top → TL → left → BL
+            p.addArc(tangent1End: tr, tangent2End: tl, radius: rad(.layerMaxXMaxYCorner))
+            p.addArc(tangent1End: tl, tangent2End: bl, radius: rad(.layerMinXMaxYCorner))
+            p.addLine(to: bl)
+        } else {
+            return closedCornerPath(rect, radius: radius, corners: corners)
+        }
+        return p
+    }
+
     // MARK: - Layout
 
     private var backingScale: CGFloat {
@@ -449,22 +537,24 @@ public final class ThemedButton: NSControl {
             let local = CGRect(origin: .zero, size: b.size)
 
             self.shadowLayer.frame = b
-            self.shadowLayer.shadowPath = CGPath(roundedRect: local,
-                cornerWidth: m.radius, cornerHeight: m.radius, transform: nil)
+            self.shadowLayer.shadowPath = self.closedCornerPath(local, radius: m.radius,
+                corners: self.roundedCorners)
 
             self.fillLayer.frame = b
             self.fillLayer.cornerRadius = m.radius
+            self.fillLayer.maskedCorners = self.roundedCorners
             self.overlayLayer.frame = local
             self.overlayLayer.cornerRadius = m.radius
+            self.overlayLayer.maskedCorners = self.roundedCorners
 
             self.borderLayer.frame = b
             let inset = m.border / 2
-            self.borderLayer.path = CGPath(roundedRect: local.insetBy(dx: inset, dy: inset),
-                cornerWidth: m.radius, cornerHeight: m.radius, transform: nil)
+            self.borderLayer.path = self.borderPath(local.insetBy(dx: inset, dy: inset),
+                radius: m.radius, corners: self.roundedCorners, edges: self.drawnBorderEdges)
 
             self.focusRingLayer.frame = b
-            self.focusRingLayer.path = CGPath(roundedRect: local.insetBy(dx: -2, dy: -2),
-                cornerWidth: m.radius + 2, cornerHeight: m.radius + 2, transform: nil)
+            self.focusRingLayer.path = self.closedCornerPath(local.insetBy(dx: -2, dy: -2),
+                radius: m.radius + 2, corners: self.roundedCorners)
 
             self.layoutContent(in: b, m: m)
         }
@@ -652,6 +742,11 @@ extension ThemedButton {
         public let height: CGFloat
         public let hasLeadingIcon: Bool
         public let hasTrailingIcon: Bool
+        // Grouping geometry (ThemedButtonGroup)
+        public let maskedCorners: CACornerMask
+        public let drawnBorderEdges: BorderEdges
+        public let groupedShadow: Bool
+        public let borderPathBounds: CGRect
     }
     var buttonProbe: ButtonProbe {
         ButtonProbe(
@@ -664,7 +759,11 @@ extension ThemedButton {
             focusRingOpacity: focusRingLayer.opacity,
             height: metrics.height,
             hasLeadingIcon: leadingImageSize != nil,
-            hasTrailingIcon: trailingImageSize != nil)
+            hasTrailingIcon: trailingImageSize != nil,
+            maskedCorners: fillLayer.maskedCorners,
+            drawnBorderEdges: drawnBorderEdges,
+            groupedShadow: groupedShadow,
+            borderPathBounds: borderLayer.path?.boundingBoxOfPath ?? .null)
     }
 }
 #endif
