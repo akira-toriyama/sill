@@ -94,6 +94,12 @@ enum PopupPlacement {
     /// Context menu at a screen `point`: a `size` panel growing down-right from the
     /// point, flipping up / left on overflow. Returns the pinned corner.
     case point(_ point: CGPoint, size: CGSize)
+    /// Submenu child beside its parent ROW (anchorRectOnScreen = the row's rect): the
+    /// child's top-leading meets the row's top-trailing, `gap` to the right (so the
+    /// first child row tops-align with the parent row); flips LEFT (top-trailing at
+    /// the row's top-leading) on horizontal overflow and clamps vertically. Returns
+    /// the pinned corner (the Grow origin).
+    case submenu(size: CGSize, gap: CGFloat)
 }
 
 /// A placement RESULT — per case, never a god-tuple. The caller reads only the
@@ -103,6 +109,7 @@ enum PopupPlacementResult {
     case sideRelative(frame: CGRect, side: PopupSide)
     case anchorCorner(frame: CGRect, corner: PopupCorner)
     case point(frame: CGRect, corner: PopupCorner)
+    case submenu(frame: CGRect, corner: PopupCorner)
 }
 
 /// Keep the popup this far inside the screen's visible frame (shared by both
@@ -200,6 +207,23 @@ func placePopup(_ panel: NSPanel, anchorRectOnScreen onScreen: CGRect,
         panel.setFrame(frame, display: true)
         panel.invalidateShadow()
         return .point(frame: frame, corner: corner)
+
+    case let .submenu(size, gap):
+        // Child to the RIGHT of the parent row, its top aligned with the row's top
+        // (y-up: the row's top edge is onScreen.maxY). Flip LEFT on right-overflow;
+        // clamp vertically so a tall child near the screen edge shifts into view.
+        var corner = PopupCorner.topLeading
+        var x = onScreen.maxX + gap
+        let y = onScreen.maxY - size.height
+        if x + size.width > vf.maxX - m {
+            x = onScreen.minX - gap - size.width
+            corner = .topTrailing
+        }
+        let origin = clampPopupOrigin(CGPoint(x: x, y: y), size: size, into: vf, margin: m)
+        let frame = CGRect(origin: origin, size: size)
+        panel.setFrame(frame, display: true)
+        panel.invalidateShadow()
+        return .submenu(frame: frame, corner: corner)
     }
 }
 
