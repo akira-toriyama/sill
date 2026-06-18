@@ -1,4 +1,4 @@
-# sill — design doc (Palette / PaletteKit / Effects)
+# sill — design doc (theming core + widget kit)
 
 `sill` is the shared theming foundation for the swift app family
 (**facet · wand · perch · halo · glance**; chord is headless). It exists
@@ -15,9 +15,15 @@ catalog 0-base rebuilt to 12 blessed themes — on branch
 `feat/phase-v-catalog`; `swift build` clean.** See §4b for the Phase T
 decisions and **§4c for the Phase V rename + catalog**.
 
+> **Widget kit + 1.0 (2026-06):** atop the theming core, sill now ships
+> **`ThemeKit`** — a 12-widget MUI-style themed AppKit kit (TextField →
+> ComboBox · Button · List · Menu · Border …) — plus the **`prism`** visual
+> bench. That kit, complete and API-stable, is what takes sill to **1.0**.
+> See **§5**.
+
 ---
 
-## 1. Architecture — 3 modules, one repo, one version
+## 1. Architecture — modules, one repo, one version
 
 swift-collections layout: each public module is BOTH a target and its own
 library product, shipped under one git tag. The pure / AppKit split is
@@ -38,6 +44,14 @@ sill (1 repo · 1 version)
        (the live accent) onto a resolved palette; the one PaletteKit→Effects edge
 ```
 
+Three more modules ride the same one-version tag: **`ThemeKit`** — the AppKit
+**widget kit** (themed MUI-style parts; depends on `PaletteKit` + `Palette`,
+consumed from an app's View layer only, NEVER a `*Core` dependency) — plus the
+two pure siblings **`CLIKit`** (argv tokenizer) and **`ConfigSchema`**
+(`Spec<Root>` → config decode + JSON-Schema), and the **`prism`** dev bench.
+The widget kit is **§5**; the authoritative target wiring is
+[Package.swift](../Package.swift).
+
 A consumer that adds only the `Palette` product **transitively links zero
 AppKit** — that is what lets perch's pure `PerchCore` use the spec.
 
@@ -48,10 +62,10 @@ AppKit** — that is what lets perch's pure `PerchCore` use the spec.
 | wand | Palette + PaletteKit + Effects | adapter |
 | halo | Palette + Effects (+ PaletteKit if it adds chrome) | the ring |
 | glance | PaletteKit (background/foreground/primary now; Effects later) | panel |
+| chord | — | headless, zero need |
 
 *(sill role names shown; each app's view call sites adopt them at migration —
 until then an un-migrated app pinned to `0.1.0` keeps the old `pal.text`/`pal.accent` spelling.)*
-| chord | — | headless, zero need |
 
 **Why not one module / monorepo:** see plan-atelier. Pure↔AppKit must be
 separable (perch); `1 repo = 1 version` is SwiftPM's grain.
@@ -176,6 +190,38 @@ each app owns the **motion drawing** for its surface.
 > glance fade) — sill's Effects is **color-only**. The renderer / Pac-Man
 > mouth / splatoon splat were always app-side; sill now ships no motion
 > abstraction at all until a second consumer earns one.
+
+### 1.0 — the kit earns the shared motion (ThemedBorder)
+
+Phase A removed the motion abstraction because **no second consumer existed**.
+By 1.0 one does — sill's own **widget kit**. The border flash / breathe /
+colour-cycle that facet · halo · wand · glance each hand-drew is now ONE part,
+**`ThemedBorder`** (ThemeKit), and the live accent trio is
+**`ResolvedPalette.animated(forTheme:at:)`** (PaletteKit). The rule-of-three,
+finally met, promoted the shared *colour* motion INTO sill. This does **not**
+walk back the §3 / Q4-A mandate — it sharpens it:
+
+- **Effects stays colour-only.** `animatedPalette(theme:at:)` still returns only
+  the time-varying accent atoms (primary / secondary / selection), and
+  `resolveBorder(…)` is a per-frame `f(now)` yielding a stroke colour + width.
+  There is still **no motion-*geometry* protocol** — Pac-Man's mouth, facet's
+  tree flourish, the splatoon splat stay 100% app-side, each app drawing its own.
+- **What moved in is the *application* of that colour motion**, not a new
+  abstraction. `ThemedBorder` owns the 30 Hz redraw + the off-screen /
+  reduce-motion / window-visibility lifecycle; `ResolvedPalette.animated` grafts
+  the accent frame onto an otherwise-steady palette so a widget's whole
+  appearance cycles, not just its rim. PaletteKit owns this composition (the one
+  acyclic **`PaletteKit → Effects`** edge) precisely because Effects must NOT
+  know `ResolvedPalette` — halo still links Effects alone.
+- **One master switch.** `ThemedBorder.effectsEnabled` and
+  `animated(forTheme:at:enabled:)` take the SAME `enabled` flag (派手好き ON /
+  静か OFF), so a host reads ONE preference and the whole theme — border rim +
+  widget accents — animates or rests together. `Effects.isAnimatableTheme(_:)`
+  is the authority on which themes cycle.
+
+So §4b-GQ6 still holds — `primary` (static) ⊻ `EffectSpec.steady` (active) is a
+**mode selector the render layer applies** — but for the shared cases that render
+layer is now a sill **widget** rather than each app's bespoke code.
 
 ---
 
@@ -315,9 +361,130 @@ Still deferred (block 2c, not in this pass): `Intensity` shared enum (Q9),
 `canonical(_:)`/`suggest(_:)` validation helpers (Q10), `TypeScale` font-size
 scale (Q7 — held until rule-of-three).
 
+**Post-Phase-V growth (0.24–0.25):** the blessed-12 set above is the Phase-V
+*base*; the catalog has since grown to **32 themes + `system`** (33 entries).
+Added — the **animated-neon family** `voltage` · `toxic` · `ember` ·
+`solar-veil` · `molten-vein` · `coin-op` · `arcane` (0.24.0), each a `ThemeSpec`
+preset PAIRED with an animatable `EffectSpec` (these — with `rainbow` / `chomp` —
+are exactly the themes `Effects.isAnimatableTheme(_:)` returns true for), and the
+**muted black-based family** `dusk` · `clay` · `gemstone` · `graphite` (0.25.0,
+static). The live authority is `Palette.themeCatalog` / `canonicalThemeNames`,
+not this Phase-V table; `prism` iterates the full set.
+
 ---
 
-## 5. Per-app migration (next phase, not done yet)
+## 5. The widget kit — ThemeKit (the parts) + prism (the bench)
+
+The same north star, one layer up: *「facet の field 真似て」「wand の menu 真似て」
+を二度と言わない*. Where §2–§3 share the **theme** (colours + motion), `ThemeKit`
+shares the **widgets** that wear it — the MUI-style AppKit parts the apps were
+each hand-drawing (facet's tree-filter / tag-rename fields + popup menus, wand's
+tome list, …). This is the work that takes sill to **1.0**.
+
+### Where it sits
+
+`ThemeKit` is the AppKit widget tier: it depends on `PaletteKit` (which resolves
+the theme) + `Palette`, and draws in the resolved roles. Like PaletteKit it is
+consumed from an app's **View** layer only and is **never** a dependency of a
+pure `*Core`. The module is `ThemeKit`; its primary types are `ThemedTextField`,
+… — module ≠ type, avoiding a `ThemeKit.ThemeKit` collision (the same rule as
+`Palette` / `ThemeSpec`).
+
+### The contract (one rule, enforced by shape)
+
+Every widget is themed by **assigning a `ResolvedPalette` and repainting** — no
+theme flags, no app `NSColor`s reaching in:
+
+```swift
+public var palette: ResolvedPalette { didSet { applyTheme() } }   // re-themes the whole widget
+```
+
+A widget consumes only the **canonical role fields** (`background · foreground ·
+muted · tertiary · primary · secondary · border · hover · selection · error`,
+plus `backgroundAlpha` and the rendering hints), with the family accent
+convention — **focus / active affordances go `primary`**. Where a host hands in
+app data it passes **pre-resolved atoms** (an `NSImage`, a role enum, a closure
+for the 実処理), never an app `NSColor` or a raw `NSView` — so the component owns
+*render + interaction + theming* and the host owns *data + behaviour*. These are
+GENERAL React-style components; facet / wand are study cases, **not** coupling
+targets.
+
+### Two embedding shapes
+
+| shape | what | widgets |
+|---|---|---|
+| **embed** | a bare `NSView` / `NSControl` you `addSubview` + configure; owns its intrinsic size, is itself screencapturable | TextField · Button · ButtonGroup · Checkbox · FAB · Divider · Border · Skeleton · **List** |
+| **controller** | a retained object owning a borderless **child-window popup** (the host window stays key); add its `.field` / anchor or call `present(…)`, retain for its lifetime | ComboBox · Menu · Tooltip |
+
+The child-window popups share **one factory** (the 0.28 `PopupPanel` refactor):
+a borderless **non-key** panel so the host window keeps key + IME focus, instead
+of ComboBox / Menu / Tooltip each reinventing that seam.
+
+### The catalog — 12 widgets, 4 families
+
+`prism`'s `KitCatalog.swift` is the **single source of truth**: each entry
+carries the part's MUI analog, embed/controller shape, key API, and variants.
+The gallery's per-widget **"copy ref"** button serialises one entry to the
+clipboard (so another agent can FIND + USE the part), and this section reads the
+same array. The families are the gallery's tabs:
+
+| family | widgets (MUI analog) |
+|---|---|
+| **Text** | `ThemedTextField` ⟨TextField⟩ · `ThemedComboBox` ⟨Autocomplete⟩ |
+| **Action** | `ThemedButton` ⟨Button⟩ · `ThemedButtonGroup` ⟨ButtonGroup⟩ · `ThemedCheckbox` ⟨Checkbox⟩ · `ThemedFAB` ⟨Fab⟩ |
+| **Feedback** | `ThemedDivider` ⟨Divider⟩ · `ThemedBorder` ⟨surface rim⟩ · `ThemedSkeleton` ⟨Skeleton⟩ · `ThemedTooltip` ⟨Tooltip⟩ |
+| **Collection** | `ThemedList` ⟨List⟩ · `ThemedMenu` ⟨Menu⟩ |
+
+`ThemedList` is the shared **row-painter** that both `ThemedComboBox`'s drop-down
+and `ThemedMenu`'s panel host (0.31) — mixed-height rows, section headers /
+separators, badges, density / selection / hover modes, and either host-driven or
+self-managed keyboard nav. So the three collection-ish parts draw from one body.
+
+### Live effects in the kit (the §3 motion, applied)
+
+Two pieces make the dynamic theme (§3) visible *in the kit itself*, gated by ONE
+master switch:
+
+- **`ThemedBorder`** — the universal surface rim. No effect (or
+  `effectsEnabled = false`) → a static `primary` stroke; an effect + effects ON →
+  the live `Effects.resolveBorder` rim (glowing / breathing / colour-cycling),
+  driven by its own 30 Hz `Timer` with the off-screen / reduce-motion /
+  window-visibility lifecycle (mirroring `ThemedSkeleton`).
+- **`ResolvedPalette.animated(forTheme:at:enabled:)`** (PaletteKit) — grafts the
+  live accent trio onto an otherwise-steady palette each frame, so a widget's
+  *whole* appearance cycles, not just its border. `prism` drives every widget
+  family through it on a `TimelineView`; the static **`.palette`** tab stays
+  still for deterministic capture.
+
+`effectsEnabled` is the host's **one preference** (派手好き ON / 静か OFF): the
+same flag feeds `ThemedBorder.effectsEnabled` AND `animated(…enabled:)`, so
+border + widget accents animate or rest *together* (see §3, "the kit earns the
+shared motion").
+
+### Adding a widget (rule-of-three + the prism mandate)
+
+A part earns its place in sill once **≥2 apps would otherwise hand-draw it**.
+Every widget MUST ship a `prism` showcase — a `<Widget>View: NSViewRepresentable`
+bridge hosting the REAL widget plus a `Mock<Widget>` grid wired into the family
+gallery, so it renders live across every catalog theme (the full
+`Palette.themeCatalog` — 32 + `system`, see §4c). `prism` **never imports
+an app's View**, so the bench can't drift toward one app's needs. And because the
+maintainer's machine is **CommandLineTools-only (no XCTest)**, logic is
+unit-tested but **UI behaviour is proven live in `prism`** — every widget exposes
+`preview…` overrides (`previewHovered` / `previewFocused` / `previewOpen` /
+`previewFrozen` / …) that force a deterministic state for a static screenshot.
+
+### Versioning at 1.0
+
+1.0 marks the widget kit **complete and its API stable**. Pre-1.0 a minor could
+break and consumers pinned `.upToNextMinor`; from 1.0 the kit follows standard
+semver. The next consumer-facing step is the **facet / wand redesign** adopting
+`ThemedList` + `ThemedMenu` (the parts built last, for exactly that) — a separate
+round, app-side.
+
+---
+
+## 6. Per-app migration (next phase, not done yet)
 
 - **facet** (biggest): delete `FacetView/Palette.swift` preset bodies +
   `BorderEffect.swift`; depend on the 3 modules; `paletteFor` now returns
@@ -348,7 +515,7 @@ Each step keeps all apps green; any step can stop. Convention cleanup
 
 ---
 
-## 6. Open issues
+## 7. Open issues
 
 - **system trio** can't be a `HexColor` (dynamic system colors) — special-
   cased inside `resolve`. Fine, but it's the one preset the recipe doesn't
@@ -383,10 +550,14 @@ v2 (Phase T) residual risks — carried, not blocking:
 
 ---
 
-## 7. Verification status
+## 8. Verification status
 
 - `swift build` — ✅ clean (Palette · PaletteKit · Effects, no warnings).
 - runtime smoke check — ✅ ALL PASS (derive recipe reproduces facet's
   exact values; system / bg-override / chomp / registry all correct).
 - XCTest suites (`Tests/…`) — written defensively; run in **CI** (CLT has
   no XCTest locally, same as facet).
+- widget kit (`ThemeKit`) + `prism` — `swift build` ✅ clean; widget LOGIC in
+  XCTest (CI), but **UI behaviour proven live in `prism`** across every catalog
+  theme, since the CLT-only machine has no XCTest (see §5). Each widget ships
+  `preview…` seams so a static screenshot captures a deterministic state.
