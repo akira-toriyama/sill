@@ -177,7 +177,9 @@ struct MockTree: View {
         let ink = selected ? p.primary : p.foreground
         let dim = hidden && !selected
         let hasBadge = master || float || hidden || mark != nil || tag != nil
-        HStack(alignment: .top, spacing: 8) {
+        // Centre the app icon against the WHOLE row (app · title · optional badge
+        // line), not top-aligned with the first line — it read as sitting too high.
+        HStack(alignment: .center, spacing: 8) {
             // The REAL macOS app icon (as the live facet tree paints), falling
             // back to a theme-tinted tile when the app isn't installed.
             if let img = appIcon(bundleIDs) {
