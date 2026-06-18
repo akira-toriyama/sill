@@ -2,6 +2,7 @@
 // resolved palette so the colors read as they will in a real app.
 
 import SwiftUI
+import AppKit
 import Palette
 import PaletteKit
 import Effects
@@ -34,6 +35,10 @@ struct Gallery: View {
     /// the header chips then drive it at runtime — no relaunch, no file edit.
     @State private var selected: String
 
+    /// The widget-family tab in view. Each card renders ONLY this family's content,
+    /// so a card stays short (no more 11-mock scroll). `.palette` = theme foundations.
+    @State private var selectedFamily: KitFamily = .palette
+
     init(config: PrismConfig) {
         self.config = config
         let t = config.theme
@@ -53,7 +58,7 @@ struct Gallery: View {
             ScrollView {
                 LazyVStack(spacing: 18) {
                     ForEach(shown, id: \.self) { name in
-                        ThemeCard(name: name, scale: config.fontScale,
+                        ThemeCard(name: name, family: selectedFamily, scale: config.fontScale,
                                   showEffects: config.showEffects)
                     }
                 }
@@ -80,6 +85,15 @@ struct Gallery: View {
                 ForEach(Gallery.switchable, id: \.self) { name in
                     ThemeChip(name: name, label: name,
                               selected: selected == name) { selected = name }
+                }
+            }
+            // Widget-family tabs — only the chosen family renders in each card, so
+            // the bench is browsable by family instead of one painfully tall stack.
+            HStack(spacing: 6) {
+                ForEach(KitFamily.allCases) { fam in
+                    FamilyTab(family: fam, selected: selectedFamily == fam) {
+                        selectedFamily = fam
+                    }
                 }
             }
         }
@@ -182,6 +196,7 @@ struct FlowLayout: Layout {
 
 struct ThemeCard: View {
     let name: String
+    let family: KitFamily
     let scale: CGFloat
     let showEffects: Bool
 
@@ -212,37 +227,45 @@ struct ThemeCard: View {
                 Spacer()
             }
 
-            SwatchRow(p: p)
-
-            // Font specimen
-            Text("AaBbCcGg 0123 — The quick brown fox jumps")
-                .font(themeFont(spec.font, size: 15 * scale))
-                .foregroundColor(fg)
-
-            if showEffects, let fx = borderEffectFor(name) {
-                LiveEffectStrip(fx: fx, name: name, fallback: p.primary)
+            // Only the selected widget family renders — the de-tall win. `.palette`
+            // is the theme foundations; `.chrome` the fake app mocks; the rest are
+            // the REAL ThemeKit widgets, each over a `copy ref` section header.
+            switch family {
+            case .palette:
+                SwatchRow(p: p)
+                Text("AaBbCcGg 0123 — The quick brown fox jumps")
+                    .font(themeFont(spec.font, size: 15 * scale))
+                    .foregroundColor(fg)
+                if showEffects, let fx = borderEffectFor(name) {
+                    LiveEffectStrip(fx: fx, name: name, fallback: p.primary)
+                }
+            case .text:
+                WidgetSection(kitComponent("ThemedTextField"), p: p) { MockField(p: p) }
+                WidgetSection(kitComponent("ThemedComboBox"), p: p) { MockComboBox(p: p) }
+            case .action:
+                WidgetSection(kitComponent("ThemedButton"), p: p) { MockButton(p: p) }
+                WidgetSection(kitComponent("ThemedButtonGroup"), p: p) { MockButtonGroup(p: p) }
+                WidgetSection(kitComponent("ThemedCheckbox"), p: p) { MockCheckbox(p: p) }
+                WidgetSection(kitComponent("ThemedFAB"), p: p) { MockFAB(p: p) }
+            case .feedback:
+                WidgetSection(kitComponent("ThemedDivider"), p: p) { MockDivider(p: p) }
+                WidgetSection(kitComponent("ThemedSkeleton"), p: p) { MockSkeleton(p: p) }
+                WidgetSection(kitComponent("ThemedTooltip"), p: p) { MockTooltip(p: p) }
+            case .collection:
+                WidgetSection(kitComponent("ThemedList"), p: p) { MockList(p: p) }
+                WidgetSection(kitComponent("ThemedMenu"), p: p) { MockMenu(p: p) }
+            case .chrome:
+                Text("App chrome — fake perch / facet / wand / glance, drawn by prism (never imports an app's View).")
+                    .font(sysFont(9, design: .monospaced))
+                    .foregroundColor(Color(nsColor: p.muted))
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .top, spacing: 12) {
+                    MockTree(p: p)
+                    MockPill(p: p)
+                    MockTome(p: p)
+                    MockMarkdown(p: p)
+                }
             }
-
-            // Mock chrome — drawn by prism, never imported from an app.
-            HStack(alignment: .top, spacing: 12) {
-                MockTree(p: p)
-                MockPill(p: p)
-                MockTome(p: p)
-                MockMarkdown(p: p)
-            }
-
-            // ThemeKit — the REAL shared components, in this theme.
-            MockField(p: p)
-            MockDivider(p: p)
-            MockSkeleton(p: p)
-            MockButton(p: p)
-            MockButtonGroup(p: p)
-            MockCheckbox(p: p)
-            MockFAB(p: p)
-            MockTooltip(p: p)
-            MockComboBox(p: p)
-            MockList(p: p)
-            MockMenu(p: p)
         }
         .padding(16)
         .background(cardBG)
@@ -258,6 +281,101 @@ struct ThemeCard: View {
                     .stroke(Color(nsColor: p.border), lineWidth: 1)
             }
         }
+    }
+}
+
+// MARK: - Widget section (kit-widget header + copy-ref button + the live mock)
+
+/// A kit-widget block inside a theme card: a header row — the component name, its
+/// MUI kind, and a `copy ref` button that puts the component's IDENTIFYING info on
+/// the clipboard — over the live `Mock<Widget>`. The header is the only addition
+/// vs the old flat stack; the mock itself is unchanged.
+struct WidgetSection<Content: View>: View {
+    let component: KitComponent
+    let p: ResolvedPalette
+    let content: Content
+
+    init(_ component: KitComponent, p: ResolvedPalette,
+         @ViewBuilder content: () -> Content) {
+        self.component = component
+        self.p = p
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                Text(component.name)
+                    .font(sysFont(11, weight: .bold, design: .monospaced))
+                    .foregroundColor(Color(nsColor: p.foreground))
+                Text(component.kind)
+                    .font(sysFont(8.5, design: .monospaced))
+                    .foregroundColor(Color(nsColor: p.muted))
+                    .lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 8)
+                CopyRefButton(component: component, p: p)
+            }
+            content
+        }
+    }
+}
+
+/// Copies a component's `referenceText` (name · module · kind · key API · variants)
+/// to the clipboard — so the user can paste it into ANOTHER Claude Code session
+/// that then FINDS + uses the part. Flashes a check on copy.
+struct CopyRefButton: View {
+    let component: KitComponent
+    let p: ResolvedPalette
+    @State private var copied = false
+
+    var body: some View {
+        Button {
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(component.referenceText, forType: .string)
+            copied = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) { copied = false }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                Text(copied ? "copied" : "copy ref")
+            }
+            .font(sysFont(8.5, weight: .medium, design: .monospaced))
+            .foregroundColor(Color(nsColor: copied ? p.primary : p.muted))
+            .padding(.horizontal, 7).padding(.vertical, 3)
+            .overlay(RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: copied ? p.primary : p.border), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .help("Copy \(component.name) reference info to the clipboard (paste it to another agent)")
+    }
+}
+
+// MARK: - Family tab (one widget-family selector in the header)
+
+/// One widget-family tab. Neutral app chrome (it selects across ALL themes, so it
+/// is NOT theme-tinted like the ThemeChip row); the selected tab fills with the
+/// system accent.
+struct FamilyTab: View {
+    let family: KitFamily
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(family.rawValue)
+                .font(sysFont(11, weight: selected ? .bold : .medium, design: .monospaced))
+                .foregroundColor(selected ? Color.white : Color(nsColor: .labelColor))
+                .padding(.horizontal, 11).padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: 7)
+                    .fill(selected ? Color(nsColor: .controlAccentColor)
+                                   : Color(nsColor: .controlColor)))
+                .overlay(RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color(nsColor: .separatorColor),
+                            lineWidth: selected ? 0 : 1))
+        }
+        .buttonStyle(.plain)
+        .help("Show the \(family.rawValue) family")
     }
 }
 
