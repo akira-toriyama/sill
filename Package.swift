@@ -93,7 +93,7 @@ let package = Package(
 
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit", "Effects"]),
-        .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", "PaletteKit", "Palette"]),
+        .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", "PaletteKit", "Palette", "Effects"]),
         .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette"]),
         .testTarget(name: "ConfigSchemaTests",
                     dependencies: ["ConfigSchema",

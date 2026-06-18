@@ -195,6 +195,27 @@ let kitCatalog: [KitComponent] = [
              ],
         family: .feedback),
     KitComponent(
+        name: "ThemedBorder", module: "ThemeKit",
+        kind: "Themed surface border — universal: static primary stroke ↔ live effect rim (glow/breathe/cycle)",
+        summary: "The family's ONE themed surface outline; static `primary` stroke by default, the shared `resolveBorder` animator (glowing/breathing/cycling) when given an effect with effects ON. Themed by assigning a ResolvedPalette.",
+        consumes: "Embed/overlay the NSView directly: `ThemedBorder(palette:, effect:)` (a final NSView), size it to the surface and add it as a top sibling/overlay (decorative — hitTest returns nil, AX-ignored). It owns its 30 Hz redraw clock + window-visibility/reduce-motion lifecycle. No controller/child window. Resolve the effect from a theme name via `borderEffectFor(_:)` (Effects).",
+        keyAPI: [
+                 "palette: ResolvedPalette — theme; the static stroke + cycle fallback resolve from `primary`",
+                 "effect: EffectSpec? — nil = static primary border; set = the live effect rim (resolve via borderEffectFor(themeName))",
+                 "effectsEnabled: Bool — MASTER switch (default true); false rests to the static primary stroke even with an effect set. Pass the SAME flag to ResolvedPalette.animated(forTheme:at:enabled:) so border + widget accents rest together",
+                 "cornerRadius / lineWidth: CGFloat — match the host surface; the effect breathes between lineWidth and ~2.5×",
+                 "glow: Glow — .none (flat) / .bloom (default, neon halo scaled by the breathing width; the effect rim only)",
+                 "previewFrozen: Bool + previewPhase: CGFloat — hold a fixed-phase frame for deterministic capture",
+                 "init(palette:effect:) — sole initializer; init?(coder:) unavailable; no callbacks (decorative)",
+             ],
+        variants: [
+                 "mode: static primary stroke (no effect / effects off) vs live effect rim (effect + effects on)",
+                 "glow: none / bloom",
+                 "states: live-cycling / frozen (previewFrozen) / reduce-motion (rests on the effect steady hue) / auto-stopped when window hidden-miniaturized-occluded",
+                 "the effect rim reuses Effects.resolveBorder (rainbow hue-rotate, flash blend, breathing width) — the same animator halo/facet drive",
+             ],
+        family: .feedback),
+    KitComponent(
         name: "ThemedSkeleton", module: "ThemeKit",
         kind: "MUI <Skeleton> (low-alpha loading placeholder with pulse/wave ambient animation)",
         summary: "Themed grey-wash loading placeholder; themed by assigning a ResolvedPalette.",
