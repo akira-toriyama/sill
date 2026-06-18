@@ -23,7 +23,7 @@
 // label) is the best-contrast black/white on the role fill via PaletteKit's
 // `onPrimary` / `onSecondary` (so a secondary FAB on a neon theme still gets a
 // legible glyph). The interaction 演出 (hover / pressed state layer + the
-// pressed elevation deepening) is REQUIRED and runs LIVE in `still`.
+// pressed elevation deepening) is REQUIRED and runs LIVE in `prism`.
 
 import AppKit
 import Palette

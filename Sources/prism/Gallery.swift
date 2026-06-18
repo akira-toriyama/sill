@@ -1,4 +1,4 @@
-// still — the gallery: one card per theme, each rendered IN its own
+// prism — the gallery: one card per theme, each rendered IN its own
 // resolved palette so the colors read as they will in a real app.
 
 import SwiftUI
@@ -8,7 +8,7 @@ import Effects
 
 // MARK: - UI scale
 
-/// One knob for the whole still preview's type + metrics. Every font goes
+/// One knob for the whole prism preview's type + metrics. Every font goes
 /// through `sysFont`, and the fixed panel / swatch / icon / window sizes are
 /// multiplied by this, so bumping it enlarges the entire gallery uniformly.
 let uiScale: CGFloat = 1.25
@@ -23,7 +23,7 @@ func sysFont(_ size: CGFloat, weight: Font.Weight = .regular,
 // MARK: - Gallery
 
 struct Gallery: View {
-    let config: StillConfig
+    let config: PrismConfig
 
     /// Catalog names the header switcher offers — the `random` meta-name is
     /// a roll action, not a persistent selection, so it's excluded.
@@ -34,7 +34,7 @@ struct Gallery: View {
     /// the header chips then drive it at runtime — no relaunch, no file edit.
     @State private var selected: String
 
-    init(config: StillConfig) {
+    init(config: PrismConfig) {
         self.config = config
         let t = config.theme
         _selected = State(initialValue:
@@ -68,7 +68,7 @@ struct Gallery: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("still — \(selected == "all" ? "\(Gallery.switchable.count) themes" : selected)")
+            Text("prism — \(selected == "all" ? "\(Gallery.switchable.count) themes" : selected)")
                 .font(sysFont(12, weight: .semibold, design: .monospaced))
                 .foregroundColor(.secondary)
             // A wrapping flow of theme buttons — "All" first, then the catalog
@@ -223,7 +223,7 @@ struct ThemeCard: View {
                 LiveEffectStrip(fx: fx, name: name, fallback: p.primary)
             }
 
-            // Mock chrome — drawn by still, never imported from an app.
+            // Mock chrome — drawn by prism, never imported from an app.
             HStack(alignment: .top, spacing: 12) {
                 MockTree(p: p)
                 MockPill(p: p)
@@ -347,7 +347,7 @@ struct Checker: View {
 
 // MARK: - Helpers
 
-/// SwiftUI font for a `FontKind` (still-local; mirrors PaletteKit's uiFont
+/// SwiftUI font for a `FontKind` (prism-local; mirrors PaletteKit's uiFont
 /// without touching the global `pal`). `.menu` ≈ system for a specimen.
 func themeFont(_ kind: FontKind, size: CGFloat) -> Font {
     switch kind {

@@ -1,7 +1,7 @@
 // ThemeKit / ThemedCheckbox tests — DETERMINISTIC in headless CI (no Xcode
 // locally → these first compile + run in CI). State is driven via the preview…
 // overrides and asserted through the DEBUG checkboxProbe — no synthetic events.
-// The live check-draw-in + hover circle 演出 is proven in still, not here.
+// The live check-draw-in + hover circle 演出 is proven in prism, not here.
 
 import XCTest
 import AppKit

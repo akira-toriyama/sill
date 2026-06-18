@@ -1,5 +1,5 @@
-# still — the sill theme preview app.
-# Read from ./still.toml (or $STILL_CONFIG). Edit + re-run `swift run still`.
+# prism — the sill theme preview app.
+# Read from ./prism.toml (or $PRISM_CONFIG). Edit + re-run `swift run prism`.
 # This is the ONE config.toml in sill; the library modules stay config-less.
 
 # Which themes to show. "all" = the full gallery, or a single canonical

@@ -1,7 +1,7 @@
 // ThemeKit / ThemedFAB tests — DETERMINISTIC in headless CI (no Xcode locally →
 // these first compile + run in CI). State is driven via the preview… overrides
 // and read through the DEBUG `fabProbe` — no synthetic events. The live float /
-// hover-press 演出 is proven in still, not here.
+// hover-press 演出 is proven in prism, not here.
 
 import XCTest
 import AppKit

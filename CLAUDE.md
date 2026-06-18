@@ -17,10 +17,10 @@ The maintainer's machine has **CommandLineTools only, no Xcode**, so
 gate; `swift test` runs in CI** (`.github/workflows/build.yml`, macOS + full
 Xcode). Therefore:
 
-- Write XCTest for logic, but **prove UI behavior LIVE in `still`** — don't claim
+- Write XCTest for logic, but **prove UI behavior LIVE in `prism`** — don't claim
   a widget works off an unrun test.
-- still capture recipe (windows jump Spaces under the tiling WM): launch
-  `.build/debug/still` with `STILL_CONFIG=…toml`, get the window id, then
+- prism capture recipe (windows jump Spaces under the tiling WM): launch
+  `.build/debug/prism` with `PRISM_CONFIG=…toml`, get the window id, then
   `screencapture -l<winid> -o out.png` **without** `osascript`-activating (that
   jumps Spaces and flakes the capture). For hover/pressed/popup/animation states,
   use the widget's `preview…` overrides so a static screenshot is deterministic.
@@ -35,7 +35,7 @@ Xcode). Therefore:
 | `ConfigSchema` | one `Spec<Root>` decodes config.toml + emits its JSON Schema | pure |
 | `CLIKit` | arity-driven argv tokenizer | pure |
 | `ThemeKit` | shared themed **AppKit widgets** (`ThemedTextField`, …) | AppKit / `@MainActor` |
-| `still` (exe) | the visual bench — renders every catalog theme + the real widgets | AppKit + SwiftUI |
+| `prism` (exe) | the visual bench — renders every catalog theme + the real widgets | AppKit + SwiftUI |
 
 **The pure / AppKit split is enforced by the DEPENDENCY GRAPH, not a flag.**
 `Palette` imports nothing platform-specific; a consumer that links only `Palette`
@@ -60,10 +60,10 @@ convention: focus/active affordances go `primary`.
 
 `ThemeKit` is the AppKit widget kit (PaletteKit resolves the theme; ThemeKit
 draws in it). A widget belongs in sill once ≥2 apps would otherwise hand-draw it
-(rule-of-three). Every widget MUST add a `still` showcase — a
+(rule-of-three). Every widget MUST add a `prism` showcase — a
 `<Widget>View: NSViewRepresentable` bridge hosting the REAL widget + a
 `Mock<Widget>(p:)` grid wired into `ThemeCard`, so it appears live across all
-themes (still never imports an app's View → no drift).
+themes (prism never imports an app's View → no drift).
 
 ## Conventions
 

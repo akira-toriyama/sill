@@ -1,5 +1,5 @@
-// still — ThemeKit List bench. Unlike the ComboBox / Tooltip popups (which live on
-// their own child windows and CAN'T appear in a `screencapture` of still's main
+// prism — ThemeKit List bench. Unlike the ComboBox / Tooltip popups (which live on
+// their own child windows and CAN'T appear in a `screencapture` of prism's main
 // window), `ThemedList` is a plain embeddable NSView — so the REAL widget bridges
 // straight into the per-theme grid and IS captured. Three specimens prove the
 // coverage the kit was designed for, each in its own theme:
@@ -11,7 +11,7 @@
 //      chevron trailing. `previewHighlight` forces the accent row for capture.
 //   3. dense single-line  — `.compact` density, mixed trailing, a disabled row, a
 //      `.error` tint row.
-// still never imports an app's View — these are mock data shapes drawn by the real
+// prism never imports an app's View — these are mock data shapes drawn by the real
 // kit, so the bench can't drift from facet / wand.
 
 import SwiftUI
@@ -78,7 +78,7 @@ struct ListView: NSViewRepresentable {
             [Badge("⌘3", role: .primary), Badge("Space 2")]),
         win("w2", "hammer", "Xcode", "ThemedList.swift — Edited",
             [Badge("⌘2", role: .primary), Badge("min", symbol: minGlyph, role: .secondary)]),
-        win("w3", "terminal", "Terminal", "still — swift build",
+        win("w3", "terminal", "Terminal", "prism — swift build",
             [Badge("⌘1", role: .primary)]),
         ListItem(id: "wsB", primary: "Workspace B",
                  kind: .sectionHeader(subtitle: "2 windows")),

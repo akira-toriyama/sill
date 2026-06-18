@@ -1,5 +1,5 @@
-// still — ThemeKit Tooltip bench. A tooltip lives on its OWN borderless child
-// window, which `screencapture -l<winid>` of still's main window can NEVER
+// prism — ThemeKit Tooltip bench. A tooltip lives on its OWN borderless child
+// window, which `screencapture -l<winid>` of prism's main window can NEVER
 // include — so the per-theme grid draws an INLINE MOCK of the rendered bubble
 // (the exact fill `foreground@0.92`, best-contrast text, radius 4, padding 4×8,
 // the palette font, and the edge arrow) across all four placements + a wrapped
@@ -32,7 +32,7 @@ import ThemeKit
 
 /// A real anchor (a ThemedButton) with a live ThemedTooltip attached. Hover it
 /// in the running bench to see the actual inverted bubble fade in on its own
-/// child window (a separate window — not part of a still screenshot).
+/// child window (a separate window — not part of a prism screenshot).
 struct ThemedTooltipAnchorView: NSViewRepresentable {
     let palette: ResolvedPalette
     let text: String
@@ -141,7 +141,7 @@ struct MockTooltip: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             // LIVE — hover the real anchors; their tooltips appear on a separate
-            // child window (won't show in a still screenshot, but proves the 演出).
+            // child window (won't show in a prism screenshot, but proves the 演出).
             HStack(spacing: 24) {
                 liveCell("bottom (auto)", placement: .auto)
                 liveCell("top",          placement: .top)

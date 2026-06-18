@@ -2,7 +2,7 @@
 // locally → these first compile + run in CI). They drive the joined geometry via
 // the DEBUG `groupProbe` (per-member corners / edges / grouped-shadow, divider,
 // selection) — no synthetic events. The live seams / hover / selection 演出 is
-// proven in still, not here.
+// proven in prism, not here.
 
 import XCTest
 import AppKit

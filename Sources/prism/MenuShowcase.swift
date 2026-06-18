@@ -1,6 +1,6 @@
-// still — ThemeKit Menu bench. `ThemedMenu` is a CONTROLLER that owns a child
+// prism — ThemeKit Menu bench. `ThemedMenu` is a CONTROLLER that owns a child
 // window (like the combo / tooltip), so the open menu can't appear in a
-// `screencapture` of still's main window. The per-theme grid therefore renders an
+// `screencapture` of prism's main window. The per-theme grid therefore renders an
 // INLINE MOCK of the open menu — a REAL `ThemedList` configured exactly as
 // `ThemedMenu` hosts it (selectionMode .none · solidAccent highlight ·
 // highlightFollowsHover · compact · separators), with `previewHighlight` forcing a
@@ -8,7 +8,7 @@
 // a LIVE trigger opens the REAL `ThemedMenu` (touch it: hover, ↑↓, Enter, Esc), the
 // 演出 to feel even though the floating panel won't sit in a static shot.
 //
-// still never imports an app's View: these are mock data shapes drawn by the real
+// prism never imports an app's View: these are mock data shapes drawn by the real
 // kit, mirroring `ThemedMenu`'s own MenuItem → ListItem mapping, so the bench can't
 // drift from facet / wand.
 

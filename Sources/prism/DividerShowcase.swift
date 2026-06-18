@@ -1,4 +1,4 @@
-// still — ThemeKit divider bench. Hosts the REAL shared `ThemedDivider`
+// prism — ThemeKit divider bench. Hosts the REAL shared `ThemedDivider`
 // (ThemeKit) inside the SwiftUI gallery, one cell per orientation / variant,
 // so the hairline can be evaluated live in every theme — crispness, the
 // `border` tint, and the text-in-divider gap.

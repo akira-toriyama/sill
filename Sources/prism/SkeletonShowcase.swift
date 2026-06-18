@@ -1,4 +1,4 @@
-// still — ThemeKit skeleton bench. Hosts the REAL shared `ThemedSkeleton`
+// prism — ThemeKit skeleton bench. Hosts the REAL shared `ThemedSkeleton`
 // (ThemeKit) inside the SwiftUI gallery, one cell per variant / animation, so
 // the loading placeholder can be evaluated live in every theme. The shimmer
 // runs LIVE here (the bench is where the pulse / wave 演出 is demonstrated and

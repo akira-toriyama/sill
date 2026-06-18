@@ -698,7 +698,7 @@ extension ThemedComboBox {
         // The row highlight (selection wash + primary accent bar) + disabled/
         // No-options text are NOT probed as colours: the hosted list reads the
         // palette roles directly, so a probe field would just echo the input. The
-        // row rendering is proven LIVE in still across light/dark/neon instead.
+        // row rendering is proven LIVE in prism across light/dark/neon instead.
         let noOptions: Bool
         let emptyActionActive: Bool     // an actionable empty row is offered (0 matches + emptyActionRow)
         let emptyActionLabel: String?   // its resolved label

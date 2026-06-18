@@ -1,4 +1,4 @@
-// still — ThemeKit text-field bench. Hosts the REAL shared `ThemedTextField`
+// prism — ThemeKit text-field bench. Hosts the REAL shared `ThemedTextField`
 // (ThemeKit) inside the SwiftUI gallery, both as the mock search fields
 // (facet tree / wand tome) and a dedicated variant/state showcase, so the
 // component can be evaluated live in every theme.

@@ -5,7 +5,7 @@
 // animation == .none, no window, and the reduce-motion invariant — plus the
 // static facts (tint role/alpha, theme re-tint, per-variant corner, text
 // line-height). The live pulse/wave + the off-screen-teardown CPU drop are
-// proven LIVE in still, not here.
+// proven LIVE in prism, not here.
 
 import XCTest
 import AppKit
