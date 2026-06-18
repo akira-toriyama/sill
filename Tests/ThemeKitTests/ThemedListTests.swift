@@ -373,4 +373,20 @@ final class ThemedListTests: XCTestCase {
                              "a longer label widens the fit")
         XCTAssertEqual(wide.fittingWidth(maxWidth: 60), 60, "fitting width is capped at maxWidth")
     }
+
+    // MARK: - Leading image column (the combo's image-less option list)
+
+    func testReservesLeadingImageColumnCollapsesTextInset() {
+        // DEFAULT (true): an image-less row still reserves the leading image column,
+        // so the text budget starts at textXOrigin = leadingInset(12) + imageBox(24)
+        // + gapImageToText(8) = 44 (the facet/wand mixed-icon alignment).
+        let reserved = makeList([row("hello")])
+        // OFF: the column collapses to leadingInset(12) — the combo's option rows, so
+        // text sits flush like the old ComboListView. The fit shrinks by exactly the
+        // dropped image column = imageBox(24) + gapImageToText(8) = 32 (comfortable).
+        let collapsed = makeList([row("hello")])
+        collapsed.reservesLeadingImageColumn = false
+        XCTAssertEqual(reserved.fittingWidth() - collapsed.fittingWidth(), 32, accuracy: 0.5,
+                       "suppressing the leading image column moves text from textXOrigin(44) to leadingInset(12)")
+    }
 }
