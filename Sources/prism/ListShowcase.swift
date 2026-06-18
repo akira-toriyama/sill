@@ -121,6 +121,16 @@ struct ListView: NSViewRepresentable {
     ]
 }
 
+// A plain reorder list (no headers) for the `.between` insertion-line affordance.
+@MainActor private func reorderItems() -> [ListItem] {
+    [
+        ListItem(id: "r1", image: glyph("1.circle"), primary: "First task"),
+        ListItem(id: "r2", image: glyph("2.circle"), primary: "Second task"),
+        ListItem(id: "r3", image: glyph("3.circle"), primary: "Third task"),
+        ListItem(id: "r4", image: glyph("4.circle"), primary: "Fourth task"),
+    ]
+}
+
 // MARK: - Showcase
 
 struct MockList: View {
@@ -128,7 +138,7 @@ struct MockList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKit · List — the REAL embeddable widget (hover a row, ↑↓/click in the dense list when focused). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list.")
+            Text("ThemeKit · List — the REAL embeddable widget (hover a row, ↑↓/click in the dense list when focused). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list. Bottom row: the additive drag layer (default-off) — the lifted row dims under a drop-onto ring or a between insertion-line; a live drag's ghost is a child window (hand-checked, not captured).")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
                 .fixedSize(horizontal: false, vertical: true)
@@ -175,6 +185,45 @@ struct MockList: View {
                         list.previewHighlight = "copy"
                     }
                     .frame(width: 220, height: 188)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(alignment: .top, spacing: 20) {
+                cell("drag · drop-onto (facet tree) · w3 → Workspace B") {
+                    ListView(palette: p) { list in
+                        list.items = facetItems()
+                        list.selectionMode = .single
+                        list.showsDividers = true
+                        list.draggable = true
+                        list.dragMode = .dropOnto
+                        // A window row lifted (dimmed) and aimed ONTO the Workspace B
+                        // header — the ring + faint fill on the target, the static
+                        // stand-in for the live ghost (a child window prism can't grab).
+                        list.previewDragSource = "w3"
+                        list.previewDropTarget = DropTarget(placement: .onto(id: "wsB"))
+                        list.previewScrollY = 120         // bring the lifted w3 + the Workspace B target into view
+                    }
+                    .frame(width: 320, height: 188)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+
+                cell("drag · reorder (insertion line) · before 'Third task'") {
+                    ListView(palette: p) { list in
+                        list.items = reorderItems()
+                        list.draggable = true
+                        list.dragMode = .reorderBetween
+                        // The first task lifted (dimmed); the insertion line + dot mark
+                        // the gap it would land in (before the third row).
+                        list.previewDragSource = "r1"
+                        list.previewDropTarget = DropTarget(placement: .between(beforeID: "r3"))
+                    }
+                    .frame(width: 300, height: 140)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8)
                         .stroke(Color(nsColor: p.border), lineWidth: 1))

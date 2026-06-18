@@ -117,6 +117,52 @@ public struct ListItem {
     var isSeparator: Bool { if case .separator = kind { return true }; return false }
 }
 
+// MARK: - Drag-and-drop vocabulary (the additive, default-off drag layer)
+
+/// What kinds of drop a draggable list resolves from the pointer / keyboard aim.
+/// The DEFAULT is `.both`; a list opts into dragging at all via `draggable`.
+///   * `.dropOnto` — only `.onto(id:)` targets (facet's tree: a window row dropped
+///     ONTO a Workspace header re-homes it; headers swap onto each other). The whole
+///     target row lights.
+///   * `.reorderBetween` — only `.between(beforeID:)` targets (a future plain-list
+///     reorder): an insertion line in the gap the row would land in.
+///   * `.both` — the kit picks onto vs between by where in the row the pointer sits
+///     (top/bottom quarter ⇒ between; middle ⇒ onto), the MUI tree-DnD zone model.
+public enum DragMode: Equatable, Sendable { case dropOnto, reorderBetween, both }
+
+/// WHERE a drag would land, as resolved by the kit from the pointer zone or the
+/// keyboard aim. The host maps the row `id` onto its own domain (a window → a
+/// workspace) — the kit knows no domain (the React-component contract).
+public enum DropPlacement: Equatable, Sendable {
+    /// Dropped ONTO a row (facet: onto a Workspace header → re-home; header-to-header
+    /// swap). `id` is the target row's id.
+    case onto(id: String)
+    /// Dropped into the GAP before `beforeID` (a reorder insertion point). `nil` ⇒
+    /// after the last row (the end gap).
+    case between(beforeID: String?)
+}
+
+/// The thing being dragged — the source row's identity. A struct (not a bare
+/// `String`) so the layer can grow to carry more later (a multi-row selection, an
+/// external-pasteboard source) WITHOUT breaking the `onDrop` / validator closure
+/// signatures the host already wrote — additive stability past 1.0.
+public struct DragContext: Equatable, Sendable {
+    /// The dragged row's `id`.
+    public let id: String
+    public init(id: String) { self.id = id }
+}
+
+/// A resolved drop target handed to `dropTargetValidator` / `onDrop`. Wraps the
+/// `placement`; a struct (rather than passing the bare `DropPlacement`) for the
+/// same forward-compatibility reason as `DragContext` — a later field (a pointer
+/// fraction, an `isExternal` flag) is additive on the struct, not a breaking change
+/// to the closure type.
+public struct DropTarget: Equatable, Sendable {
+    /// Where the drop lands.
+    public let placement: DropPlacement
+    public init(placement: DropPlacement) { self.placement = placement }
+}
+
 // MARK: - ThemedList
 
 @MainActor
@@ -280,6 +326,49 @@ public final class ThemedList: NSView {
     /// The hovered row id changed (nil on exit). Headers / disabled rows report nil.
     public var onHover: ((String?) -> Void)? = nil
 
+    // MARK: Drag-and-drop (opt-in — the additive drag layer; default OFF)
+
+    /// MASTER GATE. `false` (default) ⇒ the list behaves EXACTLY as before: a press
+    /// is a click, no ghost, no drop affordance, the mouse path is untouched. `true`
+    /// ⇒ a press-and-drag past a small threshold lifts the row under it (a ghost
+    /// follows the pointer) and the kit resolves a `DropTarget`; releasing fires
+    /// `onDrop`. A keyboard lift (`beginDrag`/arrows/`commitDrag`) needs only this
+    /// gate, not the pointer. Turning it OFF mid-drag cancels the in-flight drag.
+    public var draggable = false {
+        didSet { if draggable != oldValue { if !draggable { cancelDrag() }; listView.needsDisplay = true } }
+    }
+
+    /// onto vs between resolution (see `DragMode`). DEFAULT `.both`; facet's tree
+    /// sets `.dropOnto`. Consulted only while `draggable`.
+    public var dragMode: DragMode = .both
+
+    /// Veto a resolved drop (the host's domain rule — facet rejects a drop onto the
+    /// SAME workspace, or onto self). Returns `true` to ALLOW. The kit ALWAYS first
+    /// rejects the structurally-trivial targets (onto self, a no-move reorder, a
+    /// separator) before consulting this — so the host only encodes DOMAIN vetoes.
+    /// nil ⇒ every structurally-valid target is allowed.
+    public var dropTargetValidator: ((DragContext, DropTarget) -> Bool)? = nil
+
+    /// Override the floating drag ghost for a row id (facet's snapshot card). Return
+    /// nil to fall back to the kit default (a snapshot of the row on a surface card).
+    /// Mouse-drag only — a keyboard lift shows no floating ghost (it dims the lifted
+    /// row + moves the drop affordance under the arrows).
+    public var dragImageProvider: ((String) -> NSImage?)? = nil
+
+    /// The drop was COMMITTED on a valid target (the host's 実処理 — performs the
+    /// move). Never fires on a cancel, an invalid target, or a no-op self-drop.
+    public var onDrop: ((DragContext, DropTarget) -> Void)? = nil
+
+    /// `true` while a drag (mouse or keyboard) is in flight. Read-only.
+    public var isDragging: Bool { drag != nil }
+
+    // Capture / preview seams for the drag affordance (deterministic prism shots —
+    // a live drag's ghost is a child window and can't be `screencapture`d, so the
+    // bench forces the static affordance via these). `previewDropTarget` paints the
+    // onto-ring / insertion-line; `previewDragSource` dims the lifted row.
+    public var previewDropTarget: DropTarget? = nil { didSet { listView.needsDisplay = true } }
+    public var previewDragSource: String? = nil { didSet { listView.needsDisplay = true } }
+
     // MARK: Internals
 
     private var _items: [ListItem] = []
@@ -288,6 +377,16 @@ public final class ThemedList: NSView {
     private var hoveredIndex: Int?           // into `items`
     private var emptyLabel: String?          // resolved emptyActionRow label (nil ⇒ inert)
     private var rowLayout = RowLayout()         // cached per reload (mixed-height rows)
+
+    // Drag state (one session at a time; nil when idle). `target` is the live aim;
+    // `isKeyboard` selects the lift model (no ghost, arrows aim). `dragGhost` is the
+    // floating child window (mouse only). `dragCandidateIndex` walks the validated
+    // `dragCandidates()` for a keyboard lift.
+    private struct DragSession { let sourceID: String; var target: DropTarget?; let isKeyboard: Bool }
+    private var drag: DragSession?
+    private var dragGhost: DragGhost?
+    private var dragCandidateIndex: Int?
+    private var dragGhostGrab: CGPoint = .zero        // row top-left − cursor, screen pts (mouse ghost follow)
 
     private let scrollView = NSScrollView()
     // A vertical-shaped frame so NSScroller infers a vertical scroller; the scroll
@@ -412,6 +511,15 @@ public final class ThemedList: NSView {
         // is a no-op when the flag is set BEFORE the view is in a window (the common
         // NSViewRepresentable configure-during-make ordering) — rebuild it on attach.
         if managesFirstResponder { window?.recalculateKeyViewLoop() }
+    }
+
+    public override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        // A live drag is normally torn down by mouseUp / commit / cancel. If the list
+        // is pulled out of its window mid-gesture (host teardown, a re-made
+        // NSViewRepresentable bridge), that mouseUp never arrives — cancel so the
+        // ghost child window can't orphan on screen and the session can't stick.
+        if newWindow == nil, isDragging { cancelDrag() }
     }
 
     // MARK: Theming
@@ -700,6 +808,7 @@ public final class ThemedList: NSView {
     }
 
     fileprivate func hoverRow(atDocY y: CGFloat?) {
+        if isDragging { return }                // a live drag owns the row feedback (the drop affordance)
         // The actionable empty row is the one empty-state row that lights on hover
         // (combo parity — its highlight drives drawEmptyRow's wash); report its
         // synthetic id. Dedup via highlightedIndex (setHighlight early-returns).
@@ -742,6 +851,7 @@ public final class ThemedList: NSView {
     /// itself (a menu's keyDown monitor) can move the highlight without the list
     /// being first responder.
     public func moveHighlight(_ delta: Int) {
+        if isDragging { return }               // a lift replaces highlight nav with drop-target aim (decision e)
         if isActionRowActive { setHighlight(0); return }
         let sel = items.indices.filter { isSelectable(items[$0]) }
         guard !sel.isEmpty else { setHighlight(nil); return }
@@ -910,6 +1020,7 @@ extension ThemedList {
             drawRow(i, in: r, width: width, isSel: effSel == i, isHi: effHi == i)
         }
         drawStickyHeader(view, width: width)
+        drawDropAffordance(width: width)            // the lifted-row dim + drop target ring / insertion line
     }
 
     private func drawEmptyRow(width: CGFloat) {
@@ -1251,6 +1362,356 @@ extension ThemedList {
     }
 }
 
+// MARK: - Drag-and-drop (state machine · target resolution · ghost · affordance)
+//
+// The additive drag layer (default OFF via `draggable`). One `DragSession` runs at
+// a time, started either by the pointer (the doc view's down→drag→up sequence) or by
+// the keyboard (`beginDrag` + arrows + `commitDrag`/`cancelDrag`). The kit resolves a
+// `DropTarget` (onto a row / between rows) from the pointer zone or the keyboard
+// candidate walk, rejects the structurally-trivial targets, then defers a DOMAIN
+// veto to the host's `dropTargetValidator`. The floating ghost is a non-key child
+// window (mouse only — it escapes the scroll clip like the tooltip/combo/menu do);
+// the keyboard lift shows no ghost (it dims the row + moves the affordance). On a
+// committed valid target the host's `onDrop` performs the move. The whole feature is
+// proven LIVE in prism for the visuals; the state machine + target resolution are
+// unit-tested headlessly (no window, no synthetic events). Autoscroll-on-drag is OUT
+// of this first cut (facet's tree is short — documented follow-up).
+
+extension ThemedList {
+
+    // MARK: Source eligibility
+
+    /// A row may be LIFTED when the list is draggable and the row is neither a
+    /// separator (no identity to drag) nor disabled. Headers ARE liftable — facet's
+    /// tree swaps Workspace headers onto each other; the host's validator + onDrop
+    /// decide what a header drop means (the kit knows no domain).
+    fileprivate func isDragSource(_ item: ListItem) -> Bool {
+        draggable && !item.isSeparator && !item.isDisabled
+    }
+
+    // MARK: Mouse drag (the doc view's down → drag → up sequence)
+
+    /// Begin a pointer drag from the row at `docY`. Returns false (the press stays a
+    /// click) when the row isn't a valid source. Captures the ghost image BEFORE the
+    /// lifted row dims, shows the floating ghost, and seeds the first aim.
+    fileprivate func beginMouseDrag(atDocY docY: CGFloat, locationInWindow: NSPoint) -> Bool {
+        guard drag == nil, let i = rowIndex(atDocY: docY), isDragSource(items[i]) else { return false }
+        let image = ghostImage(forRow: i)                 // capture while the row is still un-dimmed
+        drag = DragSession(sourceID: items[i].id, target: nil, isKeyboard: false)
+        showGhost(image: image, forRow: i, locationInWindow: locationInWindow)
+        updateMouseDrag(atDocY: docY, locationInWindow: locationInWindow)
+        return true
+    }
+
+    /// Update the pointer drag: re-resolve the aim from `docY`, keep the ghost under
+    /// the pointer.
+    fileprivate func updateMouseDrag(atDocY docY: CGFloat, locationInWindow: NSPoint) {
+        guard let s = drag, !s.isKeyboard else { return }
+        setDragTarget(resolveDropTarget(atDocY: docY, source: s.sourceID))
+        moveGhost(locationInWindow: locationInWindow)
+    }
+
+    /// End the pointer drag: hide the ghost; fire `onDrop` on a valid target if committing.
+    fileprivate func endMouseDrag(commit: Bool) {
+        guard let s = drag, !s.isKeyboard else { return }
+        finishDrag(commit: commit, session: s)
+    }
+
+    // MARK: Keyboard lift (PUBLIC — the host drives Space/arrows/Return/Esc, or a
+    // managesFirstResponder list routes them here via `handleDragKey`)
+
+    /// Lift row `id` for a keyboard drag. No-op if not draggable / not a valid source
+    /// / already dragging. Seeds the aim at the first valid candidate; arrows then aim
+    /// via `moveDragTarget` (highlight nav is suppressed while lifting — decision e).
+    public func beginDrag(_ id: String) {
+        guard drag == nil, let i = indexOf(id), isDragSource(items[i]) else { return }
+        drag = DragSession(sourceID: id, target: nil, isKeyboard: true)
+        let candidates = dragCandidates()
+        dragCandidateIndex = candidates.isEmpty ? nil : 0
+        setDragTarget(candidates.first)
+        listView.needsDisplay = true
+    }
+
+    /// Move the keyboard drop aim by `delta` through the validated candidates (clamped).
+    /// Scrolls the aimed row into view. No-op outside a keyboard lift.
+    public func moveDragTarget(_ delta: Int) {
+        guard let s = drag, s.isKeyboard else { return }
+        let candidates = dragCandidates()
+        guard !candidates.isEmpty else { setDragTarget(nil); return }
+        let next = min(max((dragCandidateIndex ?? 0) + delta, 0), candidates.count - 1)
+        dragCandidateIndex = next
+        setDragTarget(candidates[next])
+        if let id = targetRowID(candidates[next]) { scrollToRow(id) }
+        else if let lastID = items.last(where: { !$0.isSeparator })?.id { scrollToRow(lastID) }   // the end gap → reveal the content bottom
+    }
+
+    /// Commit the in-flight drag (mouse OR keyboard) — fires `onDrop` on a valid target.
+    public func commitDrag() {
+        guard let s = drag else { return }
+        finishDrag(commit: true, session: s)
+    }
+
+    /// Cancel any in-flight drag without firing `onDrop`.
+    public func cancelDrag() {
+        guard let s = drag else { return }
+        finishDrag(commit: false, session: s)
+    }
+
+    // MARK: Shared session teardown / target mutation
+
+    private func finishDrag(commit: Bool, session s: DragSession) {
+        let target = s.target
+        drag = nil
+        dragCandidateIndex = nil
+        hideGhost()
+        listView.needsDisplay = true
+        if commit, let target { onDrop?(DragContext(id: s.sourceID), target) }
+    }
+
+    private func setDragTarget(_ t: DropTarget?) {
+        guard drag != nil, drag?.target != t else { return }
+        drag?.target = t
+        // A drag is a transient, interactive gesture over a short list (facet's tree).
+        // The per-row invalidation discipline guards the STEADY state (a long scrolled
+        // list); here a full repaint as the pointer / aim moves is correct + simplest
+        // (the affordance can span the whole content, so there is no tidy row band).
+        listView.needsDisplay = true
+    }
+
+    // MARK: Target resolution
+
+    /// Resolve the `DropTarget` for a pointer at `docY` (the zone model), validated.
+    /// nil ⇒ no valid drop here (paint no affordance, a release is a no-op).
+    fileprivate func resolveDropTarget(atDocY docY: CGFloat, source: String) -> DropTarget? {
+        guard !items.isEmpty else { return nil }
+        if docY < 0 {                                       // above the top
+            return dragMode == .dropOnto ? nil : validatedTarget(.between(beforeID: items[0].id), source)
+        }
+        guard let i = rowIndex(atDocY: docY) else {         // below the last row
+            return dragMode == .dropOnto ? nil : validatedTarget(.between(beforeID: nil), source)
+        }
+        if items[i].isSeparator { return nil }
+        let r = rowRect(i)
+        let frac = r.height > 0 ? (docY - r.minY) / r.height : 0.5    // 0 = top edge … 1 = bottom edge
+        switch dragMode {
+        case .dropOnto:
+            return validatedTarget(.onto(id: items[i].id), source)
+        case .reorderBetween:
+            return validatedTarget(.between(beforeID: frac < 0.5 ? items[i].id : nextRowID(after: i)), source)
+        case .both:
+            if frac < 0.25 { return validatedTarget(.between(beforeID: items[i].id), source) }
+            if frac > 0.75 { return validatedTarget(.between(beforeID: nextRowID(after: i)), source) }
+            // The middle zone is an onto; fall back to a between when onto is vetoed,
+            // so the mid-zone of a non-droppable row still offers the natural reorder.
+            return validatedTarget(.onto(id: items[i].id), source)
+                ?? validatedTarget(.between(beforeID: items[i].id), source)
+        }
+    }
+
+    /// Wrap a placement into a validated `DropTarget`: reject the structurally-trivial
+    /// (onto self, a no-move reorder, a separator target), THEN consult the host's
+    /// domain veto. nil ⇒ not a legal drop.
+    private func validatedTarget(_ placement: DropPlacement, _ source: String) -> DropTarget? {
+        guard !isTrivialSelfDrop(placement, source) else { return nil }
+        if case let .onto(id) = placement, let i = indexOf(id), items[i].isSeparator { return nil }
+        let target = DropTarget(placement: placement)
+        guard dropTargetValidator?(DragContext(id: source), target) ?? true else { return nil }
+        return target
+    }
+
+    /// A drop that wouldn't move the source: onto itself, or into the gap immediately
+    /// above or below itself (incl. the end gap when the source is already last).
+    private func isTrivialSelfDrop(_ placement: DropPlacement, _ source: String) -> Bool {
+        switch placement {
+        case .onto(let id):
+            return id == source
+        case .between(let beforeID):
+            guard let si = indexOf(source) else { return false }
+            return beforeID == source || beforeID == nextRowID(after: si)
+        }
+    }
+
+    /// The ordered, validated keyboard candidates for the current source + `dragMode`:
+    /// `.dropOnto` ⇒ onto each row; `.reorderBetween` ⇒ each gap; `.both` ⇒ both,
+    /// interleaved in row order, then the end gap.
+    private func dragCandidates() -> [DropTarget] {
+        guard let source = drag?.sourceID else { return [] }
+        var out: [DropTarget] = []
+        for item in items where !item.isSeparator {
+            switch dragMode {
+            case .dropOnto:
+                if let t = validatedTarget(.onto(id: item.id), source) { out.append(t) }
+            case .reorderBetween:
+                if let t = validatedTarget(.between(beforeID: item.id), source) { out.append(t) }
+            case .both:
+                if let t = validatedTarget(.between(beforeID: item.id), source) { out.append(t) }
+                if let t = validatedTarget(.onto(id: item.id), source) { out.append(t) }
+            }
+        }
+        if dragMode != .dropOnto, let t = validatedTarget(.between(beforeID: nil), source) { out.append(t) }
+        return out
+    }
+
+    private func nextRowID(after i: Int) -> String? {
+        let n = i + 1
+        return items.indices.contains(n) ? items[n].id : nil
+    }
+
+    /// The row a target visually references (for scroll-into-view); nil for the end gap.
+    private func targetRowID(_ target: DropTarget) -> String? {
+        switch target.placement {
+        case .onto(let id):           return id
+        case .between(let beforeID):  return beforeID
+        }
+    }
+
+    // MARK: Ghost (the floating drag image — a non-key, click-through child window)
+
+    /// The ghost image for a row: the host's `dragImageProvider` if it returns one,
+    /// else a snapshot of the drawn row. The doc view is FLIPPED and `cacheDisplay`
+    /// honours that, so the capture is upright. nil ⇒ no ghost (a zero-size row
+    /// before layout, or headless tests).
+    private func ghostImage(forRow i: Int) -> NSImage? {
+        if let provider = dragImageProvider, let img = provider(items[i].id) { return img }
+        let r = rowRect(i)
+        guard r.width > 0, r.height > 0,
+              let rep = listView.bitmapImageRepForCachingDisplay(in: r) else { return nil }
+        listView.cacheDisplay(in: r, to: rep)
+        let img = NSImage(size: r.size)
+        img.addRepresentation(rep)
+        return img
+    }
+
+    /// Show the floating ghost over the lifted row and remember the cursor→row-top
+    /// vector so `moveGhost` keeps it under the pointer. No-op without a window or an
+    /// image (the ghost is a live-only affordance — headless tests skip it).
+    private func showGhost(image: NSImage?, forRow i: Int, locationInWindow: NSPoint) {
+        guard let image, let win = window, let onScreen = rowRectOnScreen(for: items[i].id) else { return }
+        let cursor = win.convertPoint(toScreen: locationInWindow)
+        // `onScreen` is y-up; its top edge is `maxY`. Hold a constant cursor→top-left
+        // vector so the ghost tracks naturally from wherever the row was grabbed.
+        dragGhostGrab = CGPoint(x: onScreen.minX - cursor.x, y: onScreen.maxY - cursor.y)
+        let ghost = dragGhost ?? DragGhost()
+        dragGhost = ghost
+        ghost.show(image: image, size: onScreen.size, backgroundColor: effectiveSurface,
+                   topLeftOnScreen: CGPoint(x: onScreen.minX, y: onScreen.maxY))
+    }
+
+    private func moveGhost(locationInWindow: NSPoint) {
+        guard let ghost = dragGhost, let win = window else { return }
+        let cursor = win.convertPoint(toScreen: locationInWindow)
+        ghost.move(topLeftOnScreen: CGPoint(x: cursor.x + dragGhostGrab.x, y: cursor.y + dragGhostGrab.y))
+    }
+
+    private func hideGhost() { dragGhost?.hide(); dragGhost = nil }
+
+    // MARK: Affordance (the lifted-row dim + the onto-ring / insertion-line)
+
+    /// Paint the drag feedback: the lifted SOURCE row dimmed, plus the resolved
+    /// target's affordance (an `.onto` ring + faint fill on the target row, or a
+    /// `.between` insertion line in the gap). Driven by the live drag OR the prism
+    /// `previewDragSource` / `previewDropTarget` seams (a live ghost can't be captured).
+    fileprivate func drawDropAffordance(width: CGFloat) {
+        let source = drag?.sourceID ?? previewDragSource
+        let target = drag?.target ?? previewDropTarget
+        if let source, let si = indexOf(source) {
+            (effectiveSurface ?? palette.background ?? .windowBackgroundColor).withAlphaComponent(0.55).setFill()
+            rowRect(si).fill()
+        }
+        guard let placement = target?.placement else { return }
+        switch placement {
+        case .onto(let id):
+            guard let i = indexOf(id) else { return }
+            let path = NSBezierPath(roundedRect: rowRect(i).insetBy(dx: 1.5, dy: 1.5), xRadius: 5, yRadius: 5)
+            palette.primary.withAlphaComponent(0.12).setFill(); path.fill()
+            palette.primary.setStroke(); path.lineWidth = 2; path.stroke()
+        case .between(let beforeID):
+            let y = insertionY(beforeID: beforeID)
+            let x = rowTextX
+            palette.primary.setFill()
+            CGRect(x: x, y: y - 1, width: max(0, width - x - metrics.trailingInset), height: 2).fill()
+            NSBezierPath(ovalIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)).fill()   // MUI insertion dot
+        }
+    }
+
+    /// The doc-y of a `.between` insertion line: the top of `beforeID`'s row, or the
+    /// content bottom for the end gap (`beforeID == nil`).
+    private func insertionY(beforeID: String?) -> CGFloat {
+        guard let beforeID, let i = indexOf(beforeID) else { return rowLayout.totalHeight }
+        return rowLayout.yOffsets[i]
+    }
+
+    // MARK: Key routing (the managesFirstResponder list's keyDown calls this first)
+
+    /// Route a keyDown for the drag layer. Returns true when the key is a drag command
+    /// and was consumed; false to fall through to the normal nav. Space lifts the
+    /// highlighted row (or commits an in-flight lift); WHILE dragging, ↑↓ aim, ⏎
+    /// commits, Esc cancels — when NOT dragging those return false so the list's
+    /// ordinary ↑↓/⏎/Esc nav still runs.
+    fileprivate func handleDragKey(_ ev: NSEvent) -> Bool {
+        guard draggable else { return false }
+        switch ev.keyCode {
+        case 49:                                    // Space — lift the highlighted row, or commit a lift
+            if isDragging { commitDrag(); return true }
+            if let id = highlightedID { beginDrag(id); return true }
+            return false                            // nothing to lift → let Space fall through to the host
+        case 36, 76:                                // Return / keypad Return — commit a lift
+            guard isDragging else { return false }
+            commitDrag(); return true
+        case 53:                                    // Esc — cancel a lift
+            guard isDragging else { return false }
+            cancelDrag(); return true
+        case 125:                                   // ↓ — aim down
+            guard isDragging else { return false }
+            moveDragTarget(1); return true
+        case 126:                                   // ↑ — aim up
+            guard isDragging else { return false }
+            moveDragTarget(-1); return true
+        default:
+            return false
+        }
+    }
+}
+
+// MARK: - DragGhost (the floating drag image — a non-key, click-through child panel)
+
+/// A borderless, non-activating, click-through child window showing the drag image.
+/// It reuses the shared `themedPopupPanel` plumbing (like the tooltip / combo / menu),
+/// so it floats ABOVE the list — escaping the scroll clip AND the list's own bounds —
+/// and never becomes key or steals first responder. Mouse-drag only.
+@MainActor
+private final class DragGhost {
+    private let panel: PopupPanel
+    private let imageView = NSImageView()
+
+    init() {
+        panel = themedPopupPanel(interactive: false, role: .unknown)   // click-through, out of AX
+        imageView.imageScaling = .scaleAxesIndependently               // the snapshot is already row-sized → 1:1
+        imageView.wantsLayer = true
+        imageView.layer?.cornerRadius = 6
+        imageView.layer?.masksToBounds = true
+        panel.contentView = imageView
+        panel.alphaValue = 0.9                                          // the translucent drag look
+    }
+
+    /// Show the ghost with its TOP-LEFT at `topLeftOnScreen` (y-up; the panel origin
+    /// is its bottom-left, so subtract the height).
+    func show(image: NSImage, size: CGSize, backgroundColor: NSColor?, topLeftOnScreen: CGPoint) {
+        imageView.image = image
+        imageView.layer?.backgroundColor = (backgroundColor ?? .windowBackgroundColor).cgColor
+        panel.setFrame(CGRect(x: topLeftOnScreen.x, y: topLeftOnScreen.y - size.height,
+                              width: size.width, height: size.height), display: true)
+        panel.invalidateShadow()
+        panel.orderFrontRegardless()                                   // NEVER makeKey — keep the host's focus
+    }
+
+    func move(topLeftOnScreen: CGPoint) {
+        panel.setFrameOrigin(CGPoint(x: topLeftOnScreen.x, y: topLeftOnScreen.y - panel.frame.height))
+    }
+
+    func hide() { panel.orderOut(nil) }
+}
+
 // MARK: - RowLayout (cached per reload — rows have mixed heights)
 
 private struct RowLayout {
@@ -1299,10 +1760,56 @@ private final class ListDocumentView: NSView {
 
     override func mouseMoved(with event: NSEvent) { owner?.hoverRow(atDocY: docY(event)) }
     override func mouseExited(with event: NSEvent) { owner?.clearHover() }
-    override func mouseUp(with event: NSEvent) { owner?.handleClick(atDocY: docY(event)) }
 
-    // Keyboard nav — only reached when `managesFirstResponder` makes us FR.
-    override func keyDown(with event: NSEvent) { interpretKeyEvents([event]) }
+    // Drag press tracking — only engaged when the owner is `draggable`. Otherwise the
+    // mouse path is byte-identical to before: `mouseDown`/`mouseDragged` defer to
+    // `super` (the no-override behaviour), and a `mouseUp` is a click.
+    private var pressLocationInWindow: NSPoint?
+    private var pressDocY: CGFloat = 0
+    private var didDrag = false
+    private let dragThreshold: CGFloat = 4          // a click jitter under this isn't a drag
+
+    override func mouseDown(with event: NSEvent) {
+        guard owner?.draggable == true else { super.mouseDown(with: event); return }
+        pressLocationInWindow = event.locationInWindow
+        pressDocY = docY(event)
+        didDrag = false
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard owner?.draggable == true, let start = pressLocationInWindow else {
+            super.mouseDragged(with: event); return
+        }
+        if !didDrag {
+            let dx = event.locationInWindow.x - start.x, dy = event.locationInWindow.y - start.y
+            guard (dx * dx + dy * dy).squareRoot() >= dragThreshold else { return }
+            guard owner?.beginMouseDrag(atDocY: pressDocY, locationInWindow: event.locationInWindow) == true else {
+                pressLocationInWindow = nil          // not a valid source → abandon (mouseUp still clicks)
+                return
+            }
+            didDrag = true
+        }
+        owner?.updateMouseDrag(atDocY: docY(event), locationInWindow: event.locationInWindow)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if didDrag {                                 // a drag gesture — commit on release, no click
+            owner?.endMouseDrag(commit: true)
+            didDrag = false
+            pressLocationInWindow = nil
+            return
+        }
+        pressLocationInWindow = nil
+        owner?.handleClick(atDocY: docY(event))      // the unchanged click path
+    }
+
+    // Keyboard nav — only reached when `managesFirstResponder` makes us FR. Drag keys
+    // (Space/arrows/Return/Esc while draggable) are routed first; the rest fall through
+    // to the standard nav commands below.
+    override func keyDown(with event: NSEvent) {
+        if owner?.handleDragKey(event) == true { return }
+        interpretKeyEvents([event])
+    }
     override func moveUp(_ sender: Any?) { owner?.moveHighlight(-1) }
     override func moveDown(_ sender: Any?) { owner?.moveHighlight(1) }
     override func insertNewline(_ sender: Any?) { owner?.activateHighlight() }
@@ -1402,5 +1909,34 @@ extension ThemedList {
     }
     /// Resolved badge fill for a role (colour-equality assert).
     func _badgeFill(_ role: BadgeRole, onAccent: Bool) -> NSColor { badgeColors(role, onAccent: onAccent).fill }
+
+    // MARK: Drag seams (the state machine + target resolution, window-independent —
+    // the ghost is a live-only child window, hand-checked in prism)
+
+    struct DragProbe {
+        let isDragging: Bool
+        let isKeyboardDrag: Bool
+        let sourceID: String?
+        let target: DropTarget?
+        let candidateCount: Int        // validated keyboard candidates for the live source
+    }
+    var dragProbe: DragProbe {
+        DragProbe(isDragging: isDragging, isKeyboardDrag: drag?.isKeyboard ?? false,
+                  sourceID: drag?.sourceID, target: drag?.target, candidateCount: dragCandidates().count)
+    }
+    /// The `DropTarget` a pointer at `docY` would resolve to (validated) for `source` —
+    /// no window, no live drag needed (the resolver is pure of the ghost).
+    func _resolveDropTarget(atDocY y: CGFloat, source: String) -> DropTarget? {
+        resolveDropTarget(atDocY: y, source: source)
+    }
+    /// Drive a mouse drag's begin / update / end headlessly (no synthetic events, no
+    /// window — the ghost simply doesn't show).
+    @discardableResult func _beginMouseDrag(atDocY y: CGFloat) -> Bool { beginMouseDrag(atDocY: y, locationInWindow: .zero) }
+    func _updateMouseDrag(atDocY y: CGFloat) { updateMouseDrag(atDocY: y, locationInWindow: .zero) }
+    func _endMouseDrag(commit: Bool) { endMouseDrag(commit: commit) }
+    /// The ordered, validated keyboard drop candidates for the live source.
+    func _dragCandidates() -> [DropTarget] { dragCandidates() }
+    /// Route a keyDown through the real drag-key logic (consume-vs-fall-through).
+    @discardableResult func _handleDragKey(_ ev: NSEvent) -> Bool { handleDragKey(ev) }
 }
 #endif
