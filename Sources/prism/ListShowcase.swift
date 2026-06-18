@@ -26,15 +26,24 @@ struct ListView: NSViewRepresentable {
     let palette: ResolvedPalette
     let configure: (ThemedList) -> Void
 
+    // The specimen data + preview seams are theme-INDEPENDENT (role-typed tints,
+    // resolved at draw), so they're applied ONCE — on the first update, after
+    // SwiftUI has sized the view (the previewScrollY/Highlight seams need bounds).
+    // Subsequent frames only re-theme, so an animatable theme cycling its palette
+    // at 30 Hz no longer triggers a full item reload + NSImage re-raster each tick.
+    final class Coordinator { var configured = false }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeNSView(context: Context) -> ThemedList {
-        let list = ThemedList(palette: palette)
-        configure(list)
-        return list
+        ThemedList(palette: palette)
     }
 
     func updateNSView(_ list: ThemedList, context: Context) {
-        list.palette = palette
-        configure(list)            // re-applies items + preview seams after SwiftUI sizes the view
+        list.palette = palette                  // re-tint every frame (cheap snap-recolour)
+        if !context.coordinator.configured {
+            configure(list)                     // items + preview seams: once, post-sizing
+            context.coordinator.configured = true
+        }
     }
 }
 

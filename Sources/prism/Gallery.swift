@@ -202,69 +202,50 @@ struct ThemeCard: View {
 
     var body: some View {
         let spec = paletteFor(name)
-        let p = resolve(spec)
-        let cardBG = p.background.map { Color(nsColor: $0) }
+        let base = resolve(spec)
+        let cardBG = base.background.map { Color(nsColor: $0) }
             ?? Color(nsColor: .underPageBackgroundColor)
-        let fg = Color(nsColor: p.foreground)
+        let fg = Color(nsColor: base.foreground)
 
         VStack(alignment: .leading, spacing: 14) {
-            // Header: name + font/mode badges
+            // Header: name + font/mode badges. Steady — only the accent cycles,
+            // and the header reads none of the accent roles.
             HStack(spacing: 8) {
                 Text(name)
                     .font(themeFont(spec.font, size: 16 * scale).weight(.bold))
                     .foregroundColor(fg)
                 Text(spec.font.label.uppercased())
                     .font(sysFont(9, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Color(nsColor: p.muted))
+                    .foregroundColor(Color(nsColor: base.muted))
                     .padding(.horizontal, 5).padding(.vertical, 2)
                     .overlay(RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                        .stroke(Color(nsColor: base.border), lineWidth: 1))
                 if spec.background == nil {
                     Text("VIBRANCY")
                         .font(sysFont(9, weight: .semibold, design: .monospaced))
-                        .foregroundColor(Color(nsColor: p.muted))
+                        .foregroundColor(Color(nsColor: base.muted))
                 }
                 Spacer()
             }
 
-            // Only the selected widget family renders — the de-tall win. `.palette`
-            // is the theme foundations; `.chrome` the fake app mocks; the rest are
-            // the REAL ThemeKit widgets, each over a `copy ref` section header.
-            switch family {
-            case .palette:
-                SwatchRow(p: p)
-                Text("AaBbCcGg 0123 — The quick brown fox jumps")
-                    .font(themeFont(spec.font, size: 15 * scale))
-                    .foregroundColor(fg)
-                if showEffects, let fx = borderEffectFor(name) {
-                    LiveEffectStrip(fx: fx, name: name, fallback: p.primary)
+            // The body. `.palette` is the (static) theme foundations; the widget
+            // families render the REAL ThemeKit widgets. For an animatable theme
+            // those widgets cycle LIVE: a 30 Hz `TimelineView` drives each mock's
+            // palette through `ResolvedPalette.animated(forTheme:at:)`, so a
+            // button's accent / a list's selection wash / a FAB fill breathe
+            // through the effect exactly as they will in an app — not the frozen
+            // `resolve(spec)` accent the cards used to show.
+            if family == .palette {
+                paletteFoundations(spec: spec, p: base)
+            } else if showEffects, isAnimatableTheme(name) {
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                    let now = timeline.date.timeIntervalSinceReferenceDate
+                    let live = base.animated(forTheme: name,
+                                             at: CGFloat(now / effectCycleSeconds))
+                    widgetFamily(p: live)
                 }
-            case .text:
-                WidgetSection(kitComponent("ThemedTextField"), p: p) { MockField(p: p) }
-                WidgetSection(kitComponent("ThemedComboBox"), p: p) { MockComboBox(p: p) }
-            case .action:
-                WidgetSection(kitComponent("ThemedButton"), p: p) { MockButton(p: p) }
-                WidgetSection(kitComponent("ThemedButtonGroup"), p: p) { MockButtonGroup(p: p) }
-                WidgetSection(kitComponent("ThemedCheckbox"), p: p) { MockCheckbox(p: p) }
-                WidgetSection(kitComponent("ThemedFAB"), p: p) { MockFAB(p: p) }
-            case .feedback:
-                WidgetSection(kitComponent("ThemedDivider"), p: p) { MockDivider(p: p) }
-                WidgetSection(kitComponent("ThemedSkeleton"), p: p) { MockSkeleton(p: p) }
-                WidgetSection(kitComponent("ThemedTooltip"), p: p) { MockTooltip(p: p) }
-            case .collection:
-                WidgetSection(kitComponent("ThemedList"), p: p) { MockList(p: p) }
-                WidgetSection(kitComponent("ThemedMenu"), p: p) { MockMenu(p: p) }
-            case .chrome:
-                Text("App chrome — fake perch / facet / wand / glance, drawn by prism (never imports an app's View).")
-                    .font(sysFont(9, design: .monospaced))
-                    .foregroundColor(Color(nsColor: p.muted))
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(alignment: .top, spacing: 12) {
-                    MockTree(p: p)
-                    MockPill(p: p)
-                    MockTome(p: p)
-                    MockMarkdown(p: p)
-                }
+            } else {
+                widgetFamily(p: base)
             }
         }
         .padding(16)
@@ -275,10 +256,64 @@ struct ThemeCard: View {
         // visible at gallery scale; every other theme keeps the flat hairline.
         .overlay {
             if showEffects, isAnimatableTheme(name) {
-                AnimatedCardBorder(name: name, cornerRadius: 12, fallback: p.primary)
+                AnimatedCardBorder(name: name, cornerRadius: 12, fallback: base.primary)
             } else {
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(nsColor: p.border), lineWidth: 1)
+                    .stroke(Color(nsColor: base.border), lineWidth: 1)
+            }
+        }
+    }
+
+    /// The `.palette` family — the STATIC theme foundations: every resolved
+    /// role as a swatch (kept static so the hex labels stay readable as
+    /// documentation), a font specimen, and — for an animatable theme — the
+    /// `LiveEffectStrip` (which animates on its own clock). The accent-cycling
+    /// demo for the real widgets lives in the other families, not here.
+    @ViewBuilder
+    private func paletteFoundations(spec: ThemeSpec, p: ResolvedPalette) -> some View {
+        SwatchRow(p: p)
+        Text("AaBbCcGg 0123 — The quick brown fox jumps")
+            .font(themeFont(spec.font, size: 15 * scale))
+            .foregroundColor(Color(nsColor: p.foreground))
+        if showEffects, let fx = borderEffectFor(name) {
+            LiveEffectStrip(fx: fx, name: name, fallback: p.primary)
+        }
+    }
+
+    /// The widget families — the REAL ThemeKit widgets, each over a `copy ref`
+    /// section header. `p` is the LIVE (cycling) palette for an animatable
+    /// theme, else the static resolve; the mocks re-theme by reassigning
+    /// `palette` each frame (cheap — a snap-recolour, no animation restart).
+    @ViewBuilder
+    private func widgetFamily(p: ResolvedPalette) -> some View {
+        switch family {
+        case .palette:
+            EmptyView()   // handled by `paletteFoundations`
+        case .text:
+            WidgetSection(kitComponent("ThemedTextField"), p: p) { MockField(p: p) }
+            WidgetSection(kitComponent("ThemedComboBox"), p: p) { MockComboBox(p: p) }
+        case .action:
+            WidgetSection(kitComponent("ThemedButton"), p: p) { MockButton(p: p) }
+            WidgetSection(kitComponent("ThemedButtonGroup"), p: p) { MockButtonGroup(p: p) }
+            WidgetSection(kitComponent("ThemedCheckbox"), p: p) { MockCheckbox(p: p) }
+            WidgetSection(kitComponent("ThemedFAB"), p: p) { MockFAB(p: p) }
+        case .feedback:
+            WidgetSection(kitComponent("ThemedDivider"), p: p) { MockDivider(p: p) }
+            WidgetSection(kitComponent("ThemedSkeleton"), p: p) { MockSkeleton(p: p) }
+            WidgetSection(kitComponent("ThemedTooltip"), p: p) { MockTooltip(p: p) }
+        case .collection:
+            WidgetSection(kitComponent("ThemedList"), p: p) { MockList(p: p) }
+            WidgetSection(kitComponent("ThemedMenu"), p: p) { MockMenu(p: p) }
+        case .chrome:
+            Text("App chrome — fake perch / facet / wand / glance, drawn by prism (never imports an app's View).")
+                .font(sysFont(9, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: 12) {
+                MockTree(p: p)
+                MockPill(p: p)
+                MockTome(p: p)
+                MockMarkdown(p: p)
             }
         }
     }

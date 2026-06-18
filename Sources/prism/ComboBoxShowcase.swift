@@ -31,24 +31,35 @@ struct ThemedComboBoxView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> ThemedTextField {
         let combo = ThemedComboBox(palette: palette)
-        apply(combo)
+        applyTheme(combo)
+        configureStatic(combo)
         context.coordinator.combo = combo          // RETAIN the controller (owns the popup + monitor)
         return combo.field
     }
 
     func updateNSView(_ v: ThemedTextField, context: Context) {
         guard let combo = context.coordinator.combo else { return }
-        apply(combo)
+        applyTheme(combo)          // ONLY the theming — see configureStatic
     }
 
-    private func apply(_ combo: ThemedComboBox) {
+    /// Per-frame: the theme. Under an animatable theme the gallery re-themes at
+    /// 30 Hz, so this MUST stay cheap — and must NOT touch `options`, which would
+    /// re-filter + reframe an open popup every tick (resetting the user's
+    /// arrow-key highlight). The static data is set once in `configureStatic`.
+    private func applyTheme(_ combo: ThemedComboBox) {
         combo.palette = palette
+        combo.surfaceColor = palette.background
+    }
+
+    /// One-time: the bench's static data + behaviour (the mock options never
+    /// change after creation). Set in `makeNSView` so the live theme cycle
+    /// doesn't churn the option list / popup geometry.
+    private func configureStatic(_ combo: ThemedComboBox) {
         combo.options = options.map { ThemedComboBox.Item($0) }
         combo.label = label
         combo.placeholder = placeholder
         combo.allowsFreeText = freeText
         combo.field.leadingSymbol = leading
-        combo.surfaceColor = palette.background
         if createOnEmpty {
             combo.emptyActionRow = { q in q.isEmpty ? nil : "Create “\(q)”" }
             combo.onEmptyAction = { [weak combo] q in
