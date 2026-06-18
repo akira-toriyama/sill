@@ -274,6 +274,8 @@ let kitCatalog: [KitComponent] = [
                  "emptyActionRow: ((query:String)->String?)? + query + onEmptyAction: ((String)->Void)? — actionable empty state (else noOptionsText)",
                  "setLeadingImage(_:forID:) — patch one row's icon (async favicon) without reload; rowFrame(for:)/scrollToRow/fittingWidth(maxWidth:)/contentHeight — sizing & geometry for a host container",
                  "moveHighlight(_:Int)/activateHighlight()/clearHighlight() — host drives keyboard nav when managesFirstResponder is false",
+                 "DRAG LAYER (opt-in, default off): draggable=true gate + dragMode (.dropOnto/.reorderBetween/.both) + onDrop((DragContext,DropTarget)->Void) (host's 実処理 move) + dropTargetValidator((DragContext,DropTarget)->Bool) (domain veto; kit pre-rejects onto-self / no-move / separator) + dragImageProvider((String)->NSImage?) (the row id; override the snapshot ghost). DropPlacement = .onto(id:) / .between(beforeID:String?)  (nil beforeID = end gap)",
+                 "keyboard lift (accessible DnD): beginDrag(id)/moveDragTarget(±1)/commitDrag()/cancelDrag()/isDragging — a managesFirstResponder list routes Space(lift/commit)·↑↓(aim)·⏎(commit)·Esc(cancel) automatically; mouse-drag is the down→drag(threshold 4pt)→up sequence with a non-key child-window ghost",
              ],
         variants: [
                  "density: .comfortable (30pt rows, combo-parity) / .compact",
@@ -283,7 +285,8 @@ let kitCatalog: [KitComponent] = [
                  "managesFirstResponder (list takes FR + drives ↑↓/⏎/Esc) vs host-driven nav",
                  "vendsRowAXElements (synthetic per-row .menuItem AX children) · surfaceColor override (vibrancy escape hatch)",
                  "row kinds: .row / .sectionHeader(subtitle:) (sticky, 1- or 2-line) / .separator; ListTint: none/primary/secondary/error/.custom(HexColor); BadgeRole: neutral/primary/secondary/error; TrailingAccessory: none/chevron/shortcut(String)/custom(NSImage)",
-                 "capture seams: previewHighlight/previewSelection/previewScrollY (id-keyed, deterministic prism shots)",
+                 "drag affordance: .onto lights the target row (2pt primary ring + faint fill); .between draws a 2pt primary insertion line + leading dot in the gap; the lifted source row dims. grid/rail/real-window drag stay app-side (not in sill); autoscroll-on-drag is a documented follow-up",
+                 "capture seams: previewHighlight/previewSelection/previewScrollY + previewDragSource/previewDropTarget (id-keyed, deterministic prism shots — the live ghost is a child window, hand-checked)",
                  "themed scroll: the vertical scroller is a ThemedScroller (public, reusable on any NSScrollView) — its overlay knob is painted palette.muted instead of macOS grey, auto-hiding (shown only while scrolling)",
              ],
         family: .collection),

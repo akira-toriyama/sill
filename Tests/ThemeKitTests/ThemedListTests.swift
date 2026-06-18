@@ -389,4 +389,223 @@ final class ThemedListTests: XCTestCase {
         XCTAssertEqual(reserved.fittingWidth() - collapsed.fittingWidth(), 32, accuracy: 0.5,
                        "suppressing the leading image column moves text from textXOrigin(44) to leadingInset(12)")
     }
+
+    // MARK: - Drag layer (state machine + target resolution — headless; the ghost is
+    // a live-only child window proven in prism). Rows are comfortable single-line =
+    // 30pt: row i spans [30i, 30i+30); a separator band = 9pt.
+
+    func testDragGateOffByDefault() {
+        let l = makeList([row("a"), row("b")])
+        XCTAssertFalse(l.draggable, "draggable defaults OFF")
+        l.beginDrag("a")
+        XCTAssertFalse(l.isDragging, "no keyboard lift when draggable is off")
+        XCTAssertFalse(l._beginMouseDrag(atDocY: 5), "no mouse drag when draggable is off")
+        XCTAssertFalse(l.dragProbe.isDragging)
+    }
+
+    func testHeaderIsDraggableSeparatorAndDisabledAreNot() {
+        let l = makeList([header("H"), row("a"), separator(),
+                          ListItem(id: "off", primary: "Off", isDisabled: true)])
+        l.draggable = true
+        l.beginDrag("sep"); XCTAssertFalse(l.isDragging, "a separator can't be lifted (no identity)")
+        l.beginDrag("off"); XCTAssertFalse(l.isDragging, "a disabled row can't be lifted")
+        l.beginDrag("H");   XCTAssertTrue(l.isDragging, "a header CAN be lifted (facet header swap)")
+        l.cancelDrag()
+        l.beginDrag("a");   XCTAssertTrue(l.isDragging, "a normal row lifts")
+        l.cancelDrag(); XCTAssertFalse(l.isDragging)
+    }
+
+    func testMouseDragDropOntoCommitsOnDrop() {
+        let l = makeList([row("a"), row("b"), row("c")])     // a 0..30, b 30..60, c 60..90
+        l.draggable = true; l.dragMode = .dropOnto
+        var dropped: (String, DropPlacement)?
+        l.onDrop = { ctx, t in dropped = (ctx.id, t.placement) }
+        XCTAssertTrue(l._beginMouseDrag(atDocY: 5), "lift row a")
+        XCTAssertTrue(l.dragProbe.isDragging)
+        XCTAssertFalse(l.dragProbe.isKeyboardDrag, "a mouse drag is not a keyboard lift")
+        l._updateMouseDrag(atDocY: 45)                       // over b
+        XCTAssertEqual(l.dragProbe.target?.placement, .onto(id: "b"))
+        l._endMouseDrag(commit: true)
+        XCTAssertFalse(l.isDragging, "the drag ends on release")
+        XCTAssertEqual(dropped?.0, "a"); XCTAssertEqual(dropped?.1, .onto(id: "b"))
+    }
+
+    func testMouseDragCancelFiresNothing() {
+        let l = makeList([row("a"), row("b"), row("c")])
+        l.draggable = true; l.dragMode = .dropOnto
+        var fired = false; l.onDrop = { _, _ in fired = true }
+        XCTAssertTrue(l._beginMouseDrag(atDocY: 5))
+        l._updateMouseDrag(atDocY: 45)
+        l._endMouseDrag(commit: false)
+        XCTAssertFalse(l.isDragging); XCTAssertFalse(fired, "an aborted release must not fire onDrop")
+    }
+
+    func testOntoSelfIsRejected() {
+        let l = makeList([row("a"), row("b")]); l.draggable = true; l.dragMode = .dropOnto
+        XCTAssertNil(l._resolveDropTarget(atDocY: 5, source: "a"), "dropping a onto itself is no target")
+        XCTAssertEqual(l._resolveDropTarget(atDocY: 45, source: "a")?.placement, .onto(id: "b"))
+    }
+
+    func testReorderBetweenZoneModel() {
+        let l = makeList([row("a"), row("b"), row("c"), row("d")])   // 30pt each
+        l.draggable = true; l.dragMode = .reorderBetween
+        XCTAssertEqual(l._resolveDropTarget(atDocY: 62, source: "a")?.placement, .between(beforeID: "c"),
+                       "top half of c → insert before c")
+        XCTAssertEqual(l._resolveDropTarget(atDocY: 85, source: "a")?.placement, .between(beforeID: "d"),
+                       "bottom half of c → insert before d (after c)")
+        XCTAssertEqual(l._resolveDropTarget(atDocY: 115, source: "a")?.placement, .between(beforeID: nil),
+                       "bottom half of the last row → the end gap")
+    }
+
+    func testBetweenSelfAdjacentNoOpRejected() {
+        let l = makeList([row("a"), row("b"), row("c")]); l.draggable = true; l.dragMode = .reorderBetween
+        XCTAssertNil(l._resolveDropTarget(atDocY: 32, source: "b"), "the gap immediately above self is a no-op")
+        XCTAssertNil(l._resolveDropTarget(atDocY: 58, source: "b"), "the gap immediately below self is a no-op")
+        XCTAssertEqual(l._resolveDropTarget(atDocY: 5, source: "b")?.placement, .between(beforeID: "a"),
+                       "moving b above a IS a real move")
+    }
+
+    func testSeparatorIsNotADropTarget() {
+        let l = makeList([row("a"), separator(), row("b")])     // a 0..30, sep 30..39, b 39..69
+        l.draggable = true; l.dragMode = .dropOnto
+        XCTAssertNil(l._resolveDropTarget(atDocY: 34, source: "a"), "can't drop onto a separator")
+        XCTAssertEqual(l._resolveDropTarget(atDocY: 50, source: "a")?.placement, .onto(id: "b"))
+    }
+
+    func testValidatorVetoesTarget() {
+        let l = makeList([row("a"), row("b"), row("c")]); l.draggable = true; l.dragMode = .dropOnto
+        l.dropTargetValidator = { _, target in
+            if case .onto(let id) = target.placement { return id != "b" }     // veto onto b
+            return true
+        }
+        XCTAssertNil(l._resolveDropTarget(atDocY: 45, source: "a"), "the validator vetoes onto b")
+        XCTAssertEqual(l._resolveDropTarget(atDocY: 75, source: "a")?.placement, .onto(id: "c"), "onto c still allowed")
+    }
+
+    func testBothModeZones() {
+        let l = makeList([row("a"), row("b"), row("c"), row("d")]); l.draggable = true; l.dragMode = .both
+        // c spans 60..90: top quarter <67.5 ⇒ between-before; mid ⇒ onto; bottom quarter >82.5 ⇒ between-after.
+        XCTAssertEqual(l._resolveDropTarget(atDocY: 62, source: "a")?.placement, .between(beforeID: "c"), "top quarter ⇒ between before")
+        XCTAssertEqual(l._resolveDropTarget(atDocY: 75, source: "a")?.placement, .onto(id: "c"), "middle ⇒ onto")
+        XCTAssertEqual(l._resolveDropTarget(atDocY: 88, source: "a")?.placement, .between(beforeID: "d"), "bottom quarter ⇒ between after")
+    }
+
+    func testOutOfBoundsResolution() {
+        let l = makeList([row("a"), row("b"), row("c")]); l.draggable = true
+        l.dragMode = .reorderBetween
+        XCTAssertEqual(l._resolveDropTarget(atDocY: -5, source: "c")?.placement, .between(beforeID: "a"), "above the top ⇒ before the first row")
+        XCTAssertEqual(l._resolveDropTarget(atDocY: 999, source: "a")?.placement, .between(beforeID: nil), "below the last ⇒ the end gap")
+        l.dragMode = .dropOnto
+        XCTAssertNil(l._resolveDropTarget(atDocY: -5, source: "a"), ".dropOnto has no out-of-bounds target")
+        XCTAssertNil(l._resolveDropTarget(atDocY: 999, source: "a"), ".dropOnto has no out-of-bounds target")
+    }
+
+    func testKeyboardLiftAimAndCommit() {
+        let l = makeList([row("a"), row("b"), row("c")]); l.draggable = true; l.dragMode = .dropOnto
+        var dropped: (String, DropPlacement)?
+        l.onDrop = { ctx, t in dropped = (ctx.id, t.placement) }
+        l.beginDrag("a")
+        XCTAssertTrue(l.isDragging); XCTAssertTrue(l.dragProbe.isKeyboardDrag)
+        XCTAssertEqual(l._dragCandidates().count, 2, "onto b, onto c (onto-self rejected)")
+        XCTAssertEqual(l.dragProbe.target?.placement, .onto(id: "b"), "seeds at the first candidate")
+        l.moveDragTarget(1)
+        XCTAssertEqual(l.dragProbe.target?.placement, .onto(id: "c"), "arrow aims to the next candidate")
+        l.moveDragTarget(1)
+        XCTAssertEqual(l.dragProbe.target?.placement, .onto(id: "c"), "clamps at the last candidate")
+        l.commitDrag()
+        XCTAssertFalse(l.isDragging)
+        XCTAssertEqual(dropped?.0, "a"); XCTAssertEqual(dropped?.1, .onto(id: "c"))
+    }
+
+    func testKeyboardCancelFiresNothing() {
+        let l = makeList([row("a"), row("b")]); l.draggable = true; l.dragMode = .dropOnto
+        var fired = false; l.onDrop = { _, _ in fired = true }
+        l.beginDrag("a"); l.moveDragTarget(1)
+        l.cancelDrag()
+        XCTAssertFalse(l.isDragging); XCTAssertFalse(fired, "cancel must not fire onDrop")
+    }
+
+    func testMoveHighlightSuppressedDuringLift() {
+        let l = makeList([row("a"), row("b"), row("c")]); l.draggable = true; l.dragMode = .reorderBetween
+        l._moveHighlight(1); XCTAssertEqual(l.listProbe.effectiveHighlightID, "a")
+        l.beginDrag("a")
+        let aim = l.dragProbe.target?.placement
+        l._moveHighlight(1)
+        XCTAssertEqual(l.listProbe.effectiveHighlightID, "a", "highlight nav is suppressed during a lift (decision e)")
+        XCTAssertEqual(l.dragProbe.target?.placement, aim, "moveHighlight doesn't move the drop aim")
+        l.cancelDrag()
+    }
+
+    func testCandidateCompositionByMode() {
+        let l = makeList([row("a"), row("b"), row("c")]); l.draggable = true
+        l.beginDrag("a")                                     // a live source for the candidate walk
+        l.dragMode = .dropOnto
+        XCTAssertEqual(l._dragCandidates().map(\.placement), [.onto(id: "b"), .onto(id: "c")])
+        l.dragMode = .reorderBetween
+        XCTAssertEqual(l._dragCandidates().map(\.placement), [.between(beforeID: "c"), .between(beforeID: nil)],
+                       "before-a (self above) and before-b (self below) are no-ops; before-c and the end gap remain")
+        l.dragMode = .both
+        XCTAssertEqual(l._dragCandidates().map(\.placement),
+                       [.onto(id: "b"), .between(beforeID: "c"), .onto(id: "c"), .between(beforeID: nil)],
+                       "interleaved between-then-onto per row, trivial self-targets dropped")
+        l.cancelDrag()
+    }
+
+    func testTurningOffDraggableCancelsInFlightDrag() {
+        let l = makeList([row("a"), row("b")]); l.draggable = true; l.dragMode = .dropOnto
+        var fired = false; l.onDrop = { _, _ in fired = true }
+        l.beginDrag("a"); XCTAssertTrue(l.isDragging)
+        l.draggable = false
+        XCTAssertFalse(l.isDragging, "disabling draggable cancels the in-flight drag")
+        XCTAssertFalse(fired, "and does not commit it")
+    }
+
+    // MARK: - Drag key routing (Space lift/commit · arrows aim · Return/Esc · fall-through)
+
+    /// A synthetic keyDown for the `_handleDragKey` seam (it reads only `keyCode`;
+    /// `chars` is non-empty so `NSEvent.keyEvent` succeeds). Mirrors ThemedMenuTests.
+    private func keyDown(_ keyCode: UInt16, chars: String = " ") -> NSEvent {
+        NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                         windowNumber: 0, context: nil, characters: chars,
+                         charactersIgnoringModifiers: chars, isARepeat: false, keyCode: keyCode)!
+    }
+
+    func testDragKeyRoutingLiftAimCommitAndFallThrough() {
+        let l = makeList([row("a"), row("b"), row("c")]); l.draggable = true; l.dragMode = .dropOnto
+        l.managesFirstResponder = true
+        // Space with nothing highlighted FALLS THROUGH (not silently swallowed).
+        XCTAssertFalse(l._handleDragKey(keyDown(49)), "Space with no highlight falls through to the host")
+        XCTAssertFalse(l.isDragging)
+        l._moveHighlight(1)                                  // highlight 'a'
+        XCTAssertTrue(l._handleDragKey(keyDown(49)), "Space lifts the highlighted row")
+        XCTAssertTrue(l.isDragging)
+        XCTAssertEqual(l.dragProbe.target?.placement, .onto(id: "b"), "seeds at the first candidate")
+        XCTAssertTrue(l._handleDragKey(keyDown(125)), "↓ aims to the next candidate while dragging")
+        XCTAssertEqual(l.dragProbe.target?.placement, .onto(id: "c"))
+        var dropped: DropPlacement?
+        l.onDrop = { _, t in dropped = t.placement }
+        XCTAssertTrue(l._handleDragKey(keyDown(49)), "Space commits the in-flight lift")
+        XCTAssertFalse(l.isDragging)
+        XCTAssertEqual(dropped, .onto(id: "c"))
+        // Arrows / Return / Esc FALL THROUGH to the ordinary nav when NOT dragging.
+        XCTAssertFalse(l._handleDragKey(keyDown(125)), "↓ falls through to nav when not dragging")
+        XCTAssertFalse(l._handleDragKey(keyDown(36)),  "Return falls through when not dragging")
+        XCTAssertFalse(l._handleDragKey(keyDown(53)),  "Esc falls through when not dragging")
+    }
+
+    func testDragKeyEscCancels() {
+        let l = makeList([row("a"), row("b")]); l.draggable = true; l.dragMode = .dropOnto
+        var fired = false; l.onDrop = { _, _ in fired = true }
+        l._moveHighlight(1); _ = l._handleDragKey(keyDown(49))   // lift 'a'
+        XCTAssertTrue(l.isDragging)
+        XCTAssertTrue(l._handleDragKey(keyDown(53)), "Esc cancels the in-flight lift")
+        XCTAssertFalse(l.isDragging); XCTAssertFalse(fired, "Esc cancel fires no onDrop")
+    }
+
+    func testDragKeysInertWhenNotDraggable() {
+        let l = makeList([row("a"), row("b")]); l.managesFirstResponder = true
+        XCTAssertFalse(l._handleDragKey(keyDown(49)),  "Space falls through when not draggable")
+        XCTAssertFalse(l._handleDragKey(keyDown(125)), "↓ falls through when not draggable")
+        XCTAssertFalse(l.isDragging)
+    }
 }
