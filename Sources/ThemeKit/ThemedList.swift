@@ -565,6 +565,15 @@ public final class ThemedList: NSView {
         scrollRowVisible(i, position: position)
     }
 
+    /// The row's rect in SCREEN coordinates (the flipped-doc rect walked out through
+    /// the scroll offset → window → screen), or nil if off-list / no window. For a
+    /// host anchoring a child popup to a specific row (a submenu beside its parent
+    /// row) or a drag drop-band; the conversion accounts for the current scroll.
+    public func rowRectOnScreen(for id: String) -> CGRect? {
+        guard let win = window, let r = rowFrame(for: id) else { return nil }
+        return win.convertToScreen(listView.convert(r, to: nil))
+    }
+
     /// The content width that fits every row's text without truncation, capped at
     /// `maxWidth` — for a host that sizes a container to the list (a menu sizes to
     /// its widest item). Accounts for the leading slot, the trailing cluster

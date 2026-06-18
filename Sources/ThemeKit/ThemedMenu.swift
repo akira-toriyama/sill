@@ -50,32 +50,40 @@ public final class ThemedMenu: NSObject {
         public var title: String
         public var icon: NSImage?            // pre-resolved leading glyph (template ⇒ tinted)
         public var shortcut: String?         // ⌘-hint, drawn as a trailing lozenge
-        public var hasSubmenu: Bool          // a trailing chevron (cascade is DEFERRED — facet needs one level)
+        public var hasSubmenu: Bool          // a trailing chevron; auto-true when `submenu` is non-empty
         public var isChecked: Bool           // a leading checkmark (native toggle item; suppresses `icon`)
         public var isEnabled: Bool
         public var isDestructive: Bool       // tints the leading accent bar `error` (a "Delete" row)
         public var action: (() -> Void)?
+        /// Child rows. Non-empty ⇒ this row opens a ONE-LEVEL cascade (the kit caps
+        /// at one level): hover / `→` / click opens a child menu beside the row; its
+        /// own rows' `submenu` is ignored (no grandchildren). A submenu row's own
+        /// `action` is ignored — opening the child IS its activation.
+        public var submenu: [MenuItem]
         public var kind: Kind
 
         public enum Kind: Equatable { case item, separator, header }
 
         public init(id: String, title: String, icon: NSImage? = nil, shortcut: String? = nil,
                     hasSubmenu: Bool = false, isChecked: Bool = false, isEnabled: Bool = true,
-                    isDestructive: Bool = false, action: (() -> Void)? = nil) {
+                    isDestructive: Bool = false, submenu: [MenuItem] = [], action: (() -> Void)? = nil) {
             self.id = id; self.title = title; self.icon = icon; self.shortcut = shortcut
-            self.hasSubmenu = hasSubmenu; self.isChecked = isChecked; self.isEnabled = isEnabled
-            self.isDestructive = isDestructive; self.action = action; self.kind = .item
+            self.hasSubmenu = hasSubmenu || !submenu.isEmpty
+            self.isChecked = isChecked; self.isEnabled = isEnabled
+            self.isDestructive = isDestructive; self.submenu = submenu; self.action = action; self.kind = .item
         }
         public init(_ title: String, icon: NSImage? = nil, shortcut: String? = nil,
-                    isEnabled: Bool = true, isDestructive: Bool = false, action: (() -> Void)? = nil) {
+                    isEnabled: Bool = true, isDestructive: Bool = false,
+                    submenu: [MenuItem] = [], action: (() -> Void)? = nil) {
             self.init(id: title, title: title, icon: icon, shortcut: shortcut,
-                      isEnabled: isEnabled, isDestructive: isDestructive, action: action)
+                      isEnabled: isEnabled, isDestructive: isDestructive, submenu: submenu, action: action)
         }
 
         private init(id: String, title: String, kind: Kind) {
             self.id = id; self.title = title; self.kind = kind
             self.icon = nil; self.shortcut = nil; self.hasSubmenu = false
-            self.isChecked = false; self.isEnabled = false; self.isDestructive = false; self.action = nil
+            self.isChecked = false; self.isEnabled = false; self.isDestructive = false
+            self.submenu = []; self.action = nil
         }
         /// A non-interactive divider between groups. `id` only needs to be unique.
         public static func separator(id: String = "—") -> MenuItem { MenuItem(id: id, title: "", kind: .separator) }
@@ -92,7 +100,7 @@ public final class ThemedMenu: NSObject {
     public var palette: ResolvedPalette { didSet { list.palette = palette; applyTheme() } }
 
     /// The items. Assigning rebuilds the hosted list rows + reframes an open menu.
-    public var items: [MenuItem] = [] { didSet { rebuildRows(); if isOpen { reframe() } } }
+    public var items: [MenuItem] = [] { didSet { rebuildRows(); if isOpen { reframe(); validateOpenChild() } } }
 
     /// Row density — `.compact` (the native-menu default, 26pt rows) or
     /// `.comfortable` (30pt, the dropdown-list metric).
@@ -155,6 +163,18 @@ public final class ThemedMenu: NSObject {
     private var anchorGap: CGFloat = 4
     private var resolvedCorner: PopupCorner = .topLeading
 
+    // Submenu cascade (ONE level). A submenu row owns a CHILD ThemedMenu placed beside
+    // it; the ROOT owns ALL keyboard / mouse / glue, so a child installs none of them.
+    // `parentMenu` is set on a child (≠ nil ⇒ this menu is a submenu and will NOT open
+    // grandchildren — the one-level cap). `submenuRowOnScreen` is a child's placement
+    // anchor (its parent row's screen rect).
+    private weak var parentMenu: ThemedMenu?
+    private var child: ThemedMenu?
+    private var childRowID: String?
+    private var submenuRowOnScreen: CGRect?
+    private var hoverWork: DispatchWorkItem?
+    private let submenuHoverDelay: TimeInterval = 0.16
+
     private var fadeGen = 0
     nonisolated(unsafe) private var keyMon: Any?
     nonisolated(unsafe) private var mouseMon: Any?
@@ -192,6 +212,7 @@ public final class ThemedMenu: NSObject {
         list.managesFirstResponder = false
         list.density = density
         list.onActivate = { [weak self] item in self?.activate(item.id) }
+        list.onHover = { [weak self] id in self?.handleHover(id) }
         rebuildRows()
     }
 
@@ -279,6 +300,7 @@ public final class ThemedMenu: NSObject {
     public func dismiss(animated: Bool = true) {
         guard isOpen else { return }
         isOpen = false
+        closeChild()                                    // tear the whole cascade down first
         removeKeyMonitor()
         removeMouseMonitor()
         glue.stop()
@@ -291,6 +313,8 @@ public final class ThemedMenu: NSObject {
     public func invalidate() {
         guard !isInvalidated else { return }
         isInvalidated = true
+        hoverWork?.cancel(); hoverWork = nil
+        child?.invalidate(); child = nil; childRowID = nil
         removeKeyMonitor()
         removeMouseMonitor()
         glue.stop()
@@ -371,6 +395,10 @@ public final class ThemedMenu: NSObject {
         } else if let p = pointInHost {
             let onScreen = host.convertToScreen(CGRect(origin: p, size: .zero))
             result = placePopup(panel, anchorRectOnScreen: onScreen, .point(onScreen.origin, size: size))
+        } else if let rowRect = submenuRowOnScreen {
+            // A child menu beside its parent row (the row's rect is already on-screen,
+            // captured at open from the parent's list); gap 2 so it reads connected.
+            result = placePopup(panel, anchorRectOnScreen: rowRect, .submenu(size: size, gap: 2))
         } else {
             return
         }
@@ -379,6 +407,7 @@ public final class ThemedMenu: NSObject {
         switch result {
         case let .anchorCorner(f, corner): frame = f; resolvedCorner = corner
         case let .point(f, corner):        frame = f; resolvedCorner = corner
+        case let .submenu(f, corner):      frame = f; resolvedCorner = corner
         default: return
         }
 
@@ -399,12 +428,118 @@ public final class ThemedMenu: NSObject {
 
     private func activate(_ id: String) {
         guard let mi = items.first(where: { $0.id == id }), mi.isEnabled, mi.kind == .item else { return }
-        // Close FIRST (so the action may freely re-present a menu / mutate state),
-        // then run the host's behavior. The panel is non-key, so there is no first
-        // responder to restore — order-out then act.
-        dismiss(animated: false)
+        if !mi.submenu.isEmpty {
+            // A submenu row: opening the child IS its activation (its own `action` is
+            // ignored). Light the child's first row so ⏎-into-submenu reads naturally.
+            openSubmenu(rowID: id, highlightFirst: true)
+            return
+        }
+        // A leaf row: close the WHOLE chain (root + any open child) so the action may
+        // freely re-present a menu / mutate state, THEN run the host's behavior. The
+        // panels are non-key, so there is no first responder to restore — order-out, act.
+        rootMenu().dismiss(animated: false)
         mi.action?()
     }
+
+    // MARK: - Submenu cascade (ONE level; the ROOT owns all monitors / glue)
+
+    /// Pointer rested on row `id` (nil ⇒ left the rows). Open a hovered submenu row's
+    /// child after a short intent delay; collapse an open child when the pointer rests
+    /// on a DIFFERENT row. A nil id (pointer between the panels — e.g. travelling INTO
+    /// the open child) is IGNORED so the child stays put.
+    private func handleHover(_ id: String?) {
+        guard parentMenu == nil else { return }         // only the root drives the cascade
+        hoverWork?.cancel(); hoverWork = nil
+        guard let id else { return }                    // left the rows — keep any open child
+        let isSubmenuRow = items.first(where: { $0.id == id })?.submenu.isEmpty == false
+        if isSubmenuRow {
+            if childRowID == id, child?.isOpen == true { return }   // already showing this one
+            schedule { [weak self] in self?.openSubmenu(rowID: id, highlightFirst: false) }
+        } else if child != nil {
+            schedule { [weak self] in self?.closeChild() }          // collapse on a non-submenu row
+        }
+    }
+
+    private func schedule(_ body: @escaping () -> Void) {
+        let work = DispatchWorkItem(block: body)
+        hoverWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + submenuHoverDelay, execute: work)
+    }
+
+    /// Open (or re-target) the submenu child for parent row `id`, placed beside it.
+    /// No-op on a child (the one-level cap) or a disabled / non-submenu / off-screen row.
+    private func openSubmenu(rowID id: String, highlightFirst: Bool) {
+        guard parentMenu == nil else { return }         // a child opens no grandchild
+        hoverWork?.cancel(); hoverWork = nil
+        guard isOpen, let host = hostWindow,
+              let mi = items.first(where: { $0.id == id }), mi.isEnabled, !mi.submenu.isEmpty,
+              let rowRect = list.rowRectOnScreen(for: id) else { return }
+        if childRowID == id, child?.isOpen == true {                // already showing this one
+            if highlightFirst { child?.list.moveHighlight(1) }      // re-light its first row (Enter/→ intent)
+            return
+        }
+        closeChild()
+        let c = ThemedMenu(palette: palette)
+        c.parentMenu = self
+        c.surfaceColor = surfaceColor
+        c.highlightsFirstOnOpen = false
+        c.density = density
+        c.items = mi.submenu
+        child = c
+        childRowID = id
+        c.presentAsSubmenu(rowRectOnScreen: rowRect, in: host)
+        if highlightFirst { c.list.moveHighlight(1) }
+    }
+
+    /// Collapse the open submenu child (idempotent). Cancels a pending hover-intent.
+    private func closeChild() {
+        hoverWork?.cancel(); hoverWork = nil
+        guard let c = child else { return }
+        child = nil
+        childRowID = nil
+        c.teardownAsChild()
+    }
+
+    /// Close THIS menu as a submenu child: collapse any descendant, drop the highlight,
+    /// snap the panel out. It installed NO monitors / glue (the root owns them), so
+    /// there is nothing to remove.
+    private func teardownAsChild() {
+        closeChild()
+        guard isOpen else { return }
+        isOpen = false
+        list.clearHighlight()
+        fadeOut(animated: false)
+        submenuRowOnScreen = nil
+    }
+
+    /// Keep an open child glued to its parent row when the parent relayouts (it
+    /// scrolled, or its items changed): re-anchor the child to the row's new screen
+    /// rect, or close it if the row vanished / is no longer a submenu. Root-only.
+    private func validateOpenChild() {
+        guard let c = child, let id = childRowID else { return }
+        guard items.first(where: { $0.id == id })?.submenu.isEmpty == false else {
+            closeChild(); return                             // the submenu row is gone / lost its children
+        }
+        if let rect = list.rowRectOnScreen(for: id) {
+            c.submenuRowOnScreen = rect
+            c.reframe()
+        } else {
+            closeChild()                                     // the parent row scrolled out of view
+        }
+    }
+
+    private func presentAsSubmenu(rowRectOnScreen rect: CGRect, in window: NSWindow) {
+        anchorView = nil
+        pointInHost = nil
+        submenuRowOnScreen = rect
+        hostWindow = window
+        open(animated: !reduceMotion, installDismiss: false)        // the root owns the monitors / glue
+    }
+
+    /// The deepest currently-open menu in the cascade (self if no open child).
+    private func activeLeaf() -> ThemedMenu { (child?.isOpen == true) ? child!.activeLeaf() : self }
+    /// The cascade's root (self if not a submenu child).
+    private func rootMenu() -> ThemedMenu { parentMenu?.rootMenu() ?? self }
 
     // MARK: - Keyboard (ONE local keyDown monitor — the panel is non-key)
 
@@ -423,13 +558,29 @@ public final class ThemedMenu: NSObject {
     /// call it).
     func handleKeyDown(_ ev: NSEvent) -> NSEvent? {
         guard isOpen else { return ev }
+        // The ROOT owns the only monitor; route the keys to the DEEPEST open menu
+        // (the active leaf) so a cascade navigates its open child, not the root.
+        let leaf = activeLeaf()
         switch ev.keyCode {
-        case 125: list.moveHighlight(1);  return nil    // ↓
-        case 126: list.moveHighlight(-1); return nil    // ↑
-        case 36, 76, 49: list.activateHighlight(); return nil   // ⏎ / keypad ⏎ / Space
-        case 53:  dismiss(); return nil                 // Esc — swallow
-        case 48:  dismiss(); return ev                  // Tab — dismiss, don't trap focus
-        default:  return ev                             // pass everything else through (host IME, etc.)
+        case 125: leaf.list.moveHighlight(1);  return nil    // ↓
+        case 126: leaf.list.moveHighlight(-1); return nil    // ↑
+        case 124:                                            // → open the highlighted submenu (else pass through)
+            if let id = leaf.list.highlightedID,
+               leaf.items.first(where: { $0.id == id })?.submenu.isEmpty == false {
+                leaf.openSubmenu(rowID: id, highlightFirst: true)
+                return nil
+            }
+            return ev                                        // no submenu on this row → host keeps → (IME safe)
+        case 123:                                            // ← close the current submenu level
+            guard let parent = leaf.parentMenu else { return ev }   // at the root there's no level to close
+            parent.closeChild()
+            return nil
+        case 36, 76, 49: leaf.list.activateHighlight(); return nil   // ⏎ / keypad ⏎ / Space
+        case 53:                                             // Esc — close one level (root ⇒ dismiss all)
+            if let parent = leaf.parentMenu { parent.closeChild() } else { dismiss() }
+            return nil
+        case 48:  dismiss(); return ev                       // Tab — dismiss all, don't trap focus
+        default:  return ev                                  // pass everything else through (host IME, etc.)
         }
     }
 
@@ -468,6 +619,7 @@ public final class ThemedMenu: NSObject {
     /// instantly dismiss it.
     private func clickIsInside(_ ev: NSEvent) -> Bool {
         if ev.window === panel { return true }
+        if let child, child.clickIsInside(ev) { return true }   // a click in any open descendant panel
         if let anchor = anchorView, ev.window === anchor.window {
             let p = anchor.convert(ev.locationInWindow, from: nil)
             return anchor.bounds.contains(p)
@@ -495,6 +647,7 @@ public final class ThemedMenu: NSObject {
         if let anchor = anchorView {
             if anchor.visibleRect.isEmpty { dismiss(); return }
             reframe()
+            validateOpenChild()                             // re-anchor / close an open submenu after the parent moves
         } else {
             dismiss()
         }
@@ -588,6 +741,11 @@ extension ThemedMenu {
         let axMenuItemLabels: [String]    // synthetic per-row AX labels (actionable rows only)
         let hasOpacityAnimation: Bool
         let reduceMotionRespected: Bool
+        let childOpen: Bool               // a submenu child is currently shown
+        let childRowID: String?           // the parent row owning the open child
+        let childRowCount: Int            // the open child's hosted-list row count (0 = none)
+        let childHighlightedID: String?   // the open child's highlighted row
+        let leafIsChild: Bool             // the active leaf is the child (keys route there)
     }
     var menuProbe: MenuProbe {
         let animating = container.layer?.animation(forKey: "opacity") != nil
@@ -602,12 +760,23 @@ extension ThemedMenu {
             hasMouseMonitor: mouseMon != nil,
             axMenuItemLabels: list._axChildren().compactMap { $0.accessibilityLabel() },
             hasOpacityAnimation: animating,
-            reduceMotionRespected: !(reduceMotion && animating))
+            reduceMotionRespected: !(reduceMotion && animating),
+            childOpen: child?.isOpen ?? false,
+            childRowID: childRowID,
+            childRowCount: child?.list.listProbe.rowCount ?? 0,
+            childHighlightedID: child?.list.highlightedID,
+            leafIsChild: activeLeaf() !== self)
     }
     /// The hosted list (drive its probe / nav directly in tests).
     var _list: ThemedList { list }
+    /// The open submenu child controller, if any (drive its probe in tests).
+    var _child: ThemedMenu? { child }
     /// Activate a row by id as if clicked (fires the item's action + dismisses).
     func _activate(_ id: String) { activate(id) }
+    /// Open a submenu by its parent row id (as if hovered / →-keyed).
+    func _openSubmenu(_ id: String) { openSubmenu(rowID: id, highlightFirst: true) }
+    /// Collapse the open submenu child.
+    func _closeChild() { closeChild() }
     /// Route a keyDown through the REAL monitor logic (swallow-vs-passthrough).
     func _handleKey(_ ev: NSEvent) -> NSEvent? { handleKeyDown(ev) }
 }
