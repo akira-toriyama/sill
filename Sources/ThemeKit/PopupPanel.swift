@@ -68,6 +68,12 @@ func themedPopupPanel(interactive: Bool, role: NSAccessibility.Role) -> PopupPan
 /// future menu share one vocabulary.
 enum PopupSide { case top, bottom, leading, trailing }
 
+/// The corner of a popup pinned to its anchor / cursor — the Grow transform origin
+/// (a menu scales OUT from this corner, MUI's transform-origin). Read in the panel
+/// content's UN-FLIPPED y-up space: `.top*` = the upper edge (y = height),
+/// `.bottom*` = the lower edge (y = 0); `*Leading` = x 0, `*Trailing` = x width.
+enum PopupCorner: Equatable { case topLeading, topTrailing, bottomLeading, bottomTrailing }
+
 /// A placement REQUEST. Each case carries exactly the inputs its geometry needs;
 /// the engine shares only the screen-pick + clamp + `setFrame`/`invalidateShadow`
 /// scaffold around the per-case origin/flip math (so the two existing layouts stay
@@ -80,6 +86,14 @@ enum PopupPlacement {
     /// on the anchor-facing axis), `gap` from the anchor edge, edge-flipped to the
     /// opposite side on overflow.
     case sideRelative(preferred: PopupSide, fillSize: CGSize, gap: CGFloat, arrowLen: CGFloat)
+    /// Menu drop-down from an anchor view: a `size` panel whose top-leading meets
+    /// the anchor's bottom-leading, `gap` below; flips ABOVE on vertical underflow
+    /// and RIGHT-aligns on horizontal overflow. Returns the pinned corner (the Grow
+    /// origin).
+    case anchorCorner(size: CGSize, gap: CGFloat)
+    /// Context menu at a screen `point`: a `size` panel growing down-right from the
+    /// point, flipping up / left on overflow. Returns the pinned corner.
+    case point(_ point: CGPoint, size: CGSize)
 }
 
 /// A placement RESULT — per case, never a god-tuple. The caller reads only the
@@ -87,6 +101,8 @@ enum PopupPlacement {
 enum PopupPlacementResult {
     case anchorWidthBelow(frame: CGRect, flippedAbove: Bool)
     case sideRelative(frame: CGRect, side: PopupSide)
+    case anchorCorner(frame: CGRect, corner: PopupCorner)
+    case point(frame: CGRect, corner: PopupCorner)
 }
 
 /// Keep the popup this far inside the screen's visible frame (shared by both
@@ -144,6 +160,46 @@ func placePopup(_ panel: NSPanel, anchorRectOnScreen onScreen: CGRect,
         panel.setFrame(frame, display: true)
         panel.invalidateShadow()
         return .sideRelative(frame: frame, side: side)
+
+    case let .anchorCorner(size, gap):
+        // Prefer the menu's top-leading at the anchor's bottom-leading (drop below,
+        // left-aligned). Flip ABOVE on underflow, RIGHT-align on overflow; the Grow
+        // origin corner follows the resolved position.
+        var corner = PopupCorner.topLeading
+        var x = onScreen.minX
+        var y = onScreen.minY - gap - size.height
+        if y < vf.minY + m {
+            y = onScreen.maxY + gap
+            corner = .bottomLeading
+        }
+        if x + size.width > vf.maxX - m {
+            x = onScreen.maxX - size.width
+            corner = (corner == .topLeading) ? .topTrailing : .bottomTrailing
+        }
+        let origin = clampPopupOrigin(CGPoint(x: x, y: y), size: size, into: vf, margin: m)
+        let frame = CGRect(origin: origin, size: size)
+        panel.setFrame(frame, display: true)
+        panel.invalidateShadow()
+        return .anchorCorner(frame: frame, corner: corner)
+
+    case let .point(p, size):
+        // Grow down-right from the cursor; flip up / left on overflow.
+        var corner = PopupCorner.topLeading
+        var x = p.x
+        var y = p.y - size.height
+        if x + size.width > vf.maxX - m {
+            x = p.x - size.width
+            corner = .topTrailing
+        }
+        if y < vf.minY + m {
+            y = p.y
+            corner = (corner == .topLeading) ? .bottomLeading : .bottomTrailing
+        }
+        let origin = clampPopupOrigin(CGPoint(x: x, y: y), size: size, into: vf, margin: m)
+        let frame = CGRect(origin: origin, size: size)
+        panel.setFrame(frame, display: true)
+        panel.invalidateShadow()
+        return .point(frame: frame, corner: corner)
     }
 }
 

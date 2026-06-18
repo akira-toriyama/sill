@@ -279,4 +279,98 @@ final class ThemedListTests: XCTestCase {
         l.managesFirstResponder = true
         XCTAssertTrue(l.listProbe.acceptsFirstResponder, "opt-in: the list drives nav itself")
     }
+
+    // MARK: - Separator (menu rule — non-interactive, skipped by nav)
+
+    private func separator(_ id: String = "sep") -> ListItem { ListItem(id: id, primary: "", kind: .separator) }
+
+    func testSeparatorBandHeightByDensity() {
+        let l = makeList([row("a"), separator(), row("b")])
+        XCTAssertEqual(l.listProbe.rowFrames["sep"]?.height, 9, "comfortable separator band = 9")
+        l.density = .compact
+        XCTAssertEqual(l.listProbe.rowFrames["sep"]?.height, 7, "compact separator band = 7")
+    }
+
+    func testSeparatorIsNotSelectableAndSkippedByNav() {
+        let l = makeList([row("a"), separator(), row("b")])
+        l.selectedID = "sep"
+        XCTAssertNil(l.selectedItem, "a separator can't be selected")
+        l._moveHighlight(1); XCTAssertEqual(l.listProbe.effectiveHighlightID, "a")
+        l._moveHighlight(1); XCTAssertEqual(l.listProbe.effectiveHighlightID, "b", "arrow nav skips the separator")
+    }
+
+    // MARK: - Wrap (menu) vs clamp (default)
+
+    func testWrapsHighlightCyclesEnds() {
+        let l = makeList([row("a"), row("b"), row("c")])
+        l.wrapsHighlight = true
+        l._moveHighlight(1); XCTAssertEqual(l.listProbe.effectiveHighlightID, "a")
+        l._moveHighlight(-1); XCTAssertEqual(l.listProbe.effectiveHighlightID, "c", "up from the first wraps to the last")
+        l._moveHighlight(1); XCTAssertEqual(l.listProbe.effectiveHighlightID, "a", "down from the last wraps to the first")
+    }
+
+    // MARK: - Pointer hover drives the shared highlight (menu)
+
+    func testHighlightFollowsHoverSharesHighlightAndKeepsLastOnExit() {
+        let l = makeList([row("a"), row("b"), row("c")])   // rows 0..30, 30..60, 60..90
+        l.highlightFollowsHover = true
+        l._hoverRow(atDocY: 45)
+        XCTAssertEqual(l.listProbe.effectiveHighlightID, "b", "hover lights the row under the pointer")
+        l._hoverRow(atDocY: nil)
+        XCTAssertEqual(l.listProbe.effectiveHighlightID, "b", "the last-hovered row stays lit on exit (native menu)")
+        l._hoverRow(atDocY: 15)
+        XCTAssertEqual(l.listProbe.effectiveHighlightID, "a", "moving to another row re-lights it")
+    }
+
+    func testHoverOverSeparatorKeepsPriorHighlight() {
+        let l = makeList([row("a"), separator(), row("b")])   // a 0..30, sep 30..39, b 39..69
+        l.highlightFollowsHover = true
+        l._hoverRow(atDocY: 15)                                 // a
+        l._hoverRow(atDocY: 34)                                 // over the separator
+        XCTAssertEqual(l.listProbe.effectiveHighlightID, "a", "a separator is not highlightable; the prior row stays lit")
+    }
+
+    // MARK: - Synthetic per-row AX (opt-in `.menuItem` children)
+
+    func testNoPerRowAXByDefault() {
+        let l = makeList([row("a"), row("b")])
+        XCTAssertTrue(l._axChildren().isEmpty, "default: the list vends no per-row AX (the combo's basic limitation)")
+    }
+
+    func testAXVendsMenuItemsForActionableRowsWithFlippedFramesAndPress() {
+        // H(28)@0 · a(30)@28 · off(30)@58 · sep(9)@88 · b(30)@97 — total 127.
+        let items = [header("H"), row("a"),
+                     ListItem(id: "off", primary: "Off", isDisabled: true),
+                     separator(), row("b")]
+        let l = makeList(items)
+        l.vendsRowAXElements = true
+        let kids = l._axChildren()
+        XCTAssertEqual(kids.compactMap { $0.accessibilityLabel() }, ["A", "B"],
+                       "only actionable rows vend an element (header / disabled / separator skipped)")
+        XCTAssertEqual(kids.first?.accessibilityRole(), .menuItem, "role is .menuItem")
+        // The doc view is flipped (y down) but AX frames are y-up: axY = docHeight − rowRect.maxY.
+        let aFrame = kids.first?.accessibilityFrameInParentSpace()
+        XCTAssertEqual(aFrame?.height, 30)
+        XCTAssertEqual(aFrame?.minY ?? -1, 127 - (28 + 30), accuracy: 0.5, "flip-converted frame")
+        // AXPress activates the row.
+        var fired: [String] = []
+        l.onActivate = { fired.append($0.id) }
+        _ = kids.first?.accessibilityPerformPress()
+        XCTAssertEqual(fired, ["a"], "AXPress on the element activates its row")
+    }
+
+    // MARK: - Content sizing (a host that sizes to the list — a menu)
+
+    func testContentHeightSumsRowHeights() {
+        let l = makeList([row("a"), row("b", secondary: "x"), separator()])
+        XCTAssertEqual(l.contentHeight, 30 + 46 + 9, "content height sums every row (incl. a separator band)")
+    }
+
+    func testFittingWidthGrowsWithTextAndCaps() {
+        let wide = makeList([row("short"), ListItem(id: "long", primary: "A considerably longer menu label")])
+        let narrow = makeList([row("short")])
+        XCTAssertGreaterThan(wide.fittingWidth(maxWidth: 1000), narrow.fittingWidth(maxWidth: 1000),
+                             "a longer label widens the fit")
+        XCTAssertEqual(wide.fittingWidth(maxWidth: 60), 60, "fitting width is capped at maxWidth")
+    }
 }

@@ -86,24 +86,35 @@ public struct ListItem {
     public var tint: ListTint
     public var kind: Kind
     public var isDisabled: Bool
+    /// Marks the row as in a checked / on state FOR ACCESSIBILITY (a menu's
+    /// `isChecked` toggle item). Purely an AX hint — the visible check is the host's
+    /// leading image; this folds a "checked" marker into the row's synthetic
+    /// `.menuItem` label so VoiceOver can tell a checked row from an unchecked one.
+    public var axChecked: Bool
 
     public enum Kind: Equatable {
         case row
         case sectionHeader(subtitle: String? = nil)
+        /// A non-interactive thin rule between groups (a menu separator). Drawn as a
+        /// full-bleed 1pt `border` hairline in a short band; skipped by nav / hover /
+        /// activation / AX. Its `id` only needs to be unique.
+        case separator
     }
 
     public init(id: String, image: NSImage? = nil, primary: String,
                 secondary: String? = nil, secondaryMono: Bool = false,
                 badges: [Badge] = [], trailing: TrailingAccessory = .none,
-                tint: ListTint = .none, kind: Kind = .row, isDisabled: Bool = false) {
+                tint: ListTint = .none, kind: Kind = .row, isDisabled: Bool = false,
+                axChecked: Bool = false) {
         self.id = id; self.image = image; self.primary = primary
         self.secondary = secondary; self.secondaryMono = secondaryMono
         self.badges = badges; self.trailing = trailing; self.tint = tint
-        self.kind = kind; self.isDisabled = isDisabled
+        self.kind = kind; self.isDisabled = isDisabled; self.axChecked = axChecked
     }
 
     var isHeader: Bool { if case .sectionHeader = kind { return true }; return false }
     var headerSubtitle: String? { if case let .sectionHeader(s) = kind { return s }; return nil }
+    var isSeparator: Bool { if case .separator = kind { return true }; return false }
 }
 
 // MARK: - ThemedList
@@ -112,6 +123,10 @@ public struct ListItem {
 public final class ThemedList: NSView {
 
     // MARK: Config types (nested — the codebase idiom, like ThemedButton.Size)
+
+    /// Per-character tracking applied to a 1-line section header (the drawn header
+    /// AND `fittingWidth` must use the same value or the width contract drifts).
+    static let headerKern: CGFloat = 0.5
 
     public enum Density { case comfortable, compact }   // comfortable == the combo engine's metrics
     public enum SelectionMode { case none, single }      // no .multiple (YAGNI)
@@ -177,6 +192,27 @@ public final class ThemedList: NSView {
         }
     }
 
+    /// `moveHighlight` WRAPS top↔bottom instead of clamping (MUI menu nav;
+    /// `disableListWrap = false`). DEFAULT false — a plain list / the combo clamp.
+    public var wrapsHighlight = false
+
+    /// Pointer hover drives the SAME `highlightedIndex` keyboard nav uses, so one
+    /// row is lit at a time whether reached by mouse or arrows (the menu model —
+    /// `hoverStyle = .solidAccent` then lights every row under the pointer). The
+    /// last-hovered row STAYS lit when the pointer leaves the list (native menu
+    /// feel). DEFAULT false — hover only veils an already-selected row (`.wash`).
+    public var highlightFollowsHover = false
+
+    /// Vend a synthetic per-row accessibility child (role `.menuItem`, the row's
+    /// primary text as its label, an AXPress that activates the row) for every
+    /// ACTIONABLE row — so VoiceOver can navigate a menu hosted in this list. The
+    /// children are rebuilt from the live layout on each AX query (frames stay
+    /// valid across scroll). DEFAULT false — the list vends no per-row AX (the
+    /// combo's documented basic limitation). NOTE: the synthetic tree is unit-tested
+    /// (count / role / label / flipped frame / press) but VoiceOver TRAVERSAL over a
+    /// non-key panel is a live hand-check.
+    public var vendsRowAXElements = false { didSet { listView.needsDisplay = true } }
+
     // Empty state (promoted from ComboBox — B2). When `items` is empty:
     //   * `emptyActionRow?(query)` non-nil ⇒ ONE actionable row (foreground,
     //     highlightable, activatable → `onEmptyAction(query)`);
@@ -195,6 +231,18 @@ public final class ThemedList: NSView {
 
     /// The selected `ListItem`, or nil.
     public var selectedItem: ListItem? { _selectedID.flatMap { id in items.first { $0.id == id } } }
+
+    /// The id of the row currently highlighted by keyboard nav / hover (or the
+    /// synthetic empty-action row), nil if none. Read-only — drive it with
+    /// `moveHighlight` / `clearHighlight` (or hover when `highlightFollowsHover`).
+    public var highlightedID: String? {
+        effectiveHighlightIndex.flatMap { items.indices.contains($0) ? items[$0].id
+            : (isActionRowActive ? ThemedList.emptyActionID : nil) }
+    }
+
+    /// Total height of all rows (the laid-out doc height) — for a host that sizes a
+    /// container to the list's content (a menu). Independent of the view's frame.
+    public var contentHeight: CGFloat { rowLayout.totalHeight }
 
     // Capture / preview seams (deterministic still capture + tests; id-keyed).
     public var previewHighlight: String? = nil { didSet { listView.needsDisplay = true } }
@@ -255,7 +303,7 @@ public final class ThemedList: NSView {
         let badgeHeight, badgeHPad, badgeSymbolPt, badgePt, badgeGap: CGFloat
         let chevronPt, shortcutHeight, shortcutHPad, shortcutRadius, shortcutPt: CGFloat
         let header1Pt, header2TitlePt, header2SubPt: CGFloat
-        let clusterGap, budgetMargin: CGFloat
+        let clusterGap, budgetMargin, separatorBand: CGFloat
         var textXOrigin: CGFloat { leadingInset + imageBox + gapImageToText }
     }
 
@@ -269,7 +317,7 @@ public final class ThemedList: NSView {
                            badgeHeight: 16, badgeHPad: 6, badgeSymbolPt: 11, badgePt: 10, badgeGap: 4,
                            chevronPt: 11, shortcutHeight: 16, shortcutHPad: 5, shortcutRadius: 4, shortcutPt: 10,
                            header1Pt: 11, header2TitlePt: 13, header2SubPt: 11,
-                           clusterGap: 6, budgetMargin: 8)
+                           clusterGap: 6, budgetMargin: 8, separatorBand: 9)
         case .compact:
             // header2 == comfortable's 40: the 2-line title(13)+subtitle(11) content
             // doesn't shrink with density, so a shorter row clipped the subtitle.
@@ -280,7 +328,7 @@ public final class ThemedList: NSView {
                            badgeHeight: 14, badgeHPad: 6, badgeSymbolPt: 11, badgePt: 9, badgeGap: 4,
                            chevronPt: 10, shortcutHeight: 14, shortcutHPad: 5, shortcutRadius: 4, shortcutPt: 10,
                            header1Pt: 11, header2TitlePt: 13, header2SubPt: 11,
-                           clusterGap: 6, budgetMargin: 8)
+                           clusterGap: 6, budgetMargin: 8, separatorBand: 7)
         }
     }
 
@@ -422,6 +470,7 @@ public final class ThemedList: NSView {
 
     private func rowHeight(for item: ListItem) -> CGFloat {
         let m = metrics
+        if item.isSeparator { return m.separatorBand }
         if item.isHeader { return item.headerSubtitle != nil ? m.header2 : m.header1 }
         return item.secondary != nil ? m.twoLineRow : m.singleRow
     }
@@ -435,7 +484,7 @@ public final class ThemedList: NSView {
         return CGRect(x: 0, y: rowLayout.yOffsets[i], width: docWidth, height: rowLayout.heights[i])
     }
 
-    private func isSelectable(_ item: ListItem) -> Bool { !item.isHeader && !item.isDisabled }
+    private func isSelectable(_ item: ListItem) -> Bool { !item.isHeader && !item.isSeparator && !item.isDisabled }
 
     private func indexOf(_ id: String?) -> Int? { id.flatMap { id in items.firstIndex { $0.id == id } } }
 
@@ -493,6 +542,44 @@ public final class ThemedList: NSView {
         scrollRowVisible(i, position: position)
     }
 
+    /// The content width that fits every row's text without truncation, capped at
+    /// `maxWidth` — for a host that sizes a container to the list (a menu sizes to
+    /// its widest item). Accounts for the leading slot, the trailing cluster
+    /// (shortcut / chevron / badges) and both insets. Rows past the cap ellipsize.
+    public func fittingWidth(maxWidth: CGFloat = .greatestFiniteMagnitude) -> CGFloat {
+        let m = metrics
+        var w: CGFloat = 0
+        for item in items where !item.isSeparator {
+            let textX = item.isHeader ? m.leadingInset : m.textXOrigin
+            let pFont: NSFont = item.isHeader
+                ? (item.headerSubtitle != nil ? themedFont(m.header2TitlePt, .medium) : themedFont(m.header1Pt, .semibold))
+                : themedFont(m.primaryPt)
+            let isOneLineHeader = item.isHeader && item.headerSubtitle == nil
+            let pText = isOneLineHeader ? item.primary.uppercased() : item.primary
+            // A 1-line header is DRAWN with `headerKern` per character — measure it
+            // the same way (else it under-measures by kern × (chars−1)).
+            var textW = isOneLineHeader
+                ? ceil((pText as NSString).size(withAttributes: [.font: pFont, .kern: ThemedList.headerKern]).width)
+                : measureWidth(pText, font: pFont)
+            if let secondary = item.secondary {
+                let sFont = item.secondaryMono ? .monospacedSystemFont(ofSize: m.secondaryPt, weight: .regular)
+                                               : themedFont(m.secondaryPt)
+                textW = max(textW, measureWidth(secondary, font: sFont))
+            }
+            if let sub = item.headerSubtitle {
+                textW = max(textW, measureWidth(sub, font: themedFont(m.header2SubPt)))
+            }
+            let trailing = item.isHeader ? 0 : trailingClusterWidth(item)
+            let rowW = textX + textW + (trailing > 0 ? trailing + m.budgetMargin : 0) + m.trailingInset
+            w = max(w, rowW)
+        }
+        return min(maxWidth, ceil(w))
+    }
+
+    private func measureWidth(_ s: String, font: NSFont) -> CGFloat {
+        ceil((s as NSString).size(withAttributes: [.font: font]).width)
+    }
+
     /// USER-intent selection (fires `onSelectionChange`). Ignored in `.none`.
     public func selectRow(_ id: String?) {
         guard selectionMode == .single else { return }
@@ -505,6 +592,40 @@ public final class ThemedList: NSView {
         if isActionRowActive, id == ThemedList.emptyActionID { fireEmptyAction(); return }
         guard let i = indexOf(id) else { return }
         activate(i)
+    }
+
+    // MARK: Accessibility (synthetic per-row `.menuItem` children — opt-in)
+
+    fileprivate var vendsRowAXElementsFlag: Bool { vendsRowAXElements }
+
+    /// Build the synthetic per-row AX children FRESH from the current layout (so
+    /// frames stay valid across scroll / reload). One element per ACTIONABLE row
+    /// (+ an active empty-action row); headers / separators / disabled rows get
+    /// none. Role `.menuItem`, label = the row's primary text, AXPress activates it.
+    fileprivate func buildAXChildren() -> [NSAccessibilityElement] {
+        guard vendsRowAXElements, let lv = listView else { return [] }
+        let docHeight = lv.bounds.height
+        if items.isEmpty {
+            guard isActionRowActive, let label = emptyLabel else { return [] }
+            return [makeAXRow(id: ThemedList.emptyActionID, label: label, checked: false, rect: rowRect(0), docHeight: docHeight)]
+        }
+        return items.indices.filter { isSelectable(items[$0]) }
+            .map { makeAXRow(id: items[$0].id, label: items[$0].primary, checked: items[$0].axChecked,
+                             rect: rowRect($0), docHeight: docHeight) }
+    }
+
+    private func makeAXRow(id: String, label: String, checked: Bool, rect: CGRect, docHeight: CGFloat) -> RowAXElement {
+        let el = RowAXElement(owner: self, rowID: id)
+        el.setAccessibilityRole(.menuItem)
+        // Fold a "checked" marker into the label VoiceOver reads (a synthetic
+        // `.menuItem` element doesn't reliably surface AXMenuItemMarkChar).
+        el.setAccessibilityLabel(checked ? "\(label), checked" : label)
+        el.setAccessibilityParent(listView)
+        // The doc view is FLIPPED (row 0 at top, y grows down) but AX frames are
+        // y-up → convert the flipped rowRect into the parent's y-up space.
+        el.setAccessibilityFrameInParentSpace(
+            CGRect(x: rect.minX, y: docHeight - rect.maxY, width: rect.width, height: rect.height))
+        return el
     }
 
     // MARK: Interaction (driven by the doc view)
@@ -553,11 +674,20 @@ public final class ThemedList: NSView {
             return
         }
         var idx = y.flatMap { rowIndex(atDocY: $0) }
-        // A point under the pinned header, or over a header / disabled row, hovers nothing.
+        // A point under the pinned header, or over a header / separator / disabled
+        // row, hovers nothing (`isSelectable` covers all three).
         if let i = idx {
-            if items.isEmpty || items[i].isHeader || items[i].isDisabled { idx = nil }
+            if items.isEmpty || !isSelectable(items[i]) { idx = nil }
             else if let yy = y, let pin = stickyHeader(atVisibleTop: listView.visibleRect.minY),
                     yy >= pin.drawY, yy < pin.drawY + rowLayout.heights[pin.index] { idx = nil }
+        }
+        // Menu model: the pointer drives the SAME highlight as the arrows (one lit
+        // row), and the last-hovered row STAYS lit when the pointer leaves (native
+        // menu feel — don't clear on a nil/over-gap move).
+        if highlightFollowsHover {
+            if let idx { setHighlight(idx) }
+            onHover?(idx.flatMap { items.indices.contains($0) ? items[$0].id : nil })
+            return
         }
         guard idx != hoveredIndex else { return }
         let old = hoveredIndex
@@ -569,15 +699,21 @@ public final class ThemedList: NSView {
     fileprivate func clearHover() { hoverRow(atDocY: nil) }
 
     /// Move the keyboard highlight to the next / previous selectable row (skips
-    /// headers + disabled), CLAMPED (no wrap — a list isn't a cyclic menu of one
-    /// kind). Opens nothing; the host owns visibility.
-    fileprivate func moveHighlight(_ delta: Int) {
+    /// headers / separators / disabled). CLAMPED at the ends by default; WRAPS
+    /// top↔bottom when `wrapsHighlight` (the menu). Scrolls the target into view;
+    /// opens nothing (the host owns visibility). Public so a host driving keys
+    /// itself (a menu's keyDown monitor) can move the highlight without the list
+    /// being first responder.
+    public func moveHighlight(_ delta: Int) {
         if isActionRowActive { setHighlight(0); return }
         let sel = items.indices.filter { isSelectable(items[$0]) }
         guard !sel.isEmpty else { setHighlight(nil); return }
         let target: Int
         if let cur = highlightedIndex, let pos = sel.firstIndex(of: cur) {
-            target = sel[min(max(pos + delta, 0), sel.count - 1)]
+            let n = sel.count
+            let np = wrapsHighlight ? ((pos + delta) % n + n) % n
+                                    : min(max(pos + delta, 0), n - 1)
+            target = sel[np]
         } else {
             target = delta > 0 ? sel.first! : sel.last!
         }
@@ -592,12 +728,15 @@ public final class ThemedList: NSView {
         invalidateRows([old, i])
     }
 
-    fileprivate func activateHighlight() {
+    /// Activate the highlighted row (fires `onActivate`, or `onEmptyAction`). A
+    /// no-op when nothing is highlighted. Public — a menu's Enter routes here.
+    public func activateHighlight() {
         if isActionRowActive { fireEmptyAction(); return }
         if let h = highlightedIndex, items.indices.contains(h), isSelectable(items[h]) { activate(h) }
     }
 
-    fileprivate func clearHighlight() { setHighlight(nil) }
+    /// Drop the keyboard / hover highlight. Public — a menu clears it on dismiss.
+    public func clearHighlight() { setHighlight(nil) }
 
     // MARK: Invalidation (per-row — D1, never the blunt full bounds)
 
@@ -752,6 +891,7 @@ extension ThemedList {
     private func drawRow(_ i: Int, in r: CGRect, width: CGFloat, isSel: Bool, isHi: Bool) {
         let item = items[i]
         if item.isHeader { drawHeader(item, in: r, width: width); return }
+        if item.isSeparator { drawSeparator(in: r, width: width); return }
 
         let m = metrics
         let onAccent = (isSel || isHi) && hoverStyle == .solidAccent
@@ -801,8 +941,9 @@ extension ThemedList {
         // 5. Trailing cluster (right-to-left).
         drawTrailingCluster(item, in: r, onAccent: onAccent)
 
-        // 6. Divider between rows (not after the last; full-bleed above a header).
-        if showsDividers, i < items.count - 1 {
+        // 6. Divider between rows (not after the last; full-bleed above a header;
+        //    suppressed above a separator row, which draws its own rule).
+        if showsDividers, i < items.count - 1, !items[i + 1].isSeparator {
             let nextIsHeader = items[i + 1].isHeader
             let x = nextIsHeader ? 0 : m.textXOrigin
             palette.border.setFill()
@@ -871,13 +1012,20 @@ extension ThemedList {
                      x: m.leadingInset, maxWidth: width - m.leadingInset * 2, row: sRow, mode: .byTruncatingTail)
         } else {
             let f = themedFont(m.header1Pt, .semibold)
-            let attrs: [NSAttributedString.Key: Any] = [.font: f, .foregroundColor: palette.muted, .kern: 0.5]
+            let attrs: [NSAttributedString.Key: Any] = [.font: f, .foregroundColor: palette.muted, .kern: ThemedList.headerKern]
             let label = item.primary.uppercased() as NSString
             let size = label.size(withAttributes: attrs)
             label.draw(at: NSPoint(x: m.leadingInset, y: r.minY + (r.height - size.height) / 2), withAttributes: attrs)
         }
         palette.border.setFill()                            // a full-bleed underline
         CGRect(x: 0, y: r.maxY - 1, width: width, height: 1).fill()
+    }
+
+    /// A menu separator: a full-bleed 1pt `border` hairline centred in its short
+    /// band (the band gives it the breathing room above/below). Non-interactive.
+    private func drawSeparator(in r: CGRect, width: CGFloat) {
+        palette.border.setFill()
+        CGRect(x: 0, y: r.midY - 0.5, width: width, height: 1).fill()
     }
 
     private func drawStickyHeader(_ view: ListDocumentView, width: CGFloat) {
@@ -1080,6 +1228,17 @@ private final class ListDocumentView: NSView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var isOpaque: Bool { false }                 // the scroll view paints the surface
 
+    // Accessibility — vend synthetic per-row `.menuItem` children when the owner
+    // opts in (a menu hosts this list); otherwise default (no per-row AX — the
+    // combo's documented basic limitation).
+    override func accessibilityRole() -> NSAccessibility.Role? {
+        owner?.vendsRowAXElementsFlag == true ? .menu : super.accessibilityRole()
+    }
+    override func accessibilityChildren() -> [Any]? {
+        guard owner?.vendsRowAXElementsFlag == true else { return super.accessibilityChildren() }
+        return owner?.buildAXChildren()
+    }
+
     override func draw(_ dirtyRect: NSRect) { owner?.drawRows(self, dirty: dirtyRect) }
 
     override func updateTrackingAreas() {
@@ -1114,6 +1273,32 @@ private final class ListDocumentView: NSView {
         let ok = super.resignFirstResponder()
         if ok { owner?.setFocusRing(visible: false) }
         return ok
+    }
+}
+
+// MARK: - RowAXElement (synthetic `.menuItem` accessibility child)
+
+/// One synthetic accessibility element standing in for a custom-drawn row (the
+/// list has NO per-row subviews). Built fresh by `ThemedList.buildAXChildren`;
+/// its role / label / frame are set there, and AXPress activates the row. NOT
+/// `@MainActor` — `accessibilityPerformPress` overrides a nonisolated AppKit
+/// method, so it assumes main isolation (AX is delivered on main) to reach the
+/// owner.
+private final class RowAXElement: NSAccessibilityElement {
+    weak var owner: ThemedList?
+    let rowID: String
+
+    init(owner: ThemedList, rowID: String) {
+        self.owner = owner
+        self.rowID = rowID
+        super.init()
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        guard let owner else { return false }
+        let id = rowID
+        MainActor.assumeIsolated { owner.activateRow(id) }
+        return true
     }
 }
 
@@ -1155,6 +1340,12 @@ extension ThemedList {
 
     /// Drive the keyboard nav without a live first responder.
     func _moveHighlight(_ delta: Int) { moveHighlight(delta) }
+    /// The synthetic per-row AX children (role / label / flipped frame / AXPress) —
+    /// asserted deterministically headlessly; VoiceOver traversal is a live check.
+    func _axChildren() -> [NSAccessibilityElement] { buildAXChildren() }
+    /// Drive a pointer hover at a doc-y (or nil = exit) without synthetic events —
+    /// exercises `highlightFollowsHover` deterministically.
+    func _hoverRow(atDocY y: CGFloat?) { hoverRow(atDocY: y) }
     /// The pinned sticky section + its draw-y for a given scroll offset (pure).
     func _stickyHeader(atScrollY y: CGFloat) -> (id: String?, drawY: CGFloat) {
         guard let pin = stickyHeader(atVisibleTop: y) else { return (nil, 0) }
