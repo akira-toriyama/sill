@@ -1,4 +1,4 @@
-// still — ThemeKit button-group bench. Hosts the REAL shared `ThemedButtonGroup`
+// prism — ThemeKit button-group bench. Hosts the REAL shared `ThemedButtonGroup`
 // (ThemeKit) inside the SwiftUI gallery so the joined seams / corners / divider /
 // elevation can be evaluated live in every theme. The top rows are INTERACTIVE
 // (hover a member, click to bump the tap counter, click the segmented group to

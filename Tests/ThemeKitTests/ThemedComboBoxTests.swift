@@ -3,7 +3,7 @@
 // `previewOpen` / `previewHighlight` + the public field seams the combo wires
 // (`onChange` / `onMoveDown` / `onReturn` / `onEscape` / `onFocusChange`), and
 // read through the DEBUG `comboProbe`; no synthetic mouse events. The live
-// click-keeps-focus / IME / placement-flip 演出 is proven in still, not here.
+// click-keeps-focus / IME / placement-flip 演出 is proven in prism, not here.
 // Window-server-dependent asserts (panel ordered in, screen placement) are
 // guarded so a truly headless box doesn't hard-fail.
 
@@ -208,7 +208,7 @@ final class ThemedComboBoxTests: XCTestCase {
             let pr = c.comboProbe
             // The container surface + border are read back from the layer (real
             // rendered state). The row highlight (selection wash + primary accent
-            // bar) is proven LIVE in still — drawRows reads the roles directly, so
+            // bar) is proven LIVE in prism — drawRows reads the roles directly, so
             // a probe assertion would only echo the input palette.
             sameColor(pr.surfaceColor, p.background ?? .textBackgroundColor,
                       "popup surface = background (\(name))")

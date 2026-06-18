@@ -1,4 +1,4 @@
-// still — ThemeKit button bench. Hosts the REAL shared `ThemedButton`
+// prism — ThemeKit button bench. Hosts the REAL shared `ThemedButton`
 // (ThemeKit) inside the SwiftUI gallery so it can be evaluated live in every
 // theme: the top row is fully INTERACTIVE (hover with the pointer, click to
 // bump the tap counter — the 演出 to feel), and the rows below force each

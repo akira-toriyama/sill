@@ -1,6 +1,6 @@
-// still — the LIVE effect preview.
+// prism — the LIVE effect preview.
 //
-// still's old `EffectStrip` rendered an effect's flash palette STATICALLY —
+// prism's old `EffectStrip` rendered an effect's flash palette STATICALLY —
 // a row of fixed swatches. Nothing actually animated, so the dynamic-theming
 // atom (Effects' `resolveBorder` / `blendThrough`) looked *disabled* in the
 // gallery even though `show-effects = true`. This file drives a real clock
@@ -8,7 +8,7 @@
 // (`resolveBorder`), so an animatable theme's card now GLOWS + cycles live —
 // proving the effect works, not just listing its colours.
 //
-// Lives in its OWN file (not Gallery.swift) so the still preview's animation
+// Lives in its OWN file (not Gallery.swift) so the prism preview's animation
 // machinery is self-contained; Gallery.swift only swaps two call sites.
 
 import SwiftUI
@@ -52,7 +52,7 @@ func liveEffectFrame(name: String, now: Double, fallback: NSColor)
 /// chip (the actual animated colour, glowing) + the theme-tinted label,
 /// then the full flash palette so every colour is still readable at a
 /// glance, then a "● live" dot so it's unmistakable the gallery is moving
-/// (a still screenshot catches one frame, but the lit dot reads as "on").
+/// (a prism screenshot catches one frame, but the lit dot reads as "on").
 struct LiveEffectStrip: View {
     let fx: EffectSpec
     let name: String

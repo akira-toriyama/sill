@@ -3,7 +3,7 @@
 // key window + synthetic events (flaky headless — see the Phase 0 learning), so
 // these tests drive each state through the `preview…` overrides and read the
 // rendered result via the DEBUG `buttonProbe`, which IS deterministic. The live
-// 演出 (the animated hover / press / elevation) is proven in still, not here.
+// 演出 (the animated hover / press / elevation) is proven in prism, not here.
 
 import XCTest
 import AppKit

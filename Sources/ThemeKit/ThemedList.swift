@@ -5,7 +5,7 @@
 //
 // Unlike ThemedComboBox / ThemedTooltip (per-field CONTROLLERS that own a child
 // window), ThemedList is a plain `NSView` a host embeds directly — so it is
-// `screencapture`-able in still, the big win that makes a static per-theme grid
+// `screencapture`-able in prism, the big win that makes a static per-theme grid
 // possible. It PROMOTES ComboBox's private `ComboListView` drawing engine (the
 // flipped, custom-drawn, hover-tracked row painter) OUT of the popup and
 // generalizes it: mixed-height rows, leading image + primary/secondary text +
@@ -1330,7 +1330,7 @@ private final class RowAXElement: NSAccessibilityElement {
 // `comboProbe`): driven via `previewHighlight`/`previewSelection` + the public
 // callbacks + the pure `stickyHeader(atVisibleTop:)` seam — no synthetic events,
 // no live window. The visual selection/hover/solidAccent appearance is proven
-// LIVE in still, not asserted as pixels.
+// LIVE in prism, not asserted as pixels.
 extension ThemedList {
     struct ListProbe {
         let rowCount: Int

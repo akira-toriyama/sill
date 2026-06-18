@@ -73,7 +73,7 @@ public final class ThemedTooltip: NSObject {
 
     /// Force-show the bubble inline, skipping the enter/leave delays and the
     /// fade — the capture / test seam (the analogue of ThemedTextField's
-    /// `previewFocused`). still can't screenshot a separate child window, so the
+    /// `previewFocused`). prism can't screenshot a separate child window, so the
     /// bench draws an inline MOCK of the bubble instead; this exists for tests.
     public var previewVisible = false {
         didSet {

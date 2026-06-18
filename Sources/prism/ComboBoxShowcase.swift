@@ -1,5 +1,5 @@
-// still — ThemeKit ComboBox bench. The dropdown lives on its OWN borderless
-// child window, which `screencapture -l<winid>` of still's main window can NEVER
+// prism — ThemeKit ComboBox bench. The dropdown lives on its OWN borderless
+// child window, which `screencapture -l<winid>` of prism's main window can NEVER
 // include — so (like the Tooltip bench) the per-theme grid draws an INLINE MOCK
 // of the OPEN dropdown (rounded `background` surface, 1 pt `border`, 30 pt rows,
 // the highlighted row = `selection` wash + a `primary` accent bar, a disabled
@@ -132,7 +132,7 @@ struct MockComboBox: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             // LIVE — type into the real combo; its dropdown appears on a separate
-            // child window (won't show in a still screenshot, but proves the 演出).
+            // child window (won't show in a prism screenshot, but proves the 演出).
             HStack(alignment: .top, spacing: 24) {
                 liveCell("select-only") {
                     ThemedComboBoxView(palette: p, options: fruits,

@@ -1,4 +1,4 @@
-// still — ThemeKit FAB bench. Hosts the REAL shared `ThemedFAB` (ThemeKit)
+// prism — ThemeKit FAB bench. Hosts the REAL shared `ThemedFAB` (ThemeKit)
 // inside the SwiftUI gallery so the float / elevation / hover-press 演出 can be
 // evaluated live in every theme. The top row is INTERACTIVE (hover for the
 // state layer, click to bump the counter + feel the press deepen the shadow);

@@ -3,7 +3,7 @@
 // DEBUG `menuProbe` / `_list` / `_activate` seams; the hosted list's nav / AX are
 // exercised through the same list the controller configures. Open / monitor-
 // lifecycle uses a real (un-ordered) NSWindow + anchor. The Grow appearance + live
-// VoiceOver traversal are proven LIVE in still, not asserted here.
+// VoiceOver traversal are proven LIVE in prism, not asserted here.
 
 import XCTest
 import AppKit

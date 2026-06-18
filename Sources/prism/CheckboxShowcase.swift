@@ -1,4 +1,4 @@
-// still — ThemeKit checkbox bench. Hosts the REAL shared `ThemedCheckbox`
+// prism — ThemeKit checkbox bench. Hosts the REAL shared `ThemedCheckbox`
 // (ThemeKit) inside the SwiftUI gallery so the box / check-draw-in / hover circle
 // can be evaluated live in every theme. The top row is INTERACTIVE (click to
 // toggle, watch the checkmark draw in + the hover circle); the rows below force

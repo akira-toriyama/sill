@@ -3,7 +3,7 @@
 // `previewHighlight`/`previewSelection` + the pure `stickyHeader`/`_moveHighlight`
 // seams, and read through the DEBUG `listProbe`; no synthetic mouse events, no
 // live window (the layout cache + role resolvers are pure of the rendered pixels).
-// The selection / hover / solidAccent APPEARANCE is proven LIVE in still, not
+// The selection / hover / solidAccent APPEARANCE is proven LIVE in prism, not
 // asserted here (the combo-probe precedent).
 
 import XCTest

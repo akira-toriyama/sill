@@ -1,6 +1,6 @@
-// still — mock chrome specimens. Each is a tiny, deliberately-fake
+// prism — mock chrome specimens. Each is a tiny, deliberately-fake
 // rendition of an app's signature surface, drawn HERE in the resolved
-// palette. still imports NO app View code — these mirror the apps by
+// palette. prism imports NO app View code — these mirror the apps by
 // eye, so the preview can't couple the library to any app.
 
 import AppKit
@@ -76,7 +76,7 @@ struct SpecimenBox<Content: View>: View {
 /// a pinned "Desktop N" handle band, a search field, then per-workspace
 /// sections — each a 2-line caption (WS name + layout mode) over its
 /// window rows (app icon · app name · title · status badges). Hardcoded
-/// sample data; still imports no app View, so this mirrors the real
+/// sample data; prism imports no app View, so this mirrors the real
 /// `SidebarView+Draw` layout by eye only. Now panel-shaped (was a flat
 /// 4-row list): selection = `selection` fill + a 3 px `primary` left bar,
 /// a zebra stripe on alternating window rows, and master=crown /

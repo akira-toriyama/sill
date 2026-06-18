@@ -2,7 +2,7 @@
 // locally → these first compile + run in CI). The bubble is driven via
 // `previewVisible` (the force-show seam) and read through the DEBUG
 // `tooltipProbe`; no synthetic mouse events. The live hover-show / fade /
-// placement-flip 演出 is proven in still, not here. Placement assertions need a
+// placement-flip 演出 is proven in prism, not here. Placement assertions need a
 // screen — guarded with XCTSkip so a truly headless box doesn't hard-fail.
 
 import XCTest

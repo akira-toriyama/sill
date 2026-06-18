@@ -79,11 +79,11 @@ let package = Package(
         .target(name: "ConfigSchema",
                 dependencies: [.product(name: "Toml", package: "swift-toml-edit")]),
 
-        // `still` — the theme PREVIEW app. The one place in sill with a
+        // `prism` — the theme PREVIEW app. The one place in sill with a
         // config.toml. Renders every catalog theme (all roles + font +
         // its OWN mock chrome specimens — never imports an app's View, so
         // no drift debt). The visual verification bench for the catalog.
-        .executableTarget(name: "still", dependencies: ["Palette", "PaletteKit", "Effects", "ThemeKit"]),
+        .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "ThemeKit"]),
 
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit"]),
