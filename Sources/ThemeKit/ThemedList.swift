@@ -171,6 +171,15 @@ public final class ThemedList: NSView {
     /// section header). Default off.
     public var showsDividers = false { didSet { listView.needsDisplay = true } }
 
+    /// Reserve the leading image column on EVERY row so text aligns under a common
+    /// left edge even on image-less rows (facet/wand's mixed icon lists). DEFAULT
+    /// true. A list whose rows NEVER carry a leading image (the combo's option
+    /// list) sets this false so text sits at `leadingInset` with no empty icon
+    /// gutter, and such a row renders no leading image (there is no column for one).
+    public var reservesLeadingImageColumn = true {
+        didSet { if reservesLeadingImageColumn != oldValue { listView.needsDisplay = true } }
+    }
+
     /// Surface behind the rows — the kit-wide escape hatch (mirrors
     /// ThemedTextField / ThemedComboBox / ThemedDivider): a host on a lifted /
     /// vibrant panel sets the panel's colour. Defaults to `palette.background`.
@@ -477,6 +486,11 @@ public final class ThemedList: NSView {
 
     private var docWidth: CGFloat { listView.bounds.width }
 
+    /// Where a row's text/secondary starts: after the reserved leading image
+    /// column, or at `leadingInset` when the column is suppressed (an image-less
+    /// list — the combo's option rows, so they sit flush like the old ComboListView).
+    private var rowTextX: CGFloat { reservesLeadingImageColumn ? metrics.textXOrigin : metrics.leadingInset }
+
     /// A row's rect in the flipped doc view (y grows down).
     private func rowRect(_ i: Int) -> CGRect {
         if items.isEmpty { return CGRect(x: 0, y: 0, width: docWidth, height: metrics.singleRow) }
@@ -500,8 +514,17 @@ public final class ThemedList: NSView {
     }
 
     private var effectiveHighlightIndex: Int? {
-        if items.isEmpty { return (isActionRowActive && highlightedIndex == 0) ? 0 : nil }
-        if let pv = previewHighlight { return indexOf(pv) }
+        if items.isEmpty {
+            // Honor a forced preview of the synthetic action row (capture seam); else the live highlight.
+            if previewHighlight == ThemedList.emptyActionID { return isActionRowActive ? 0 : nil }
+            return (isActionRowActive && highlightedIndex == 0) ? 0 : nil
+        }
+        if let pv = previewHighlight {
+            // Never highlight a non-selectable row (mirrors effectiveSelectionIndex);
+            // the live nav already skips them, so this only guards the preview seam.
+            guard let i = indexOf(pv), isSelectable(items[i]) else { return nil }
+            return i
+        }
         return highlightedIndex
     }
 
@@ -550,7 +573,7 @@ public final class ThemedList: NSView {
         let m = metrics
         var w: CGFloat = 0
         for item in items where !item.isSeparator {
-            let textX = item.isHeader ? m.leadingInset : m.textXOrigin
+            let textX = item.isHeader ? m.leadingInset : rowTextX
             let pFont: NSFont = item.isHeader
                 ? (item.headerSubtitle != nil ? themedFont(m.header2TitlePt, .medium) : themedFont(m.header1Pt, .semibold))
                 : themedFont(m.primaryPt)
@@ -913,14 +936,14 @@ extension ThemedList {
 
         // 3. Leading image: a TEMPLATE glyph centres at `iconGlyph` (18/16) inside
         //    the `imageBox` reservation (no upscale); a colour favicon fills the box.
-        if let image = item.image {
+        if reservesLeadingImageColumn, let image = item.image {
             let side = image.isTemplate ? m.iconGlyph : m.imageBox
             let box = CGRect(x: m.leadingInset + (m.imageBox - side) / 2, y: r.midY - side / 2, width: side, height: side)
             drawImage(image, fitting: box, tint: onAccent ? palette.onPrimary(1) : (image.isTemplate ? palette.foreground : nil))
         }
 
         // 4. Text stack.
-        let xText = m.textXOrigin
+        let xText = rowTextX
         let textMax = max(0, r.maxX - m.trailingInset - (trailingW > 0 ? trailingW + m.budgetMargin : 0) - xText)
         let primaryColor = primaryTextColor(disabled: item.isDisabled, onAccent: onAccent)
         if let secondary = item.secondary {
@@ -945,7 +968,7 @@ extension ThemedList {
         //    suppressed above a separator row, which draws its own rule).
         if showsDividers, i < items.count - 1, !items[i + 1].isSeparator {
             let nextIsHeader = items[i + 1].isHeader
-            let x = nextIsHeader ? 0 : m.textXOrigin
+            let x = nextIsHeader ? 0 : rowTextX
             palette.border.setFill()
             CGRect(x: x, y: r.maxY - 1, width: width - x - (nextIsHeader ? 0 : m.trailingInset), height: 1).fill()
         }
