@@ -284,6 +284,7 @@ let kitCatalog: [KitComponent] = [
                  "vendsRowAXElements (synthetic per-row .menuItem AX children) · surfaceColor override (vibrancy escape hatch)",
                  "row kinds: .row / .sectionHeader(subtitle:) (sticky, 1- or 2-line) / .separator; ListTint: none/primary/secondary/error/.custom(HexColor); BadgeRole: neutral/primary/secondary/error; TrailingAccessory: none/chevron/shortcut(String)/custom(NSImage)",
                  "capture seams: previewHighlight/previewSelection/previewScrollY (id-keyed, deterministic prism shots)",
+                 "themed scroll: the vertical scroller is a ThemedScroller (public, reusable on any NSScrollView) — its overlay knob is painted palette.muted instead of macOS grey, auto-hiding (shown only while scrolling)",
              ],
         family: .collection),
     KitComponent(
