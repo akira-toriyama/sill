@@ -306,4 +306,147 @@ final class ThemedMenuTests: XCTestCase {
         XCTAssertEqual(m.menuProbe.resolvedCorner, .bottomLeading, "no room below ⇒ flip above, Grow from the bottom-leading corner")
         m.dismiss(animated: false)
     }
+
+    // MARK: - Submenu cascade (ONE level)
+
+    /// A menu with one submenu row ("More" → Sub 1/2/3) between two leaf rows.
+    private func cascadeItems() -> [ThemedMenu.MenuItem] {
+        [.init("A"),
+         .init(id: "more", title: "More", submenu: [
+            .init(id: "s1", title: "Sub 1"),
+            .init(id: "s2", title: "Sub 2"),
+            .init(id: "s3", title: "Sub 3"),
+         ]),
+         .init("B")]
+    }
+
+    func testSubmenuChildrenAutoSetChevron() {
+        let m = ThemedMenu(palette: theme())
+        m.items = cascadeItems()
+        XCTAssertTrue(m.items[1].hasSubmenu, "non-empty submenu auto-sets hasSubmenu")
+        XCTAssertEqual(m._list.items[1].trailing, .chevron, "a submenu row → trailing chevron")
+    }
+
+    func testOpenSubmenuShowsChildRows() {
+        let (m, anchor) = anchoredMenu(cascadeItems())
+        m.present(from: anchor)
+        XCTAssertFalse(m.menuProbe.childOpen, "no child until opened")
+        m._openSubmenu("more")
+        let p = m.menuProbe
+        XCTAssertTrue(p.childOpen, "opening a submenu row shows the child")
+        XCTAssertEqual(p.childRowID, "more")
+        XCTAssertEqual(p.childRowCount, 3, "the child hosts the submenu's rows")
+        XCTAssertTrue(p.leafIsChild, "the active leaf is now the child (keys route there)")
+        m.dismiss(animated: false)
+    }
+
+    func testRightArrowOpensAndLeftClosesSubmenu() {
+        let (m, anchor) = anchoredMenu(cascadeItems())
+        m.present(from: anchor)
+        m._list.moveHighlight(1)                 // A
+        m._list.moveHighlight(1)                 // More (the submenu row)
+        XCTAssertEqual(m.menuProbe.highlightedID, "more")
+        XCTAssertNil(m._handleKey(keyDown(124)), "→ is swallowed")
+        XCTAssertTrue(m.menuProbe.childOpen, "→ on a submenu row opens the child")
+        XCTAssertNil(m._handleKey(keyDown(123)), "← is swallowed")
+        XCTAssertFalse(m.menuProbe.childOpen, "← closes the child (back to the parent level)")
+        XCTAssertEqual(m.menuProbe.highlightedID, "more", "the parent row stays highlighted")
+        m.dismiss(animated: false)
+    }
+
+    func testArrowsRouteToTheOpenChild() {
+        let (m, anchor) = anchoredMenu(cascadeItems())
+        m.present(from: anchor)
+        m._openSubmenu("more")
+        XCTAssertEqual(m.menuProbe.childHighlightedID, "s1", "openSubmenu lit the child's first row")
+        XCTAssertNil(m._handleKey(keyDown(125)), "↓ swallowed")
+        XCTAssertEqual(m.menuProbe.childHighlightedID, "s2", "↓ moves the CHILD highlight (keys route to the leaf)")
+        m.dismiss(animated: false)
+    }
+
+    func testActivatingChildLeafBubblesDismissAndRunsAction() {
+        var fired: [String] = []
+        let items: [ThemedMenu.MenuItem] = [
+            .init(id: "more", title: "More", submenu: [
+                .init(id: "s1", title: "Sub 1", action: { fired.append("s1") }),
+            ]),
+        ]
+        let (m, anchor) = anchoredMenu(items)
+        m.present(from: anchor)
+        m._openSubmenu("more")
+        XCTAssertTrue(m.menuProbe.childOpen)
+        m._child?._activate("s1")                // click a child leaf row
+        XCTAssertEqual(fired, ["s1"], "the child leaf's action runs")
+        XCTAssertFalse(m.menuProbe.isOpen, "and the WHOLE chain dismisses (bubbles to the root)")
+        XCTAssertFalse(m.menuProbe.childOpen)
+    }
+
+    func testSubmenuRowActivationOpensChildNotItsAction() {
+        var fired = false
+        let items: [ThemedMenu.MenuItem] = [
+            .init(id: "more", title: "More", submenu: [.init(id: "s1", title: "Sub 1")], action: { fired = true }),
+        ]
+        let (m, anchor) = anchoredMenu(items)
+        m.present(from: anchor)
+        m._activate("more")                      // ⏎ / click on the submenu row
+        XCTAssertFalse(fired, "a submenu row's own action is ignored — opening the child IS its activation")
+        XCTAssertTrue(m.menuProbe.childOpen, "activating a submenu row opens the child")
+        m.dismiss(animated: false)
+    }
+
+    func testEscClosesOneLevelThenDismisses() {
+        let (m, anchor) = anchoredMenu(cascadeItems())
+        m.present(from: anchor)
+        m._openSubmenu("more")
+        XCTAssertTrue(m.menuProbe.childOpen)
+        XCTAssertNil(m._handleKey(keyDown(53)), "Esc swallowed")
+        XCTAssertFalse(m.menuProbe.childOpen, "Esc closes the submenu level first")
+        XCTAssertTrue(m.menuProbe.isOpen, "the root stays open")
+        XCTAssertNil(m._handleKey(keyDown(53)))
+        XCTAssertFalse(m.menuProbe.isOpen, "a second Esc dismisses the root")
+    }
+
+    func testDismissClosesTheChild() {
+        let (m, anchor) = anchoredMenu(cascadeItems())
+        m.present(from: anchor)
+        m._openSubmenu("more")
+        XCTAssertTrue(m.menuProbe.childOpen)
+        m.dismiss(animated: false)
+        XCTAssertFalse(m.menuProbe.childOpen, "dismiss closes the child too")
+        XCTAssertFalse(m.menuProbe.isOpen)
+    }
+
+    func testOneLevelCapOpensNoGrandchild() {
+        let items: [ThemedMenu.MenuItem] = [
+            .init(id: "more", title: "More", submenu: [
+                .init(id: "deep", title: "Deep", submenu: [.init(id: "g1", title: "G1")]),
+            ]),
+        ]
+        let (m, anchor) = anchoredMenu(items)
+        m.present(from: anchor)
+        m._openSubmenu("more")
+        XCTAssertTrue(m.menuProbe.childOpen, "the level-1 child opens")
+        m._child?._openSubmenu("deep")           // try to open a grandchild from the child
+        XCTAssertFalse(m._child?.menuProbe.childOpen ?? true, "a child opens NO grandchild (one-level cap)")
+        m.dismiss(animated: false)
+    }
+
+    func testRightArrowOnNonSubmenuRowPassesThrough() {
+        let (m, anchor) = anchoredMenu(cascadeItems())
+        m.present(from: anchor)
+        m._list.moveHighlight(1)                 // A — a leaf row with no submenu
+        XCTAssertEqual(m.menuProbe.highlightedID, "A")
+        let right = keyDown(124)
+        XCTAssertTrue(m._handleKey(right) === right, "→ on a non-submenu row passes through UNCHANGED (host IME safe)")
+        XCTAssertFalse(m.menuProbe.childOpen, "and opens nothing")
+        m.dismiss(animated: false)
+    }
+
+    func testLeftArrowAtRootPassesThrough() {
+        let (m, anchor) = anchoredMenu(cascadeItems())
+        m.present(from: anchor)
+        let left = keyDown(123)
+        XCTAssertTrue(m._handleKey(left) === left, "← at the root with no open child passes through UNCHANGED (host IME safe)")
+        m.dismiss(animated: false)
+    }
 }

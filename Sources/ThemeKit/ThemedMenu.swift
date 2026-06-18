@@ -100,7 +100,7 @@ public final class ThemedMenu: NSObject {
     public var palette: ResolvedPalette { didSet { list.palette = palette; applyTheme() } }
 
     /// The items. Assigning rebuilds the hosted list rows + reframes an open menu.
-    public var items: [MenuItem] = [] { didSet { rebuildRows(); if isOpen { reframe() } } }
+    public var items: [MenuItem] = [] { didSet { rebuildRows(); if isOpen { reframe(); validateOpenChild() } } }
 
     /// Row density — `.compact` (the native-menu default, 26pt rows) or
     /// `.comfortable` (30pt, the dropdown-list metric).
@@ -474,7 +474,10 @@ public final class ThemedMenu: NSObject {
         guard isOpen, let host = hostWindow,
               let mi = items.first(where: { $0.id == id }), mi.isEnabled, !mi.submenu.isEmpty,
               let rowRect = list.rowRectOnScreen(for: id) else { return }
-        if childRowID == id, child?.isOpen == true { return }       // already showing this one
+        if childRowID == id, child?.isOpen == true {                // already showing this one
+            if highlightFirst { child?.list.moveHighlight(1) }      // re-light its first row (Enter/→ intent)
+            return
+        }
         closeChild()
         let c = ThemedMenu(palette: palette)
         c.parentMenu = self
@@ -507,6 +510,22 @@ public final class ThemedMenu: NSObject {
         list.clearHighlight()
         fadeOut(animated: false)
         submenuRowOnScreen = nil
+    }
+
+    /// Keep an open child glued to its parent row when the parent relayouts (it
+    /// scrolled, or its items changed): re-anchor the child to the row's new screen
+    /// rect, or close it if the row vanished / is no longer a submenu. Root-only.
+    private func validateOpenChild() {
+        guard let c = child, let id = childRowID else { return }
+        guard items.first(where: { $0.id == id })?.submenu.isEmpty == false else {
+            closeChild(); return                             // the submenu row is gone / lost its children
+        }
+        if let rect = list.rowRectOnScreen(for: id) {
+            c.submenuRowOnScreen = rect
+            c.reframe()
+        } else {
+            closeChild()                                     // the parent row scrolled out of view
+        }
     }
 
     private func presentAsSubmenu(rowRectOnScreen rect: CGRect, in window: NSWindow) {
@@ -545,14 +564,16 @@ public final class ThemedMenu: NSObject {
         switch ev.keyCode {
         case 125: leaf.list.moveHighlight(1);  return nil    // ↓
         case 126: leaf.list.moveHighlight(-1); return nil    // ↑
-        case 124:                                            // → open the highlighted submenu
+        case 124:                                            // → open the highlighted submenu (else pass through)
             if let id = leaf.list.highlightedID,
                leaf.items.first(where: { $0.id == id })?.submenu.isEmpty == false {
                 leaf.openSubmenu(rowID: id, highlightFirst: true)
+                return nil
             }
-            return nil
+            return ev                                        // no submenu on this row → host keeps → (IME safe)
         case 123:                                            // ← close the current submenu level
-            leaf.parentMenu?.closeChild()
+            guard let parent = leaf.parentMenu else { return ev }   // at the root there's no level to close
+            parent.closeChild()
             return nil
         case 36, 76, 49: leaf.list.activateHighlight(); return nil   // ⏎ / keypad ⏎ / Space
         case 53:                                             // Esc — close one level (root ⇒ dismiss all)
@@ -626,6 +647,7 @@ public final class ThemedMenu: NSObject {
         if let anchor = anchorView {
             if anchor.visibleRect.isEmpty { dismiss(); return }
             reframe()
+            validateOpenChild()                             // re-anchor / close an open submenu after the parent moves
         } else {
             dismiss()
         }

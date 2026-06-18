@@ -80,7 +80,12 @@ struct MenuTriggerView: NSViewRepresentable {
         [
             ThemedMenu.MenuItem("New Window", icon: menuGlyph("doc.badge.plus"), shortcut: "⌘N") {},
             ThemedMenu.MenuItem("Open…",      icon: menuGlyph("folder"),         shortcut: "⌘O") {},
-            ThemedMenu.MenuItem(id: "recent", title: "Open Recent", icon: menuGlyph("clock"), hasSubmenu: true),
+            ThemedMenu.MenuItem(id: "recent", title: "Open Recent", icon: menuGlyph("clock"), submenu: [
+                ThemedMenu.MenuItem("Project Alpha", icon: menuGlyph("doc")) {},
+                ThemedMenu.MenuItem("Project Beta",  icon: menuGlyph("doc")) {},
+                .separator(),
+                ThemedMenu.MenuItem("Clear Menu", icon: menuGlyph("xmark.bin"), isDestructive: true) {},
+            ]),
             .separator(),
             ThemedMenu.MenuItem(id: "side", title: "Show Sidebar", icon: menuGlyph("checkmark"),
                                 shortcut: "⌘\\", isChecked: true),
@@ -106,7 +111,7 @@ struct MockMenu: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKit · Menu — a floating action menu (child window). The card shows an INLINE MOCK of the open menu (a real ThemedList in menu config); the live trigger opens the REAL ThemedMenu (hover / ↑↓ / Enter / Esc). solidAccent highlight, ⌘-shortcuts, a submenu chevron, a checkmark item, separators, a destructive (error) row, a disabled row.")
+            Text("ThemeKit · Menu — a floating action menu (child window). The card shows an INLINE MOCK of the open menu (a real ThemedList in menu config); the live trigger opens the REAL ThemedMenu (hover / ↑↓ / Enter / Esc). solidAccent highlight, ⌘-shortcuts, a checkmark item, separators, a destructive (error) row, a disabled row — and a one-level SUBMENU CASCADE: hover or → on \"Open Recent\" opens a child menu beside it (← / Esc closes it).")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
                 .fixedSize(horizontal: false, vertical: true)

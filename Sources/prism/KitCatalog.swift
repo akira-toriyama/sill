@@ -294,6 +294,7 @@ let kitCatalog: [KitComponent] = [
         keyAPI: [
                  "palette: ResolvedPalette — assign to (re)theme; repaints list + panel surface/edge",
                  "items: [MenuItem] — rows; each MenuItem carries title/icon/shortcut/isChecked/isDestructive/isEnabled + its own action closure (実処理). .separator(id:)/.header(_:id:) statics build non-interactive rows",
+                 "MenuItem.submenu: [MenuItem] — non-empty ⇒ a ONE-LEVEL cascade: the row opens a child menu beside it (hover-intent / → / click); auto-sets hasSubmenu; the row's own action is ignored (opening the child IS its activation); a child's submenu is ignored (one-level cap)",
                  "present(from: NSView, gap:) — open as a drop-down below an anchor (flips up on underflow)",
                  "present(at: CGPoint, in: NSWindow) — open as a context menu at a point (e.g. event.locationInWindow)",
                  "dismiss(animated:) — close (idempotent); invalidate() — deterministic teardown",
@@ -304,11 +305,11 @@ let kitCatalog: [KitComponent] = [
              ],
         variants: [
                  "row kinds: item / .separator / .header",
-                 "item adornments: leading icon, leading checkmark (isChecked), trailing ⌘-shortcut lozenge, trailing submenu chevron (hasSubmenu, one-level/cascade deferred)",
+                 "item adornments: leading icon, leading checkmark (isChecked), trailing ⌘-shortcut lozenge, trailing submenu chevron (hasSubmenu / non-empty submenu)",
                  "row states: enabled / disabled (isEnabled) / destructive error-tint (isDestructive)",
                  "density: compact (26pt) vs comfortable (30pt)",
-                 "placement: anchor drop-down vs context-menu point; corner-anchored Grow scale+fade (reduce-motion gated)",
-                 "interaction states demoed: hover/highlight (solidAccent), ↑↓ nav, ⏎/Space activate, Esc/Tab dismiss",
+                 "placement: anchor drop-down vs context-menu point; one-level submenu child beside its row (.submenu placement, flips left on overflow); corner-anchored Grow scale+fade (reduce-motion gated)",
+                 "interaction states demoed: hover/highlight (solidAccent), ↑↓ nav, ⏎/Space activate, → open submenu / ← + Esc close one level, Esc/Tab dismiss",
              ],
         family: .collection),
 ]
