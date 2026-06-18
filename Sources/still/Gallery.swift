@@ -241,6 +241,7 @@ struct ThemeCard: View {
             MockFAB(p: p)
             MockTooltip(p: p)
             MockComboBox(p: p)
+            MockList(p: p)
         }
         .padding(16)
         .background(cardBG)
