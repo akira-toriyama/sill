@@ -39,11 +39,19 @@ struct Gallery: View {
     /// so a card stays short (no more 11-mock scroll). `.palette` = theme foundations.
     @State private var selectedFamily: KitFamily = .palette
 
+    /// The live effect 演出 master toggle (派手 ON / 静か OFF). Seeded from the
+    /// config's `show-effects`, then driven by the header toggle at runtime — it
+    /// flips the animated widget accents, the cycling card rim, and the `.palette`
+    /// `LiveEffectStrip` together (the live mirror of the library's `effectsEnabled`),
+    /// with no relaunch or file edit.
+    @State private var showEffects: Bool
+
     init(config: PrismConfig) {
         self.config = config
         let t = config.theme
         _selected = State(initialValue:
             (t == "all" || Gallery.switchable.contains(t)) ? t : "all")
+        _showEffects = State(initialValue: config.showEffects)
     }
 
     /// The card(s) currently rendered: every theme when "all", else the one.
@@ -59,7 +67,7 @@ struct Gallery: View {
                 LazyVStack(spacing: 18) {
                     ForEach(shown, id: \.self) { name in
                         ThemeCard(name: name, family: selectedFamily, scale: config.fontScale,
-                                  showEffects: config.showEffects)
+                                  showEffects: showEffects)
                     }
                 }
                 .padding(18)
@@ -98,6 +106,11 @@ struct Gallery: View {
                         selectedFamily = fam
                     }
                 }
+                Spacer(minLength: 12)
+                // The effect 演出 master toggle — flips the live animation across the
+                // whole bench (派手 ON / 静か OFF). Trailing the family row so the two
+                // global controls (WHICH family · animate-or-not) sit together.
+                EffectToggle(on: showEffects) { showEffects.toggle() }
             }
         }
         .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 12)
@@ -415,6 +428,39 @@ struct FamilyTab: View {
         }
         .buttonStyle(.plain)
         .help("Show the \(family.rawValue) family")
+    }
+}
+
+// MARK: - Effect toggle (the 演出 master switch in the header)
+
+/// The bench-wide effect master toggle. Neutral app chrome like `FamilyTab`
+/// (it spans every theme), styled as a pill: ON fills with the system accent +
+/// a `sparkles` glyph (派手); OFF rests neutral and dimmed with a `moon.zzz`
+/// glyph (静か). Flipping it drives prism's `showEffects` — the live mirror of
+/// the library's `effectsEnabled` — so the animated widget accents, the cycling
+/// card rim, and the `.palette` `LiveEffectStrip` all start / stop together.
+struct EffectToggle: View {
+    let on: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: on ? "sparkles" : "moon.zzz")
+                    .font(.system(size: 10, weight: .semibold))
+                Text("Effects \(on ? "ON" : "OFF")")
+                    .font(sysFont(11, weight: on ? .bold : .medium, design: .monospaced))
+            }
+            .foregroundColor(on ? Color.white : Color(nsColor: .secondaryLabelColor))
+            .padding(.horizontal, 11).padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 7)
+                .fill(on ? Color(nsColor: .controlAccentColor)
+                         : Color(nsColor: .controlColor)))
+            .overlay(RoundedRectangle(cornerRadius: 7)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: on ? 0 : 1))
+        }
+        .buttonStyle(.plain)
+        .help("Toggle the effect 演出 (live animation) across the bench — 派手 ON / 静か OFF")
     }
 }
 
