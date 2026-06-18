@@ -11,7 +11,10 @@
 //     only the `Palette` product transitively links ZERO AppKit.
 //   * Effects is the shared DYNAMIC atom (Sendable spec + AppKit
 //     animator behind `#if canImport(AppKit)`), depending on Palette
-//     for the static base it animates.
+//     for the static base it animates. PaletteKit, in turn, depends on
+//     Effects (one acyclic edge) for the `ResolvedPalette.animated(…)`
+//     helper that grafts an animated accent onto a resolved palette;
+//     Effects never depends back on PaletteKit (halo links it alone).
 //
 // No `Sill` prefix — bare names are idiomatic (swift-algorithms ships
 // `Algorithms`; swift-collections ships `OrderedCollections`). The
@@ -56,11 +59,14 @@ let package = Package(
         // app supplies the verb arity table; CLIKit owns no vocabulary.
         .target(name: "CLIKit"),
 
-        // AppKit resolver. The ONLY target that `import AppKit`.
-        .target(name: "PaletteKit", dependencies: ["Palette"]),
-
         // Dynamic atom: Sendable EffectSpec + (macOS) AppKit animator.
+        // Declared before PaletteKit, which now depends on it.
         .target(name: "Effects", dependencies: ["Palette"]),
+
+        // AppKit resolver. Depends on Effects for the `ResolvedPalette.
+        // animated(forTheme:at:)` live-accent helper (composes an
+        // `Effects.AnimatedFrame` onto a resolved palette).
+        .target(name: "PaletteKit", dependencies: ["Palette", "Effects"]),
 
         // AppKit shared WIDGET KIT — MUI-style themed UI parts the family
         // draws by hand today (facet's tree filter / tag-rename fields, popup
@@ -86,7 +92,7 @@ let package = Package(
         .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "ThemeKit"]),
 
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
-        .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit"]),
+        .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit", "Effects"]),
         .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", "PaletteKit", "Palette"]),
         .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette"]),
         .testTarget(name: "ConfigSchemaTests",

@@ -28,12 +28,14 @@ sill (1 repo · 1 version)
 ├─ Palette      pure · Sendable · NO AppKit          ← any *Core can import
 │    HexColor · FontKind · ThemeSpec · presets · paletteFor · names
 │
-├─ PaletteKit   AppKit · @MainActor   depends on Palette
-│    NSColor(hex:) · resolve(ThemeSpec)->ResolvedPalette · pal · uiFont
+├─ Effects      dynamic atom (COLOR-only)   depends on Palette
+│    EffectSpec · borderEffectFor · blendThrough · animatedPalette
+│    (AppKit parts behind #if canImport. motion stays app-side — no protocol)
 │
-└─ Effects      dynamic atom (COLOR-only)   depends on Palette
-     EffectSpec · borderEffectFor · blendThrough · animatedPalette
-     (AppKit parts behind #if canImport. motion stays app-side — no protocol)
+└─ PaletteKit   AppKit · @MainActor   depends on Palette + Effects
+     NSColor(hex:) · resolve(ThemeSpec)->ResolvedPalette · pal · uiFont
+     ResolvedPalette.animated(forTheme:at:)  ← grafts an Effects AnimatedFrame
+       (the live accent) onto a resolved palette; the one PaletteKit→Effects edge
 ```
 
 A consumer that adds only the `Palette` product **transitively links zero
