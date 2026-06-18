@@ -87,6 +87,9 @@ struct Gallery: View {
                               selected: selected == name) { selected = name }
                 }
             }
+            // A rule separating the two control axes: WHICH theme (the colour chips
+            // above) vs WHICH widget family (the tabs below).
+            Divider()
             // Widget-family tabs — only the chosen family renders in each card, so
             // the bench is browsable by family instead of one painfully tall stack.
             HStack(spacing: 6) {
@@ -251,16 +254,16 @@ struct ThemeCard: View {
         .padding(16)
         .background(cardBG)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        // An animatable theme gets a LIVE glowing, breathing, colour-cycling
-        // border (the shared `resolveBorder` animator) so the effect is
-        // visible at gallery scale; every other theme keeps the flat hairline.
+        // The card rim is the REAL shared `ThemedBorder` (dogfood) — the ONE part
+        // every theme uses: a static `primary` stroke normally, the LIVE glowing /
+        // breathing / cycling effect rim when the theme has an effect AND the master
+        // `effectsEnabled` (here prism's `show-effects`) is on.
         .overlay {
-            if showEffects, isAnimatableTheme(name) {
-                AnimatedCardBorder(name: name, cornerRadius: 12, fallback: base.primary)
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(nsColor: base.border), lineWidth: 1)
-            }
+            ThemedBorderView(
+                palette: base,
+                effect: isAnimatableTheme(name) ? borderEffectFor(name) : nil,
+                effectsEnabled: showEffects,
+                cornerRadius: 12, lineWidth: 1.5)
         }
     }
 
@@ -299,6 +302,7 @@ struct ThemeCard: View {
             WidgetSection(kitComponent("ThemedFAB"), p: p) { MockFAB(p: p) }
         case .feedback:
             WidgetSection(kitComponent("ThemedDivider"), p: p) { MockDivider(p: p) }
+            WidgetSection(kitComponent("ThemedBorder"), p: p) { MockBorder(p: p, themeName: name) }
             WidgetSection(kitComponent("ThemedSkeleton"), p: p) { MockSkeleton(p: p) }
             WidgetSection(kitComponent("ThemedTooltip"), p: p) { MockTooltip(p: p) }
         case .collection:

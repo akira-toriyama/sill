@@ -101,28 +101,7 @@ struct LiveEffectStrip: View {
     }
 }
 
-// MARK: - Animated card border (the showpiece)
-
-/// A live, glowing, breathing border for an animatable theme's card —
-/// the shared `resolveBorder` animator drawn as a stroked, double-bloomed
-/// rounded rect. This is what makes "the effect" visible at gallery scale:
-/// the whole card rim cycles its neon. Non-animatable themes keep the flat
-/// 1 px `border` hairline (see Gallery's conditional overlay).
-struct AnimatedCardBorder: View {
-    let name: String
-    let cornerRadius: CGFloat
-    let fallback: NSColor
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-            let now = timeline.date.timeIntervalSinceReferenceDate
-            let live = liveEffectFrame(name: name, now: now, fallback: fallback)
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .strokeBorder(live.color, lineWidth: live.width)
-                // Two-stop bloom: a tight bright halo + a soft wide wash,
-                // scaled by the breathing width — a neon-tube glow.
-                .shadow(color: live.color.opacity(0.85), radius: live.width * 2.2)
-                .shadow(color: live.color.opacity(0.45), radius: live.width * 4.8)
-        }
-    }
-}
+// The card rim's live border is now the REAL shared `ThemedBorder` widget
+// (ThemeKit), dogfooded via prism's `ThemedBorderView` in Gallery's overlay —
+// prism's old local `AnimatedCardBorder` was retired when the part shipped.
+// `liveEffectFrame` above still backs the Palette-tab `LiveEffectStrip`.

@@ -70,6 +70,9 @@ themes (prism never imports an app's View → no drift).
 - Commits: **gitmoji + Conventional Commits** (enforced by `commit-lint`), e.g.
   `:sparkles: feat(ThemeKit): …`. Squash-merge; the PR number `(#N)` is appended
   by GitHub on merge.
-- A library change ⇒ **minor version bump + a matching git tag** (plain semver,
-  no `v`: `0.14.0`). Pre-1.0, a minor can break; consumers pin `.upToNextMinor`.
+- A library change ⇒ **minor version bump + a matching git tag**, `v`-prefixed to
+  match the app family (facet ships `v6.0.0`, …): **`v0.33.0`**. SwiftPM strips the
+  optional `v`, so `.upToNextMinor` pins resolve unchanged. Pre-1.0, a minor can
+  break; consumers pin `.upToNextMinor`. (Tags `0.17.0`…`0.32.0` predate this and
+  stay bare — the `v` prefix begins at `v0.33.0`; don't rewrite published tags.)
 - TOML is taplo-linted in CI.

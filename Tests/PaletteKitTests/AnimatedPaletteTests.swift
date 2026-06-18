@@ -101,4 +101,15 @@ final class AnimatedPaletteTests: XCTestCase {
         XCTAssertTrue(sameColor(a.secondary, b.secondary))
         XCTAssertTrue(sameColor(a.selection, b.selection))
     }
+
+    /// The master switch: `enabled: false` rests STATIC even on an animatable
+    /// theme (the 静か-OFF path), while `true` still cycles.
+    func testEnabledGateMastersTheCycle() {
+        let base = resolve(paletteFor("rainbow"))
+        let off = base.animated(forTheme: "rainbow", at: 0.3, enabled: false)
+        XCTAssertTrue(off.primary === base.primary)        // self — no cycle
+        XCTAssertTrue(off.selection === base.selection)
+        let on = base.animated(forTheme: "rainbow", at: 0.3, enabled: true)
+        XCTAssertFalse(sameColor(on.primary, base.primary)) // still cycles
+    }
 }

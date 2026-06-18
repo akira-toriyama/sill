@@ -54,8 +54,14 @@ public extension ResolvedPalette {
     /// `name` is the resolved THEME name (a `ResolvedPalette` doesn't carry its
     /// own name); pass the same name you resolved the base from. Equivalent to
     /// `Effects.animatedPalette(theme:at:)` followed by `applying(_:)`.
-    func animated(forTheme name: String, at phase: CGFloat) -> ResolvedPalette {
-        guard let frame = Effects.animatedPalette(theme: name, at: phase) else { return self }
+    ///
+    /// `enabled` is the master effects switch (派手好き ON / 静か OFF): pass `false`
+    /// and the palette rests STATIC regardless of theme — the same flag a host
+    /// passes to `ThemedBorder.effectsEnabled`, so the whole theme (widget accents
+    /// + border) animates or rests together. A host reads ONE preference and wires
+    /// it to both.
+    func animated(forTheme name: String, at phase: CGFloat, enabled: Bool = true) -> ResolvedPalette {
+        guard enabled, let frame = Effects.animatedPalette(theme: name, at: phase) else { return self }
         return applying(frame)
     }
 }
