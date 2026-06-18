@@ -439,6 +439,11 @@ same array. The families are the gallery's tabs:
 and `ThemedMenu`'s panel host (0.31) — mixed-height rows, section headers /
 separators, badges, density / selection / hover modes, and either host-driven or
 self-managed keyboard nav. So the three collection-ish parts draw from one body.
+Its vertical scroller is a **`ThemedScroller`** (a public, reusable `NSScroller`
+subclass) — an auto-hiding overlay knob painted `muted` rather than the macOS
+grey, so a scrollable surface scrolls in-theme too (1.2). The row glyphs draw
+through one `respectFlipped` image primitive (the doc view is `isFlipped`), so a
+checkmark / favicon lands upright (1.2).
 
 ### Live effects in the kit (the §3 motion, applied)
 

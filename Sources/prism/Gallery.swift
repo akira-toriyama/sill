@@ -12,7 +12,7 @@ import Effects
 /// One knob for the whole prism preview's type + metrics. Every font goes
 /// through `sysFont`, and the fixed panel / swatch / icon / window sizes are
 /// multiplied by this, so bumping it enlarges the entire gallery uniformly.
-let uiScale: CGFloat = 1.25
+let uiScale: CGFloat = 1.5
 
 /// A SwiftUI system font at the global `uiScale`. Drop-in for
 /// `.system(size:weight:design:)` — same labels, just scaled.

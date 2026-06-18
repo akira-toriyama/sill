@@ -290,6 +290,9 @@ public final class ThemedList: NSView {
     private var rowLayout = RowLayout()         // cached per reload (mixed-height rows)
 
     private let scrollView = NSScrollView()
+    // A vertical-shaped frame so NSScroller infers a vertical scroller; the scroll
+    // view resizes it. Themed in `applyTheme` so the knob reads in-palette.
+    private let vScroller = ThemedScroller(frame: NSRect(x: 0, y: 0, width: 16, height: 100))
     private var listView: ListDocumentView!
     private var focusRingLayer: CAShapeLayer?
 
@@ -355,8 +358,9 @@ public final class ThemedList: NSView {
         scrollView.documentView = lv
         scrollView.drawsBackground = true
         scrollView.hasVerticalScroller = true
+        scrollView.verticalScroller = vScroller          // theme-painted knob, not macOS grey
         scrollView.autohidesScrollers = true
-        scrollView.scrollerStyle = .overlay
+        scrollView.scrollerStyle = .overlay              // show only while scrolling (auto-hide)
         scrollView.borderType = .noBorder
         scrollView.automaticallyAdjustsContentInsets = false
         scrollView.frame = bounds
@@ -420,6 +424,7 @@ public final class ThemedList: NSView {
         // translucent surface lets the lifted/vibrant host show through.
         scrollView.drawsBackground = (surface?.alphaComponent ?? 0) >= 1
         scrollView.backgroundColor = surface ?? .clear
+        vScroller.knobColor = palette.muted              // themed scroll knob (vs macOS grey)
         focusRingLayer?.strokeColor = palette.primary.cgColor
         CATransaction.commit()
         listView?.needsDisplay = true
@@ -1213,6 +1218,11 @@ extension ThemedList {
 
     /// Aspect-fit `image` centred in `box`; tint a TEMPLATE image (a colour image
     /// draws as-is — the kit can't knock out a favicon).
+    ///
+    /// `respectFlipped: true` is REQUIRED: this list's document view is
+    /// `isFlipped` (row 0 at top), and the plain `draw(in:)` ignores the context
+    /// flip, so every glyph (a checkmark, a hammer, an app favicon) rendered
+    /// upside-down. The flag makes NSImage honour the flip and draw upright.
     private func drawImage(_ image: NSImage, fitting box: CGRect, tint: NSColor?) {
         let s = image.size
         guard s.width > 0, s.height > 0 else { return }
@@ -1221,12 +1231,14 @@ extension ThemedList {
         let fit = CGRect(x: box.midX - w / 2, y: box.midY - h / 2, width: w, height: h)
         if let tint, image.isTemplate {
             NSGraphicsContext.saveGraphicsState()
-            image.draw(in: fit, from: .zero, operation: .sourceOver, fraction: 1)
+            image.draw(in: fit, from: .zero, operation: .sourceOver, fraction: 1,
+                       respectFlipped: true, hints: nil)
             tint.set()
             fit.fill(using: .sourceAtop)
             NSGraphicsContext.restoreGraphicsState()
         } else {
-            image.draw(in: fit, from: .zero, operation: .sourceOver, fraction: 1)
+            image.draw(in: fit, from: .zero, operation: .sourceOver, fraction: 1,
+                       respectFlipped: true, hints: nil)
         }
     }
 
