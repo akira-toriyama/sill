@@ -608,4 +608,109 @@ final class ThemedListTests: XCTestCase {
         XCTAssertFalse(l._handleDragKey(keyDown(125)), "↓ falls through when not draggable")
         XCTAssertFalse(l.isDragging)
     }
+
+    // MARK: - Indent / disclosure (Part 3)
+
+    private func indentedRow(_ id: String, _ level: Int) -> ListItem {
+        ListItem(id: id, primary: id.capitalized, indentLevel: level)
+    }
+    private func collapsibleHeader(_ id: String, collapsed: Bool, subtitle: String? = nil, level: Int = 0) -> ListItem {
+        ListItem(id: id, primary: id, kind: .sectionHeader(subtitle: subtitle, collapsed: collapsed), indentLevel: level)
+    }
+
+    func testIndentLevelShiftsRowContentByStep() {
+        // comfortable: rowTextX = textXOrigin = leadingInset(12)+imageBox(24)+gap(8) = 44;
+        // indentStep = 16, so each level shifts the content right by 16.
+        let l = makeList([indentedRow("a", 0), indentedRow("b", 1), indentedRow("c", 2)])
+        XCTAssertEqual(l._contentLeadingX(forID: "a"), 44, "level 0 = the un-indented text origin (additive)")
+        XCTAssertEqual(l._contentLeadingX(forID: "b"), 44 + 16, "level 1 shifts one step")
+        XCTAssertEqual(l._contentLeadingX(forID: "c"), 44 + 32, "level 2 shifts two steps")
+    }
+
+    func testIndentStepIsDensityDependent() {
+        let l = makeList([indentedRow("a", 0), indentedRow("b", 1)])
+        l.density = .compact   // rowTextX = 10+20+6 = 36; indentStep = 14
+        XCTAssertEqual(l._contentLeadingX(forID: "a"), 36)
+        XCTAssertEqual(l._contentLeadingX(forID: "b"), 36 + 14, "compact indent step = 14")
+    }
+
+    func testIndentLevelDoesNotChangeRowHeightsOrOffsets() {
+        // Indent is purely a content x-shift — the row band (height / offset, hence the
+        // full-bleed selection fill) is identical to an un-indented list.
+        let flat = makeList([row("a"), row("b"), row("c")]).listProbe
+        let nested = makeList([indentedRow("a", 0), indentedRow("b", 2), indentedRow("c", 1)]).listProbe
+        XCTAssertEqual(nested.rowFrames["b"]?.minY, flat.rowFrames["b"]?.minY, "indent doesn't move the row band")
+        XCTAssertEqual(nested.rowFrames["b"]?.height, flat.rowFrames["b"]?.height)
+        XCTAssertEqual(nested.totalHeight, flat.totalHeight)
+    }
+
+    func testHeaderCollapsedAccessors() {
+        let plain = header("Plain")
+        XCTAssertNil(plain.headerCollapsed, "a plain header is not collapsible (collapsed nil)")
+        XCTAssertFalse(plain.isCollapsibleHeader)
+        let expanded = collapsibleHeader("Open", collapsed: false)
+        XCTAssertEqual(expanded.headerCollapsed, false, "collapsible + expanded")
+        XCTAssertTrue(expanded.isCollapsibleHeader)
+        let collapsed = collapsibleHeader("Shut", collapsed: true)
+        XCTAssertEqual(collapsed.headerCollapsed, true, "collapsible + collapsed")
+        XCTAssertTrue(collapsed.isCollapsibleHeader)
+    }
+
+    func testDefaultSectionHeaderIsUnchanged() {
+        // The pre-Part-3 call sites (.sectionHeader() / .sectionHeader(subtitle:)) keep
+        // collapsed == nil → non-collapsible, byte-identical behaviour.
+        XCTAssertNil(header("H").headerCollapsed)
+        XCTAssertNil(header("H", subtitle: "sub").headerCollapsed)
+        XCTAssertFalse(header("H").isCollapsibleHeader)
+    }
+
+    func testCollapsibleHeaderTitleShiftsByDisclosureGutter() {
+        // A plain header's title sits at leadingInset(12); a collapsible header's after
+        // the disclosure gutter = disclosurePt(11)+disclosureGap(5) = 16; indent adds 16/level.
+        let l = makeList([header("plain"),
+                          collapsibleHeader("open", collapsed: false),
+                          collapsibleHeader("deep", collapsed: true, level: 1)])
+        XCTAssertEqual(l._contentLeadingX(forID: "plain"), 12, "plain header: no disclosure gutter")
+        XCTAssertEqual(l._contentLeadingX(forID: "open"), 12 + 16, "collapsible header reserves the disclosure gutter")
+        XCTAssertEqual(l._contentLeadingX(forID: "deep"), 12 + 16 + 16, "indent + disclosure gutter stack")
+    }
+
+    func testClickOnCollapsibleHeaderFiresToggleNotActivate() {
+        // top collapsible header (index 0 → reached via the sticky-pin branch), a row,
+        // a PLAIN header (no toggle), and a low collapsible header (general branch).
+        let l = makeList([collapsibleHeader("top", collapsed: false),  // [0,28)
+                          row("a"),                                     // [28,58)
+                          header("mid"),                                // [58,86)  — plain
+                          row("b"),                                     // [86,116)
+                          collapsibleHeader("low", collapsed: true)])   // [116,144)
+        var toggled: [String] = []; var activated: [String] = []
+        l.onToggleSection = { toggled.append($0) }
+        l.onActivate = { activated.append($0.id) }
+
+        l._handleClick(atDocY: 10)           // the top collapsible header (pinned-band path)
+        XCTAssertEqual(toggled, ["top"], "clicking a collapsible header toggles it")
+        l._handleClick(atDocY: 130)          // the low collapsible header (general path)
+        XCTAssertEqual(toggled, ["top", "low"])
+        l._handleClick(atDocY: 70)           // the PLAIN header — no toggle, no activate
+        XCTAssertEqual(toggled, ["top", "low"], "a plain header never toggles")
+        XCTAssertTrue(activated.isEmpty, "a header never activates")
+        l._handleClick(atDocY: 40)           // a row — activates, never toggles
+        XCTAssertEqual(activated, ["a"], "a row activates")
+        XCTAssertEqual(toggled, ["top", "low"], "a row never toggles a section")
+    }
+
+    func testIndentWidensFittingWidth() {
+        let flat = makeList([ListItem(id: "x", primary: "Same label")])
+        let deep = makeList([ListItem(id: "x", primary: "Same label", indentLevel: 3)])
+        XCTAssertEqual(deep.fittingWidth(maxWidth: 5000) - flat.fittingWidth(maxWidth: 5000), 48,
+                       "3 levels widen the fit by 3 × indentStep(16)")
+    }
+
+    func testStickyHeaderKeepsCollapsibleHeaderPinnable() {
+        // A collapsible header still pins like any header (its disclosure draws via the
+        // shared drawHeader, so the pin keeps its state) — assert the pure sticky math.
+        let l = makeList([collapsibleHeader("WS", collapsed: false), row("a"), row("b"), row("c")])
+        let pin = l._stickyHeader(atScrollY: 50)   // scrolled past the header's natural slot
+        XCTAssertEqual(pin.id, "WS", "the collapsible header is the pinned section")
+    }
 }
