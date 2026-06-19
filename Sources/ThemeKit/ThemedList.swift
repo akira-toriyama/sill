@@ -224,7 +224,15 @@ public final class ThemedList: NSView {
 
     /// The theme. Assigning re-snaps the surface and repaints every row (all colour
     /// intent resolves in `drawRows`, so a switch fully re-themes) — the contract.
-    public var palette: ResolvedPalette { didSet { applyTheme() } }
+    /// A font-KIND change (mono↔system) changes glyph advances, so when the list is
+    /// horizontally scrolling the cached natural width is recomputed + the doc resized
+    /// (text widths are the only metric that depends on the font; heights don't).
+    public var palette: ResolvedPalette {
+        didSet {
+            applyTheme()
+            if horizontalContentScroll, oldValue.font != palette.font { recomputeLayout(); syncDocSize() }
+        }
+    }
 
     public var density: Density = .comfortable { didSet { if density != oldValue { reload() } } }
 
@@ -647,10 +655,13 @@ public final class ThemedList: NSView {
     /// Size the doc view: width = the clip width, or — when `horizontalContentScroll`
     /// is on — the wider of the clip and the natural content width (so long rows draw
     /// untruncated and the panel scrolls sideways); height = the laid-out total.
+    /// Before the view is sized (clip width 0) the WIDTH is left as-is but the HEIGHT
+    /// is still stamped to `totalHeight` — 1.4.0 set both unconditionally, and the AX
+    /// flip-frame conversion (`buildAXChildren`) reads the doc height pre-layout.
     private func syncDocSize() {
         let clip = scrollView.contentView.bounds.width
-        guard clip > 0 else { return }
-        let w = horizontalContentScroll ? max(clip, rowLayout.naturalWidth) : clip
+        let w = clip > 0 ? (horizontalContentScroll ? max(clip, rowLayout.naturalWidth) : clip)
+                         : listView.bounds.width
         if listView.bounds.width != w || listView.bounds.height != rowLayout.totalHeight {
             listView.setFrameSize(NSSize(width: w, height: rowLayout.totalHeight))
         }
@@ -1163,8 +1174,7 @@ extension ThemedList {
         // 1. Backgrounds: zebra stripe (base), the leading tint bar, then the selection /
         //    highlight fill + hover veil. All FULL-BLEED (x=0 / full width) — only the
         //    row's CONTENT indents (the MUI tree model).
-        if alternatingRowBackground, !isSel, !drawHighlightFill,
-           rowLayout.zebra.indices.contains(i), rowLayout.zebra[i] {
+        if paintsZebra(i, isSel: isSel, drawHighlightFill: drawHighlightFill) {
             zebraColor.setFill()
             CGRect(x: 0, y: r.minY, width: r.width, height: r.height).fill()
         }
@@ -1252,6 +1262,16 @@ extension ThemedList {
     /// The zebra stripe — `hover` at low alpha (no new palette role); reads as a faint
     /// lighter/darker band on light/dark surfaces alike.
     private var zebraColor: NSColor { palette.hover.withAlphaComponent(0.4) }
+
+    /// Whether row `i` paints a zebra stripe — the SINGLE source the renderer + the
+    /// probe both use. Gated on the opt-in flag, an OPAQUE surface (a translucent stripe
+    /// over a vibrancy backdrop reads inconsistently AND would bleed through a pinned
+    /// header whose punch is skipped on a nil surface), the data-row parity, and NOT a
+    /// selected / fill-highlighted row (whose fill paints over it).
+    private func paintsZebra(_ i: Int, isSel: Bool, drawHighlightFill: Bool) -> Bool {
+        alternatingRowBackground && effectiveSurface != nil && !isSel && !drawHighlightFill
+            && rowLayout.zebra.indices.contains(i) && rowLayout.zebra[i]
+    }
 
     /// Whether a row's highlight fills like a selection (`.fill`) vs draws a ring
     /// (`.outline`), and whether it sits on an opaque accent fill (`.solidAccent` →
@@ -2147,9 +2167,18 @@ extension ThemedList {
     func _highlightFillAndAccent(isSel: Bool, isHi: Bool) -> (fill: Bool, onAccent: Bool) {
         highlightFillAndAccent(isSel: isSel, isHi: isHi)
     }
-    /// The zebra parity for a row id (true = striped). nil for an unknown id.
+    /// The zebra parity for a row id (true = striped). nil for an unknown id. This is
+    /// the raw layout parity (always computed); whether a stripe actually PAINTS is
+    /// `_zebraPaints` (it folds in the flag / surface / selection suppression).
     func _zebraParity(forID id: String) -> Bool? {
         indexOf(id).flatMap { rowLayout.zebra.indices.contains($0) ? rowLayout.zebra[$0] : nil }
+    }
+    /// Whether row `id` would actually paint its stripe in (isSel, isHi) state — the
+    /// real draw decision (asserts the suppression-under-selection + surface gating).
+    func _zebraPaints(forID id: String, isSel: Bool = false, isHi: Bool = false) -> Bool {
+        guard let i = indexOf(id) else { return false }
+        let (fill, _) = highlightFillAndAccent(isSel: isSel, isHi: isHi)
+        return paintsZebra(i, isSel: isSel, drawHighlightFill: fill)
     }
     /// The cached natural content width (0 unless horizontalContentScroll is on).
     var _naturalContentWidth: CGFloat { rowLayout.naturalWidth }

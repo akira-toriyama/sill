@@ -291,8 +291,8 @@ struct MockList: View {
                         list.items = facetItems()
                         list.selectionMode = .single
                         list.highlightStyle = .outline
-                        // w1 committed (wash + bar); w3 is the keyboard cursor (a ring) —
-                        // two distinct affordances at once (facet's tree).
+                        // w1 (Safari) committed (wash + bar); w2 (Xcode) is the keyboard
+                        // cursor (a ring) — two distinct affordances at once (facet's tree).
                         list.previewSelection = "w1"
                         list.previewHighlight = "w2"
                     }

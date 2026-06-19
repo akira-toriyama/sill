@@ -773,11 +773,12 @@ final class ThemedListTests: XCTestCase {
     }
 
     func testZebraParityAlternatesAndResetsPerSection() {
-        // Data-row parity 0,1,2,… → stripe on the odd ones; headers/separators never
-        // stripe and RESET the parity so each section starts unstriped.
+        // Parity is LAYOUT (always computed at reload, independent of the flag — the flag
+        // only gates the paint, see testZebraPaintsOnlyWhenEnabledAndUnselected). Data-row
+        // parity 0,1,2,… → stripe the odd ones; headers/separators never stripe and RESET
+        // the parity so each section starts unstriped.
         let l = makeList([header("H1"), row("a"), row("b"), row("c"),
                           header("H2"), row("d"), row("e")])
-        l.alternatingRowBackground = true
         XCTAssertEqual(l._zebraParity(forID: "H1"), false, "a header is never striped")
         XCTAssertEqual(l._zebraParity(forID: "a"), false, "first data row of a section: parity 0")
         XCTAssertEqual(l._zebraParity(forID: "b"), true,  "second: parity 1 → striped")
@@ -792,6 +793,24 @@ final class ThemedListTests: XCTestCase {
         XCTAssertEqual(l._zebraParity(forID: "a"), false, "data row 0")
         XCTAssertEqual(l._zebraParity(forID: "sep"), false, "a separator is never striped / not counted")
         XCTAssertEqual(l._zebraParity(forID: "b"), true, "the separator doesn't advance parity: b is data row 1")
+    }
+
+    func testZebraPaintsOnlyWhenEnabledAndUnselected() {
+        // The actual paint decision: gated on the flag, an opaque surface, and NOT a
+        // selected / fill-highlighted row (whose fill covers the stripe). "b" is the
+        // odd (striped) parity row.
+        let l = makeList([header("H1"), row("a"), row("b")])   // a=parity0, b=parity1
+        XCTAssertFalse(l._zebraPaints(forID: "b"), "flag off → no stripe even on an odd row")
+        l.alternatingRowBackground = true
+        XCTAssertTrue(l._zebraPaints(forID: "b"), "flag on + opaque surface + unselected → stripe")
+        XCTAssertFalse(l._zebraPaints(forID: "a"), "an even-parity row never stripes")
+        XCTAssertFalse(l._zebraPaints(forID: "b", isSel: true), "a selected row's fill covers the stripe")
+        XCTAssertFalse(l._zebraPaints(forID: "b", isHi: true), "a fill-highlighted row covers the stripe")
+        // A nil (vibrancy) surface suppresses the stripe (it would bleed through a pinned header).
+        l.surfaceColor = nil
+        l.palette = resolve(.system)   // ThemeSpec.system = vibrancy (background nil)
+        XCTAssertNil(l.palette.background, "precondition: the system theme resolves to a nil (vibrancy) surface")
+        XCTAssertFalse(l._zebraPaints(forID: "b"), "a vibrancy (nil) surface suppresses the stripe")
     }
 
     func testHorizontalContentScrollNaturalWidth() {
