@@ -260,11 +260,6 @@ struct ThemeCard: View {
             // `resolve(spec)` accent the cards used to show.
             if family == .palette {
                 paletteFoundations(spec: spec, p: base)
-            } else if family == .icon {
-                // The icon bench is about the SVG glyphs, not the accent cycle —
-                // and animating it would rebuild ~60 NSImages + tear down the
-                // composed toolbar 30×/sec per card. Render it STATIC.
-                widgetFamily(p: base)
             } else if showEffects, isAnimatableTheme(name) {
                 TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
                     let now = timeline.date.timeIntervalSinceReferenceDate

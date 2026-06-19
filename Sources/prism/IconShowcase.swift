@@ -14,6 +14,32 @@ import AppKit
 import PaletteKit
 import ThemeKit
 
+// MARK: - Memoized loaders
+//
+// The icon tab follows the live effect path, so under a 30 Hz `TimelineView`
+// `MockIcons.body` re-runs every frame. The icons themselves NEVER change (the
+// template mask is recoloured by the role — SwiftUI's `.foregroundStyle` for the
+// glyph grid, the widget's device tint for the strip), so we build each `NSImage`
+// ONCE and reuse it. ThemeKit's loaders already cache the SVG parse; this caches
+// the NSImage wrapper too, so a frame is pure recolour, no allocation.
+
+@MainActor private enum IconMemo {
+    static var images: [String: NSImage] = [:]
+    static func get(_ key: String, _ make: () -> NSImage?) -> NSImage? {
+        if let hit = images[key] { return hit }
+        guard let img = make() else { return nil }
+        images[key] = img
+        return img
+    }
+}
+
+@MainActor private func phImg(_ name: String, pt: CGFloat, weight: PhosphorWeight = .regular) -> NSImage? {
+    IconMemo.get("ph:\(weight.rawValue):\(name):\(pt)") { phosphorImage(name, pt: pt, weight: weight) }
+}
+@MainActor private func siImg(_ name: String, pt: CGFloat) -> NSImage? {
+    IconMemo.get("si:\(name):\(pt)") { simpleIconImage(name, pt: pt) }
+}
+
 // MARK: - Toolbar bridge (local — takes ThemedToolBar.Item directly, with `image` items)
 
 private struct IconBarView: NSViewRepresentable {
@@ -23,18 +49,19 @@ private struct IconBarView: NSViewRepresentable {
     var variant: ThemedToolBar.Variant = .dense
 
     func makeNSView(context: Context) -> ThemedToolBar {
-        let b = ThemedToolBar(palette: palette); apply(to: b); return b
+        let b = ThemedToolBar(palette: palette)
+        b.surface = surface
+        b.variant = variant
+        b.items = items          // build the composed buttons ONCE
+        return b
     }
-    func updateNSView(_ b: ThemedToolBar, context: Context) { apply(to: b) }
+    // Per-frame (live effect): re-theme only — re-assigning `items` would tear the
+    // whole button subtree down + rebuild it 30×/sec. The memoized images keep a
+    // stable identity, so the bar's content is unchanged; just recolour it.
+    func updateNSView(_ b: ThemedToolBar, context: Context) { b.palette = palette }
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedToolBar,
                       context: Context) -> CGSize? {
         CGSize(width: proposal.width ?? 420, height: nsView.intrinsicContentSize.height)
-    }
-    private func apply(to b: ThemedToolBar) {
-        b.palette = palette
-        b.surface = surface
-        b.variant = variant
-        b.items = items          // set last — rebuilds the composed buttons
     }
 }
 
@@ -71,7 +98,7 @@ struct MockIcons: View {
                                 .frame(width: 38 * uiScale, alignment: .leading)
                             ForEach(Self.weights, id: \.self) { w in
                                 labeled(w.rawValue) {
-                                    glyph(phosphorImage(name, pt: 26, weight: w),
+                                    glyph(phImg(name, pt: 26, weight: w),
                                           color: p.primary, side: 24)
                                 }
                             }
@@ -85,7 +112,7 @@ struct MockIcons: View {
                 FlowLayout(spacing: 10, lineSpacing: 10) {
                     ForEach(Self.functional, id: \.self) { name in
                         labeled(name) {
-                            glyph(phosphorImage(name, pt: 24), color: p.foreground, side: 22)
+                            glyph(phImg(name, pt: 24), color: p.foreground, side: 22)
                         }
                     }
                 }
@@ -95,7 +122,7 @@ struct MockIcons: View {
                 HStack(alignment: .top, spacing: 16) {
                     ForEach(Self.logos, id: \.self) { name in
                         labeled(name) {
-                            glyph(simpleIconImage(name, pt: 24), color: p.foreground, side: 24)
+                            glyph(siImg(name, pt: 24), color: p.foreground, side: 24)
                         }
                     }
                     Spacer(minLength: 0)
@@ -112,23 +139,23 @@ struct MockIcons: View {
 
                     HStack(spacing: 12) {
                         ThemedButtonView(palette: p, variant: .contained, title: "Export",
-                                         leadingImage: phosphorImage("export", pt: 20))
+                                         leadingImage: phImg("export", pt: 20))
                         ThemedButtonView(palette: p, variant: .outlined, title: "Edit",
-                                         leadingImage: phosphorImage("note-pencil", pt: 20))
+                                         leadingImage: phImg("note-pencil", pt: 20))
                         ThemedButtonView(palette: p, variant: .text, title: "More",
-                                         trailingImage: phosphorImage("caret-down", pt: 20))
+                                         trailingImage: phImg("caret-down", pt: 20))
                         Spacer(minLength: 0)
                     }
 
                     HStack(spacing: 16) {
                         ThemedFABView(palette: p, variant: .circular, size: .medium, role: .primary,
-                                      image: phosphorImage("plus", pt: 24, weight: .bold))
+                                      image: phImg("plus", pt: 24, weight: .bold))
                             .frame(width: 48, height: 48)
                         ThemedFABView(palette: p, variant: .circular, size: .medium, role: .secondary,
-                                      image: phosphorImage("heart", pt: 24, weight: .fill))
+                                      image: phImg("heart", pt: 24, weight: .fill))
                             .frame(width: 48, height: 48)
                         ThemedFABView(palette: p, variant: .extended, size: .medium, role: .primary,
-                                      image: phosphorImage("note-pencil", pt: 22), label: "Compose")
+                                      image: phImg("note-pencil", pt: 22), label: "Compose")
                             .fixedSize()
                         Spacer(minLength: 0)
                     }
@@ -145,14 +172,14 @@ struct MockIcons: View {
 
     private var barItems: [ThemedToolBar.Item] {
         [
-            .button(.init(image: phosphorImage("list", pt: 20), tooltip: "Menu")),
+            .button(.init(image: phImg("list", pt: 20), tooltip: "Menu")),
             .label("prism"),
             .flexibleSpace,
-            .button(.init(image: phosphorImage("magnifying-glass", pt: 20), tooltip: "Search")),
-            .button(.init(image: phosphorImage("gear", pt: 20), tooltip: "Settings")),
+            .button(.init(image: phImg("magnifying-glass", pt: 20), tooltip: "Search")),
+            .button(.init(image: phImg("gear", pt: 20), tooltip: "Settings")),
             .divider,
-            .button(.init(image: simpleIconImage("github", pt: 18), tooltip: "GitHub")),
-            .button(.init(title: "New", image: phosphorImage("plus", pt: 18, weight: .bold),
+            .button(.init(image: siImg("github", pt: 18), tooltip: "GitHub")),
+            .button(.init(title: "New", image: phImg("plus", pt: 18, weight: .bold),
                           variant: .contained)),
         ]
     }
