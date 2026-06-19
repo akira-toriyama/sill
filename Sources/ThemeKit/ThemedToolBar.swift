@@ -66,8 +66,8 @@ public final class ThemedToolBar: NSView {
     /// button (MUI <IconButton>); a `title` = an icon+label button (MUI <Button>).
     public struct ButtonItem {
         public var title: String?
-        public var symbol: String?          // leading / sole SF Symbol
-        public var trailingSymbol: String?
+        public var symbol: String?          // leading / sole icon — a Phosphor slug
+        public var trailingSymbol: String?  // a Phosphor slug
         public var image: NSImage?          // PRE-RESOLVED leading/sole icon (wins
                                             // over `symbol`): app icon / favicon /
                                             // brand logo (Simple Icons) / Phosphor /
@@ -86,7 +86,7 @@ public final class ThemedToolBar: NSView {
             self.role = role; self.variant = variant; self.isEnabled = isEnabled
             self.tooltip = tooltip; self.keyEquivalent = keyEquivalent
         }
-        /// Icon-only ⇒ a square button (no text, an icon — SF Symbol or image — present).
+        /// Icon-only ⇒ a square button (no text, an icon — Phosphor slug or image — present).
         public var isIconOnly: Bool { (title?.isEmpty ?? true) && (symbol != nil || image != nil) }
     }
 

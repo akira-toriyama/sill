@@ -49,25 +49,21 @@ struct ListView: NSViewRepresentable {
 
 // MARK: - Mock image helpers (pre-resolved NSImages — the kit parses no SF name)
 
-/// A template SF glyph (the kit tints it to a role at draw — facet app icons,
-/// badge symbols, the chevron).
+/// A template Phosphor glyph (the kit tints it to a role at draw — facet app
+/// icons, badge symbols, the disclosure caret).
 @MainActor private func glyph(_ name: String, _ pt: CGFloat = 16) -> NSImage? {
-    guard let base = NSImage(systemSymbolName: name, accessibilityDescription: nil) else { return nil }
-    let out = base.withSymbolConfiguration(.init(pointSize: pt, weight: .regular)) ?? base
-    out.isTemplate = true
-    return out
+    phosphorImage(name, pt: pt)   // a Phosphor slug → template NSImage
 }
 
 /// A SOLID-COLOUR glyph (non-template) — a stand-in favicon, so the `.solidAccent`
 /// no-knockout path (a colour image draws as-is on the primary fill) is exercised.
 @MainActor private func favicon(_ name: String, _ color: NSColor, _ pt: CGFloat = 16) -> NSImage? {
-    guard let base = NSImage(systemSymbolName: name, accessibilityDescription: nil) else { return nil }
-    let sized = base.withSymbolConfiguration(.init(pointSize: pt, weight: .bold)) ?? base
-    let img = NSImage(size: sized.size)
+    guard let base = phosphorImage(name, pt: pt) else { return nil }
+    let img = NSImage(size: base.size)
     img.lockFocus()
     color.set()
-    sized.draw(in: NSRect(origin: .zero, size: sized.size))
-    NSRect(origin: .zero, size: sized.size).fill(using: .sourceAtop)
+    base.draw(in: NSRect(origin: .zero, size: base.size))
+    NSRect(origin: .zero, size: base.size).fill(using: .sourceAtop)
     img.unlockFocus()
     img.isTemplate = false
     return img
@@ -83,16 +79,16 @@ struct ListView: NSViewRepresentable {
     return [
         ListItem(id: "wsA", primary: "Workspace A",
                  kind: .sectionHeader(subtitle: "3 windows")),
-        win("w1", "safari", "Safari", "GitHub — akira-toriyama/sill",
+        win("w1", "compass", "Safari", "GitHub — akira-toriyama/sill",
             [Badge("⌘3", role: .primary), Badge("Space 2")]),
         win("w2", "hammer", "Xcode", "ThemedList.swift — Edited",
             [Badge("⌘2", role: .primary), Badge("min", symbol: minGlyph, role: .secondary)]),
-        win("w3", "terminal", "Terminal", "prism — swift build",
+        win("w3", "terminal-window", "Terminal", "prism — swift build",
             [Badge("⌘1", role: .primary)]),
         ListItem(id: "wsB", primary: "Workspace B",
                  kind: .sectionHeader(subtitle: "2 windows")),
-        win("w4", "note.text", "Notes", "memo.md", [Badge("hidden", role: .neutral)]),
-        win("w5", "music.note", "Music", "Focus playlist", [Badge("⌘5", role: .primary)]),
+        win("w4", "note", "Notes", "memo.md", [Badge("hidden", role: .neutral)]),
+        win("w5", "music-note", "Music", "Focus playlist", [Badge("⌘5", role: .primary)]),
     ]
 }
 
@@ -124,10 +120,10 @@ struct ListView: NSViewRepresentable {
 // A plain reorder list (no headers) for the `.between` insertion-line affordance.
 @MainActor private func reorderItems() -> [ListItem] {
     [
-        ListItem(id: "r1", image: glyph("1.circle"), primary: "First task"),
-        ListItem(id: "r2", image: glyph("2.circle"), primary: "Second task"),
-        ListItem(id: "r3", image: glyph("3.circle"), primary: "Third task"),
-        ListItem(id: "r4", image: glyph("4.circle"), primary: "Fourth task"),
+        ListItem(id: "r1", image: glyph("number-circle-one"),   primary: "First task"),
+        ListItem(id: "r2", image: glyph("number-circle-two"),   primary: "Second task"),
+        ListItem(id: "r3", image: glyph("number-circle-three"), primary: "Third task"),
+        ListItem(id: "r4", image: glyph("number-circle-four"),  primary: "Fourth task"),
     ]
 }
 
@@ -156,11 +152,11 @@ struct ListView: NSViewRepresentable {
     [
         ListItem(id: "proj", primary: "Project",
                  kind: .sectionHeader(subtitle: "4 items", collapsed: false)),
-        ListItem(id: "readme", image: glyph("doc.text", 16), primary: "README.md", indentLevel: 1),
+        ListItem(id: "readme", image: glyph("file-text", 16), primary: "README.md", indentLevel: 1),
         ListItem(id: "src", primary: "src",
                  kind: .sectionHeader(collapsed: false), indentLevel: 1),
-        ListItem(id: "f1", image: glyph("swift", 16), primary: "ThemedList.swift", indentLevel: 2),
-        ListItem(id: "f2", image: glyph("swift", 16), primary: "ThemedMenu.swift", indentLevel: 2),
+        ListItem(id: "f1", image: glyph("file-code", 16), primary: "ThemedList.swift", indentLevel: 2),
+        ListItem(id: "f2", image: glyph("file-code", 16), primary: "ThemedMenu.swift", indentLevel: 2),
         ListItem(id: "build", primary: "build",
                  kind: .sectionHeader(collapsed: true), indentLevel: 1),    // collapsed — children omitted
         ListItem(id: "archive", primary: "Archive",

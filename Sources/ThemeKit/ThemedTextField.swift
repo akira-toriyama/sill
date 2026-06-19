@@ -5,7 +5,7 @@
 // `ThemedTextField` (the first widget) is a Material-UI–style single-line
 // text field rendered in a `ResolvedPalette`: a rounded OUTLINED box
 // (default) — or FILLED / STANDARD (underline) — with an animated FLOATING
-// LABEL, optional leading / trailing SF-Symbol adornments, a focus-accent
+// LABEL, optional leading / trailing Phosphor-icon adornments, a focus-accent
 // transition (border + label go `primary` while editing), helper / error
 // text, and IME-safe editing.
 //
@@ -42,15 +42,15 @@ public final class ThemedTextField: NSView {
     /// (the label has floated up); without a label, shown whenever empty.
     public var placeholder: String = "" { didSet { syncPlaceholder(); syncAccessibility() } }
 
-    /// Leading SF-Symbol (e.g. `"magnifyingglass"`) — decorative.
+    /// Leading icon — a Phosphor slug (e.g. `"magnifying-glass"`), decorative.
     public var leadingSymbol: String? { didSet { invalidate() } }
 
-    /// Trailing SF-Symbol (e.g. `"xmark.circle.fill"`) — tappable via
+    /// Trailing icon — a Phosphor slug (e.g. `"x-circle"`) — tappable via
     /// `onTrailingTap` (a clear button, say).
     public var trailingSymbol: String? { didSet { invalidate() } }
     public var onTrailingTap: (() -> Void)?
 
-    /// A SECOND trailing SF-Symbol, sitting INNER of `trailingSymbol` (drawn to
+    /// A SECOND trailing icon, sitting INNER of `trailingSymbol` (drawn to
     /// its left), tappable via `onSecondTrailingTap`. `nil` (the default) ⇒ the
     /// single-trailing-icon geometry is byte-identical; the inner slot only
     /// engages when BOTH `trailingSymbol` and this are set (so it is always the
@@ -565,9 +565,7 @@ public final class ThemedTextField: NSView {
     }
 
     private func drawSymbol(_ name: String, in rect: NSRect, color: NSColor) {
-        let cfg = NSImage.SymbolConfiguration(pointSize: rect.height, weight: .regular)
-        guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(cfg) else { return }
+        guard let img = phosphorImage(name, pt: rect.height) else { return }
         let tinted = NSImage(size: img.size, flipped: false) { _ in
             color.set()
             img.draw(at: .zero, from: .zero, operation: .sourceOver, fraction: 1)

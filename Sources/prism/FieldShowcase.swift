@@ -66,18 +66,18 @@ struct MockField: View {
                 ex("outlined · resting", h: 50) {
                     ThemedFieldView(palette: p, label: "Filter",
                                     placeholder: "type to filter…",
-                                    leading: "magnifyingglass", surface: p.background)
+                                    leading: "magnifying-glass", surface: p.background)
                 }
                 ex("outlined · focused", h: 50) {
                     ThemedFieldView(palette: p, label: "Filter",
                                     placeholder: "type to filter…",
-                                    leading: "magnifyingglass", surface: p.background,
+                                    leading: "magnifying-glass", surface: p.background,
                                     previewFocused: true)
                 }
                 ex("outlined · filled + clear", h: 50) {
                     ThemedFieldView(palette: p, label: "Filter", text: "kernel",
-                                    leading: "magnifyingglass",
-                                    trailing: "xmark.circle.fill", surface: p.background)
+                                    leading: "magnifying-glass",
+                                    trailing: "x-circle", surface: p.background)
                 }
             }
             HStack(alignment: .top, spacing: 16) {
@@ -91,7 +91,7 @@ struct MockField: View {
                 }
                 ex("error + helper", h: 68) {
                     ThemedFieldView(palette: p, label: "Filter", text: "zzz",
-                                    leading: "magnifyingglass",
+                                    leading: "magnifying-glass",
                                     error: "no matches", surface: p.background)
                 }
             }

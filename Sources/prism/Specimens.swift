@@ -6,6 +6,18 @@
 import AppKit
 import SwiftUI
 import PaletteKit
+import ThemeKit
+
+/// A Phosphor glyph as a tintable SwiftUI `Image` (template ⇒ adopts the
+/// ancestor `.foregroundColor`). The mock specimens draw their accents this way
+/// now that the family is full-SVG (no more `Image(systemName:)`).
+@MainActor func phosphorIcon(_ name: String, _ pt: CGFloat,
+                             weight: PhosphorWeight = .regular) -> some View {
+    Image(nsImage: phosphorImage(name, pt: pt, weight: weight) ?? NSImage())
+        .resizable()
+        .renderingMode(.template)
+        .frame(width: pt, height: pt)
+}
 
 /// The real macOS icon for the first installed bundle id in `ids`, or nil
 /// (the caller then falls back to a theme-tinted tile). Mirrors the real
@@ -90,7 +102,7 @@ struct MockTree: View {
             VStack(alignment: .leading, spacing: 0) {
                 handleBand
                 searchBar.padding(.top, 7).padding(.bottom, 5)
-                section(ws: "code", mode: "bsp", modeIcon: "square.split.2x2",
+                section(ws: "code", mode: "bsp", modeIcon: "squares-four",
                         active: true, first: true) {
                     windowRow(app: "Safari", title: "GitHub — facet",
                               bundleIDs: ["com.apple.Safari"],
@@ -100,7 +112,7 @@ struct MockTree: View {
                               bundleIDs: ["com.microsoft.VSCode", "com.apple.dt.Xcode"],
                               tile: p.primary, ordinal: 1, mark: "a", tag: "work")
                 }
-                section(ws: "media", mode: "stack", modeIcon: "square.stack",
+                section(ws: "media", mode: "stack", modeIcon: "stack",
                         active: false, first: false) {
                     windowRow(app: "Terminal", title: "zsh — sill",
                               bundleIDs: ["com.apple.Terminal"],
@@ -132,7 +144,7 @@ struct MockTree: View {
         // The REAL ThemeKit field (outlined, leading magnifier), themed to
         // this panel — replacing the hand-drawn approximation.
         ThemedFieldView(palette: p, placeholder: "type to filter…",
-                        leading: "magnifyingglass", surface: p.background)
+                        leading: "magnifying-glass", surface: p.background)
             .frame(height: 40)   // ≥ the label-less field's 40pt box, else the top rule clips
     }
 
@@ -154,7 +166,7 @@ struct MockTree: View {
                         .kerning(0.6)
                         .foregroundColor(Color(nsColor: accent))
                     HStack(spacing: 4) {   // line 2: layout mode (icon + label)
-                        Image(systemName: modeIcon).font(sysFont(10))
+                        phosphorIcon(modeIcon, 10)
                         Text(mode).font(sysFont(11, weight: active ? .semibold : .medium))
                     }
                     .foregroundColor(Color(nsColor: accent))
@@ -205,8 +217,8 @@ struct MockTree: View {
                         if let mark { markPill(mark) }
                         if let tag { badge("tag", tag, p.secondary) }
                         if master { badge("crown", "master", p.primary) }
-                        if float { badge("macwindow", "float", p.foreground) }
-                        if hidden { badge("eye.slash", "hidden", p.muted) }
+                        if float { badge("app-window", "float", p.foreground) }
+                        if hidden { badge("eye-slash", "hidden", p.muted) }
                     }
                     .padding(.top, 1)
                 }
@@ -252,7 +264,7 @@ struct MockTree: View {
     /// glyph + colour carry the meaning, matching the real tree's clean look.
     private func badge(_ icon: String, _ text: String, _ color: NSColor) -> some View {
         HStack(spacing: 3) {
-            Image(systemName: icon).font(sysFont(10))
+            phosphorIcon(icon, 10)
             Text(text).font(sysFont(11, weight: .medium))
         }
         .foregroundColor(Color(nsColor: color))
@@ -322,8 +334,8 @@ struct MockTome: View {
     let p: ResolvedPalette
 
     /// A tome row's icon — mirrors wand's icon-spec vocabulary: `app:<id>`
-    /// resolves a real app icon (falling back to a tinted tile), `SF:<name>`
-    /// a tinted SF Symbol.
+    /// resolves a real app icon (falling back to a tinted tile), `symbol:<slug>`
+    /// a tinted Phosphor glyph.
     private enum RowIcon {
         case app([String])
         case symbol(String, NSColor)
@@ -335,16 +347,16 @@ struct MockTome: View {
                 // Launcher query field — the REAL ThemeKit field (replacing the
                 // hand-drawn one) so the tome mirrors the shared component.
                 ThemedFieldView(palette: p, placeholder: "open…",
-                                leading: "magnifyingglass", surface: p.background)
+                                leading: "magnifying-glass", surface: p.background)
                     .frame(height: 40)   // ≥ the label-less field's 40pt box, else the top rule clips
 
                 // Rows: an app-launch result (real icon) + two action items
-                // (tinted SF Symbols) — the app:/SF: mix the real tome renders.
+                // (tinted Phosphor glyphs) — the app:/icon: mix the real tome renders.
                 row(.app(["com.apple.Safari"]), title: "Safari", sub: "launch",
                     selected: true)
-                row(.symbol("gearshape.fill", p.secondary), title: "System Settings",
+                row(.symbol("gear", p.secondary), title: "System Settings",
                     sub: "⌘ ,", selected: false)
-                row(.symbol("paintpalette.fill", p.primary), title: "Switch theme",
+                row(.symbol("palette", p.primary), title: "Switch theme",
                     sub: "rainbow", selected: false)
             }
         }
@@ -376,7 +388,9 @@ struct MockTome: View {
                 RoundedRectangle(cornerRadius: 4).fill(Color(nsColor: p.secondary))
             }
         case .symbol(let name, let tint):
-            Image(systemName: name).font(sysFont(14))
+            Image(nsImage: phosphorImage(name, pt: 18, weight: .fill) ?? NSImage())
+                .resizable()
+                .renderingMode(.template)
                 .foregroundColor(Color(nsColor: tint))
         }
     }

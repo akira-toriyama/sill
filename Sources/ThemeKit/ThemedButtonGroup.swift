@@ -28,8 +28,8 @@ public final class ThemedButtonGroup: NSView {
     /// One member of the group.
     public struct Segment {
         public var title: String
-        public var leadingSymbol: String?
-        public var trailingSymbol: String?
+        public var leadingSymbol: String?   // a Phosphor slug
+        public var trailingSymbol: String?  // a Phosphor slug
         public var isEnabled: Bool   // ANDs with the group's `isEnabled`
         public init(_ title: String, leading: String? = nil,
                     trailing: String? = nil, isEnabled: Bool = true) {

@@ -20,7 +20,7 @@ struct ThemedComboBoxView: NSViewRepresentable {
     var options: [String]
     var label: String? = nil
     var placeholder: String = ""
-    var leading: String? = "magnifyingglass"
+    var leading: String? = "magnifying-glass"
     var freeText: Bool = false
     /// Demo the OPT-IN actionable empty state (facet's "Create a new tag"): on a
     /// no-match, offer a "Create …" row that, when committed, appends + selects it.

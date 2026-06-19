@@ -13,7 +13,7 @@
 // (with the isFlashing re-entrancy + isARepeat guards), a SEPARATE unclipped
 // shadow layer with an explicit `shadowPath` (a masksToBounds fill erases its
 // own shadow — the canonical Core-Animation gotcha), device-pixel-rasterized
-// SF Symbols, the house 0.16 s ease-out `layerTxn` timing, and `preview…`
+// Phosphor SVG icons, the house 0.16 s ease-out `layerTxn` timing, and `preview…`
 // overrides for deterministic screenshots. What it DROPS vs the button:
 // trailing icon, fullWidth, the outlined border, and grouping — a FAB is a
 // single, self-contained accent.
@@ -55,8 +55,9 @@ public final class ThemedFAB: NSControl {
     public var role:    Role    = .primary  { didSet { applyTheme() } }
 
     /// The icon (MUI's FAB icon). The WHOLE control for `circular`; the leading
-    /// adornment for `extended`. Tinted to the role's contrast ink. (SF name
-    /// until the Phosphor sweep, ROADMAP #2; `leadingImage` is the SVG entry.)
+    /// adornment for `extended`. Tinted to the role's contrast ink. A **Phosphor
+    /// slug** (e.g. `"plus"`) resolved via `phosphorImage`; `leadingImage` below is
+    /// the pre-resolved-image entry (app icon / favicon / brand logo).
     public var leadingSymbol: String? { didSet { applyTheme(); relayout() } }
 
     /// Pre-resolved icon image (wins over `leadingSymbol`): `phosphorImage(…)` /
@@ -349,10 +350,8 @@ public final class ThemedFAB: NSControl {
         let resolved: (CGImage, CGSize)?
         if let leadingImage {
             resolved = renderedIcon(leadingImage, pt: pt, tint: tint, scale: scale)
-        } else if let name = leadingSymbol,
-                  let base = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-                    .withSymbolConfiguration(.init(pointSize: pt, weight: .medium)) {
-            resolved = tintedBitmap(base: base, size: base.size, color: tint, scale: scale)
+        } else if let name = leadingSymbol, let base = phosphorImage(name, pt: pt) {
+            resolved = renderedIcon(base, pt: pt, tint: tint, scale: scale)
         } else {
             resolved = nil
         }

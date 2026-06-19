@@ -85,22 +85,22 @@ struct MockToolBar: View {
     @State private var taps = 0
 
     private let liveItems: [ToolBarDemoItem] = [
-        .button(title: nil, symbol: "line.3.horizontal"),
+        .button(title: nil, symbol: "list"),
         .label("Inbox"),
         .flex,
-        .button(title: nil, symbol: "magnifyingglass"),
-        .button(title: nil, symbol: "arrow.clockwise"),
+        .button(title: nil, symbol: "magnifying-glass"),
+        .button(title: nil, symbol: "arrow-clockwise"),
         .divider,
-        .button(title: "Compose", symbol: "square.and.pencil", variant: .contained),
+        .button(title: "Compose", symbol: "note-pencil", variant: .contained),
     ]
     private let stripItems: [ToolBarDemoItem] = [
-        .button(title: nil, symbol: "bold"),
-        .button(title: nil, symbol: "italic"),
-        .button(title: nil, symbol: "underline"),
+        .button(title: nil, symbol: "text-b"),
+        .button(title: nil, symbol: "text-italic"),
+        .button(title: nil, symbol: "text-underline"),
         .divider,
-        .button(title: nil, symbol: "text.alignleft"),
-        .button(title: nil, symbol: "text.aligncenter"),
-        .button(title: nil, symbol: "list.bullet", enabled: false),
+        .button(title: nil, symbol: "text-align-left"),
+        .button(title: nil, symbol: "text-align-center"),
+        .button(title: nil, symbol: "list-bullets", enabled: false),
     ]
 
     var body: some View {
@@ -143,14 +143,14 @@ struct MockToolBar: View {
             row("sections (flex spacers)") {
                 cell("left title · right actions (1 flex)") {
                     ThemedToolBarView(palette: p, items: [
-                        .button(title: nil, symbol: "line.3.horizontal"), .label("Files"), .flex,
-                        .button(title: nil, symbol: "plus"), .button(title: nil, symbol: "ellipsis"),
+                        .button(title: nil, symbol: "list"), .label("Files"), .flex,
+                        .button(title: nil, symbol: "plus"), .button(title: nil, symbol: "dots-three"),
                     ]).frame(height: 56)
                 }
                 cell("centred title (2 flex)") {
                     ThemedToolBarView(palette: p, items: [
-                        .button(title: nil, symbol: "chevron.left"), .flex,
-                        .label("Title"), .flex, .button(title: nil, symbol: "square.and.arrow.up"),
+                        .button(title: nil, symbol: "caret-left"), .flex,
+                        .label("Title"), .flex, .button(title: nil, symbol: "export"),
                     ]).frame(height: 56)
                 }
             }

@@ -49,10 +49,10 @@ public enum ListTint: Equatable, Sendable {
 
 /// The single trailing affordance on a row (right of any badges). One-of — a row
 /// has at most one. All glyphs are PRE-RESOLVED by the host (`.custom`) or drawn
-/// from a fixed SF name the kit owns (`.chevron`).
+/// from a fixed Phosphor slug the kit owns (`.chevron`).
 public enum TrailingAccessory: Equatable {
     case none
-    case chevron               // a disclosure `chevron.right`, `tertiary`
+    case chevron               // a disclosure `caret-right` (Phosphor), `tertiary`
     case shortcut(String)      // a bordered key-hint lozenge ("⌘1"), `muted`
     case custom(NSImage)       // a pre-resolved trailing glyph
 }
@@ -1389,7 +1389,7 @@ extension ThemedList {
         if let collapsed {
             let box = CGRect(x: m.leadingInset + indent, y: r.midY - m.disclosurePt / 2,
                              width: m.disclosurePt, height: m.disclosurePt)
-            if let tri = sfImage(collapsed ? "chevron.right" : "chevron.down", pt: m.disclosurePt) {
+            if let tri = glyphImage(collapsed ? "caret-right" : "caret-down", pt: m.disclosurePt) {
                 drawImage(tri, fitting: box, tint: palette.muted)
             }
         }
@@ -1508,7 +1508,7 @@ extension ThemedList {
         case .chevron:
             let color = onAccent ? palette.onPrimary(0.55) : palette.tertiary
             let box = CGRect(x: cell.minX, y: cell.midY - m.chevronPt / 2, width: m.chevronPt, height: m.chevronPt)
-            if let img = sfImage("chevron.right", pt: m.chevronPt) { drawImage(img, fitting: box, tint: color) }
+            if let img = glyphImage("caret-right", pt: m.chevronPt) { drawImage(img, fitting: box, tint: color) }
         case .shortcut(let s):
             let h = m.shortcutHeight
             let lozenge = CGRect(x: cell.minX, y: cell.midY - h / 2, width: cell.width, height: h)
@@ -1607,12 +1607,11 @@ extension ThemedList {
         }
     }
 
-    private func sfImage(_ name: String, pt: CGFloat) -> NSImage? {
-        guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil) else { return nil }
-        let conf = NSImage.SymbolConfiguration(pointSize: pt, weight: .regular)
-        let out = img.withSymbolConfiguration(conf) ?? img
-        out.isTemplate = true
-        return out
+    /// A Phosphor glyph (template `NSImage`) the list owns (the disclosure
+    /// caret) — `phosphorImage` already returns a `pt`-sized template, so this is
+    /// a thin named wrapper for the kit's fixed slugs.
+    private func glyphImage(_ name: String, pt: CGFloat) -> NSImage? {
+        phosphorImage(name, pt: pt)
     }
 }
 
