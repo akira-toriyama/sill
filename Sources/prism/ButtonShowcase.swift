@@ -102,7 +102,7 @@ struct MockButton: View {
                 cell("medium")   { ThemedButtonView(palette: p, variant: .contained, size: .medium, title: "Medium") }
                 cell("large")    { ThemedButtonView(palette: p, variant: .contained, size: .large,  title: "Large") }
                 cell("+ icons")  { ThemedButtonView(palette: p, variant: .outlined, title: "Save",
-                                                    leading: "tray.and.arrow.down", trailing: "chevron.right") }
+                                                    leading: "tray-arrow-down", trailing: "caret-right") }
                 Spacer(minLength: 0)
             }
             VStack(alignment: .leading, spacing: 5) {

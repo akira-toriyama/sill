@@ -88,7 +88,7 @@ public final class ThemedComboBox: NSObject {
     public var clearsOnEscape = false
 
     /// MUI openOnFocus (DEFAULT false). The popup opens on type / ArrowDown /
-    /// chevron click, NOT on bare focus.
+    /// caret click, NOT on bare focus.
     public var opensOnFocus = false
 
     /// The filter. DEFAULT: localized "standard" contains (case- + diacritic- +
@@ -225,7 +225,7 @@ public final class ThemedComboBox: NSObject {
     }
 
     private func configureField() {
-        field.trailingSymbol = "chevron.down"        // disclosure (outermost trailing icon)
+        field.trailingSymbol = "caret-down"          // disclosure (outermost trailing icon)
         field.onTrailingTap = { [weak self] in self?.toggleOpen() }
         field.onSecondTrailingTap = { [weak self] in self?.clear(); self?.field.focus() }
         field.onChange = { [weak self] text in self?.fieldDidChange(text) }
@@ -327,8 +327,8 @@ public final class ThemedComboBox: NSObject {
     }
 
     private func syncTrailingIcons() {
-        // The clear-× appears (inner of the chevron) only when there is text.
-        field.secondTrailingSymbol = field.stringValue.isEmpty ? nil : "xmark.circle.fill"
+        // The clear-× appears (inner of the caret) only when there is text.
+        field.secondTrailingSymbol = field.stringValue.isEmpty ? nil : "x-circle"
     }
 
     // MARK: - List sync (push the filtered options into the hosted ThemedList)

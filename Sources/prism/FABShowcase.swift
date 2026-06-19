@@ -85,7 +85,7 @@ struct MockFAB: View {
                 tagged("small")     { circ(.small,  role: .primary,   symbol: "plus") }
                 tagged("medium")    { circ(.medium, role: .primary,   symbol: "plus") }
                 tagged("large")     { circ(.large,  role: .primary,   symbol: "plus") }
-                tagged("secondary") { circ(.large,  role: .secondary, symbol: "heart.fill") }
+                tagged("secondary") { circ(.large,  role: .secondary, symbol: "heart") }
                 Spacer(minLength: 0)
             }
 
@@ -103,7 +103,7 @@ struct MockFAB: View {
             // + focus ring, geometrically distinct from the circular ring).
             HStack(alignment: .center, spacing: 14) {
                 cell("extended · primary")   { ext(.large, role: .primary,   symbol: "plus",       label: "Create") }
-                cell("extended · secondary") { ext(.large, role: .secondary, symbol: "square.and.arrow.up", label: "Share") }
+                cell("extended · secondary") { ext(.large, role: .secondary, symbol: "export", label: "Share") }
                 cell("hover")                { ext(.large, role: .primary,   symbol: "plus",       label: "Create", h: true) }
                 Spacer(minLength: 0)
             }

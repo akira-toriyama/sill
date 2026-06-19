@@ -71,9 +71,10 @@ public final class ThemedButton: NSControl {
     /// name keeps the original case.
     public var title: String = "" { didSet { applyTheme(); relayout() } }
 
-    /// Leading / trailing SF-Symbol adornments (MUI startIcon / endIcon), tinted
-    /// to the label colour. (These names stay SF until the Phosphor name sweep,
-    /// ROADMAP #2; the SVG entry point today is `leadingImage` below.)
+    /// Leading / trailing icon adornments (MUI startIcon / endIcon), tinted to the
+    /// label colour. The string is a **Phosphor slug** (e.g. `"caret-right"`,
+    /// `"magnifying-glass"`) resolved via `phosphorImage`; for a pre-resolved image
+    /// (app icon / favicon / brand logo) use `leadingImage` / `trailingImage` below.
     public var leadingSymbol:  String? { didSet { applyTheme(); relayout() } }
     public var trailingSymbol: String? { didSet { applyTheme(); relayout() } }
 
@@ -433,19 +434,18 @@ public final class ThemedButton: NSControl {
     }
 
     /// Resolve the icon slot: a pre-resolved `image` (wins) renders via
-    /// `renderedIcon`; otherwise an SF-Symbol `symbol` is template-tinted through
-    /// the shared `tintedBitmap` (one tint recipe for SF and SVG). Returns the
-    /// POINT size for layout, or nil when empty.
+    /// `renderedIcon`; otherwise `symbol` is a Phosphor slug loaded via
+    /// `phosphorImage` and template-tinted through the same `renderedIcon` recipe
+    /// (one tint path for the image and slug channels). Returns the POINT size for
+    /// layout, or nil when empty.
     @discardableResult
     private func applyIcon(_ iconLayer: CALayer, symbol: String?, image: NSImage?,
                            pt: CGFloat, tint: NSColor, scale: CGFloat) -> CGSize? {
         let resolved: (CGImage, CGSize)?
         if let image {
             resolved = renderedIcon(image, pt: pt, tint: tint, scale: scale)
-        } else if let name = symbol,
-                  let base = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-                    .withSymbolConfiguration(.init(pointSize: pt, weight: .medium)) {
-            resolved = tintedBitmap(base: base, size: base.size, color: tint, scale: scale)
+        } else if let name = symbol, let base = phosphorImage(name, pt: pt) {
+            resolved = renderedIcon(base, pt: pt, tint: tint, scale: scale)
         } else {
             resolved = nil
         }

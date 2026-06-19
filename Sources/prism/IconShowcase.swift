@@ -73,7 +73,8 @@ struct MockIcons: View {
     /// Glyphs shown across the full weight ramp.
     private static let ramp = ["heart", "star", "sun"]
     private static let weights: [PhosphorWeight] = [.thin, .light, .regular, .bold, .fill, .duotone]
-    /// The vendored functional set (a slice of the eventual SF→Phosphor map, #2).
+    /// The vendored functional set (the glyphs the family uses after the
+    /// SF→Phosphor sweep, ROADMAP #2 — a curated slice of Phosphor's full set).
     private static let functional = [
         "magnifying-glass", "plus", "minus", "gear", "gear-six", "folder", "tag", "trash",
         "bell", "palette", "list", "list-bullets", "caret-down", "caret-right", "caret-up",

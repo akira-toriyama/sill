@@ -21,25 +21,22 @@ import ThemeKit
 // MARK: - Mock images (pre-resolved template glyphs — the kit parses no SF name)
 
 @MainActor private func menuGlyph(_ name: String, _ pt: CGFloat = 15) -> NSImage? {
-    guard let base = NSImage(systemSymbolName: name, accessibilityDescription: nil) else { return nil }
-    let out = base.withSymbolConfiguration(.init(pointSize: pt, weight: .regular)) ?? base
-    out.isTemplate = true
-    return out
+    phosphorImage(name, pt: pt)   // a Phosphor slug → template NSImage
 }
 
 // MARK: - Inline-mock rows (mirror ThemedMenu's MenuItem → ListItem mapping)
 
 @MainActor private func menuRows() -> [ListItem] {
     [
-        ListItem(id: "new",    image: menuGlyph("doc.badge.plus"), primary: "New Window",  trailing: .shortcut("⌘N")),
+        ListItem(id: "new",    image: menuGlyph("file-plus"), primary: "New Window",  trailing: .shortcut("⌘N")),
         ListItem(id: "open",   image: menuGlyph("folder"),         primary: "Open…",        trailing: .shortcut("⌘O")),
         ListItem(id: "recent", image: menuGlyph("clock"),          primary: "Open Recent",  trailing: .chevron),
         ListItem(id: "sep1",   primary: "", kind: .separator),
-        ListItem(id: "side",   image: menuGlyph("checkmark"),      primary: "Show Sidebar", trailing: .shortcut("⌘\\")),
+        ListItem(id: "side",   image: menuGlyph("check"),      primary: "Show Sidebar", trailing: .shortcut("⌘\\")),
         ListItem(id: "sep2",   primary: "", kind: .separator),
         ListItem(id: "rename", image: menuGlyph("pencil"),         primary: "Rename"),
         ListItem(id: "del",    image: menuGlyph("trash"),          primary: "Delete", trailing: .shortcut("⌘⌫"), tint: .error),
-        ListItem(id: "off",    image: menuGlyph("nosign"),         primary: "Unavailable", isDisabled: true),
+        ListItem(id: "off",    image: menuGlyph("prohibit"),         primary: "Unavailable", isDisabled: true),
     ]
 }
 // 7 rows @ 26 (compact) + 2 separators @ 7 = 196pt of content.
@@ -57,7 +54,7 @@ struct MenuTriggerView: NSViewRepresentable {
         let button = ThemedButton(palette: palette)
         button.variant = .outlined
         button.title = "Actions"
-        button.trailingSymbol = "chevron.down"
+        button.trailingSymbol = "caret-down"
         button.frame = NSRect(x: 0, y: 0, width: 130, height: 34)
         host.addSubview(button)
 
@@ -78,21 +75,21 @@ struct MenuTriggerView: NSViewRepresentable {
 
     private func liveItems(_ coord: Coordinator) -> [ThemedMenu.MenuItem] {
         [
-            ThemedMenu.MenuItem("New Window", icon: menuGlyph("doc.badge.plus"), shortcut: "⌘N") {},
+            ThemedMenu.MenuItem("New Window", icon: menuGlyph("file-plus"), shortcut: "⌘N") {},
             ThemedMenu.MenuItem("Open…",      icon: menuGlyph("folder"),         shortcut: "⌘O") {},
             ThemedMenu.MenuItem(id: "recent", title: "Open Recent", icon: menuGlyph("clock"), submenu: [
-                ThemedMenu.MenuItem("Project Alpha", icon: menuGlyph("doc")) {},
-                ThemedMenu.MenuItem("Project Beta",  icon: menuGlyph("doc")) {},
+                ThemedMenu.MenuItem("Project Alpha", icon: menuGlyph("file")) {},
+                ThemedMenu.MenuItem("Project Beta",  icon: menuGlyph("file")) {},
                 .separator(),
-                ThemedMenu.MenuItem("Clear Menu", icon: menuGlyph("xmark.bin"), isDestructive: true) {},
+                ThemedMenu.MenuItem("Clear Menu", icon: menuGlyph("trash"), isDestructive: true) {},
             ]),
             .separator(),
-            ThemedMenu.MenuItem(id: "side", title: "Show Sidebar", icon: menuGlyph("checkmark"),
+            ThemedMenu.MenuItem(id: "side", title: "Show Sidebar", icon: menuGlyph("check"),
                                 shortcut: "⌘\\", isChecked: true),
             .separator(),
             ThemedMenu.MenuItem("Rename", icon: menuGlyph("pencil")) {},
             ThemedMenu.MenuItem("Delete", icon: menuGlyph("trash"), isDestructive: true) {},
-            ThemedMenu.MenuItem("Unavailable", icon: menuGlyph("nosign"), isEnabled: false),
+            ThemedMenu.MenuItem("Unavailable", icon: menuGlyph("prohibit"), isEnabled: false),
         ]
     }
 

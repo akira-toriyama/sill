@@ -6,6 +6,7 @@ import AppKit
 import Palette
 import PaletteKit
 import Effects
+import ThemeKit
 
 // MARK: - UI scale
 
@@ -399,7 +400,7 @@ struct CopyRefButton: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) { copied = false }
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                phosphorIcon(copied ? "check" : "copy", 10)
                 Text(copied ? "copied" : "copy ref")
             }
             .font(sysFont(8.5, weight: .medium, design: .monospaced))
@@ -456,8 +457,7 @@ struct EffectToggle: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                Image(systemName: on ? "sparkles" : "moon.zzz")
-                    .font(.system(size: 10, weight: .semibold))
+                phosphorIcon(on ? "sparkle" : "moon", 11)
                 Text("Effects \(on ? "ON" : "OFF")")
                     .font(sysFont(11, weight: on ? .bold : .medium, design: .monospaced))
             }

@@ -159,9 +159,9 @@ final class ThemedTextFieldTests: XCTestCase {
     func testSecondTrailingNilIsGeometryIdentical() {
         let frame = NSRect(x: 0, y: 0, width: 240, height: 46)
         let a = ThemedTextField(palette: palette()); a.label = "Fruit"
-        a.trailingSymbol = "chevron.down"; a.frame = frame; a.layoutSubtreeIfNeeded()
+        a.trailingSymbol = "caret-down"; a.frame = frame; a.layoutSubtreeIfNeeded()
         let b = ThemedTextField(palette: palette()); b.label = "Fruit"
-        b.trailingSymbol = "chevron.down"; b.secondTrailingSymbol = nil
+        b.trailingSymbol = "caret-down"; b.secondTrailingSymbol = nil
         b.frame = frame; b.layoutSubtreeIfNeeded()
 
         let ga = a.geometryProbe, gb = b.geometryProbe
@@ -176,9 +176,9 @@ final class ThemedTextFieldTests: XCTestCase {
     func testSecondTrailingShrinksTextRectByOneIconPlusGap() {
         let frame = NSRect(x: 0, y: 0, width: 240, height: 46)
         let one = ThemedTextField(palette: palette()); one.label = "Fruit"
-        one.trailingSymbol = "chevron.down"; one.frame = frame; one.layoutSubtreeIfNeeded()
+        one.trailingSymbol = "caret-down"; one.frame = frame; one.layoutSubtreeIfNeeded()
         let two = ThemedTextField(palette: palette()); two.label = "Fruit"
-        two.trailingSymbol = "chevron.down"; two.secondTrailingSymbol = "xmark.circle.fill"
+        two.trailingSymbol = "caret-down"; two.secondTrailingSymbol = "x-circle"
         two.frame = frame; two.layoutSubtreeIfNeeded()
 
         let g1 = one.geometryProbe, g2 = two.geometryProbe

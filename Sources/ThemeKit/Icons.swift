@@ -16,10 +16,11 @@
 // lacks. SwiftDraw is pure-Swift CoreGraphics — the one renderer that both
 // resolves AND compiles here. It is a ThemeKit-ONLY dependency.
 //
-// RENDERING CONTRACT — one tint path for SF *and* SVG. `tintedBitmap` is the
-// lower half of the old per-widget `tintedSymbol`, factored out: it rasterizes a
-// vector base (an SF symbol OR a SwiftDraw `NSImage`) into a DEVICE-PIXEL bitmap
-// and template-tints it with `sourceIn`. Setting a layer's `contentsScale` alone
+// RENDERING CONTRACT — one tint path for every icon channel. `tintedBitmap` is
+// the lower half of the old per-widget `tintedSymbol`, factored out: it
+// rasterizes a vector base (a SwiftDraw-loaded Phosphor / Simple-Icons `NSImage`,
+// or any pre-resolved app icon / favicon) into a DEVICE-PIXEL bitmap and
+// template-tints it with `sourceIn`. Setting a layer's `contentsScale` alone
 // leaves a vector's 1× CGImage blurry on Retina — the bitmap must be sized in
 // device pixels (`pt × backingScale`). A loaded SVG carries no fixed resolution,
 // so we draw the WHOLE image (`from: .zero`) into the target-point rect and the
@@ -83,9 +84,10 @@ public func simpleIconImage(_ name: String, pt: CGFloat) -> NSImage? {
 /// DEVICE-PIXEL bitmap and, when `color` is non-nil, fill its opaque pixels with
 /// it (`sourceIn` template tint). `color == nil` keeps the source colours (a
 /// multi-colour app icon / favicon drawn raw). The whole image is drawn
-/// (`from: .zero`) so a 256-viewBox SVG and a point-sized SF symbol both scale to
-/// fill `size`. Returns the device image + its POINT size (for layout). Lives
-/// here so SF and SVG share ONE tint recipe.
+/// (`from: .zero`) so a 256-viewBox SVG and a point-sized pre-resolved raster
+/// both scale to fill `size`. Returns the device image + its POINT size (for
+/// layout). Lives here so the SVG and pre-resolved-image channels share ONE tint
+/// recipe.
 @MainActor
 func tintedBitmap(base: NSImage, size: CGSize, color: NSColor?,
                   scale: CGFloat) -> (CGImage, CGSize)? {

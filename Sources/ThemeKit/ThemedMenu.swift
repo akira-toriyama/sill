@@ -250,12 +250,7 @@ public final class ThemedMenu: NSObject {
     /// A template checkmark glyph — the list tints it to `foreground` (resting) /
     /// `onPrimary` (highlighted), so it re-themes with the palette (a native menu
     /// check is the control text colour, not an accent).
-    private static let checkmark: NSImage? = {
-        guard let base = NSImage(systemSymbolName: "checkmark", accessibilityDescription: "checked") else { return nil }
-        let out = base.withSymbolConfiguration(.init(pointSize: 12, weight: .semibold)) ?? base
-        out.isTemplate = true
-        return out
-    }()
+    private static let checkmark: NSImage? = phosphorImage("check", pt: 12, weight: .bold)
 
     // MARK: - Theming
 

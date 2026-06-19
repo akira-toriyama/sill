@@ -78,7 +78,7 @@ final class ThemedButtonTests: XCTestCase {
 
     func testLeadingIconReflectedAndWidens() {
         let plain = laidOut { $0.title = "Save" }
-        let withIcon = laidOut { $0.title = "Save"; $0.leadingSymbol = "tray.and.arrow.down" }
+        let withIcon = laidOut { $0.title = "Save"; $0.leadingSymbol = "tray-arrow-down" }
         XCTAssertTrue(withIcon.buttonProbe.hasLeadingIcon)
         XCTAssertFalse(plain.buttonProbe.hasLeadingIcon)
         XCTAssertGreaterThan(withIcon.intrinsicContentSize.width, plain.intrinsicContentSize.width,
