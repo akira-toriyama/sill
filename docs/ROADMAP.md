@@ -8,7 +8,8 @@
 
 > **方針（2026-06-19 決定・ユーザー）**: icon が必要な箇所は**全て SVG**。主役 **Phosphor**(MIT)＋ロゴは **Simple Icons**(CC0)。**後方互換不要・破壊的変更OK**。タイミング一任。見た目と使いやすさ優先・形式は問わない。実装方式はリコンで de-risk 済（下記）。
 
-1. **sill v1.8.0 = SVG アイコン基盤**（= wand 移植の解除点）。
+1. **sill v1.8.0 = SVG アイコン基盤**（= wand 移植の解除点）。 **着手中: PR #52**（実装・全要素ライブ撮影確認済・敵対的レビュー反映済。マージで `v1.8.0` タグ＋完了へ。次は #2 の sweep）。
+   - ⚠**実装メモ（PR #52）**: SwiftDraw は最新 0.27.0 ではなく **`< 0.25.0`（=0.24.0）にピン** — 0.25.0 が追加した `SVGView.swift` の `#Preview` マクロ（`PreviewsMacros` プラグイン）が **CLT でビルド不可**。0.24.0 は同一 API（`SVG(fileURL:)`/`rasterize`/`NSImage(_:)`）で CLT クリーン。tint 共有関数は `tintedBitmap(base:size:color:scale:)` 名で実装（`pt` は CGSize＝SF を byte-identical に保つため）。`leadingSymbol` の SF→Phosphor リゾルバ差し替えは #2 に分離（基盤では SF 維持＝回帰ゼロ、SVG 入口は `leadingImage`）。prism に `family` 設定キー追加（タブ決定論撮影）。`Package.resolved` は `.gitignore`（lib 慣習）。
    - **レンダラ = SwiftDraw**（github.com/swhitty/SwiftDraw・Zlib・依存ゼロ・純 Swift CoreGraphics・macOS10.15+）を **ThemeKit 専用の package 依存**に追加。✗NSImage 直 SVG（macOS13 で nil＝私的 `_NSSVGImageRep`）／✗アセットカタログ（Xcode/actool 必須＝CLT-only の本機で不可）。**SwiftDraw が CLT でも確定動作する唯一手**。
    - **アイコン源 = phosphor-icons/core**(MIT) の SVG を**使う分だけ** `Sources/ThemeKit/Resources/Phosphor/<weight>/<name>-<weight>.svg` に vendor（regular は無サフィックス・他weightは `-bold` 等）＋ `LICENSE` 同梱。viewBox **256**・`fill=currentColor`＝黒マスク。ロゴは simple-icons(CC0・viewBox24・黒マスク) を `Resources/SimpleIcons/` に subset vendor。
    - **tint は既存経路を流用**: `ThemedFAB`/`ThemedButton` の `tintedSymbol` 下半分（device-pixel bitmap＋`sourceIn`）を共有 `tint(base:pt:color:scale:)` に factor し、**SF も Phosphor も tint 1 本**に。viewBox が大きいので必ず **targetPt×backingScale** でラスタライズ。`(name,weight,pt,color,scale)` でキャッシュ。
