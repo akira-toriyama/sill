@@ -113,7 +113,7 @@ final class ThemedToolBarTests: XCTestCase {
     }
 
     func testLabelledButtonIsWiderThanTall() {
-        let f = bar([.button(.init(title: "Compose", symbol: "square.and.pencil"))]).frame(ofItem: 0)!
+        let f = bar([.button(.init(title: "Compose", symbol: "note-pencil"))]).frame(ofItem: 0)!
         XCTAssertGreaterThan(f.width, f.height, "a labelled button is a pill, not a square")
     }
 
