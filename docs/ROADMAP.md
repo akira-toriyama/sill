@@ -1,8 +1,17 @@
 # sill やることリスト
 
-- 現行 **v1.7.0**。**番号が小さいほど先**にやる（小さいほど優先度高め）。
+- 現行 **v1.7.0**（**v1.8.0 = #1 が PR #52 で着手中**・マージ待ち）。**番号が小さいほど先**にやる。
 - すべて sill 本体の作業（追加は additive・default-off）。
 - このファイルが残作業・進捗の**唯一の記録**（git 管理）。
+
+## 🧭 現在地（引き継ぎ — 最新セッション 2026-06-19）
+
+**新セッションはまずここを読む。** 進捗の単一ソースはこのファイル。
+
+- **#1（SVG アイコン基盤・v1.8.0）= 実装完了、PR #52 で CI 緑・マージ待ち。** 内容: SwiftDraw（`<0.25` ピン）・Phosphor/Simple Icons を使う分だけ vendor・`phosphorImage`/`simpleIconImage` ローダ・共有 `tintedBitmap`（SF は byte-identical）・新画像API（`ThemedButton/FAB.leadingImage`・`ThemedToolBar.ButtonItem.image`）・prism「Icons」タブ＋`family` 設定キー。敵対的レビュー反映済。詳細は下の #1 と Package.swift / `Sources/ThemeKit/Resources/README.md`。
+- **アイコン vendor 方針 = A「使う分だけ」で確定**（全カタログ ~12.5k/~6MB は入れない。発見可能性は README＋DEBUG ログ＋CLAUDE.md で担保済。#2 の sweep で実使用分が自然に増える）。
+- **次にやる = #2（全 SF→Phosphor sweep）。** マッピング表は下の #2 にある。手順: ① PR #52 マージ後にクリーン main から（未マージなら #52 ブランチ起点）worktree を切る ② `leadingSymbol` 等の内部リゾルバを SF→Phosphor に差し替え＋全シンボル文字列を Phosphor 名へ＋使う Phosphor SVG を vendor（README の手順） ③ prism「Icons」以外の各ショーケースの `Image(systemName:)` も置換 ④ 全テーマでライブ撮影（capture レシピはメモリ [[prism-bench]]：アクティブ Space に載った時だけ撮る・off-Space は 7KB 空・必要なら tart VM） ⑤ minor bump = **v1.9.0** タグ。
+- **マージ時 TODO**: `v1.8.0` タグ付け（未使用確認済）＋ ROADMAP #1 を 完了 へ。
 
 ## アイコンを全面 SVG 化（Phosphor）— いま最優先（1〜2）
 
