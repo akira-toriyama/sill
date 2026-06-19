@@ -419,7 +419,7 @@ final class ThemedListTests: XCTestCase {
         let l = makeList([row("a"), row("b"), row("c")])     // a 0..30, b 30..60, c 60..90
         l.draggable = true; l.dragMode = .dropOnto
         var dropped: (String, DropPlacement)?
-        l.onDrop = { ctx, t in dropped = (ctx.id, t.placement) }
+        l.onDrop = { ctx, t in dropped = (ctx.sourceID, t.placement) }
         XCTAssertTrue(l._beginMouseDrag(atDocY: 5), "lift row a")
         XCTAssertTrue(l.dragProbe.isDragging)
         XCTAssertFalse(l.dragProbe.isKeyboardDrag, "a mouse drag is not a keyboard lift")
@@ -503,7 +503,7 @@ final class ThemedListTests: XCTestCase {
     func testKeyboardLiftAimAndCommit() {
         let l = makeList([row("a"), row("b"), row("c")]); l.draggable = true; l.dragMode = .dropOnto
         var dropped: (String, DropPlacement)?
-        l.onDrop = { ctx, t in dropped = (ctx.id, t.placement) }
+        l.onDrop = { ctx, t in dropped = (ctx.sourceID, t.placement) }
         l.beginDrag("a")
         XCTAssertTrue(l.isDragging); XCTAssertTrue(l.dragProbe.isKeyboardDrag)
         XCTAssertEqual(l._dragCandidates().count, 2, "onto b, onto c (onto-self rejected)")
@@ -607,6 +607,172 @@ final class ThemedListTests: XCTestCase {
         XCTAssertFalse(l._handleDragKey(keyDown(49)),  "Space falls through when not draggable")
         XCTAssertFalse(l._handleDragKey(keyDown(125)), "↓ falls through when not draggable")
         XCTAssertFalse(l.isDragging)
+    }
+
+    // MARK: - Chunk reorder (v1.6.0 — a section header lifts with its child rows as one
+    // unit). Comfortable: a plain 1-line header = 28pt, a single-line row = 30pt. Headless;
+    // the multi-row ghost is a child window, hand-checked in prism.
+
+    // [H1(28) a(28→58) b(58→88)] [H2(88) c(116) d(146)] — total 176; headers at 0 and 3.
+    private func sectioned() -> [ListItem] {
+        [header("H1"), row("a"), row("b"), header("H2"), row("c"), row("d")]
+    }
+
+    func testChunkGatherFromHeader() {
+        let l = makeList(sectioned())
+        XCTAssertEqual(l._chunkMemberIDs(forHeader: "H1"), ["H1", "a", "b"], "header + its rows to the next header")
+        XCTAssertEqual(l._chunkMemberIDs(forHeader: "H2"), ["H2", "c", "d"], "the last section runs to the end")
+    }
+
+    func testChunkGatherStopsAtNextHeaderAndSkipsSeparators() {
+        let l = makeList([header("H1"), row("a"), separator("s1"), row("b"), header("H2"), row("c")])
+        XCTAssertEqual(l._chunkMemberIDs(forHeader: "H1"), ["H1", "a", "b"],
+                       "the separator is skipped (no identity) and the walk stops at the next header")
+    }
+
+    func testChunkGatherCollapsedHeaderIsHeaderOnly() {
+        // A collapsed section's children are absent from `items` (the host owns the shape),
+        // so its chunk is the header alone — back-to-back headers.
+        let l = makeList([header("H1"), header("H2"), row("c")])
+        XCTAssertEqual(l._chunkMemberIDs(forHeader: "H1"), ["H1"], "a collapsed/empty section is the header alone")
+    }
+
+    func testChunkGatherNonHeaderOrUnknownIsEmpty() {
+        let l = makeList(sectioned())
+        XCTAssertEqual(l._chunkMemberIDs(forHeader: "a"), [], "a non-header row carries no chunk")
+        XCTAssertEqual(l._chunkMemberIDs(forHeader: "zzz"), [], "an unknown id carries no chunk")
+    }
+
+    func testHeaderLiftCarriesChunkByDefault() {
+        let l = makeList(sectioned()); l.draggable = true
+        XCTAssertTrue(l._beginMouseDrag(atDocY: 5), "lift H1 (header drag is a chunk by default — no opt-in flag)")
+        XCTAssertEqual(l.dragProbe.chunkIDs, ["H1", "a", "b"], "the live chunk is the whole section")
+        l._endMouseDrag(commit: false)
+        XCTAssertEqual(l.dragProbe.chunkIDs, [], "the chunk is cleared on teardown")
+    }
+
+    func testNonHeaderLiftIsSoloEvenInASectionedList() {
+        let l = makeList(sectioned()); l.draggable = true
+        XCTAssertTrue(l._beginMouseDrag(atDocY: 40), "lift row a (its band is [28,58))")
+        XCTAssertEqual(l.dragProbe.chunkIDs, [], "a non-header row drags solo — chunk is headers-only (orthogonality)")
+        l._endMouseDrag(commit: false)
+    }
+
+    func testChunkCommitCarriesMemberIDs() {
+        let l = makeList(sectioned()); l.draggable = true
+        var dropped: (String, [String], DropPlacement)?
+        l.onDrop = { ctx, t in dropped = (ctx.sourceID, ctx.memberIDs, t.placement) }
+        l.beginDrag("H1")                                    // keyboard lift of section 1
+        XCTAssertEqual(l.dragProbe.chunkIDs, ["H1", "a", "b"])
+        l.commitDrag()
+        XCTAssertEqual(dropped?.0, "H1")
+        XCTAssertEqual(dropped?.1, ["H1", "a", "b"], "onDrop carries the whole chunk in memberIDs")
+        XCTAssertEqual(dropped?.2, .between(beforeID: nil), "the only real move for section 1 of two is the end gap")
+    }
+
+    func testSingleRowCommitMemberIDsIsSelf() {
+        let l = makeList([row("a"), row("b"), row("c")]); l.draggable = true; l.dragMode = .reorderBetween
+        var members: [String]?
+        l.onDrop = { ctx, _ in members = ctx.memberIDs }
+        l.beginDrag("a"); l.commitDrag()
+        XCTAssertEqual(members, ["a"], "a single-row drag surfaces memberIDs == [sourceID]")
+    }
+
+    func testDropInsideOwnChunkRejected() {
+        let l = makeList(sectioned()); l.draggable = true
+        l._beginMouseDrag(atDocY: 5)                         // lift H1 → chunk [H1,a,b]
+        XCTAssertTrue(l._isInsideChunk(.onto(id: "a"), source: "H1"), "onto a member is inside the chunk")
+        XCTAssertTrue(l._isInsideChunk(.between(beforeID: "b"), source: "H1"), "a gap between members is inside")
+        XCTAssertTrue(l._isInsideChunk(.between(beforeID: "H2"), source: "H1"), "the gap just below the chunk is a no-move")
+        XCTAssertFalse(l._isInsideChunk(.onto(id: "c"), source: "H1"), "a row in another section is outside")
+        XCTAssertFalse(l._isInsideChunk(.between(beforeID: nil), source: "H1"), "the end gap is a real landing")
+        // And the resolver returns no target over the chunk's own body, a target outside it.
+        XCTAssertNil(l._resolveDropTarget(atDocY: 40, source: "H1"), "no target over the chunk's own rows")
+        XCTAssertNotNil(l._resolveDropTarget(atDocY: 999, source: "H1"), "the end gap below the last row is a target")
+        l._endMouseDrag(commit: false)
+    }
+
+    func testChunkKeyboardCandidatesAreSectionGapsOnly() {
+        // Three sections [H1 a][H2 b][H3 c] — headers at 0, 2, 4.
+        let l = makeList([header("H1"), row("a"), header("H2"), row("b"), header("H3"), row("c")])
+        l.draggable = true
+        l.beginDrag("H2")                                    // lift the MIDDLE section
+        XCTAssertEqual(l.dragProbe.chunkIDs, ["H2", "b"])
+        XCTAssertEqual(l._dragCandidates().map(\.placement),
+                       [.between(beforeID: "H1"), .between(beforeID: nil)],
+                       "section boundaries only: above section 1, or the end gap (own + adjacent gaps rejected)")
+        XCTAssertEqual(l.dragProbe.target?.placement, .between(beforeID: "H1"), "seeds at the first section gap")
+        l.moveDragTarget(1)
+        XCTAssertEqual(l.dragProbe.target?.placement, .between(beforeID: nil), "an arrow steps by SECTION, not by row")
+        l.moveDragTarget(1)
+        XCTAssertEqual(l.dragProbe.target?.placement, .between(beforeID: nil), "clamps at the last section gap")
+        l.cancelDrag()
+    }
+
+    func testChunkTrailingSeparatorGapIsNoMove() {
+        // A section ending with a separator: [H1, a, sep, H2, b]. The chunk is [H1,a]; the
+        // gap before H2 (only a separator between) is the chunk's OWN slot — a no-move, so it
+        // is offered by NEITHER the mouse resolver nor the keyboard candidates (mouse/keyboard
+        // agree on the trailing-separator case).
+        let l = makeList([header("H1"), row("a"), separator("sep"), header("H2"), row("b")])
+        l.draggable = true
+        l.beginDrag("H1")
+        XCTAssertEqual(l.dragProbe.chunkIDs, ["H1", "a"])
+        XCTAssertTrue(l._isInsideChunk(.between(beforeID: "H2"), source: "H1"),
+                      "the gap before the next header (only a separator between) is the chunk's own slot")
+        XCTAssertEqual(l._dragCandidates().map(\.placement), [.between(beforeID: nil)],
+                       "keyboard offers only the end gap — the H2 boundary gap is a no-move")
+        l.cancelDrag()
+    }
+
+    // MARK: - KeyboardDragController (the shared engine — §3b: single-row AND chunk lifts
+    // run through ONE instance; only the injected `candidates` differ, never the flow)
+
+    func testKeyboardDragControllerDrivesAnyInjectedCandidateSet() {
+        let c = KeyboardDragController()
+        var candidateSet: [DropTarget] = [DropTarget(placement: .onto(id: "x")),
+                                          DropTarget(placement: .onto(id: "y"))]
+        var lastAim: DropTarget?
+        var committed: DropTarget?
+        var cancelled = false
+        c.candidates = { candidateSet }
+        c.onAim = { lastAim = $0 }
+        c.onCommit = { committed = $0 }
+        c.onCancel = { cancelled = true }
+
+        // Case 1 — single-row-style onto candidates.
+        c.lift(source: "src")
+        XCTAssertTrue(c.isLifted); XCTAssertEqual(c.candidateIndex, 0)
+        XCTAssertEqual(lastAim?.placement, .onto(id: "x"), "seeds at the first candidate")
+        c.aim(1); XCTAssertEqual(lastAim?.placement, .onto(id: "y"))
+        c.aim(1); XCTAssertEqual(lastAim?.placement, .onto(id: "y"), "clamps at the last")
+        c.commit()
+        XCTAssertEqual(committed?.placement, .onto(id: "y"), "commits the aimed candidate")
+        XCTAssertFalse(c.isLifted, "the engine is idle after commit")
+
+        // Case 2 — swap the injected closure for chunk-style section-gap candidates; SAME
+        // engine, SAME lift/aim/cancel flow.
+        candidateSet = [DropTarget(placement: .between(beforeID: "H1")),
+                        DropTarget(placement: .between(beforeID: nil))]
+        committed = nil
+        c.lift(source: "H2")
+        XCTAssertEqual(lastAim?.placement, .between(beforeID: "H1"))
+        c.aim(1); XCTAssertEqual(lastAim?.placement, .between(beforeID: nil))
+        c.cancel()
+        XCTAssertTrue(cancelled, "cancel routes to onCancel"); XCTAssertNil(committed)
+        XCTAssertFalse(c.isLifted)
+    }
+
+    func testKeyboardDragControllerCommitWithNoCandidatesCancels() {
+        let c = KeyboardDragController()
+        var committed = false, cancelled = false
+        c.candidates = { [] }
+        c.onCommit = { _ in committed = true }
+        c.onCancel = { cancelled = true }
+        c.lift(source: "x")
+        XCTAssertNil(c.candidateIndex, "no candidates → no aim index")
+        c.commit()
+        XCTAssertFalse(committed); XCTAssertTrue(cancelled, "committing with nothing to land on cancels")
     }
 
     // MARK: - Indent / disclosure (Part 3)
