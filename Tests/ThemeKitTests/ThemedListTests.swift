@@ -686,6 +686,9 @@ final class ThemedListTests: XCTestCase {
         var toggled: [String] = []; var activated: [String] = []
         l.onToggleSection = { toggled.append($0) }
         l.onActivate = { activated.append($0.id) }
+        // The atDocY:10 click below relies on the top header occupying the pinned band
+        // headlessly (visibleRect.minY == 0) — assert that invariant rather than assume it.
+        XCTAssertEqual(l._stickyHeader(atScrollY: 0).id, "top", "the top header is the pinned section at scroll 0")
 
         l._handleClick(atDocY: 10)           // the top collapsible header (pinned-band path)
         XCTAssertEqual(toggled, ["top"], "clicking a collapsible header toggles it")
@@ -712,5 +715,35 @@ final class ThemedListTests: XCTestCase {
         let l = makeList([collapsibleHeader("WS", collapsed: false), row("a"), row("b"), row("c")])
         let pin = l._stickyHeader(atScrollY: 50)   // scrolled past the header's natural slot
         XCTAssertEqual(pin.id, "WS", "the collapsible header is the pinned section")
+    }
+
+    func testClickOnPlainHeaderInPinBandIsInert() {
+        // A NON-collapsible header in its own pinned slot (branch c of the reworked pin
+        // handling): a click in its band neither toggles nor activates — the pre-Part-3
+        // behaviour preserved. (Branch b — a click on a row OCCLUDED by a scrolled-off
+        // header — needs a live scroll and is a prism / live hand-check.)
+        let l = makeList([header("top"), row("a"), row("b")])
+        var toggled = false; var activated = false
+        l.onToggleSection = { _ in toggled = true }
+        l.onActivate = { _ in activated = true }
+        XCTAssertEqual(l._stickyHeader(atScrollY: 0).id, "top")
+        l._handleClick(atDocY: 10)               // inside the plain header's band
+        XCTAssertFalse(toggled, "a plain header never toggles")
+        XCTAssertFalse(activated, "a header never activates")
+    }
+
+    func testNegativeIndentLevelClampsToZero() {
+        // indentInset guards a host passing a negative level (max(0, level)).
+        let l = makeList([ListItem(id: "n", primary: "N", indentLevel: -3)])
+        XCTAssertEqual(l._contentLeadingX(forID: "n"), 44, "a negative indentLevel clamps to 0 (no left overshoot)")
+    }
+
+    func testBetweenInsertionLineFollowsTargetIndent() {
+        // The .between drop affordance aligns its insertion line to the TARGET row's
+        // depth (the Part-2 connection); the end gap / unknown id uses the base text x.
+        let l = makeList([row("a"), indentedRow("deep", 2)])
+        XCTAssertEqual(l._insertionLineX(beforeID: "a"), 44, "before a top-level row = base text x")
+        XCTAssertEqual(l._insertionLineX(beforeID: "deep"), 44 + 32, "before an indented row follows its depth")
+        XCTAssertEqual(l._insertionLineX(beforeID: nil), 44, "the end gap uses the base text x")
     }
 }

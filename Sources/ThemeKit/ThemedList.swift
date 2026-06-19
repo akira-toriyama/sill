@@ -91,8 +91,9 @@ public struct ListItem {
     /// leading image; this folds a "checked" marker into the row's synthetic
     /// `.menuItem` label so VoiceOver can tell a checked row from an unchecked one.
     public var axChecked: Bool
-    /// Visual nesting depth (0 = top level). The leading cluster — disclosure
-    /// triangle, image, and text — shifts right by `indentLevel × indentStep`; the
+    /// Visual nesting depth (0 = top level). The leading cluster — the image and
+    /// text (plus a collapsible header's disclosure triangle) — shifts right by
+    /// `indentLevel × indentStep`; the
     /// selection / hover fill and the leading tint bar stay FULL-BLEED (MUI's tree
     /// model: the content indents, the row's hit area + background do not). DEFAULT 0
     /// ⇒ byte-identical to a non-indented list. The kit only DRAWS the depth — the
@@ -133,8 +134,9 @@ public struct ListItem {
     /// nil ⇒ a non-collapsible header (or not a header); true/false ⇒ collapsible,
     /// collapsed/expanded.
     var headerCollapsed: Bool? { if case let .sectionHeader(_, c) = kind { return c }; return nil }
-    /// A header the user can toggle (its `collapsed` flag is non-nil).
-    var isCollapsibleHeader: Bool { isHeader && headerCollapsed != nil }
+    /// A header the user can toggle: collapsible (its `collapsed` flag is non-nil) and
+    /// not disabled (mirrors `isSelectable` / `isDragSource` — a disabled item is inert).
+    var isCollapsibleHeader: Bool { isHeader && !isDisabled && headerCollapsed != nil }
     var isSeparator: Bool { if case .separator = kind { return true }; return false }
 }
 
@@ -1144,8 +1146,13 @@ extension ThemedList {
         if showsDividers, i < items.count - 1, !items[i + 1].isSeparator {
             let nextIsHeader = items[i + 1].isHeader
             let x = nextIsHeader ? 0 : rowTextX + indent     // align the rule under this row's (indented) text
-            palette.border.setFill()
-            CGRect(x: x, y: r.maxY - 1, width: width - x - (nextIsHeader ? 0 : m.trailingInset), height: 1).fill()
+            // A deep indent in a narrow pane can push `x` past the right inset — clamp
+            // (a negative-width fill would paint a stray sliver LEFT of `x`).
+            let w = max(0, width - x - (nextIsHeader ? 0 : m.trailingInset))
+            if w > 0 {
+                palette.border.setFill()
+                CGRect(x: x, y: r.maxY - 1, width: w, height: 1).fill()
+            }
         }
     }
 
@@ -1694,7 +1701,7 @@ extension ThemedList {
             palette.primary.setStroke(); path.lineWidth = 2; path.stroke()
         case .between(let beforeID):
             let y = insertionY(beforeID: beforeID)
-            let x = rowTextX + indentInset(forID: beforeID)   // align to the target row's depth
+            let x = insertionLineX(beforeID: beforeID)        // align to the target row's depth
             palette.primary.setFill()
             CGRect(x: x, y: y - 1, width: max(0, width - x - metrics.trailingInset), height: 2).fill()
             NSBezierPath(ovalIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)).fill()   // MUI insertion dot
@@ -1707,6 +1714,11 @@ extension ThemedList {
         guard let beforeID, let i = indexOf(beforeID) else { return rowLayout.totalHeight }
         return rowLayout.yOffsets[i]
     }
+
+    /// The leading x of a `.between` insertion line — aligned to the TARGET row's
+    /// depth (the end gap / an unknown id uses the base text x). Shared by the draw
+    /// path and the test seam so they can't drift.
+    private func insertionLineX(beforeID: String?) -> CGFloat { rowTextX + indentInset(forID: beforeID) }
 
     // MARK: Key routing (the managesFirstResponder list's keyDown calls this first)
 
@@ -2022,5 +2034,8 @@ extension ThemedList {
         }
         return rowTextX + indentInset(item)
     }
+    /// The x a `.between` drop insertion line draws at for `beforeID` (the real draw
+    /// path) — locks the "insertion line follows the target's depth" contract.
+    func _insertionLineX(beforeID: String?) -> CGFloat { insertionLineX(beforeID: beforeID) }
 }
 #endif
