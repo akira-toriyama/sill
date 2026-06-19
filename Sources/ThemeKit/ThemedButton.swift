@@ -72,9 +72,17 @@ public final class ThemedButton: NSControl {
     public var title: String = "" { didSet { applyTheme(); relayout() } }
 
     /// Leading / trailing SF-Symbol adornments (MUI startIcon / endIcon), tinted
-    /// to the label colour.
+    /// to the label colour. (These names stay SF until the Phosphor name sweep,
+    /// ROADMAP #2; the SVG entry point today is `leadingImage` below.)
     public var leadingSymbol:  String? { didSet { applyTheme(); relayout() } }
     public var trailingSymbol: String? { didSet { applyTheme(); relayout() } }
+
+    /// Pre-resolved leading / trailing image (wins over the matching `*Symbol`).
+    /// The SVG entry point: pass `phosphorImage(…)` / `simpleIconImage(…)`, or any
+    /// app icon / favicon / emoji bitmap. `isTemplate` ⇒ tinted to the label
+    /// colour; else drawn raw (multi-colour).
+    public var leadingImage:  NSImage? { didSet { applyTheme(); relayout() } }
+    public var trailingImage: NSImage? { didSet { applyTheme(); relayout() } }
 
     /// Stretch to the host's width (MUI `fullWidth`) — content stays centred.
     /// `true` drops the intrinsic width so the host / Auto Layout sizes it.
@@ -418,14 +426,30 @@ public final class ThemedButton: NSControl {
 
     private func rebuildIcons() {
         let scale = backingScale, pt = metrics.iconPt, tint = titleColor
-        leadingImageSize  = applyIcon(leadingIconLayer,  symbol: leadingSymbol,  pt: pt, tint: tint, scale: scale)
-        trailingImageSize = applyIcon(trailingIconLayer, symbol: trailingSymbol, pt: pt, tint: tint, scale: scale)
+        leadingImageSize  = applyIcon(leadingIconLayer,  symbol: leadingSymbol,
+                                      image: leadingImage,  pt: pt, tint: tint, scale: scale)
+        trailingImageSize = applyIcon(trailingIconLayer, symbol: trailingSymbol,
+                                      image: trailingImage, pt: pt, tint: tint, scale: scale)
     }
 
+    /// Resolve the icon slot: a pre-resolved `image` (wins) renders via
+    /// `renderedIcon`; otherwise an SF-Symbol `symbol` is template-tinted through
+    /// the shared `tintedBitmap` (one tint recipe for SF and SVG). Returns the
+    /// POINT size for layout, or nil when empty.
     @discardableResult
-    private func applyIcon(_ iconLayer: CALayer, symbol: String?, pt: CGFloat,
-                           tint: NSColor, scale: CGFloat) -> CGSize? {
-        guard let name = symbol, let (img, sz) = tintedSymbol(name, pt: pt, color: tint, scale: scale) else {
+    private func applyIcon(_ iconLayer: CALayer, symbol: String?, image: NSImage?,
+                           pt: CGFloat, tint: NSColor, scale: CGFloat) -> CGSize? {
+        let resolved: (CGImage, CGSize)?
+        if let image {
+            resolved = renderedIcon(image, pt: pt, tint: tint, scale: scale)
+        } else if let name = symbol,
+                  let base = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+                    .withSymbolConfiguration(.init(pointSize: pt, weight: .medium)) {
+            resolved = tintedBitmap(base: base, size: base.size, color: tint, scale: scale)
+        } else {
+            resolved = nil
+        }
+        guard let (img, sz) = resolved else {
             layerTxn(animated: false) { iconLayer.contents = nil; iconLayer.isHidden = true }
             return nil
         }
@@ -435,35 +459,6 @@ public final class ThemedButton: NSControl {
             iconLayer.isHidden = false
         }
         return sz
-    }
-
-    /// Rasterize an SF Symbol AT THE BACKING SCALE and template-tint it (the
-    /// ThemedTextField fill recipe, but into a device-pixel bitmap). Setting
-    /// `contentsScale` alone leaves a vector symbol's 1× CGImage blurry on
-    /// Retina — the bitmap must be sized in device pixels. Returns the POINT
-    /// size for layout.
-    private func tintedSymbol(_ name: String, pt: CGFloat, color: NSColor,
-                              scale: CGFloat) -> (CGImage, CGSize)? {
-        let cfg = NSImage.SymbolConfiguration(pointSize: pt, weight: .medium)
-        guard let base = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(cfg) else { return nil }
-        let sizePt = base.size
-        let pxW = max(1, Int((sizePt.width  * scale).rounded()))
-        let pxH = max(1, Int((sizePt.height * scale).rounded()))
-        guard let rep = NSBitmapImageRep(
-                bitmapDataPlanes: nil, pixelsWide: pxW, pixelsHigh: pxH,
-                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
-        rep.size = sizePt
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        let r = NSRect(origin: .zero, size: sizePt)
-        base.draw(in: r, from: .zero, operation: .sourceOver, fraction: 1)
-        color.set()
-        r.fill(using: .sourceIn)
-        NSGraphicsContext.restoreGraphicsState()
-        guard let cg = rep.cgImage else { return nil }
-        return (cg, sizePt)
     }
 
     // MARK: - Corner-aware paths (standalone = a plain rounded rect; a grouped

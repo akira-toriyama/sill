@@ -19,6 +19,8 @@ struct ThemedButtonView: NSViewRepresentable {
     var title: String = "Button"
     var leading: String? = nil
     var trailing: String? = nil
+    var leadingImage: NSImage? = nil      // pre-resolved icon (SVG / logo / …)
+    var trailingImage: NSImage? = nil
     var fullWidth = false
     var enabled = true
     var previewHovered = false
@@ -50,6 +52,8 @@ struct ThemedButtonView: NSViewRepresentable {
         b.title = title
         b.leadingSymbol = leading
         b.trailingSymbol = trailing
+        b.leadingImage = leadingImage
+        b.trailingImage = trailingImage
         b.fullWidth = fullWidth
         b.isEnabled = enabled
         b.previewHovered = previewHovered

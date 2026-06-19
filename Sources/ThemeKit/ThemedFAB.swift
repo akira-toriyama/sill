@@ -55,8 +55,14 @@ public final class ThemedFAB: NSControl {
     public var role:    Role    = .primary  { didSet { applyTheme() } }
 
     /// The icon (MUI's FAB icon). The WHOLE control for `circular`; the leading
-    /// adornment for `extended`. Tinted to the role's contrast ink.
+    /// adornment for `extended`. Tinted to the role's contrast ink. (SF name
+    /// until the Phosphor sweep, ROADMAP #2; `leadingImage` is the SVG entry.)
     public var leadingSymbol: String? { didSet { applyTheme(); relayout() } }
+
+    /// Pre-resolved icon image (wins over `leadingSymbol`): `phosphorImage(…)` /
+    /// `simpleIconImage(…)` or any app icon / favicon / emoji bitmap. `isTemplate`
+    /// ⇒ tinted to the role's contrast ink; else drawn raw (multi-colour).
+    public var leadingImage: NSImage? { didSet { applyTheme(); relayout() } }
 
     /// The label — `extended`-ONLY (a circular FAB is icon-only). Drawn
     /// UPPERCASE with MUI's 0.4 pt tracking, like ThemedButton; the accessible
@@ -340,8 +346,17 @@ public final class ThemedFAB: NSControl {
 
     private func rebuildIcon() {
         let scale = backingScale, pt = metrics.iconPt, tint = inkColor
-        guard let name = leadingSymbol,
-              let (img, sz) = tintedSymbol(name, pt: pt, color: tint, scale: scale) else {
+        let resolved: (CGImage, CGSize)?
+        if let leadingImage {
+            resolved = renderedIcon(leadingImage, pt: pt, tint: tint, scale: scale)
+        } else if let name = leadingSymbol,
+                  let base = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+                    .withSymbolConfiguration(.init(pointSize: pt, weight: .medium)) {
+            resolved = tintedBitmap(base: base, size: base.size, color: tint, scale: scale)
+        } else {
+            resolved = nil
+        }
+        guard let (img, sz) = resolved else {
             iconSize = nil
             layerTxn(animated: false) { self.iconLayer.contents = nil; self.iconLayer.isHidden = true }
             return
@@ -352,34 +367,6 @@ public final class ThemedFAB: NSControl {
             self.iconLayer.contentsScale = scale
             self.iconLayer.isHidden = false
         }
-    }
-
-    /// Rasterize an SF Symbol AT THE BACKING SCALE and template-tint it (the
-    /// ThemedButton recipe). `contentsScale` alone leaves a vector symbol's 1×
-    /// CGImage blurry on Retina — the bitmap must be sized in device pixels.
-    /// Returns the POINT size for layout.
-    private func tintedSymbol(_ name: String, pt: CGFloat, color: NSColor,
-                              scale: CGFloat) -> (CGImage, CGSize)? {
-        let cfg = NSImage.SymbolConfiguration(pointSize: pt, weight: .medium)
-        guard let base = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(cfg) else { return nil }
-        let sizePt = base.size
-        let pxW = max(1, Int((sizePt.width  * scale).rounded()))
-        let pxH = max(1, Int((sizePt.height * scale).rounded()))
-        guard let rep = NSBitmapImageRep(
-                bitmapDataPlanes: nil, pixelsWide: pxW, pixelsHigh: pxH,
-                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
-        rep.size = sizePt
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        let r = NSRect(origin: .zero, size: sizePt)
-        base.draw(in: r, from: .zero, operation: .sourceOver, fraction: 1)
-        color.set()
-        r.fill(using: .sourceIn)
-        NSGraphicsContext.restoreGraphicsState()
-        guard let cg = rep.cgImage else { return nil }
-        return (cg, sizePt)
     }
 
     // MARK: - Layout

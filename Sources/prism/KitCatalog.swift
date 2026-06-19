@@ -9,7 +9,7 @@ import Foundation
 /// The gallery's top-level tabs. `palette` (theme foundations) and `chrome` (the
 /// fake app mocks) carry no kit component; the other four group the real widgets.
 enum KitFamily: String, CaseIterable, Identifiable {
-    case palette = "Palette", text = "Text", action = "Action",
+    case palette = "Palette", icon = "Icons", text = "Text", action = "Action",
          feedback = "Feedback", collection = "Collection", chrome = "Chrome"
     public var id: String { rawValue }
 }

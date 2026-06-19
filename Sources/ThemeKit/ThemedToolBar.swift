@@ -68,20 +68,26 @@ public final class ThemedToolBar: NSView {
         public var title: String?
         public var symbol: String?          // leading / sole SF Symbol
         public var trailingSymbol: String?
+        public var image: NSImage?          // PRE-RESOLVED leading/sole icon (wins
+                                            // over `symbol`): app icon / favicon /
+                                            // brand logo (Simple Icons) / Phosphor /
+                                            // emoji. Template ⇒ tinted; else raw.
         public var role: ThemedButton.Role
         public var variant: ThemedButton.Variant
         public var isEnabled: Bool
         public var tooltip: String?         // hover hint (esp. for icon-only)
         public var keyEquivalent: String
         public init(title: String? = nil, symbol: String? = nil, trailingSymbol: String? = nil,
+                    image: NSImage? = nil,
                     role: ThemedButton.Role = .primary, variant: ThemedButton.Variant = .text,
                     isEnabled: Bool = true, tooltip: String? = nil, keyEquivalent: String = "") {
             self.title = title; self.symbol = symbol; self.trailingSymbol = trailingSymbol
+            self.image = image
             self.role = role; self.variant = variant; self.isEnabled = isEnabled
             self.tooltip = tooltip; self.keyEquivalent = keyEquivalent
         }
-        /// Icon-only ⇒ a square button (no text, an SF Symbol present).
-        public var isIconOnly: Bool { (title?.isEmpty ?? true) && symbol != nil }
+        /// Icon-only ⇒ a square button (no text, an icon — SF Symbol or image — present).
+        public var isIconOnly: Bool { (title?.isEmpty ?? true) && (symbol != nil || image != nil) }
     }
 
     /// A row element. `flexibleSpace` is the MUI `flexGrow:1` spacer (greedy);
@@ -225,6 +231,7 @@ public final class ThemedToolBar: NSView {
                 b.role = spec.role
                 b.title = spec.title ?? ""
                 b.leadingSymbol = spec.symbol
+                b.leadingImage = spec.image
                 b.trailingSymbol = spec.trailingSymbol
                 b.isEnabled = spec.isEnabled
                 b.keyEquivalent = spec.keyEquivalent
