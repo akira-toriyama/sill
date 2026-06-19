@@ -5,6 +5,11 @@
 // `Resources/` (viewBox-256 `currentColor` masks for Phosphor, viewBox-24 black
 // masks for Simple Icons) — see each folder's LICENSE.
 //
+// The bundled icons are a CURATED SUBSET, not the full catalogs (Phosphor has
+// 1,512 icons × 6 weights; Simple Icons ~3,445). Need one that isn't here? It's
+// upstream — add it in one step: see `Resources/README.md`. (A missing lookup
+// also prints that pointer in DEBUG, once per name.)
+//
 // WHY SwiftDraw (not NSImage's own SVG / an asset catalog): on macOS 13 the
 // built-in SVG path is the PRIVATE `_NSSVGImageRep` and returns nil; asset
 // catalogs need Xcode/actool, which the maintainer's CommandLineTools-only box
@@ -52,7 +57,8 @@ public enum PhosphorWeight: String, Sendable, CaseIterable {
 public func phosphorImage(_ name: String, pt: CGFloat,
                           weight: PhosphorWeight = .regular) -> NSImage? {
     let file = name + weight.fileSuffix
-    return IconStore.templateImage(key: "ph:\(weight.rawValue)/\(file)", pt: pt) {
+    return IconStore.templateImage(key: "ph:\(weight.rawValue)/\(file)", pt: pt,
+                                   describe: "Phosphor \"\(name)\" (\(weight.rawValue))") {
         Bundle.module.url(forResource: file, withExtension: "svg",
                           subdirectory: "Phosphor/\(weight.rawValue)")
     }
@@ -65,7 +71,8 @@ public func phosphorImage(_ name: String, pt: CGFloat,
 /// with `isTemplate == false` — it's then drawn raw. @MainActor.
 @MainActor
 public func simpleIconImage(_ name: String, pt: CGFloat) -> NSImage? {
-    IconStore.templateImage(key: "si:\(name)", pt: pt) {
+    IconStore.templateImage(key: "si:\(name)", pt: pt,
+                            describe: "Simple Icons \"\(name)\"") {
         Bundle.module.url(forResource: name, withExtension: "svg", subdirectory: "SimpleIcons")
     }
 }
@@ -134,6 +141,7 @@ private enum IconStore {
     static var svgs: [String: SVG?] = [:]
 
     static func templateImage(key: String, pt: CGFloat,
+                              describe: @autoclosure () -> String,
                               url: () -> URL?) -> NSImage? {
         let svg: SVG
         if let cached = svgs[key] {          // present (success OR cached failure)
@@ -142,7 +150,18 @@ private enum IconStore {
         } else {
             let parsed = url().flatMap { SVG(fileURL: $0) }
             svgs[key] = parsed               // cache the SVG, or nil on failure
-            guard let hit = parsed else { return nil }
+            guard let hit = parsed else {
+                // The vendored set is a CURATED SUBSET (see Resources/README.md).
+                // Tell the developer — once per name — where to get the missing one.
+                #if DEBUG
+                print("""
+                ⚠️ ThemeKit: icon not vendored — \(describe()). The bundled set is a \
+                curated SUBSET; the glyph almost certainly exists upstream. Add it \
+                (one curl) per Sources/ThemeKit/Resources/README.md.
+                """)
+                #endif
+                return nil
+            }
             svg = hit
         }
         let image = NSImage(svg)            // vector, resolution-independent

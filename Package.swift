@@ -93,6 +93,7 @@ let package = Package(
         .target(name: "ThemeKit",
                 dependencies: ["PaletteKit", "Palette",
                                .product(name: "SwiftDraw", package: "SwiftDraw")],
+                exclude: ["Resources/README.md"],   // doc, not a bundled resource
                 resources: [.copy("Resources/Phosphor"),
                             .copy("Resources/SimpleIcons")]),
 
