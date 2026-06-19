@@ -7,6 +7,12 @@
 ## sill に部品を足す — facet / wand のツリー・ランチャー用（1）
 
 1. 横ツールバー `ThemedToolBar` を新規 — wand のランチャー（新規ウィジェット。MUI から設計、別セッションで計画先行）
+   — **着手中: PR #50（v1.7.0 予定）** sill 本体のみ（widget＋prism＋tests）。MUI `<AppBar>`+`<Toolbar>` 融合を AppKit 移植：surface(surface/primary/secondary/transparent)・variant(regular64/dense48/compact40)・flex セクション・型付き items（button は本物の ThemedButton を COMPOSE／icon-only は角ボタン・label・custom・divider・spaces）・非アクティブパネル hover・子パネルアンカー（frameOnScreen）。overflow は follow-up。wand への移植は別 PR（PR2）。
+   — **次工程（すべて v1.7.0 マージ＋タグ後）**：
+     1. **sill v1.8.0 = アイコン NSImage 対応**（wand 移植の必須前提）。現状 `ThemedButton`/`ThemedToolBar` のアイコンは **SF Symbol 名のみ**だが、wand のランチャーは大半が**アプリアイコン/絵文字/favicon/SVG＝事前解決 NSImage**。`ThemedButton` に `leadingImage: NSImage?`（`.isTemplate` なら ink で tint・それ以外は素描画）＋ `ThemedToolBar.ButtonItem.image` を追加。**フォーマット非依存**＝SVG/PNG/.icns/絵文字すべて呼び出し側で NSImage 化して渡す（macOS の NSImage は SVG もネイティブ読込）。画像ボタンは `.button` のまま＝バー駆動 hover も効く（[[kit-component-philosophy]] の「事前解決 NSImage」に合致／ユーザー方針: 見た目と使いやすさ優先・形式は問わない）。別 PR で実施。
+     2. **wand PR2a = sill ピン `0.11.0`→`1.x`**。wand が使う sill シンボル（Palette/Effects/ConfigSchema/CLIKit）は 0.11.0↔現行で **API バイト一致**（`git show` で逐一 diff 済み）＝実質ノーオペ。1 行＋`swift package update sill`＋ビルド確認のみ。独立リバート可。
+     3. **wand PR2b = ThemedToolBar 採用**。WandAdapterMacOS に PaletteKit/ThemeKit を追加＋ `wandResolvedPalette(name)=resolve(paletteFor(name))` ブリッジ（list 行は当面 4-slot トークン併存）。`LauncherPanel` の横2経路（`buildContent` の `.toolbar`/`.labeledToolbar` ＋ `installToolbarLayout`/`installLabeledToolbarLayout` ＋ ItemRow idle/hover/tracking）を 1 つの `ThemedToolBar`(variant `.compact`/`.dense`・corners `.rounded`・surface transparent/alpha) に置換。`onItemClick`/`onItemHover`/`frameOnScreen(ofItem:)`/`trackingMode .nonActivatingPanel` で結線。**据え置き**：縦 `.list` 全部（子は常に list）・子パネル統括・アイコン解決(IconResolver)・装飾(rainbow/line-pet/blur/影/開閉アニメ)・neon/splatoon/rainbow（動的入力）・✓/− グリフ・NonActivatingPanel。
+     ※ wand 側 (PR2a/PR2b) の進捗は wand リポで管理（このファイルは sill の単一ソース）。
 
 ## sill に部品を足す — perch 用（2〜6）
 
