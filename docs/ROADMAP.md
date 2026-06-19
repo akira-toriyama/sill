@@ -1,14 +1,24 @@
 # sill やることリスト
 
-- 現行 **v1.7.0**。**番号が小さいほど先**にやる（小さいほど優先度高め）。
+- 現行 **v1.7.0**（**v1.8.0 = #1 が PR #52 で着手中**・マージ待ち）。**番号が小さいほど先**にやる。
 - すべて sill 本体の作業（追加は additive・default-off）。
 - このファイルが残作業・進捗の**唯一の記録**（git 管理）。
+
+## 🧭 現在地（引き継ぎ — 最新セッション 2026-06-19）
+
+**新セッションはまずここを読む。** 進捗の単一ソースはこのファイル。
+
+- **#1（SVG アイコン基盤・v1.8.0）= 実装完了、PR #52 で CI 緑・マージ待ち。** 内容: SwiftDraw（`<0.25` ピン）・Phosphor/Simple Icons を使う分だけ vendor・`phosphorImage`/`simpleIconImage` ローダ・共有 `tintedBitmap`（SF は byte-identical）・新画像API（`ThemedButton/FAB.leadingImage`・`ThemedToolBar.ButtonItem.image`）・prism「Icons」タブ＋`family` 設定キー。敵対的レビュー反映済。詳細は下の #1 と Package.swift / `Sources/ThemeKit/Resources/README.md`。
+- **アイコン vendor 方針 = A「使う分だけ」で確定**（全カタログ ~12.5k/~6MB は入れない。発見可能性は README＋DEBUG ログ＋CLAUDE.md で担保済。#2 の sweep で実使用分が自然に増える）。
+- **次にやる = #2（全 SF→Phosphor sweep）。** マッピング表は下の #2 にある。手順: ① PR #52 マージ後にクリーン main から（未マージなら #52 ブランチ起点）worktree を切る ② `leadingSymbol` 等の内部リゾルバを SF→Phosphor に差し替え＋全シンボル文字列を Phosphor 名へ＋使う Phosphor SVG を vendor（README の手順） ③ prism「Icons」以外の各ショーケースの `Image(systemName:)` も置換 ④ 全テーマでライブ撮影（capture レシピはメモリ [[prism-bench]]：アクティブ Space に載った時だけ撮る・off-Space は 7KB 空・必要なら tart VM） ⑤ minor bump = **v1.9.0** タグ。
+- **マージ時 TODO**: `v1.8.0` タグ付け（未使用確認済）＋ ROADMAP #1 を 完了 へ。
 
 ## アイコンを全面 SVG 化（Phosphor）— いま最優先（1〜2）
 
 > **方針（2026-06-19 決定・ユーザー）**: icon が必要な箇所は**全て SVG**。主役 **Phosphor**(MIT)＋ロゴは **Simple Icons**(CC0)。**後方互換不要・破壊的変更OK**。タイミング一任。見た目と使いやすさ優先・形式は問わない。実装方式はリコンで de-risk 済（下記）。
 
-1. **sill v1.8.0 = SVG アイコン基盤**（= wand 移植の解除点）。
+1. **sill v1.8.0 = SVG アイコン基盤**（= wand 移植の解除点）。 **着手中: PR #52**（実装・全要素ライブ撮影確認済・敵対的レビュー反映済。マージで `v1.8.0` タグ＋完了へ。次は #2 の sweep）。
+   - ⚠**実装メモ（PR #52）**: SwiftDraw は最新 0.27.0 ではなく **`< 0.25.0`（=0.24.0）にピン** — 0.25.0 が追加した `SVGView.swift` の `#Preview` マクロ（`PreviewsMacros` プラグイン）が **CLT でビルド不可**。0.24.0 は同一 API（`SVG(fileURL:)`/`rasterize`/`NSImage(_:)`）で CLT クリーン。tint 共有関数は `tintedBitmap(base:size:color:scale:)` 名で実装（`pt` は CGSize＝SF を byte-identical に保つため）。`leadingSymbol` の SF→Phosphor リゾルバ差し替えは #2 に分離（基盤では SF 維持＝回帰ゼロ、SVG 入口は `leadingImage`）。prism に `family` 設定キー追加（タブ決定論撮影）。`Package.resolved` は `.gitignore`（lib 慣習）。
    - **レンダラ = SwiftDraw**（github.com/swhitty/SwiftDraw・Zlib・依存ゼロ・純 Swift CoreGraphics・macOS10.15+）を **ThemeKit 専用の package 依存**に追加。✗NSImage 直 SVG（macOS13 で nil＝私的 `_NSSVGImageRep`）／✗アセットカタログ（Xcode/actool 必須＝CLT-only の本機で不可）。**SwiftDraw が CLT でも確定動作する唯一手**。
    - **アイコン源 = phosphor-icons/core**(MIT) の SVG を**使う分だけ** `Sources/ThemeKit/Resources/Phosphor/<weight>/<name>-<weight>.svg` に vendor（regular は無サフィックス・他weightは `-bold` 等）＋ `LICENSE` 同梱。viewBox **256**・`fill=currentColor`＝黒マスク。ロゴは simple-icons(CC0・viewBox24・黒マスク) を `Resources/SimpleIcons/` に subset vendor。
    - **tint は既存経路を流用**: `ThemedFAB`/`ThemedButton` の `tintedSymbol` 下半分（device-pixel bitmap＋`sourceIn`）を共有 `tint(base:pt:color:scale:)` に factor し、**SF も Phosphor も tint 1 本**に。viewBox が大きいので必ず **targetPt×backingScale** でラスタライズ。`(name,weight,pt,color,scale)` でキャッシュ。

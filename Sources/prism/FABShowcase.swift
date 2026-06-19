@@ -18,6 +18,7 @@ struct ThemedFABView: NSViewRepresentable {
     var size: ThemedFAB.Size = .large
     var role: ThemedFAB.Role = .primary
     var symbol: String? = "plus"
+    var image: NSImage? = nil          // pre-resolved icon (SVG / logo / …); wins over symbol
     var label: String = ""
     var enabled = true
     var previewHovered = false
@@ -40,6 +41,7 @@ struct ThemedFABView: NSViewRepresentable {
         f.size = size
         f.role = role
         f.leadingSymbol = symbol
+        f.leadingImage = image
         f.label = label
         f.isEnabled = enabled
         f.previewHovered = previewHovered

@@ -47,6 +47,21 @@ let package = Package(
         // decodes over that projection. See atelier docs/swift-toml-edit.md.
         .package(url: "https://github.com/akira-toriyama/swift-toml-edit.git",
                  .upToNextMinor(from: "1.0.0")),
+
+        // SwiftDraw (Zlib · zero deps · pure-Swift CoreGraphics SVG renderer,
+        // macOS 10.15+) — ThemeKit's SVG rasterizer. The ONLY path that
+        // resolves AND compiles on a CommandLineTools-only machine: ✗ NSImage's
+        // direct SVG load is the private `_NSSVGImageRep` (nil on macOS 13);
+        // ✗ asset catalogs need Xcode/actool. A ThemeKit-ONLY dependency — the
+        // pure modules (Palette/…) never link it. See docs/ROADMAP.md item 1.
+        //
+        // PINNED < 0.25.0: 0.25.0 added `SVGView.swift`, a SwiftUI view whose
+        // `#Preview` macro needs the `PreviewsMacros` plugin that ships ONLY with
+        // full Xcode — it fails to compile under CommandLineTools (the local gate).
+        // 0.24.0 predates SVGView and gives the same `SVG(fileURL:)` / `rasterize`
+        // / `NSImage(_:)` API. Bump only if a CLT-buildable newer release lands.
+        .package(url: "https://github.com/swhitty/SwiftDraw.git",
+                 .upToNextMinor(from: "0.24.0")),
     ],
     targets: [
         // Pure, Sendable, AppKit-free. The shared base.
@@ -75,7 +90,12 @@ let package = Package(
         // / standard) text field: floating label, leading/trailing SF
         // adornments, focus-accent transition, helper/error, IME-aware. Themed
         // by assigning `palette`. @MainActor / AppKit.
-        .target(name: "ThemeKit", dependencies: ["PaletteKit", "Palette"]),
+        .target(name: "ThemeKit",
+                dependencies: ["PaletteKit", "Palette",
+                               .product(name: "SwiftDraw", package: "SwiftDraw")],
+                exclude: ["Resources/README.md"],   // doc, not a bundled resource
+                resources: [.copy("Resources/Phosphor"),
+                            .copy("Resources/SimpleIcons")]),
 
         // Pure, Sendable, AppKit-free. One declarative `Spec<Root>` that
         // BOTH decodes a `config.toml` (over `Toml`) and emits its JSON

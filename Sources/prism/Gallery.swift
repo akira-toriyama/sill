@@ -37,7 +37,7 @@ struct Gallery: View {
 
     /// The widget-family tab in view. Each card renders ONLY this family's content,
     /// so a card stays short (no more 11-mock scroll). `.palette` = theme foundations.
-    @State private var selectedFamily: KitFamily = .palette
+    @State private var selectedFamily: KitFamily
 
     /// The live effect 演出 master toggle (派手 ON / 静か OFF). Seeded from the
     /// config's `show-effects`, then driven by the header toggle at runtime — it
@@ -52,6 +52,13 @@ struct Gallery: View {
         _selected = State(initialValue:
             (t == "all" || Gallery.switchable.contains(t)) ? t : "all")
         _showEffects = State(initialValue: config.showEffects)
+        // Accept either the displayed tab label ("icons") or the enum case name
+        // ("icon") — the latter is what the ROADMAP / docs use.
+        _selectedFamily = State(initialValue:
+            KitFamily.allCases.first {
+                $0.rawValue.lowercased() == config.family
+                    || String(describing: $0) == config.family
+            } ?? .palette)
     }
 
     /// The card(s) currently rendered: every theme when "all", else the one.
@@ -305,6 +312,8 @@ struct ThemeCard: View {
         switch family {
         case .palette:
             EmptyView()   // handled by `paletteFoundations`
+        case .icon:
+            MockIcons(p: p)
         case .text:
             WidgetSection(kitComponent("ThemedTextField"), p: p) { MockField(p: p) }
             WidgetSection(kitComponent("ThemedComboBox"), p: p) { MockComboBox(p: p) }

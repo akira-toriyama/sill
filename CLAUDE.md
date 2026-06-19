@@ -65,6 +65,20 @@ draws in it). A widget belongs in sill once ≥2 apps would otherwise hand-draw 
 `Mock<Widget>(p:)` grid wired into `ThemeCard`, so it appears live across all
 themes (prism never imports an app's View → no drift).
 
+## Icons (SVG, since v1.8.0)
+
+All icons are SVG, rendered by **SwiftDraw** (a ThemeKit-only dep, pinned
+`< 0.25.0` — 0.25+ needs an Xcode-only `#Preview` plugin that breaks the CLT
+build). Load with `phosphorImage(name:pt:weight:)` (Phosphor, MIT — the workhorse
+glyphs) or `simpleIconImage(name:pt:)` (Simple Icons, CC0 — brand/app logos);
+both return a template `NSImage` the widgets tint. Pass a pre-resolved image to
+`ThemedButton/FAB.leadingImage` or `ThemedToolBar.ButtonItem.image` (wins over the
+SF `*Symbol`; template ⇒ tinted, multi-colour ⇒ raw). **The vendored set in
+`Sources/ThemeKit/Resources/` is a CURATED SUBSET, not the full catalogs** — need
+a glyph that isn't there? Add it in one step per
+[`Resources/README.md`](Sources/ThemeKit/Resources/README.md) (a missing lookup
+also prints that pointer in DEBUG). The SF→Phosphor name sweep is ROADMAP #2.
+
 ## Conventions
 
 - Commits: **gitmoji + Conventional Commits** (enforced by `commit-lint`), e.g.

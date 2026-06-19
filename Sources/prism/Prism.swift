@@ -48,6 +48,10 @@ struct PrismConfig {
     var fontScale: CGFloat = 1.0
     /// Show the effect flash palette strip for animatable themes.
     var showEffects: Bool = true
+    /// Which widget-family tab opens (a `KitFamily` raw value, case-insensitive;
+    /// e.g. `icons`, `action`). Lets a screenshot target a tab deterministically
+    /// instead of clicking. Default = `palette` (the foundations).
+    var family: String = "palette"
 
     static func load() -> PrismConfig {
         var c = PrismConfig()
@@ -66,6 +70,7 @@ struct PrismConfig {
             case "theme":        if !val.isEmpty { c.theme = val.lowercased() }
             case "font-scale":   if let d = Double(val) { c.fontScale = CGFloat(d) }
             case "show-effects": c.showEffects = (val.lowercased() == "true")
+            case "family":       if !val.isEmpty { c.family = val.lowercased() }
             default: break
             }
         }
