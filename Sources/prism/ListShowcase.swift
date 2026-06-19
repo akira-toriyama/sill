@@ -151,6 +151,20 @@ struct ListView: NSViewRepresentable {
     ]
 }
 
+// Long titles that overflow a narrow pane — for the horizontalContentScroll demo
+// (the row extends past the clip and scrolls sideways rather than truncating).
+@MainActor private func longItems() -> [ListItem] {
+    func r(_ id: String, _ icon: String, _ title: String, _ sub: String) -> ListItem {
+        ListItem(id: id, image: glyph(icon, 16), primary: title, secondary: sub, secondaryMono: true,
+                 badges: [Badge("⌘\(id.suffix(1))", role: .primary)])
+    }
+    return [
+        r("1", "safari",   "akira-toriyama/sill — ThemedList.swift (Edited)", "github.com/akira-toriyama/sill/blob/main/Sources/ThemeKit/ThemedList.swift"),
+        r("2", "hammer",   "prism — the visual bench for the whole widget kit",  "file:///Volumes/workspace/github.com/akira-toriyama/sill/Sources/prism"),
+        r("3", "terminal", "swift build -c release && swift test --parallel",     "~/workspace/github.com/akira-toriyama/sill"),
+    ]
+}
+
 // MARK: - Showcase
 
 struct MockList: View {
@@ -158,7 +172,7 @@ struct MockList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKit · List — the REAL embeddable widget (hover a row, ↑↓/click in the dense list when focused). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list. Middle row: the additive drag layer (default-off) — the lifted row dims under a drop-onto ring or a between insertion-line; a live drag's ghost is a child window (hand-checked, not captured). Bottom row: hierarchy — ListItem.indentLevel shifts content right (selection wash stays full-bleed) + collapsible section headers (▾ expanded / ▸ collapsed, click → onToggleSection; the host omits a collapsed section's rows).")
+            Text("ThemeKit · List — the REAL embeddable widget (hover a row, ↑↓/click in the dense list when focused). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list. Middle row: the additive drag layer (default-off) — the lifted row dims under a drop-onto ring or a between insertion-line; a live drag's ghost is a child window (hand-checked, not captured). 4th row: hierarchy — ListItem.indentLevel shifts content right (selection wash stays full-bleed) + collapsible section headers (▾ expanded / ▸ collapsed, click → onToggleSection; the host omits a collapsed section's rows). Bottom row: facet polish — highlightStyle .outline (a keyboard cursor ring distinct from the filled selection), alternatingRowBackground (zebra; parity resets per section), horizontalContentScroll (long titles draw in full and scroll sideways, never truncated).")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
                 .fixedSize(horizontal: false, vertical: true)
@@ -262,6 +276,53 @@ struct MockList: View {
                         list.previewSelection = "f1"
                     }
                     .frame(width: 320, height: 224)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+                Spacer(minLength: 0)
+            }
+
+            // Facet polish (all additive, default-off): outline keyboard cursor vs
+            // filled selection · zebra rows · horizontal content scroll (no truncation).
+            HStack(alignment: .top, spacing: 20) {
+                cell("highlight .outline (cursor) ≠ selection (fill)") {
+                    ListView(palette: p) { list in
+                        list.items = facetItems()
+                        list.selectionMode = .single
+                        list.highlightStyle = .outline
+                        // w1 committed (wash + bar); w3 is the keyboard cursor (a ring) —
+                        // two distinct affordances at once (facet's tree).
+                        list.previewSelection = "w1"
+                        list.previewHighlight = "w2"
+                    }
+                    .frame(width: 320, height: 150)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+
+                cell("zebra · alternatingRowBackground (resets per section)") {
+                    ListView(palette: p) { list in
+                        list.items = facetItems()
+                        list.alternatingRowBackground = true
+                        list.selectionMode = .none
+                    }
+                    .frame(width: 300, height: 150)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+
+                cell("horizontalContentScroll · long titles, no truncation") {
+                    ListView(palette: p) { list in
+                        list.items = longItems()
+                        list.selectionMode = .single
+                        list.horizontalContentScroll = true
+                        list.previewSelection = "1"
+                        list.previewScrollX = 150          // scrolled sideways to reveal the title tail
+                    }
+                    .frame(width: 260, height: 150)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8)
                         .stroke(Color(nsColor: p.border), lineWidth: 1))

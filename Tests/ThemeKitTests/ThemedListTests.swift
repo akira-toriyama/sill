@@ -746,4 +746,68 @@ final class ThemedListTests: XCTestCase {
         XCTAssertEqual(l._insertionLineX(beforeID: "deep"), 44 + 32, "before an indented row follows its depth")
         XCTAssertEqual(l._insertionLineX(beforeID: nil), 44, "the end gap uses the base text x")
     }
+
+    // MARK: - Facet polish: highlightStyle / zebra / horizontalContentScroll (1.5.0)
+
+    func testHighlightStyleDefaultsToFill() {
+        XCTAssertEqual(makeList([row("a")]).highlightStyle, .fill, "default is the menu/combo fill look (additive)")
+    }
+
+    func testHighlightFillAndAccentMatrix() {
+        let l = makeList([row("a")])
+        // Default .fill: a highlighted row fills like a selection; with .solidAccent it
+        // sits on the opaque accent (onPrimary ink) — the menu model, unchanged.
+        l.highlightStyle = .fill; l.hoverStyle = .solidAccent
+        XCTAssertTrue(l._highlightFillAndAccent(isSel: false, isHi: true).fill)
+        XCTAssertTrue(l._highlightFillAndAccent(isSel: false, isHi: true).onAccent, ".fill highlight is on the accent")
+        // .outline: the highlight draws a RING, no fill → no accent → text keeps normal ink.
+        l.highlightStyle = .outline
+        XCTAssertFalse(l._highlightFillAndAccent(isSel: false, isHi: true).fill)
+        XCTAssertFalse(l._highlightFillAndAccent(isSel: false, isHi: true).onAccent,
+                       ".outline cursor does not put text on the accent")
+        // A committed selection still fills + accents regardless of highlightStyle.
+        XCTAssertTrue(l._highlightFillAndAccent(isSel: true, isHi: false).onAccent)
+        // .wash never accents (no opaque primary fill).
+        l.hoverStyle = .wash; l.highlightStyle = .fill
+        XCTAssertFalse(l._highlightFillAndAccent(isSel: true, isHi: false).onAccent, ".wash is not an accent fill")
+    }
+
+    func testZebraParityAlternatesAndResetsPerSection() {
+        // Data-row parity 0,1,2,… → stripe on the odd ones; headers/separators never
+        // stripe and RESET the parity so each section starts unstriped.
+        let l = makeList([header("H1"), row("a"), row("b"), row("c"),
+                          header("H2"), row("d"), row("e")])
+        l.alternatingRowBackground = true
+        XCTAssertEqual(l._zebraParity(forID: "H1"), false, "a header is never striped")
+        XCTAssertEqual(l._zebraParity(forID: "a"), false, "first data row of a section: parity 0")
+        XCTAssertEqual(l._zebraParity(forID: "b"), true,  "second: parity 1 → striped")
+        XCTAssertEqual(l._zebraParity(forID: "c"), false, "third: parity 0")
+        XCTAssertEqual(l._zebraParity(forID: "H2"), false, "a header resets the parity")
+        XCTAssertEqual(l._zebraParity(forID: "d"), false, "next section's first data row: parity 0 again")
+        XCTAssertEqual(l._zebraParity(forID: "e"), true,  "second of the new section: striped")
+    }
+
+    func testZebraSkipsSeparators() {
+        let l = makeList([row("a"), separator(), row("b")])
+        XCTAssertEqual(l._zebraParity(forID: "a"), false, "data row 0")
+        XCTAssertEqual(l._zebraParity(forID: "sep"), false, "a separator is never striped / not counted")
+        XCTAssertEqual(l._zebraParity(forID: "b"), true, "the separator doesn't advance parity: b is data row 1")
+    }
+
+    func testHorizontalContentScrollNaturalWidth() {
+        let l = makeList([ListItem(id: "x", primary: "A reasonably long row title that overflows a narrow pane")])
+        XCTAssertEqual(l._naturalContentWidth, 0, "off (default): no natural-width measuring (byte-identical)")
+        l.horizontalContentScroll = true
+        XCTAssertEqual(l._naturalContentWidth, ceil(l.fittingWidth()), "on: the cached natural width = the content fit")
+        XCTAssertGreaterThan(l._naturalContentWidth, 100, "a long row produces a wide natural width")
+    }
+
+    func testHorizontalContentScrollPreservesRowLayout() {
+        let off = makeList([row("a"), row("b", secondary: "x"), row("c")]).listProbe
+        let l = makeList([row("a"), row("b", secondary: "x"), row("c")])
+        l.horizontalContentScroll = true
+        let on = l.listProbe
+        XCTAssertEqual(on.totalHeight, off.totalHeight, "horizontal scroll changes WIDTH only, never the vertical layout")
+        XCTAssertEqual(on.rowFrames["c"]?.minY, off.rowFrames["c"]?.minY)
+    }
 }
