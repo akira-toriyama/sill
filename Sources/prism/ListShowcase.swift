@@ -131,6 +131,26 @@ struct ListView: NSViewRepresentable {
     ]
 }
 
+// A nested tree: collapsible section headers at varying `indentLevel` + indented
+// rows. Shows the indent steps (level 1 / 2), both disclosure states (▾ expanded /
+// ▸ collapsed) on a 2-line AND a 1-line header, and a collapsed section whose child
+// rows the HOST simply omits (the kit hides nothing itself — host owns the shape).
+@MainActor private func treeItems() -> [ListItem] {
+    [
+        ListItem(id: "proj", primary: "Project",
+                 kind: .sectionHeader(subtitle: "4 items", collapsed: false)),
+        ListItem(id: "readme", image: glyph("doc.text", 16), primary: "README.md", indentLevel: 1),
+        ListItem(id: "src", primary: "src",
+                 kind: .sectionHeader(collapsed: false), indentLevel: 1),
+        ListItem(id: "f1", image: glyph("swift", 16), primary: "ThemedList.swift", indentLevel: 2),
+        ListItem(id: "f2", image: glyph("swift", 16), primary: "ThemedMenu.swift", indentLevel: 2),
+        ListItem(id: "build", primary: "build",
+                 kind: .sectionHeader(collapsed: true), indentLevel: 1),    // collapsed — children omitted
+        ListItem(id: "archive", primary: "Archive",
+                 kind: .sectionHeader(collapsed: true)),                     // collapsed — children omitted
+    ]
+}
+
 // MARK: - Showcase
 
 struct MockList: View {
@@ -138,7 +158,7 @@ struct MockList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKit · List — the REAL embeddable widget (hover a row, ↑↓/click in the dense list when focused). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list. Bottom row: the additive drag layer (default-off) — the lifted row dims under a drop-onto ring or a between insertion-line; a live drag's ghost is a child window (hand-checked, not captured).")
+            Text("ThemeKit · List — the REAL embeddable widget (hover a row, ↑↓/click in the dense list when focused). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list. Middle row: the additive drag layer (default-off) — the lifted row dims under a drop-onto ring or a between insertion-line; a live drag's ghost is a child window (hand-checked, not captured). Bottom row: hierarchy — ListItem.indentLevel shifts content right (selection wash stays full-bleed) + collapsible section headers (▾ expanded / ▸ collapsed, click → onToggleSection; the host omits a collapsed section's rows).")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
                 .fixedSize(horizontal: false, vertical: true)
@@ -224,6 +244,24 @@ struct MockList: View {
                         list.previewDropTarget = DropTarget(placement: .between(beforeID: "r3"))
                     }
                     .frame(width: 300, height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(alignment: .top, spacing: 20) {
+                cell("tree · indentLevel + collapsible sections (▾ / ▸)") {
+                    ListView(palette: p) { list in
+                        list.items = treeItems()
+                        list.selectionMode = .single
+                        list.showsDividers = true
+                        // An INDENTED row selected: the wash + 3pt bar stay full-bleed
+                        // while the text sits at its depth (the MUI tree model).
+                        list.previewSelection = "f1"
+                    }
+                    .frame(width: 320, height: 224)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8)
                         .stroke(Color(nsColor: p.border), lineWidth: 1))

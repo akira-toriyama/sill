@@ -91,10 +91,26 @@ public struct ListItem {
     /// leading image; this folds a "checked" marker into the row's synthetic
     /// `.menuItem` label so VoiceOver can tell a checked row from an unchecked one.
     public var axChecked: Bool
+    /// Visual nesting depth (0 = top level). The leading cluster — the image and
+    /// text (plus a collapsible header's disclosure triangle) — shifts right by
+    /// `indentLevel × indentStep`; the
+    /// selection / hover fill and the leading tint bar stay FULL-BLEED (MUI's tree
+    /// model: the content indents, the row's hit area + background do not). DEFAULT 0
+    /// ⇒ byte-identical to a non-indented list. The kit only DRAWS the depth — the
+    /// host owns the tree shape (which rows are children, what a level means).
+    public var indentLevel: Int
 
     public enum Kind: Equatable {
         case row
-        case sectionHeader(subtitle: String? = nil)
+        /// A group label (1-line, or 2-line with a `subtitle`), optionally sticky.
+        /// `collapsed` opts the header into being COLLAPSIBLE: `nil` (default) ⇒ a
+        /// plain, non-interactive header exactly as before (no disclosure triangle);
+        /// `false` ⇒ collapsible + currently expanded (a ▾ triangle); `true` ⇒
+        /// collapsed (a ▸ triangle). Clicking a collapsible header fires
+        /// `onToggleSection(id)`. The kit does NOT hide the section's rows itself —
+        /// the host owns the collapsed set and rebuilds `items` accordingly (the
+        /// React-component contract: the kit reports the toggle, the host owns shape).
+        case sectionHeader(subtitle: String? = nil, collapsed: Bool? = nil)
         /// A non-interactive thin rule between groups (a menu separator). Drawn as a
         /// full-bleed 1pt `border` hairline in a short band; skipped by nav / hover /
         /// activation / AX. Its `id` only needs to be unique.
@@ -105,15 +121,22 @@ public struct ListItem {
                 secondary: String? = nil, secondaryMono: Bool = false,
                 badges: [Badge] = [], trailing: TrailingAccessory = .none,
                 tint: ListTint = .none, kind: Kind = .row, isDisabled: Bool = false,
-                axChecked: Bool = false) {
+                axChecked: Bool = false, indentLevel: Int = 0) {
         self.id = id; self.image = image; self.primary = primary
         self.secondary = secondary; self.secondaryMono = secondaryMono
         self.badges = badges; self.trailing = trailing; self.tint = tint
         self.kind = kind; self.isDisabled = isDisabled; self.axChecked = axChecked
+        self.indentLevel = indentLevel
     }
 
     var isHeader: Bool { if case .sectionHeader = kind { return true }; return false }
-    var headerSubtitle: String? { if case let .sectionHeader(s) = kind { return s }; return nil }
+    var headerSubtitle: String? { if case let .sectionHeader(s, _) = kind { return s }; return nil }
+    /// nil ⇒ a non-collapsible header (or not a header); true/false ⇒ collapsible,
+    /// collapsed/expanded.
+    var headerCollapsed: Bool? { if case let .sectionHeader(_, c) = kind { return c }; return nil }
+    /// A header the user can toggle: collapsible (its `collapsed` flag is non-nil) and
+    /// not disabled (mirrors `isSelectable` / `isDragSource` — a disabled item is inert).
+    var isCollapsibleHeader: Bool { isHeader && !isDisabled && headerCollapsed != nil }
     var isSeparator: Bool { if case .separator = kind { return true }; return false }
 }
 
@@ -325,6 +348,10 @@ public final class ThemedList: NSView {
     public var onEmptyAction: ((_ query: String) -> Void)? = nil
     /// The hovered row id changed (nil on exit). Headers / disabled rows report nil.
     public var onHover: ((String?) -> Void)? = nil
+    /// A COLLAPSIBLE section header (its `collapsed` flag is non-nil) was clicked,
+    /// carrying the header's id. The host flips its own collapsed state and rebuilds
+    /// `items` (the kit hides nothing itself). Never fires for a plain header.
+    public var onToggleSection: ((String) -> Void)? = nil
 
     // MARK: Drag-and-drop (opt-in — the additive drag layer; default OFF)
 
@@ -415,7 +442,11 @@ public final class ThemedList: NSView {
         let chevronPt, shortcutHeight, shortcutHPad, shortcutRadius, shortcutPt: CGFloat
         let header1Pt, header2TitlePt, header2SubPt: CGFloat
         let clusterGap, budgetMargin, separatorBand: CGFloat
+        let indentStep, disclosurePt, disclosureGap: CGFloat
         var textXOrigin: CGFloat { leadingInset + imageBox + gapImageToText }
+        /// Width reserved at a collapsible header's leading edge for the disclosure
+        /// triangle (the triangle glyph + the gap before the title).
+        var disclosureGutter: CGFloat { disclosurePt + disclosureGap }
     }
 
     private var metrics: Metrics {
@@ -428,7 +459,8 @@ public final class ThemedList: NSView {
                            badgeHeight: 16, badgeHPad: 6, badgeSymbolPt: 11, badgePt: 10, badgeGap: 4,
                            chevronPt: 11, shortcutHeight: 16, shortcutHPad: 5, shortcutRadius: 4, shortcutPt: 10,
                            header1Pt: 11, header2TitlePt: 13, header2SubPt: 11,
-                           clusterGap: 6, budgetMargin: 8, separatorBand: 9)
+                           clusterGap: 6, budgetMargin: 8, separatorBand: 9,
+                           indentStep: 16, disclosurePt: 11, disclosureGap: 5)
         case .compact:
             // header2 == comfortable's 40: the 2-line title(13)+subtitle(11) content
             // doesn't shrink with density, so a shorter row clipped the subtitle.
@@ -439,7 +471,8 @@ public final class ThemedList: NSView {
                            badgeHeight: 14, badgeHPad: 6, badgeSymbolPt: 11, badgePt: 9, badgeGap: 4,
                            chevronPt: 10, shortcutHeight: 14, shortcutHPad: 5, shortcutRadius: 4, shortcutPt: 10,
                            header1Pt: 11, header2TitlePt: 13, header2SubPt: 11,
-                           clusterGap: 6, budgetMargin: 8, separatorBand: 7)
+                           clusterGap: 6, budgetMargin: 8, separatorBand: 7,
+                           indentStep: 14, disclosurePt: 10, disclosureGap: 5)
         }
     }
 
@@ -604,6 +637,12 @@ public final class ThemedList: NSView {
     /// list — the combo's option rows, so they sit flush like the old ComboListView).
     private var rowTextX: CGFloat { reservesLeadingImageColumn ? metrics.textXOrigin : metrics.leadingInset }
 
+    /// The horizontal offset a row's leading content (disclosure / image / text) is
+    /// pushed right by its nesting depth. 0 for a top-level (or non-indented) row, so
+    /// a list whose rows never set `indentLevel` is geometrically unchanged.
+    private func indentInset(_ item: ListItem) -> CGFloat { CGFloat(max(0, item.indentLevel)) * metrics.indentStep }
+    private func indentInset(forID id: String?) -> CGFloat { indexOf(id).map { indentInset(items[$0]) } ?? 0 }
+
     /// A row's rect in the flipped doc view (y grows down).
     private func rowRect(_ i: Int) -> CGRect {
         if items.isEmpty { return CGRect(x: 0, y: 0, width: docWidth, height: metrics.singleRow) }
@@ -695,7 +734,10 @@ public final class ThemedList: NSView {
         let m = metrics
         var w: CGFloat = 0
         for item in items where !item.isSeparator {
-            let textX = item.isHeader ? m.leadingInset : rowTextX
+            // Match drawHeader / drawRow: a header's text starts after its indent + the
+            // disclosure gutter (when collapsible); a row's after its indent + leading slot.
+            let textX = (item.isHeader ? m.leadingInset + (item.headerCollapsed != nil ? m.disclosureGutter : 0) : rowTextX)
+                + indentInset(item)
             let pFont: NSFont = item.isHeader
                 ? (item.headerSubtitle != nil ? themedFont(m.header2TitlePt, .medium) : themedFont(m.header1Pt, .semibold))
                 : themedFont(m.primaryPt)
@@ -787,12 +829,19 @@ public final class ThemedList: NSView {
     fileprivate func handleClick(atDocY y: CGFloat) {
         guard let i = rowIndex(atDocY: y) else { return }
         if items.isEmpty { if isActionRowActive { fireEmptyAction() }; return }
-        // Swallow a click that lands under the PINNED sticky header — the row there
-        // is occluded, and the header (pin.index) is never selectable.
+        // A click inside the PINNED sticky header's band acts on the PINNED header (it
+        // occludes the row scrolled beneath it): toggle it if collapsible, else swallow
+        // the click — except when the header sits in its own natural slot (i == pin.index),
+        // where a non-collapsible header just no-ops through `activate`.
         if let pin = stickyHeader(atVisibleTop: listView.visibleRect.minY),
-           y >= pin.drawY, y < pin.drawY + rowLayout.heights[pin.index], i != pin.index {
+           y >= pin.drawY, y < pin.drawY + rowLayout.heights[pin.index] {
+            if items[pin.index].isCollapsibleHeader { onToggleSection?(items[pin.index].id) }
+            else if i != pin.index { return }
+            else { activate(i) }
             return
         }
+        // A collapsible header (anywhere else) toggles; any other row activates.
+        if items[i].isCollapsibleHeader { onToggleSection?(items[i].id); return }
         activate(i)
     }
 
@@ -1043,8 +1092,11 @@ extension ThemedList {
 
         let m = metrics
         let onAccent = (isSel || isHi) && hoverStyle == .solidAccent
+        let indent = indentInset(item)        // leading content shifts right by depth; fills stay full-bleed
 
-        // 1. Backgrounds: tint bar (under everything), then selection/hover.
+        // 1. Backgrounds: tint bar (under everything), then selection/hover. The leading
+        //    tint bar + the selection/hover fill stay FULL-BLEED (x=0 / full width) —
+        //    only the row's CONTENT indents (the MUI tree model).
         if item.tint != .none, !onAccent {
             resolvedTint(item.tint).setFill()
             CGRect(x: 0, y: r.minY, width: m.accentBar, height: r.height).fill()
@@ -1063,12 +1115,12 @@ extension ThemedList {
         //    the `imageBox` reservation (no upscale); a colour favicon fills the box.
         if reservesLeadingImageColumn, let image = item.image {
             let side = image.isTemplate ? m.iconGlyph : m.imageBox
-            let box = CGRect(x: m.leadingInset + (m.imageBox - side) / 2, y: r.midY - side / 2, width: side, height: side)
+            let box = CGRect(x: m.leadingInset + indent + (m.imageBox - side) / 2, y: r.midY - side / 2, width: side, height: side)
             drawImage(image, fitting: box, tint: onAccent ? palette.onPrimary(1) : (image.isTemplate ? palette.foreground : nil))
         }
 
         // 4. Text stack.
-        let xText = rowTextX
+        let xText = rowTextX + indent
         let textMax = max(0, r.maxX - m.trailingInset - (trailingW > 0 ? trailingW + m.budgetMargin : 0) - xText)
         let primaryColor = primaryTextColor(disabled: item.isDisabled, onAccent: onAccent)
         if let secondary = item.secondary {
@@ -1093,9 +1145,14 @@ extension ThemedList {
         //    suppressed above a separator row, which draws its own rule).
         if showsDividers, i < items.count - 1, !items[i + 1].isSeparator {
             let nextIsHeader = items[i + 1].isHeader
-            let x = nextIsHeader ? 0 : rowTextX
-            palette.border.setFill()
-            CGRect(x: x, y: r.maxY - 1, width: width - x - (nextIsHeader ? 0 : m.trailingInset), height: 1).fill()
+            let x = nextIsHeader ? 0 : rowTextX + indent     // align the rule under this row's (indented) text
+            // A deep indent in a narrow pane can push `x` past the right inset — clamp
+            // (a negative-width fill would paint a stray sliver LEFT of `x`).
+            let w = max(0, width - x - (nextIsHeader ? 0 : m.trailingInset))
+            if w > 0 {
+                palette.border.setFill()
+                CGRect(x: x, y: r.maxY - 1, width: w, height: 1).fill()
+            }
         }
     }
 
@@ -1147,23 +1204,40 @@ extension ThemedList {
         let m = metrics
         // Cover scrolled rows beneath a pinned header with the surface. Skipped when
         // the surface is nil (pure vibrancy) — there is no opaque colour to punch,
-        // and a hard block would defeat the vibrancy the host opted into.
+        // and a hard block would defeat the vibrancy the host opted into. The punch
+        // fill stays FULL-WIDTH (it occludes scrolled rows) even when the header's
+        // own content is indented.
         if let s = effectiveSurface { s.setFill(); r.fill() }
+        // The header content's leading edge: indented by depth, then a disclosure
+        // gutter when collapsible (the ▸/▾ triangle is drawn there below).
+        let indent = indentInset(item)
+        let collapsed = item.headerCollapsed                // nil ⇒ not collapsible
+        let leadX = m.leadingInset + indent + (collapsed != nil ? m.disclosureGutter : 0)
+        let textMax = max(0, width - leadX - m.leadingInset)
         if let subtitle = item.headerSubtitle {
             let title = themedFont(m.header2TitlePt, .medium)
             let tRow = CGRect(x: 0, y: r.minY + 6, width: r.width, height: title.ascender - title.descender)
             drawLine(item.primary, font: title, color: palette.foreground,
-                     x: m.leadingInset, maxWidth: width - m.leadingInset * 2, row: tRow, mode: .byTruncatingTail)
+                     x: leadX, maxWidth: textMax, row: tRow, mode: .byTruncatingTail)
             let sub = themedFont(m.header2SubPt)
             let sRow = CGRect(x: 0, y: tRow.maxY + m.lineGap, width: r.width, height: sub.ascender - sub.descender)
             drawLine(subtitle, font: sub, color: palette.muted,
-                     x: m.leadingInset, maxWidth: width - m.leadingInset * 2, row: sRow, mode: .byTruncatingTail)
+                     x: leadX, maxWidth: textMax, row: sRow, mode: .byTruncatingTail)
         } else {
             let f = themedFont(m.header1Pt, .semibold)
             let attrs: [NSAttributedString.Key: Any] = [.font: f, .foregroundColor: palette.muted, .kern: ThemedList.headerKern]
             let label = item.primary.uppercased() as NSString
             let size = label.size(withAttributes: attrs)
-            label.draw(at: NSPoint(x: m.leadingInset, y: r.minY + (r.height - size.height) / 2), withAttributes: attrs)
+            label.draw(at: NSPoint(x: leadX, y: r.minY + (r.height - size.height) / 2), withAttributes: attrs)
+        }
+        // The leading disclosure triangle (collapsible headers): ▸ when collapsed, ▾
+        // when expanded, drawn upright (the doc view is flipped → drawImage respects it).
+        if let collapsed {
+            let box = CGRect(x: m.leadingInset + indent, y: r.midY - m.disclosurePt / 2,
+                             width: m.disclosurePt, height: m.disclosurePt)
+            if let tri = sfImage(collapsed ? "chevron.right" : "chevron.down", pt: m.disclosurePt) {
+                drawImage(tri, fitting: box, tint: palette.muted)
+            }
         }
         palette.border.setFill()                            // a full-bleed underline
         CGRect(x: 0, y: r.maxY - 1, width: width, height: 1).fill()
@@ -1627,7 +1701,7 @@ extension ThemedList {
             palette.primary.setStroke(); path.lineWidth = 2; path.stroke()
         case .between(let beforeID):
             let y = insertionY(beforeID: beforeID)
-            let x = rowTextX
+            let x = insertionLineX(beforeID: beforeID)        // align to the target row's depth
             palette.primary.setFill()
             CGRect(x: x, y: y - 1, width: max(0, width - x - metrics.trailingInset), height: 2).fill()
             NSBezierPath(ovalIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)).fill()   // MUI insertion dot
@@ -1640,6 +1714,11 @@ extension ThemedList {
         guard let beforeID, let i = indexOf(beforeID) else { return rowLayout.totalHeight }
         return rowLayout.yOffsets[i]
     }
+
+    /// The leading x of a `.between` insertion line — aligned to the TARGET row's
+    /// depth (the end gap / an unknown id uses the base text x). Shared by the draw
+    /// path and the test seam so they can't drift.
+    private func insertionLineX(beforeID: String?) -> CGFloat { rowTextX + indentInset(forID: beforeID) }
 
     // MARK: Key routing (the managesFirstResponder list's keyDown calls this first)
 
@@ -1938,5 +2017,25 @@ extension ThemedList {
     func _dragCandidates() -> [DropTarget] { dragCandidates() }
     /// Route a keyDown through the real drag-key logic (consume-vs-fall-through).
     @discardableResult func _handleDragKey(_ ev: NSEvent) -> Bool { handleDragKey(ev) }
+
+    // MARK: Indent / disclosure seams
+
+    /// Drive a click at a doc-y through the real `handleClick` (a collapsible header
+    /// fires `onToggleSection`; a row activates) — no synthetic events / window.
+    func _handleClick(atDocY y: CGFloat) { handleClick(atDocY: y) }
+    /// The leading x where a row's text / a header's title is DRAWN (after its indent,
+    /// and a header's disclosure gutter) — so a test can assert the depth offset matches
+    /// the real draw path. nil for an unknown id.
+    func _contentLeadingX(forID id: String) -> CGFloat? {
+        guard let i = indexOf(id) else { return nil }
+        let item = items[i]
+        if item.isHeader {
+            return metrics.leadingInset + indentInset(item) + (item.headerCollapsed != nil ? metrics.disclosureGutter : 0)
+        }
+        return rowTextX + indentInset(item)
+    }
+    /// The x a `.between` drop insertion line draws at for `beforeID` (the real draw
+    /// path) — locks the "insertion line follows the target's depth" contract.
+    func _insertionLineX(beforeID: String?) -> CGFloat { insertionLineX(beforeID: beforeID) }
 }
 #endif
