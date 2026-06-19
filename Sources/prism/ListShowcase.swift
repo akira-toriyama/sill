@@ -131,6 +131,23 @@ struct ListView: NSViewRepresentable {
     ]
 }
 
+// A GENERIC sectioned list (no facet vocabulary) for the chunk-reorder demo: two
+// short single-line sections so a lifted chunk AND the section insertion bar both
+// frame in one static shot. Proves the chunk widget is app-agnostic, not facet-shaped.
+@MainActor private func chunkItems() -> [ListItem] {
+    func task(_ id: String, _ title: String) -> ListItem {
+        ListItem(id: id, image: glyph("circle", 14), primary: title)
+    }
+    return [
+        ListItem(id: "today", primary: "Today", kind: .sectionHeader()),
+        task("t1", "Draft the proposal"),
+        task("t2", "Review pull requests"),
+        ListItem(id: "later", primary: "Later", kind: .sectionHeader()),
+        task("l1", "Plan the release"),
+        task("l2", "Write the changelog"),
+    ]
+}
+
 // A nested tree: collapsible section headers at varying `indentLevel` + indented
 // rows. Shows the indent steps (level 1 / 2), both disclosure states (▾ expanded /
 // ▸ collapsed) on a 2-line AND a 1-line header, and a collapsed section whose child
@@ -172,7 +189,7 @@ struct MockList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKit · List — the REAL embeddable widget (hover a row, ↑↓/click in the dense list when focused). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list. Middle row: the additive drag layer (default-off) — the lifted row dims under a drop-onto ring or a between insertion-line; a live drag's ghost is a child window (hand-checked, not captured). 4th row: hierarchy — ListItem.indentLevel shifts content right (selection wash stays full-bleed) + collapsible section headers (▾ expanded / ▸ collapsed, click → onToggleSection; the host omits a collapsed section's rows). Bottom row: facet polish — highlightStyle .outline (a keyboard cursor ring distinct from the filled selection), alternatingRowBackground (zebra; parity resets per section), horizontalContentScroll (long titles draw in full and scroll sideways, never truncated).")
+            Text("ThemeKit · List — the REAL embeddable widget (hover a row, ↑↓/click in the dense list when focused). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list. Middle row: the additive drag layer (default-off) — the lifted row dims under a drop-onto ring or a between insertion-line; a live drag's ghost is a child window (hand-checked, not captured). Chunk row: a section header + its rows drag as ONE unit — every member dims, a thick full-width section insertion bar marks the gap it lands in, a 2×3 grip marks each draggable header (facet shape + a generic sectioned list; a non-header row still lifts solo). 4th row: hierarchy — ListItem.indentLevel shifts content right (selection wash stays full-bleed) + collapsible section headers (▾ expanded / ▸ collapsed, click → onToggleSection; the host omits a collapsed section's rows). Bottom row: facet polish — highlightStyle .outline (a keyboard cursor ring distinct from the filled selection), alternatingRowBackground (zebra; parity resets per section), horizontalContentScroll (long titles draw in full and scroll sideways, never truncated).")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
                 .fixedSize(horizontal: false, vertical: true)
@@ -258,6 +275,49 @@ struct MockList: View {
                         list.previewDropTarget = DropTarget(placement: .between(beforeID: "r3"))
                     }
                     .frame(width: 300, height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+                Spacer(minLength: 0)
+            }
+
+            // Chunk reorder (v1.6.0): a section HEADER lifts with its child rows as ONE
+            // unit — every member dims, a thick full-width section insertion bar marks the
+            // section gap it lands in, and a 2×3 grip marks each draggable header. Shown in
+            // the facet shape AND a generic sectioned list (no facet vocabulary). A
+            // non-header row still lifts SOLO (the reorder cell above) — chunk is headers-only.
+            HStack(alignment: .top, spacing: 20) {
+                cell("drag · chunk reorder (facet) · header + its windows lift as one") {
+                    ListView(palette: p) { list in
+                        list.items = facetItems()
+                        list.selectionMode = .single
+                        list.showsDividers = true
+                        list.draggable = true
+                        // Workspace A's header + its 3 window rows lifted as a chunk: all
+                        // four dim together; the grips mark both headers as draggable.
+                        list.previewDragChunk = ["wsA", "w1", "w2", "w3"]
+                        list.previewScrollY = 0
+                    }
+                    .frame(width: 320, height: 188)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+
+                cell("drag · chunk reorder (generic sections) · section insertion bar") {
+                    ListView(palette: p) { list in
+                        list.items = chunkItems()
+                        list.selectionMode = .single
+                        list.showsDividers = true
+                        list.draggable = true
+                        // 'Later' (header + its 2 rows) lifted and aimed above 'Today': the
+                        // members dim (bottom) while a thick full-width section bar marks the
+                        // top gap it would land in — coarser than a single row's thin line.
+                        list.previewDragChunk = ["later", "l1", "l2"]
+                        list.previewDropTarget = DropTarget(placement: .between(beforeID: "today"))
+                    }
+                    .frame(width: 300, height: 188)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8)
                         .stroke(Color(nsColor: p.border), lineWidth: 1))

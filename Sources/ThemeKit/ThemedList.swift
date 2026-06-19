@@ -165,14 +165,23 @@ public enum DropPlacement: Equatable, Sendable {
     case between(beforeID: String?)
 }
 
-/// The thing being dragged — the source row's identity. A struct (not a bare
-/// `String`) so the layer can grow to carry more later (a multi-row selection, an
-/// external-pasteboard source) WITHOUT breaking the `onDrop` / validator closure
-/// signatures the host already wrote — additive stability past 1.0.
+/// The thing being dragged. Carries the lifted row's `id` AND the full set of row
+/// ids that move together (`memberIDs`, always filled): a single-row drag is its own
+/// member (`[sourceID]`); a section-header CHUNK drag is the header followed by its
+/// child rows (`[header, …children]`). The host's `onDrop` / validator reads
+/// `memberIDs` to move the whole unit — the kit knows no domain, so whether a chunk
+/// drop becomes a positional reorder or a swap is the host's call (the React-component
+/// contract). A struct (not a bare `String`) so the layer can grow without breaking
+/// the closure signatures.
 public struct DragContext: Equatable, Sendable {
-    /// The dragged row's `id`.
-    public let id: String
-    public init(id: String) { self.id = id }
+    /// The lifted row's `id` — a chunk's header, or a single row.
+    public let sourceID: String
+    /// Every row id that moves as one unit, header-first: `[sourceID]` for a single
+    /// row, or `[header, …children]` for a chunk. NEVER empty.
+    public let memberIDs: [String]
+    public init(sourceID: String, memberIDs: [String]) {
+        self.sourceID = sourceID; self.memberIDs = memberIDs
+    }
 }
 
 /// A resolved drop target handed to `dropTargetValidator` / `onDrop`. Wraps the
@@ -419,6 +428,13 @@ public final class ThemedList: NSView {
     /// sets `.dropOnto`. Consulted only while `draggable`.
     public var dragMode: DragMode = .both
 
+    /// Draw a 2×3-dot reorder GRIP at the trailing edge of every draggable section
+    /// header, so the chunk handle is discoverable (decision ⑤: the grip is standard
+    /// once a list is `draggable`, not a hidden opt-in). DEFAULT true; set false to
+    /// suppress it. A non-`draggable` list never draws it, and it is HEADERS ONLY —
+    /// single-row reorder rows keep the v1.3 look (no grip).
+    public var showsReorderGrip = true { didSet { listView.needsDisplay = true } }
+
     /// Veto a resolved drop (the host's domain rule — facet rejects a drop onto the
     /// SAME workspace, or onto self). Returns `true` to ALLOW. The kit ALWAYS first
     /// rejects the structurally-trivial targets (onto self, a no-move reorder, a
@@ -445,6 +461,12 @@ public final class ThemedList: NSView {
     // onto-ring / insertion-line; `previewDragSource` dims the lifted row.
     public var previewDropTarget: DropTarget? = nil { didSet { listView.needsDisplay = true } }
     public var previewDragSource: String? = nil { didSet { listView.needsDisplay = true } }
+    /// Force the static CHUNK affordance for a still capture: every listed member row
+    /// dims as if a section header were lifted with its rows, so a deterministic shot
+    /// shows the mid-chunk-drag look (a live chunk ghost is a child window prism can't
+    /// grab). Pair with `previewDropTarget` for the section-level insertion bar. Takes
+    /// precedence over `previewDragSource` while no live drag runs. nil = no forced chunk.
+    public var previewDragChunk: [String]? = nil { didSet { listView.needsDisplay = true } }
 
     // MARK: Internals
 
@@ -457,13 +479,22 @@ public final class ThemedList: NSView {
 
     // Drag state (one session at a time; nil when idle). `target` is the live aim;
     // `isKeyboard` selects the lift model (no ghost, arrows aim). `dragGhost` is the
-    // floating child window (mouse only). `dragCandidateIndex` walks the validated
-    // `dragCandidates()` for a keyboard lift.
+    // floating child window (mouse only). A keyboard lift's candidate-walk index lives
+    // in `kbController` (the shared keyboard engine), not here.
     private struct DragSession { let sourceID: String; var target: DropTarget?; let isKeyboard: Bool }
     private var drag: DragSession?
     private var dragGhost: DragGhost?
-    private var dragCandidateIndex: Int?
     private var dragGhostGrab: CGPoint = .zero        // row top-left − cursor, screen pts (mouse ghost follow)
+    /// The row ids moving as one unit for the live drag: empty for a single-row drag
+    /// (the source moves alone), or `[header, …children]` while a section header is
+    /// lifted as a chunk. Seeded at lift (mouse + keyboard) BEFORE any target resolves,
+    /// cleared on teardown. Drives the multi-row dim, the chunk ghost, the
+    /// chunk-internal drop rejection, and the section-granularity keyboard candidates.
+    private var dragChunkIDs: [String] = []
+    /// The shared keyboard-DnD engine (§3b): single-row AND chunk lifts both run
+    /// through it — only the injected `candidates` differ, never the control flow.
+    /// Reusable + widget-agnostic so a future themed widget can own one too.
+    private lazy var kbController: KeyboardDragController = makeKeyboardDragController()
 
     private let scrollView = NSScrollView()
     // A vertical-shaped frame so NSScroller infers a vertical scroller; the scroll
@@ -1333,7 +1364,10 @@ extension ThemedList {
         let indent = indentInset(item)
         let collapsed = item.headerCollapsed                // nil ⇒ not collapsible
         let leadX = m.leadingInset + indent + (collapsed != nil ? m.disclosureGutter : 0)
-        let textMax = max(0, width - leadX - m.leadingInset)
+        // Reserve the trailing grip column (when one is drawn) so a long header title
+        // truncates BEFORE the grip dots rather than running under them.
+        let gripReserve = (showsReorderGrip && isDragSource(item)) ? reorderGripWidth + m.clusterGap : 0
+        let textMax = max(0, width - leadX - m.leadingInset - gripReserve)
         if let subtitle = item.headerSubtitle {
             let title = themedFont(m.header2TitlePt, .medium)
             let tRow = CGRect(x: 0, y: r.minY + 6, width: r.width, height: title.ascender - title.descender)
@@ -1359,8 +1393,34 @@ extension ThemedList {
                 drawImage(tri, fitting: box, tint: palette.muted)
             }
         }
+        // The reorder grip (decision ⑤ / §3c): a 2×3 dot handle at the trailing edge of a
+        // draggable header, so the chunk handle is discoverable. Headers only; suppressed
+        // when the list isn't draggable or `showsReorderGrip` is false.
+        if showsReorderGrip, isDragSource(item) { drawReorderGrip(in: r, width: width) }
         palette.border.setFill()                            // a full-bleed underline
         CGRect(x: 0, y: r.maxY - 1, width: width, height: 1).fill()
+    }
+
+    /// A 2×3 dot grip (facet's reorder handle) at a header's trailing edge — the
+    /// "this section is draggable" affordance for a chunk lift. Painted `tertiary` (a
+    /// quiet, always-on hint; hover/selection emphasis is a documented follow-up).
+    /// The reorder grip's column width (2 cols × 2pt dots + a 3pt gap = 7) — shared with the
+    /// header title budget so a long title truncates before the grip rather than under it.
+    private var reorderGripWidth: CGFloat { 2 * 2 + 3 }
+
+    private func drawReorderGrip(in r: CGRect, width: CGFloat) {
+        let dot: CGFloat = 2, gap: CGFloat = 3, cols = 2, rows = 3
+        let gw = reorderGripWidth
+        let gh = CGFloat(rows) * dot + CGFloat(rows - 1) * gap
+        let x0 = width - metrics.trailingInset - gw
+        let y0 = r.midY - gh / 2
+        palette.tertiary.setFill()
+        for c in 0..<cols {
+            for rr in 0..<rows {
+                NSBezierPath(ovalIn: CGRect(x: x0 + CGFloat(c) * (dot + gap), y: y0 + CGFloat(rr) * (dot + gap),
+                                            width: dot, height: dot)).fill()
+            }
+        }
     }
 
     /// A menu separator: a full-bleed 1pt `border` hairline centred in its short
@@ -1590,9 +1650,17 @@ extension ThemedList {
     /// lifted row dims, shows the floating ghost, and seeds the first aim.
     fileprivate func beginMouseDrag(atDocY docY: CGFloat, locationInWindow: NSPoint) -> Bool {
         guard drag == nil, let i = rowIndex(atDocY: docY), isDragSource(items[i]) else { return false }
-        let image = ghostImage(forRow: i)                 // capture while the row is still un-dimmed
+        // Seed the chunk membership BEFORE anything resolves a target — the ghost image,
+        // and updateMouseDrag → resolveDropTarget → isInsideChunk, all read `dragChunkIDs`.
+        // A header lifts its whole section as a chunk (decision ⑤, unconditional); any
+        // other row drags solo (single-row reorder, the v1.3 behaviour).
+        dragChunkIDs = items[i].isHeader ? chunkMemberIDs(forHeader: items[i].id) : []
+        let image = dragChunkIDs.isEmpty ? ghostImage(forRow: i)        // capture while un-dimmed
+                                         : ghostImage(forChunk: dragChunkIDs)
+        let onScreen = dragChunkIDs.isEmpty ? rowRectOnScreen(for: items[i].id)
+                                            : chunkUnionRectOnScreen(dragChunkIDs)
         drag = DragSession(sourceID: items[i].id, target: nil, isKeyboard: false)
-        showGhost(image: image, forRow: i, locationInWindow: locationInWindow)
+        showGhost(image: image, onScreenRect: onScreen, locationInWindow: locationInWindow)
         updateMouseDrag(atDocY: docY, locationInWindow: locationInWindow)
         return true
     }
@@ -1619,47 +1687,51 @@ extension ThemedList {
     /// via `moveDragTarget` (highlight nav is suppressed while lifting — decision e).
     public func beginDrag(_ id: String) {
         guard drag == nil, let i = indexOf(id), isDragSource(items[i]) else { return }
+        // Seed the chunk BEFORE the controller asks for candidates (a header → its whole
+        // section; any other row → solo), exactly mirroring the mouse path.
+        dragChunkIDs = items[i].isHeader ? chunkMemberIDs(forHeader: id) : []
         drag = DragSession(sourceID: id, target: nil, isKeyboard: true)
-        let candidates = dragCandidates()
-        dragCandidateIndex = candidates.isEmpty ? nil : 0
-        setDragTarget(candidates.first)
+        kbController.lift(source: id)            // seeds the aim at the first valid candidate
         listView.needsDisplay = true
     }
 
     /// Move the keyboard drop aim by `delta` through the validated candidates (clamped).
-    /// Scrolls the aimed row into view. No-op outside a keyboard lift.
+    /// Scrolls the aimed row into view. No-op outside a keyboard lift. A chunk lift walks
+    /// SECTION boundaries (one stop per section), a single-row lift walks row gaps — the
+    /// difference is the controller's candidate set, not this control flow (§3b).
     public func moveDragTarget(_ delta: Int) {
         guard let s = drag, s.isKeyboard else { return }
-        let candidates = dragCandidates()
-        guard !candidates.isEmpty else { setDragTarget(nil); return }
-        let next = min(max((dragCandidateIndex ?? 0) + delta, 0), candidates.count - 1)
-        dragCandidateIndex = next
-        setDragTarget(candidates[next])
-        if let id = targetRowID(candidates[next]) { scrollToRow(id) }
-        else if let lastID = items.last(where: { !$0.isSeparator })?.id { scrollToRow(lastID) }   // the end gap → reveal the content bottom
+        kbController.aim(delta)
     }
 
     /// Commit the in-flight drag (mouse OR keyboard) — fires `onDrop` on a valid target.
     public func commitDrag() {
         guard let s = drag else { return }
-        finishDrag(commit: true, session: s)
+        // A keyboard lift finalizes through the shared engine (it resolves the aimed
+        // candidate); a mouse drag already holds its pointer-resolved target.
+        if s.isKeyboard { kbController.commit() } else { finishDrag(commit: true, session: s) }
     }
 
     /// Cancel any in-flight drag without firing `onDrop`.
     public func cancelDrag() {
         guard let s = drag else { return }
-        finishDrag(commit: false, session: s)
+        if s.isKeyboard { kbController.cancel() } else { finishDrag(commit: false, session: s) }
     }
 
     // MARK: Shared session teardown / target mutation
 
     private func finishDrag(commit: Bool, session s: DragSession) {
         let target = s.target
+        // The PUBLIC `memberIDs` is always filled: the live chunk while a header is
+        // lifted, else the lone source. (Internally `dragChunkIDs` stays empty for a
+        // single-row drag — only the surfaced struct carries `[sourceID]`.)
+        let members = dragChunkIDs.isEmpty ? [s.sourceID] : dragChunkIDs
         drag = nil
-        dragCandidateIndex = nil
+        dragChunkIDs = []
+        kbController.reset()              // clear the keyboard candidate walk
         hideGhost()
         listView.needsDisplay = true
-        if commit, let target { onDrop?(DragContext(id: s.sourceID), target) }
+        if commit, let target { onDrop?(DragContext(sourceID: s.sourceID, memberIDs: members), target) }
     }
 
     private func setDragTarget(_ t: DropTarget?) {
@@ -1672,22 +1744,63 @@ extension ThemedList {
         listView.needsDisplay = true
     }
 
+    // MARK: Keyboard engine wiring (the shared KeyboardDragController — §3b)
+
+    /// Build the keyboard-DnD engine, injecting the ThemedList-specific candidates +
+    /// commit/cancel so the controller itself stays widget-agnostic (a future themed
+    /// widget wires its own). `[weak self]` throughout — the list OWNS the controller.
+    private func makeKeyboardDragController() -> KeyboardDragController {
+        let c = KeyboardDragController()
+        c.candidates = { [weak self] in self?.dragCandidates() ?? [] }
+        c.onAim      = { [weak self] target in self?.applyKeyboardAim(target) }
+        c.onCommit   = { [weak self] target in self?.commitKeyboardTarget(target) }
+        c.onCancel   = { [weak self] in self?.cancelKeyboardDrag() }
+        return c
+    }
+
+    /// Paint the keyboard aim + scroll it into view (the controller resolved the
+    /// candidate; this is the ThemedList-side effect of an aim).
+    private func applyKeyboardAim(_ target: DropTarget?) {
+        setDragTarget(target)
+        guard let target else { return }
+        if let id = targetRowID(target) { scrollToRow(id) }
+        else if let lastID = items.last(where: { !$0.isSeparator })?.id { scrollToRow(lastID) }  // end gap → reveal the bottom
+    }
+
+    /// Finalize a keyboard lift on the resolved target (the controller has cleared its
+    /// own walk state; this fires `onDrop` via the shared teardown).
+    private func commitKeyboardTarget(_ target: DropTarget) {
+        setDragTarget(target)
+        guard let s = drag else { return }
+        finishDrag(commit: true, session: s)
+    }
+
+    private func cancelKeyboardDrag() {
+        guard let s = drag else { return }
+        finishDrag(commit: false, session: s)
+    }
+
     // MARK: Target resolution
 
     /// Resolve the `DropTarget` for a pointer at `docY` (the zone model), validated.
     /// nil ⇒ no valid drop here (paint no affordance, a release is a no-op).
     fileprivate func resolveDropTarget(atDocY docY: CGFloat, source: String) -> DropTarget? {
         guard !items.isEmpty else { return nil }
+        // A lifted CHUNK always reorders to a GAP, never ONTO a row (positional reorder
+        // only — decision ①), regardless of the list's `dragMode`; a single-row drag uses
+        // the configured mode. The pointer still lands at the precise row gap (the keyboard
+        // is the one that snaps to section boundaries).
+        let mode: DragMode = dragChunkIDs.isEmpty ? dragMode : .reorderBetween
         if docY < 0 {                                       // above the top
-            return dragMode == .dropOnto ? nil : validatedTarget(.between(beforeID: items[0].id), source)
+            return mode == .dropOnto ? nil : validatedTarget(.between(beforeID: items[0].id), source)
         }
         guard let i = rowIndex(atDocY: docY) else {         // below the last row
-            return dragMode == .dropOnto ? nil : validatedTarget(.between(beforeID: nil), source)
+            return mode == .dropOnto ? nil : validatedTarget(.between(beforeID: nil), source)
         }
         if items[i].isSeparator { return nil }
         let r = rowRect(i)
         let frac = r.height > 0 ? (docY - r.minY) / r.height : 0.5    // 0 = top edge … 1 = bottom edge
-        switch dragMode {
+        switch mode {
         case .dropOnto:
             return validatedTarget(.onto(id: items[i].id), source)
         case .reorderBetween:
@@ -1707,9 +1820,11 @@ extension ThemedList {
     /// domain veto. nil ⇒ not a legal drop.
     private func validatedTarget(_ placement: DropPlacement, _ source: String) -> DropTarget? {
         guard !isTrivialSelfDrop(placement, source) else { return nil }
+        guard !isInsideChunk(placement, source: source) else { return nil }   // a chunk can't land in itself
         if case let .onto(id) = placement, let i = indexOf(id), items[i].isSeparator { return nil }
         let target = DropTarget(placement: placement)
-        guard dropTargetValidator?(DragContext(id: source), target) ?? true else { return nil }
+        let ctx = DragContext(sourceID: source, memberIDs: dragChunkIDs.isEmpty ? [source] : dragChunkIDs)
+        guard dropTargetValidator?(ctx, target) ?? true else { return nil }
         return target
     }
 
@@ -1725,11 +1840,51 @@ extension ThemedList {
         }
     }
 
+    /// A drop that would land a lifted CHUNK inside (or in the no-move gap of) itself —
+    /// rejected so a section can't be dropped into its own body. A no-op (false) for a
+    /// single-row drag (`dragChunkIDs` empty), which `isTrivialSelfDrop` already guards.
+    ///   * `.onto(id)` — `id` is a chunk member.
+    ///   * `.between(beforeID)` — `beforeID` is a chunk member (a gap WITHIN the chunk),
+    ///     OR the gap immediately AFTER the chunk's last member (the chunk's own slot, a
+    ///     no-op; the end gap `nil` matches when the chunk already ends the list).
+    private func isInsideChunk(_ placement: DropPlacement, source: String) -> Bool {
+        guard !dragChunkIDs.isEmpty else { return false }
+        let members = Set(dragChunkIDs)
+        switch placement {
+        case .onto(let id):
+            return members.contains(id)
+        case .between(let beforeID):
+            if let beforeID, members.contains(beforeID) { return true }   // a gap WITHIN the chunk
+            guard let lastID = dragChunkIDs.last, let li = indexOf(lastID) else { return false }
+            // The chunk's own trailing slot is a no-move: the gap immediately below the last
+            // member AND the gap before the next section header — a separator between the chunk
+            // and that header doesn't shift it, so BOTH the literal next row (the mouse form)
+            // and the next-header boundary (the keyboard candidate form) must reject. nil/end-gap
+            // matches when the chunk already ends the list.
+            var j = li + 1
+            while j < items.count, items[j].isSeparator { j += 1 }   // skip trailing separators
+            let boundaryID = j < items.count ? items[j].id : nil      // the next header, or nil = end
+            return beforeID == nextRowID(after: li) || beforeID == boundaryID
+        }
+    }
+
     /// The ordered, validated keyboard candidates for the current source + `dragMode`:
     /// `.dropOnto` ⇒ onto each row; `.reorderBetween` ⇒ each gap; `.both` ⇒ both,
     /// interleaved in row order, then the end gap.
     private func dragCandidates() -> [DropTarget] {
         guard let source = drag?.sourceID else { return [] }
+        // A chunk lift aims at SECTION boundaries only (decision ②): the gap before each
+        // section header + the end gap, with the chunk's own gaps rejected by
+        // `isInsideChunk`. Reorder semantics regardless of `dragMode` — a whole section
+        // can't be dropped ONTO a row. Arrows therefore step section-by-section, not row.
+        if !dragChunkIDs.isEmpty {
+            var out: [DropTarget] = []
+            for h in rowLayout.headerIndices {
+                if let t = validatedTarget(.between(beforeID: items[h].id), source) { out.append(t) }
+            }
+            if let t = validatedTarget(.between(beforeID: nil), source) { out.append(t) }
+            return out
+        }
         var out: [DropTarget] = []
         for item in items where !item.isSeparator {
             switch dragMode {
@@ -1749,6 +1904,25 @@ extension ThemedList {
     private func nextRowID(after i: Int) -> String? {
         let n = i + 1
         return items.indices.contains(n) ? items[n].id : nil
+    }
+
+    /// The ids that move as a unit when the section HEADER `id` is lifted: the header
+    /// followed by every row beneath it up to (not including) the next section header —
+    /// the flat-model section body. A non-header id yields `[]` (no chunk). Separator
+    /// ids are skipped (no identity to move). A NESTED header (a header directly below
+    /// another) stops the walk at that first subsequent header (the flat section model,
+    /// intentional). A COLLAPSED section's child rows are absent from `items`, so its
+    /// chunk is the header alone — the kit moves only visible rows; the host reconciles
+    /// the hidden children in its own model (risk #1).
+    private func chunkMemberIDs(forHeader id: String) -> [String] {
+        guard let start = indexOf(id), items[start].isHeader else { return [] }
+        var out = [items[start].id]
+        var i = start + 1
+        while i < items.count, !items[i].isHeader {
+            if !items[i].isSeparator { out.append(items[i].id) }
+            i += 1
+        }
+        return out
     }
 
     /// The row a target visually references (for scroll-into-view); nil for the end gap.
@@ -1776,19 +1950,83 @@ extension ThemedList {
         return img
     }
 
-    /// Show the floating ghost over the lifted row and remember the cursor→row-top
-    /// vector so `moveGhost` keeps it under the pointer. No-op without a window or an
-    /// image (the ghost is a live-only affordance — headless tests skip it).
-    private func showGhost(image: NSImage?, forRow i: Int, locationInWindow: NSPoint) {
-        guard let image, let win = window, let onScreen = rowRectOnScreen(for: items[i].id) else { return }
+    /// Show the floating ghost at `onScreenRect` (the lifted row's on-screen rect, or a
+    /// chunk's capped union) and remember the cursor→top-left vector so `moveGhost` keeps
+    /// it under the pointer. No-op without a window / image / rect (the ghost is a
+    /// live-only affordance — headless tests skip it).
+    private func showGhost(image: NSImage?, onScreenRect onScreen: CGRect?, locationInWindow: NSPoint) {
+        guard let image, let win = window, let onScreen else { return }
         let cursor = win.convertPoint(toScreen: locationInWindow)
         // `onScreen` is y-up; its top edge is `maxY`. Hold a constant cursor→top-left
-        // vector so the ghost tracks naturally from wherever the row was grabbed.
+        // vector so the ghost tracks naturally from wherever the unit was grabbed.
         dragGhostGrab = CGPoint(x: onScreen.minX - cursor.x, y: onScreen.maxY - cursor.y)
         let ghost = dragGhost ?? DragGhost()
         dragGhost = ghost
         ghost.show(image: image, size: onScreen.size, backgroundColor: effectiveSurface,
                    topLeftOnScreen: CGPoint(x: onScreen.minX, y: onScreen.maxY))
+    }
+
+    // MARK: Chunk ghost (multi-row snapshot — the header + its rows lifted as one)
+
+    /// The on-screen union rect for a chunk's member rows (the capped doc union walked
+    /// out through the scroll → window → screen, like `rowRectOnScreen`) — the ghost's
+    /// size + origin. nil without a window or any on-screen member.
+    private func chunkUnionRectOnScreen(_ ids: [String]) -> CGRect? {
+        guard let win = window, let r = chunkUnionRect(ids) else { return nil }
+        return win.convertToScreen(listView.convert(r, to: nil))
+    }
+
+    /// The union of a chunk's member-row rects in the flipped doc view, clipped to the
+    /// list bounds (drop off-screen blank) and capped to 60% of the viewport height from
+    /// the TOP (facet's snapshot rule — a tall section doesn't balloon the ghost). nil
+    /// when no member is laid out (zero width before sizing — headless).
+    private func chunkUnionRect(_ ids: [String]) -> CGRect? {
+        let rects = ids.compactMap { indexOf($0).map(rowRect) }.filter { $0.height > 0 }
+        guard var union = rects.first else { return nil }
+        for r in rects.dropFirst() { union = union.union(r) }
+        union = union.intersection(listView.bounds)
+        guard !union.isNull, union.width > 0, union.height > 0 else { return nil }
+        let cap = max(40, listView.bounds.height * 0.6)
+        if union.height > cap { union.size.height = cap }       // keep the top edge
+        return union
+    }
+
+    /// The ghost image for a lifted chunk: the host's `dragImageProvider(headerID)` if it
+    /// returns one, else a snapshot of the members' (capped) union with a member-count
+    /// badge. The doc view is FLIPPED and `cacheDisplay` honours it, so the capture is
+    /// upright. nil ⇒ no ghost (zero-size before layout / headless).
+    private func ghostImage(forChunk ids: [String]) -> NSImage? {
+        if let headerID = ids.first, let provider = dragImageProvider, let img = provider(headerID) { return img }
+        guard let r = chunkUnionRect(ids), r.width > 0, r.height > 0,
+              let rep = listView.bitmapImageRepForCachingDisplay(in: r) else { return nil }
+        listView.cacheDisplay(in: r, to: rep)
+        let img = NSImage(size: r.size)
+        img.addRepresentation(rep)
+        return chunkBadge(on: img, count: ids.count)
+    }
+
+    /// Composite a small "N items" pill (facet's swap-chip, generalised) onto a chunk
+    /// ghost so the count is legible while dragging. A lone header (count ≤ 1 — a
+    /// collapsed section) gets none.
+    private func chunkBadge(on base: NSImage, count: Int) -> NSImage {
+        guard count > 1 else { return base }
+        let label = "\(count) items" as NSString
+        let font = themedFont(10, .semibold)
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: palette.onPrimary(1)]
+        let textSize = label.size(withAttributes: attrs)
+        let h: CGFloat = 16, padH: CGFloat = 7
+        let pillW = ceil(textSize.width) + padH * 2
+        let out = NSImage(size: base.size)
+        out.lockFocus()
+        base.draw(at: .zero, from: CGRect(origin: .zero, size: base.size), operation: .copy, fraction: 1)
+        let pill = CGRect(x: max(0, base.size.width - pillW - 6),
+                          y: max(0, base.size.height - h - 6), width: pillW, height: h)   // top-trailing (y-up)
+        palette.primary.setFill()
+        NSBezierPath(roundedRect: pill, xRadius: h / 2, yRadius: h / 2).fill()
+        label.draw(at: NSPoint(x: pill.minX + padH, y: pill.midY - textSize.height / 2), withAttributes: attrs)
+        out.unlockFocus()
+        out.isTemplate = false
+        return out
     }
 
     private func moveGhost(locationInWindow: NSPoint) {
@@ -1808,23 +2046,41 @@ extension ThemedList {
     fileprivate func drawDropAffordance(width: CGFloat) {
         let source = drag?.sourceID ?? previewDragSource
         let target = drag?.target ?? previewDropTarget
-        if let source, let si = indexOf(source) {
-            (effectiveSurface ?? palette.background ?? .windowBackgroundColor).withAlphaComponent(0.55).setFill()
+        // The dimmed rows: a live OR preview CHUNK dims every member; otherwise the single
+        // source row. NB a single-row LIVE drag keeps `dragChunkIDs` EMPTY, so it must fall
+        // through to the source dim — do NOT collapse the two into `drag.map{dragChunkIDs}`
+        // (that returns [] for a live single-row drag and would erase its source dim).
+        let chunkDim: [String] = !dragChunkIDs.isEmpty ? dragChunkIDs
+            : (drag == nil ? (previewDragChunk ?? []) : [])
+        let dim = (effectiveSurface ?? palette.background ?? .windowBackgroundColor).withAlphaComponent(0.55)
+        if !chunkDim.isEmpty {
+            dim.setFill()
+            for id in chunkDim { if let i = indexOf(id) { rowRect(i).fill() } }
+        } else if let source, let si = indexOf(source) {
+            dim.setFill()
             rowRect(si).fill()
         }
         guard let placement = target?.placement else { return }
+        let chunkActive = !chunkDim.isEmpty
         switch placement {
         case .onto(let id):
-            guard let i = indexOf(id) else { return }
+            guard !chunkActive, let i = indexOf(id) else { return }   // a chunk reorders, never drops ONTO
             let path = NSBezierPath(roundedRect: rowRect(i).insetBy(dx: 1.5, dy: 1.5), xRadius: 5, yRadius: 5)
             palette.primary.withAlphaComponent(0.12).setFill(); path.fill()
             palette.primary.setStroke(); path.lineWidth = 2; path.stroke()
         case .between(let beforeID):
             let y = insertionY(beforeID: beforeID)
-            let x = insertionLineX(beforeID: beforeID)        // align to the target row's depth
-            palette.primary.setFill()
-            CGRect(x: x, y: y - 1, width: max(0, width - x - metrics.trailingInset), height: 2).fill()
-            NSBezierPath(ovalIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)).fill()   // MUI insertion dot
+            if chunkActive {
+                // The section-level insertion bar: full-bleed + thicker, so a chunk's
+                // landing reads at a coarser grain than a single row's thin gap line.
+                palette.primary.setFill()
+                CGRect(x: 0, y: y - 1.5, width: width, height: 3).fill()
+            } else {
+                let x = insertionLineX(beforeID: beforeID)    // align to the target row's depth
+                palette.primary.setFill()
+                CGRect(x: x, y: y - 1, width: max(0, width - x - metrics.trailingInset), height: 2).fill()
+                NSBezierPath(ovalIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)).fill()   // MUI insertion dot
+            }
         }
     }
 
@@ -1870,6 +2126,75 @@ extension ThemedList {
             return false
         }
     }
+}
+
+// MARK: - KeyboardDragController (the shared keyboard-DnD engine — §3b)
+
+/// The single, widget-agnostic engine for an ACCESSIBLE keyboard drag: lift, aim,
+/// commit, cancel. It owns ONLY the walk state (`liftedSourceID` + `candidateIndex`)
+/// and delegates everything domain-specific to injected closures, so it knows nothing
+/// of ThemedList / windows / sections — a future themed widget can own its own. A
+/// single-row AND a chunk lift run through ONE instance; the only difference is what
+/// `candidates` returns (row gaps vs section boundaries), never the control flow. (v1.6.0
+/// keeps this an internal abstraction; a public protocol other widgets conform to is a
+/// deliberate follow-up — avoid premature generality.)
+@MainActor
+final class KeyboardDragController {
+    /// The lifted source id while a keyboard drag is in flight, else nil.
+    private(set) var liftedSourceID: String?
+    /// The index into the live `candidates()` the aim sits on, else nil (no candidates).
+    private(set) var candidateIndex: Int?
+    var isLifted: Bool { liftedSourceID != nil }
+
+    /// The current validated drop candidates, in aim order. Injected — the controller
+    /// re-asks every lift/aim/commit (the set is cheap and can shift with the model).
+    var candidates: () -> [DropTarget] = { [] }
+    /// Paint / scroll the aim (nil = no valid candidate). Injected.
+    var onAim: (DropTarget?) -> Void = { _ in }
+    /// Finalize on the resolved target. Injected.
+    var onCommit: (DropTarget) -> Void = { _ in }
+    /// Cancel (also used when a commit lands on no candidate). Injected.
+    var onCancel: () -> Void = { }
+
+    /// Lift `source`: seed the aim at the first candidate (or none). No-op if already lifted.
+    func lift(source: String) {
+        guard liftedSourceID == nil else { return }
+        liftedSourceID = source
+        let c = candidates()
+        candidateIndex = c.isEmpty ? nil : 0
+        onAim(c.first)
+    }
+
+    /// Aim by `delta` through the candidates (clamped). No-op outside a lift.
+    func aim(_ delta: Int) {
+        guard liftedSourceID != nil else { return }
+        let c = candidates()
+        guard !c.isEmpty else { candidateIndex = nil; onAim(nil); return }
+        let next = min(max((candidateIndex ?? 0) + delta, 0), c.count - 1)
+        candidateIndex = next
+        onAim(c[next])
+    }
+
+    /// Commit on the aimed candidate (→ `onCommit`), or cancel when there is none. The
+    /// walk state is reset FIRST, so the engine reads idle even if a delegate re-enters.
+    func commit() {
+        guard liftedSourceID != nil else { return }
+        let c = candidates()
+        let target = candidateIndex.flatMap { c.indices.contains($0) ? c[$0] : nil }
+        reset()
+        if let target { onCommit(target) } else { onCancel() }
+    }
+
+    /// Cancel the lift (→ `onCancel`). No-op outside a lift.
+    func cancel() {
+        guard liftedSourceID != nil else { return }
+        reset()
+        onCancel()
+    }
+
+    /// Clear the walk state WITHOUT firing a delegate — the owner calls this from its
+    /// session teardown so the engine never lingers lifted past a drag's end.
+    func reset() { liftedSourceID = nil; candidateIndex = nil }
 }
 
 // MARK: - DragGhost (the floating drag image — a non-key, click-through child panel)
@@ -2120,10 +2445,12 @@ extension ThemedList {
         let sourceID: String?
         let target: DropTarget?
         let candidateCount: Int        // validated keyboard candidates for the live source
+        let chunkIDs: [String]         // the live chunk members (empty for a single-row drag)
     }
     var dragProbe: DragProbe {
         DragProbe(isDragging: isDragging, isKeyboardDrag: drag?.isKeyboard ?? false,
-                  sourceID: drag?.sourceID, target: drag?.target, candidateCount: dragCandidates().count)
+                  sourceID: drag?.sourceID, target: drag?.target, candidateCount: dragCandidates().count,
+                  chunkIDs: dragChunkIDs)
     }
     /// The `DropTarget` a pointer at `docY` would resolve to (validated) for `source` —
     /// no window, no live drag needed (the resolver is pure of the ghost).
@@ -2137,6 +2464,13 @@ extension ThemedList {
     func _endMouseDrag(commit: Bool) { endMouseDrag(commit: commit) }
     /// The ordered, validated keyboard drop candidates for the live source.
     func _dragCandidates() -> [DropTarget] { dragCandidates() }
+    /// The chunk members a header lift would carry (header + its rows) — pure, no live drag.
+    func _chunkMemberIDs(forHeader id: String) -> [String] { chunkMemberIDs(forHeader: id) }
+    /// Whether a placement lands inside the LIVE chunk (lift a header first via
+    /// `_beginMouseDrag` / `beginDrag` to seed it) — the real chunk-internal rejection.
+    func _isInsideChunk(_ placement: DropPlacement, source: String) -> Bool {
+        isInsideChunk(placement, source: source)
+    }
     /// Route a keyDown through the real drag-key logic (consume-vs-fall-through).
     @discardableResult func _handleDragKey(_ ev: NSEvent) -> Bool { handleDragKey(ev) }
 
