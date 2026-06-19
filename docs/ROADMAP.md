@@ -7,6 +7,7 @@
 ## sill に部品を足す — facet / wand のツリー・ランチャー用（1）
 
 1. 横ツールバー `ThemedToolBar` を新規 — wand のランチャー（新規ウィジェット。MUI から設計、別セッションで計画先行）
+   — **着手中: PR #NNN（v1.7.0 予定）** sill 本体のみ（widget＋prism＋tests）。MUI `<AppBar>`+`<Toolbar>` 融合を AppKit 移植：surface(surface/primary/secondary/transparent)・variant(regular64/dense48/compact40)・flex セクション・型付き items（button は本物の ThemedButton を COMPOSE／icon-only は角ボタン・label・custom・divider・spaces）・非アクティブパネル hover・子パネルアンカー（frameOnScreen）。overflow は follow-up。wand への移植は別 PR（PR2）。
 
 ## sill に部品を足す — perch 用（2〜6）
 
