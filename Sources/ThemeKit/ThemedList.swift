@@ -201,6 +201,12 @@ public final class ThemedList: NSView {
     public enum SelectionMode { case none, single }      // no .multiple (YAGNI)
     public enum HoverStyle { case wash, solidAccent }    // selection wash + bar (default) vs opaque primary
     public enum ScrollPosition { case nearest, top, center }
+    /// How the keyboard / nav HIGHLIGHT (the cursor) is drawn — distinct from the
+    /// committed selection's fill. `.fill` (default) paints the highlight exactly like
+    /// a selection (the menu / combo model); `.outline` draws a stroked ring instead,
+    /// so a keyboard cursor reads as a separate affordance ON TOP of a filled
+    /// selection (facet's tree, where cursor ≠ selection).
+    public enum HighlightStyle { case fill, outline }
 
     /// The id targeted by `activateRow` / `rowFrame` for the actionable empty
     /// row (a synthetic row with no `ListItem`). Public so a host can drive it.
@@ -218,7 +224,15 @@ public final class ThemedList: NSView {
 
     /// The theme. Assigning re-snaps the surface and repaints every row (all colour
     /// intent resolves in `drawRows`, so a switch fully re-themes) — the contract.
-    public var palette: ResolvedPalette { didSet { applyTheme() } }
+    /// A font-KIND change (mono↔system) changes glyph advances, so when the list is
+    /// horizontally scrolling the cached natural width is recomputed + the doc resized
+    /// (text widths are the only metric that depends on the font; heights don't).
+    public var palette: ResolvedPalette {
+        didSet {
+            applyTheme()
+            if horizontalContentScroll, oldValue.font != palette.font { recomputeLayout(); syncDocSize() }
+        }
+    }
 
     public var density: Density = .comfortable { didSet { if density != oldValue { reload() } } }
 
@@ -239,6 +253,37 @@ public final class ThemedList: NSView {
     /// Draw a 1pt `border` divider between rows (text-inset; full-bleed above a
     /// section header). Default off.
     public var showsDividers = false { didSet { listView.needsDisplay = true } }
+
+    /// How the keyboard / nav highlight (the cursor) is drawn. `.fill` (default) is
+    /// the menu / combo look (the highlight fills like a selection); `.outline` is a
+    /// stroked ring so a facet keyboard cursor is distinct from the filled selection.
+    public var highlightStyle: HighlightStyle = .fill { didSet { listView.needsDisplay = true } }
+
+    /// Tint every other data row with a faint `hover`-derived stripe (a zebra list —
+    /// facet). Headers / separators are never striped; the parity restarts at each
+    /// section header. Default off. No new palette role (the stripe is `hover` at low
+    /// alpha), and a selection / hover fill paints over it.
+    public var alternatingRowBackground = false { didSet { listView.needsDisplay = true } }
+
+    /// Let rows extend PAST the clip width and scroll horizontally instead of
+    /// truncating — facet's tree shows long window titles in full. DEFAULT false
+    /// (rows truncate to the pane, the doc width tracks the clip — byte-identical).
+    /// When true: the doc view widens to the natural content width (the widest row,
+    /// floored at the clip), text draws untruncated (clipped, never ellipsized — a
+    /// sub-pixel gap can't reintroduce "…"), and a themed horizontal scroller appears.
+    /// Trailing accessories right-align to the content's right edge (a column) and
+    /// scroll WITH the row — there is no frozen/pinned column (facet's model).
+    public var horizontalContentScroll = false {
+        didSet {
+            guard horizontalContentScroll != oldValue else { return }
+            scrollView.hasHorizontalScroller = horizontalContentScroll
+            // Give up the width-tracks-clip autoresize when we own the width.
+            listView.autoresizingMask = horizontalContentScroll ? [] : [.width]
+            recomputeLayout()        // refresh the cached natural content width
+            syncDocSize()
+            listView.needsDisplay = true
+        }
+    }
 
     /// Reserve the leading image column on EVERY row so text aligns under a common
     /// left edge even on image-less rows (facet/wand's mixed icon lists). DEFAULT
@@ -332,7 +377,12 @@ public final class ThemedList: NSView {
     /// later manual scroll. A capture/preview seam like `previewHighlight` (always
     /// compiled — the showcase uses it in any build config).
     public var previewScrollY: CGFloat? = nil {
-        didSet { previewScrollPending = previewScrollY != nil; applyPreviewScroll(); listView.needsDisplay = true }
+        didSet { previewScrollPending = (previewScrollY ?? previewScrollX) != nil; applyPreviewScroll(); listView.needsDisplay = true }
+    }
+    /// Force the clip horizontally to this doc-x (a static capture of a
+    /// `horizontalContentScroll` list scrolled sideways). nil = live scroll.
+    public var previewScrollX: CGFloat? = nil {
+        didSet { previewScrollPending = (previewScrollY ?? previewScrollX) != nil; applyPreviewScroll(); listView.needsDisplay = true }
     }
     private var previewScrollPending = false
 
@@ -419,6 +469,9 @@ public final class ThemedList: NSView {
     // A vertical-shaped frame so NSScroller infers a vertical scroller; the scroll
     // view resizes it. Themed in `applyTheme` so the knob reads in-palette.
     private let vScroller = ThemedScroller(frame: NSRect(x: 0, y: 0, width: 16, height: 100))
+    // A horizontal-shaped frame so NSScroller infers a horizontal scroller (installed
+    // only when `horizontalContentScroll` is on). Themed in `applyTheme`.
+    private let hScroller = ThemedScroller(frame: NSRect(x: 0, y: 0, width: 100, height: 16))
     private var listView: ListDocumentView!
     private var focusRingLayer: CAShapeLayer?
 
@@ -491,6 +544,8 @@ public final class ThemedList: NSView {
         scrollView.drawsBackground = true
         scrollView.hasVerticalScroller = true
         scrollView.verticalScroller = vScroller          // theme-painted knob, not macOS grey
+        scrollView.horizontalScroller = hScroller        // themed too; enabled by horizontalContentScroll
+        scrollView.hasHorizontalScroller = false         // off until horizontalContentScroll opts in
         scrollView.autohidesScrollers = true
         scrollView.scrollerStyle = .overlay              // show only while scrolling (auto-hide)
         scrollView.borderType = .noBorder
@@ -520,21 +575,14 @@ public final class ThemedList: NSView {
 
     public override func layout() {
         super.layout()
-        // Keep the doc view as wide as the clip (height owned by `reload`).
-        let w = scrollView.contentView.bounds.width
-        if w > 0, listView.bounds.width != w {
-            listView.setFrameSize(NSSize(width: w, height: rowLayout.totalHeight))
-        }
+        syncDocSize()                  // doc width = clip (or natural content width when h-scrolling)
         updateFocusRingPath()
         if previewScrollPending { applyPreviewScroll() }
     }
 
     public override func resizeSubviews(withOldSize oldSize: NSSize) {
         super.resizeSubviews(withOldSize: oldSize)
-        let w = scrollView.contentView.bounds.width
-        if w > 0, listView.bounds.width != w {
-            listView.setFrameSize(NSSize(width: w, height: rowLayout.totalHeight))
-        }
+        syncDocSize()
         updateFocusRingPath()
     }
 
@@ -566,6 +614,7 @@ public final class ThemedList: NSView {
         scrollView.drawsBackground = (surface?.alphaComponent ?? 0) >= 1
         scrollView.backgroundColor = surface ?? .clear
         vScroller.knobColor = palette.muted              // themed scroll knob (vs macOS grey)
+        hScroller.knobColor = palette.muted
         focusRingLayer?.strokeColor = palette.primary.cgColor
         CATransaction.commit()
         listView?.needsDisplay = true
@@ -598,9 +647,24 @@ public final class ThemedList: NSView {
             highlightedIndex = isActionRowActive ? 0 : nil
         }
         hoveredIndex = nil
-        listView.setFrameSize(NSSize(width: scrollView.contentView.bounds.width, height: rowLayout.totalHeight))
+        syncDocSize()
         listView.needsDisplay = true
         listView.window?.invalidateCursorRects(for: listView)
+    }
+
+    /// Size the doc view: width = the clip width, or — when `horizontalContentScroll`
+    /// is on — the wider of the clip and the natural content width (so long rows draw
+    /// untruncated and the panel scrolls sideways); height = the laid-out total.
+    /// Before the view is sized (clip width 0) the WIDTH is left as-is but the HEIGHT
+    /// is still stamped to `totalHeight` — 1.4.0 set both unconditionally, and the AX
+    /// flip-frame conversion (`buildAXChildren`) reads the doc height pre-layout.
+    private func syncDocSize() {
+        let clip = scrollView.contentView.bounds.width
+        let w = clip > 0 ? (horizontalContentScroll ? max(clip, rowLayout.naturalWidth) : clip)
+                         : listView.bounds.width
+        if listView.bounds.width != w || listView.bounds.height != rowLayout.totalHeight {
+            listView.setFrameSize(NSSize(width: w, height: rowLayout.totalHeight))
+        }
     }
 
     private func renderEmptyState() {
@@ -609,18 +673,25 @@ public final class ThemedList: NSView {
     }
 
     private func recomputeLayout() {
-        var ys: [CGFloat] = [], hs: [CGFloat] = [], headers: [Int] = []
+        var ys: [CGFloat] = [], hs: [CGFloat] = [], headers: [Int] = [], zebra: [Bool] = []
         var y: CGFloat = 0
+        var dataOrdinal = 0          // counts .row items within a section; resets at each header
         if items.isEmpty {
-            ys = [0]; hs = [metrics.singleRow]; y = metrics.singleRow         // one synthetic row
+            ys = [0]; hs = [metrics.singleRow]; y = metrics.singleRow; zebra = [false]   // one synthetic row
         } else {
             for (i, item) in items.enumerated() {
                 let h = rowHeight(for: item)
                 ys.append(y); hs.append(h); y += h
-                if item.isHeader { headers.append(i) }
+                if item.isHeader { headers.append(i); dataOrdinal = 0; zebra.append(false) }
+                else if item.isSeparator { zebra.append(false) }
+                else { zebra.append(dataOrdinal % 2 == 1); dataOrdinal += 1 }   // every 2nd data row
             }
         }
-        rowLayout = RowLayout(yOffsets: ys, heights: hs, totalHeight: y, headerIndices: headers)
+        // The natural content width (widest untruncated row) is needed only when
+        // horizontalContentScroll is on — skip the per-row text measuring otherwise.
+        let natural = horizontalContentScroll ? ceil(fittingWidth()) : 0
+        rowLayout = RowLayout(yOffsets: ys, heights: hs, totalHeight: y,
+                              headerIndices: headers, zebra: zebra, naturalWidth: natural)
     }
 
     private func rowHeight(for item: ListItem) -> CGFloat {
@@ -1010,11 +1081,15 @@ public final class ThemedList: NSView {
     }
 
     private func applyPreviewScroll() {
-        guard let y = previewScrollY else { return }
-        // Needs a real clip size + scrollable overflow; retried from layout() while pending.
-        guard scrollView.contentView.bounds.height > 0,
-              rowLayout.totalHeight > scrollView.contentView.bounds.height else { return }
-        scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
+        guard previewScrollY != nil || previewScrollX != nil else { return }
+        let clip = scrollView.contentView.bounds
+        // Needs a real clip size + scrollable overflow on the requested axis; retried
+        // from layout() while pending.
+        guard clip.height > 0, clip.width > 0 else { return }
+        let canY = rowLayout.totalHeight > clip.height
+        let canX = listView.bounds.width > clip.width
+        guard (previewScrollY != nil && canY) || (previewScrollX != nil && canX) else { return }
+        scrollView.contentView.scroll(to: NSPoint(x: previewScrollX ?? 0, y: previewScrollY ?? 0))
         scrollView.reflectScrolledClipView(scrollView.contentView)
         previewScrollPending = false
     }
@@ -1091,22 +1166,30 @@ extension ThemedList {
         if item.isSeparator { drawSeparator(in: r, width: width); return }
 
         let m = metrics
-        let onAccent = (isSel || isHi) && hoverStyle == .solidAccent
         let indent = indentInset(item)        // leading content shifts right by depth; fills stay full-bleed
+        // The highlight fills (like a selection) under `.fill`; under `.outline` it is a
+        // ring drawn last and contributes no accent fill (so text keeps normal ink).
+        let (drawHighlightFill, onAccent) = highlightFillAndAccent(isSel: isSel, isHi: isHi)
 
-        // 1. Backgrounds: tint bar (under everything), then selection/hover. The leading
-        //    tint bar + the selection/hover fill stay FULL-BLEED (x=0 / full width) —
-        //    only the row's CONTENT indents (the MUI tree model).
+        // 1. Backgrounds: zebra stripe (base), the leading tint bar, then the selection /
+        //    highlight fill + hover veil. All FULL-BLEED (x=0 / full width) — only the
+        //    row's CONTENT indents (the MUI tree model).
+        if paintsZebra(i, isSel: isSel, drawHighlightFill: drawHighlightFill) {
+            zebraColor.setFill()
+            CGRect(x: 0, y: r.minY, width: r.width, height: r.height).fill()
+        }
         if item.tint != .none, !onAccent {
             resolvedTint(item.tint).setFill()
             CGRect(x: 0, y: r.minY, width: m.accentBar, height: r.height).fill()
         }
-        if isSel || isHi { paintSelectionBackground(r, onAccent: onAccent) }
+        if isSel || drawHighlightFill { paintSelectionBackground(r, onAccent: onAccent) }
         // Pointer veil over a selected row (wash mode) so the hovered row reads on top.
         if hoverStyle == .wash, isSel, hoveredIndex == i {
             palette.hover.setFill()
             selectionPath(r).fill()
         }
+        // The keyboard cursor as a stroked ring, distinct from a filled selection.
+        if isHi, highlightStyle == .outline { paintHighlightOutline(r) }
 
         // 2. Trailing cluster width FIRST (so the text budget is right), drawn later.
         let trailingW = trailingClusterWidth(item)
@@ -1127,15 +1210,15 @@ extension ThemedList {
             let pFont = themedFont(m.primaryPt)
             let pH = (pFont.ascender - pFont.descender)
             let pRow = CGRect(x: 0, y: r.minY + m.twoLineTop, width: r.width, height: pH)
-            drawLine(item.primary, font: pFont, color: primaryColor, x: xText, maxWidth: textMax, row: pRow, mode: .byTruncatingTail)
+            drawLine(item.primary, font: pFont, color: primaryColor, x: xText, maxWidth: textMax, row: pRow, mode: textBreakMode)
             let sFont = item.secondaryMono ? .monospacedSystemFont(ofSize: m.secondaryPt, weight: .regular) : themedFont(m.secondaryPt)
             let sColor = secondaryTextColor(disabled: item.isDisabled, onAccent: onAccent)
             let sRow = CGRect(x: 0, y: pRow.maxY + m.lineGap, width: r.width, height: sFont.ascender - sFont.descender)
             drawLine(secondary, font: sFont, color: sColor, x: xText, maxWidth: textMax, row: sRow,
-                     mode: item.secondaryMono ? .byTruncatingMiddle : .byTruncatingTail)
+                     mode: horizontalContentScroll ? .byClipping : (item.secondaryMono ? .byTruncatingMiddle : .byTruncatingTail))
         } else {
             drawLine(item.primary, font: themedFont(m.primaryPt), color: primaryColor,
-                     x: xText, maxWidth: textMax, row: r, mode: .byTruncatingTail)
+                     x: xText, maxWidth: textMax, row: r, mode: textBreakMode)
         }
 
         // 5. Trailing cluster (right-to-left).
@@ -1164,6 +1247,43 @@ extension ThemedList {
                            xRadius: metrics.roundedRadius, yRadius: metrics.roundedRadius)
             : NSBezierPath(rect: r)
     }
+
+    /// The keyboard cursor as a 1.5pt `primary` ring (`highlightStyle == .outline`) —
+    /// a distinct affordance ON TOP of any selection fill, inset so the stroke isn't
+    /// clipped at the row edges.
+    private func paintHighlightOutline(_ r: CGRect) {
+        let path = NSBezierPath(roundedRect: r.insetBy(dx: 1.5, dy: 1.5),
+                                xRadius: metrics.roundedRadius, yRadius: metrics.roundedRadius)
+        palette.primary.setStroke()
+        path.lineWidth = 1.5
+        path.stroke()
+    }
+
+    /// The zebra stripe — `hover` at low alpha (no new palette role); reads as a faint
+    /// lighter/darker band on light/dark surfaces alike.
+    private var zebraColor: NSColor { palette.hover.withAlphaComponent(0.4) }
+
+    /// Whether row `i` paints a zebra stripe — the SINGLE source the renderer + the
+    /// probe both use. Gated on the opt-in flag, an OPAQUE surface (a translucent stripe
+    /// over a vibrancy backdrop reads inconsistently AND would bleed through a pinned
+    /// header whose punch is skipped on a nil surface), the data-row parity, and NOT a
+    /// selected / fill-highlighted row (whose fill paints over it).
+    private func paintsZebra(_ i: Int, isSel: Bool, drawHighlightFill: Bool) -> Bool {
+        alternatingRowBackground && effectiveSurface != nil && !isSel && !drawHighlightFill
+            && rowLayout.zebra.indices.contains(i) && rowLayout.zebra[i]
+    }
+
+    /// Whether a row's highlight fills like a selection (`.fill`) vs draws a ring
+    /// (`.outline`), and whether it sits on an opaque accent fill (`.solidAccent` →
+    /// `onPrimary` ink). The SINGLE source the renderer + the DEBUG probe both use.
+    fileprivate func highlightFillAndAccent(isSel: Bool, isHi: Bool) -> (fill: Bool, onAccent: Bool) {
+        let fill = isHi && highlightStyle == .fill
+        return (fill, (isSel || fill) && hoverStyle == .solidAccent)
+    }
+
+    /// Primary/secondary text break mode: clip (never ellipsize) when the list scrolls
+    /// horizontally so a long row draws in full; truncate to the pane otherwise.
+    private var textBreakMode: NSLineBreakMode { horizontalContentScroll ? .byClipping : .byTruncatingTail }
 
     private func paintSelectionBackground(_ r: CGRect, onAccent: Bool) {
         if onAccent {
@@ -1798,6 +1918,8 @@ private struct RowLayout {
     var heights: [CGFloat] = []
     var totalHeight: CGFloat = 0
     var headerIndices: [Int] = []
+    var zebra: [Bool] = []                // per-item: paint the alternating stripe (data rows only)
+    var naturalWidth: CGFloat = 0         // widest untruncated row (only computed for horizontalContentScroll)
 }
 
 // MARK: - ListDocumentView (flipped, custom-drawn, hover + keyboard → owner)
@@ -2037,5 +2159,28 @@ extension ThemedList {
     /// The x a `.between` drop insertion line draws at for `beforeID` (the real draw
     /// path) — locks the "insertion line follows the target's depth" contract.
     func _insertionLineX(beforeID: String?) -> CGFloat { insertionLineX(beforeID: beforeID) }
+
+    // MARK: Polish seams (highlightStyle / zebra / horizontalContentScroll)
+
+    /// Whether a row in (isSel, isHi) state fills its highlight + sits on an accent —
+    /// the real renderer decision (so `.outline` keeping normal ink is asserted).
+    func _highlightFillAndAccent(isSel: Bool, isHi: Bool) -> (fill: Bool, onAccent: Bool) {
+        highlightFillAndAccent(isSel: isSel, isHi: isHi)
+    }
+    /// The zebra parity for a row id (true = striped). nil for an unknown id. This is
+    /// the raw layout parity (always computed); whether a stripe actually PAINTS is
+    /// `_zebraPaints` (it folds in the flag / surface / selection suppression).
+    func _zebraParity(forID id: String) -> Bool? {
+        indexOf(id).flatMap { rowLayout.zebra.indices.contains($0) ? rowLayout.zebra[$0] : nil }
+    }
+    /// Whether row `id` would actually paint its stripe in (isSel, isHi) state — the
+    /// real draw decision (asserts the suppression-under-selection + surface gating).
+    func _zebraPaints(forID id: String, isSel: Bool = false, isHi: Bool = false) -> Bool {
+        guard let i = indexOf(id) else { return false }
+        let (fill, _) = highlightFillAndAccent(isSel: isSel, isHi: isHi)
+        return paintsZebra(i, isSel: isSel, drawHighlightFill: fill)
+    }
+    /// The cached natural content width (0 unless horizontalContentScroll is on).
+    var _naturalContentWidth: CGFloat { rowLayout.naturalWidth }
 }
 #endif
