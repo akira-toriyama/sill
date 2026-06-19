@@ -1,6 +1,6 @@
 # sill やることリスト
 
-- 現行 **v1.8.0**（#1 完了・PR #52 merged + tagged 2026-06-19）。**番号が小さいほど先**にやる。
+- 現行 **v1.9.0**（#2 完了・PR #53 merged + tagged 2026-06-19）。**番号が小さいほど先**にやる。
 - すべて sill 本体の作業（追加は additive・default-off）。
 - このファイルが残作業・進捗の**唯一の記録**（git 管理）。
 
@@ -10,7 +10,8 @@
 
 - **#1（SVG アイコン基盤）= ✅ 完了（PR #52 merged + `v1.8.0` tagged 2026-06-19）。** 内容: SwiftDraw（`<0.25` ピン）・Phosphor/Simple Icons を使う分だけ vendor・`phosphorImage`/`simpleIconImage` ローダ・共有 `tintedBitmap`（SF は byte-identical）・新画像API（`ThemedButton/FAB.leadingImage`・`ThemedToolBar.ButtonItem.image`）・prism「Icons」タブ＋`family` 設定キー。敵対的レビュー反映済。詳細は下の #1 と Package.swift / `Sources/ThemeKit/Resources/README.md`。
 - **アイコン vendor 方針 = A「使う分だけ」で確定**（全カタログ ~12.5k/~6MB は入れない。発見可能性は README＋DEBUG ログ＋CLAUDE.md で担保済。#2 の sweep で実使用分が自然に増える）。
-- **#2（全 SF→Phosphor sweep）= 🚧 着手中: PR #53。** 実装・`swift build`・prism ライブ撮影（text/action/collection/chrome）・敵対的レビュー（指摘8件反映）まで完了、レビュー待ち。内容: SF Symbol を Sources/ から全廃（`*Symbol: String?` は型維持で Phosphor スラッグを受ける／内部リゾルバを `phosphorImage` に差し替え）・メニュー✓は `check`(bold)・prism 全 showcase の文字列＋`Image(systemName:)`→`phosphorIcon` ヘルパ・Phosphor regular SVG を 31 個 vendor。**マージ時に minor bump = `v1.9.0` タグ**（→ wand 移植が解除）。
+- **#2（全 SF→Phosphor sweep）= ✅ 完了（PR #53 merged + `v1.9.0` tagged 2026-06-19）。** SF Symbol を Sources/ **と Tests/** から全廃（`*Symbol: String?` は型維持で Phosphor スラッグを受ける／内部リゾルバを `phosphorImage` に差し替え）・メニュー✓は `check`(bold)・prism 全 showcase の文字列＋`Image(systemName:)`→`phosphorIcon` ヘルパ・Phosphor regular SVG を 31 個 vendor。`swift build`＋prism ライブ撮影（text/action/collection/chrome 両 tint 経路）＋敵対的レビュー（指摘8件反映）＋CI `swift test`（full Xcode・385 tests）緑。**→ これで wand 移植が解除**（以降は wand リポで管理）。⚠教訓: sweep は **Tests/ も含める**（`swift test` は CLT ローカル不可＝CI だけが守るゲート。Button/FAB は icon 解決依存で nil slug→赤、TextField/ToolBar は文字列有無で確保）。メモリ [[sweep-include-tests]]。
+- **次にやる = #3（`ThemedChip` 新規）。** perch のヒント pill・facet のタグ・キー記号（⌘⇧）。詳細は下の #3。
 
 ## アイコンを全面 SVG 化（Phosphor）— いま最優先（1〜2）
 
@@ -25,7 +26,7 @@
    - **API churn 最小**: 各ウィジェットの `leadingSymbol: String?` 等は**維持**し、内部リゾルバを SF→Phosphor へ差し替えるだけ（型変更ゼロ）。加えて wand 用に **`leadingImage: NSImage?`**（ThemedButton/FAB）と **`ThemedToolBar.ButtonItem.image`** を追加＝事前解決画像（アプリアイコン/favicon/絵文字/ブランドロゴ・**format 非依存**）。`.isTemplate` で tint・多色は素描画。
    - 必須: prism showcase で Phosphor 数ウェイト＋ロゴを全テーマ表示し**ライブ撮影**で確認（`swift test` は CLT 不可）。⚠タグ前に **v1.8.0 未使用を要確認**（並行セッション）。
 
-2. **全 SF Symbol → Phosphor sweep** — **🚧 着手中: PR #53**（実装・ビルド・ライブ撮影・敵対的レビュー済、レビュー待ち。マージで `v1.9.0` タグ）。棚卸し済 = SF **約45種・呼出約90・16ファイル**。
+2. **全 SF Symbol → Phosphor sweep** — **✅ 完了（PR #53 merged + `v1.9.0` tagged・2026-06-19）**（Sources/ + Tests/ から SF 全廃・prism 全 showcase + `phosphorIcon` ヘルパ・Phosphor regular 31個 vendor・CI `swift test` 緑。→ wand 移植解除）。棚卸し済だった = SF **約45種・呼出約90・16ファイル**。
    - **ウィジェット(5＝load-bearing)**: ThemedComboBox(`chevron.down`→`caret-down`／`xmark.circle.fill`→`x-circle`(fill))・ThemedMenu(`checkmark`→`check`(bold))・ThemedList(行/節 `chevron.right/down`→`caret-right/down`・`sfImage` ヘルパ)・ThemedButton(`tintedSymbol`)・ThemedFAB・ThemedTextField(`drawSymbol`)。ThemedButtonGroup/ThemedToolBar は ThemedButton 経由で自動。
    - **showcase(8)**: 文字列＋ローカル resolver(`menuGlyph`/`glyph`/`favicon`)。Specimens/Gallery の SwiftUI `Image(systemName:)` は `Image(nsImage: phosphorImage(...))` へ。KitCatalog は文言のみ。
    - **主要マップ例**: plus→plus・magnifyingglass→magnifying-glass・line.3.horizontal→list・arrow.clockwise→arrow-clockwise・square.and.pencil→note-pencil・square.and.arrow.up→export・ellipsis→dots-three・gearshape.fill→gear(fill)・paintpalette.fill→palette(fill)・tag→tag・folder→folder・trash→trash・text.alignleft/center→text-align-left/center・bold→text-b(bold)・italic→text-italic・underline→text-underline・list.bullet→list-bullets・1-4.circle→number-circle-one..four（全マップは PR で）。
