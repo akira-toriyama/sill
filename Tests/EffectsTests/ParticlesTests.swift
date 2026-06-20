@@ -34,6 +34,33 @@ final class ParticlesTests: XCTestCase {
         XCTAssertEqual(r[0].x, 60, accuracy: 1e-9)
         XCTAssertEqual(r[0].y, 95, accuracy: 1e-9)
         XCTAssertEqual(r[0].alpha, 0.5, accuracy: 1e-9)   // life = 1 → localP = 0.5
+        XCTAssertEqual(r[0].radius, 2, accuracy: 1e-9)     // radiusSpeed default 0 → constant
+    }
+
+    func testRadiusSpeedShrinksClosedForm() {
+        // radius = max(0, radius₀ + radiusSpeed·t). Binary-exact values.
+        let shrink = Particle(x0: 0, y0: 0, vx: 0, vy: 0, radius: 10, color: 1,
+                              radiusSpeed: -4)
+        let clampZero = Particle(x0: 0, y0: 0, vx: 0, vy: 0, radius: 2, color: 2,
+                                 radiusSpeed: -8)
+        let b = ParticleBurst(particles: [shrink, clampZero], startedAt: 0,
+                              duration: 2, gravity: 0, emission: .fireworks)
+        let r0 = resolveParticles(b, now: 0)
+        XCTAssertEqual(r0[0].radius, 10, accuracy: 1e-9)   // t=0 → unchanged
+        XCTAssertEqual(r0[1].radius, 2, accuracy: 1e-9)
+        let r1 = resolveParticles(b, now: 1)
+        XCTAssertEqual(r1[0].radius, 6, accuracy: 1e-9)    // 10 − 4·1
+        XCTAssertEqual(r1[1].radius, 0, accuracy: 1e-9)    // max(0, 2 − 8·1)
+    }
+
+    func testRollBurstThreadsRadiusSpeed() {
+        // Default 0 (current behavior); a negative value reaches every particle.
+        let plain = rollBurst(emission: .fireworks, from: [(x: 0.0, y: 0.0)],
+                              colors: [1], now: 0, count: 5)
+        XCTAssertTrue(plain.particles.allSatisfy { $0.radiusSpeed == 0 })
+        let cooling = rollBurst(emission: .confetti, from: [(x: 0.0, y: 0.0)],
+                                colors: [1], now: 0, count: 5, radiusSpeed: -3)
+        XCTAssertTrue(cooling.particles.allSatisfy { $0.radiusSpeed == -3 })
     }
 
     func testSpinAndSwayAreClosedForm() {
