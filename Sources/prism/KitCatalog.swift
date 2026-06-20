@@ -11,7 +11,7 @@ import Foundation
 enum KitFamily: String, CaseIterable, Identifiable {
     case palette = "Palette", icon = "Icons", text = "Text", action = "Action",
          feedback = "Feedback", collection = "Collection", motion = "Motion",
-         chrome = "Chrome"
+         particles = "Particles", chrome = "Chrome"
     public var id: String { rawValue }
 }
 
@@ -389,6 +389,25 @@ let kitCatalog: [KitComponent] = [
                  "DIVISION OF LABOUR: Motion = one-shot (slide/fade/pop/reorder); Effects = cyclic (border breathe/flash, rainbow, line-pets). No timer/state here — app owns the clock (sill f(now) convention)",
              ],
         family: .motion),
+    KitComponent(
+        name: "ParticleBurst", module: "Effects",
+        kind: "Celebratory particle burst — 紙吹雪 / 花火 (confetti / fireworks). The FlashState pre-roll → wall-clock decay pattern, scaled to a field of moving particles",
+        summary: "The family's shared one-shot particle burst: roll once at the trigger, resolve each particle in CLOSED FORM per frame (ballistic arc + flutter + spin + fade), draw the rich look (glowing sparks / tumbling paper) or your own. Pure + Sendable; the app owns the clock, NSColor, and the off gate — like the border flash + line-pets.",
+        consumes: "Pure functions + an AppKit draw helper — no instance to retain. `import Effects`. On the celebratory moment: `burst = rollBurst(emission: .confetti, from: [pt], colors: EffectSpec.rainbow.flash + [accentHex], intensity: cfg.intensity, now: CACurrentMediaTime())` into one stored `ParticleBurst?` cell; tick your redraw clock while `burst.isActive(now:)`; each frame call `drawParticles(burst, now:)` in an isFlipped view (or draw from `resolveParticles(burst, now:)` yourself). Clear the cell when it settles.",
+        keyAPI: [
+                 "rollBurst(emission:from:colors:intensity:now:duration:count:) -> ParticleBurst — roll N particles per emitter (Double-tuple or CGPoint emitters). colors are 0xRRGGBB candidates each particle picks from; intensity (subtle…wild) scales count + reach (hard-capped 6…40/emitter)",
+                 "resolveParticles(_:now:) -> [ResolvedParticle] — pure closed form: x=x₀+vx·t+sway·sin(…), y=y₀+vy·t+½g·t², alpha=1−t/(dur·life), rotation=spin·t. Drops dead particles (organic dissolve); [] before roll / after settle",
+                 "ParticleBurst — Sendable rolled value (particles + startedAt + duration + gravity + emission). isActive(now:) gates the redraw clock; progress(now:) is 0…1",
+                 "drawParticles(_:now:scale:) — @MainActor AppKit renderer (glowing spark / edge-flipping paper) into the current NSGraphicsContext; the drawLinePets analog. +y is DOWN — host in an isFlipped view, or negate gravity for y-up",
+                 "ParticleEmission { fireworks (radial, light gravity), confetti (popper cone, strong gravity) }; ParticleShape { spark, paper }; EffectIntensity (Palette) scales count + reach",
+             ],
+        variants: [
+                 "Emission: .fireworks (radial omni glow) / .confetti (up-and-out popper, tumbling paper)",
+                 "Shape: .spark (glow dot + hot core) / .paper (tumbling, edge-on flip)",
+                 "Intensity: subtle 0.6× / normal 1.0× / bold 1.6× / wild 2.5× (count + reach)",
+                 "DIVISION OF LABOUR: a burst is one-shot, but it lives in Effects (not Motion) — it is the color-dynamic FlashState pattern at scale, and reuses the EffectSpec palettes + NSColor bridge. No timer/state — app owns the clock (sill f(now) convention)",
+             ],
+        family: .particles),
 ]
 
 /// Look up a component by its public type name (the names are fixed in the gallery).

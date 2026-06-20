@@ -336,6 +336,8 @@ struct ThemeCard: View {
             WidgetSection(kitComponent("ThemedMenu"), p: p) { MockMenu(p: p) }
         case .motion:
             WidgetSection(kitComponent("ThemedTransition"), p: p) { MockMotion(p: p) }
+        case .particles:
+            WidgetSection(kitComponent("ParticleBurst"), p: p) { MockParticles(p: p) }
         case .chrome:
             Text("App chrome — fake perch / facet / wand / glance, drawn by prism (never imports an app's View).")
                 .font(sysFont(9, design: .monospaced))
