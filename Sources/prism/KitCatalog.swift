@@ -10,7 +10,8 @@ import Foundation
 /// fake app mocks) carry no kit component; the other four group the real widgets.
 enum KitFamily: String, CaseIterable, Identifiable {
     case palette = "Palette", icon = "Icons", text = "Text", action = "Action",
-         feedback = "Feedback", collection = "Collection", chrome = "Chrome"
+         feedback = "Feedback", collection = "Collection", motion = "Motion",
+         chrome = "Chrome"
     public var id: String { rawValue }
 }
 
@@ -368,6 +369,26 @@ let kitCatalog: [KitComponent] = [
                  "interaction states demoed: hover/highlight (solidAccent), ↑↓ nav, ⏎/Space activate, → open submenu / ← + Esc close one level, Esc/Tab dismiss",
              ],
         family: .collection),
+    KitComponent(
+        name: "ThemedTransition", module: "Motion",
+        kind: "MUI theme.transitions analog — pure one-shot animation math (Duration/Easing tokens, Tween, lerp, spring)",
+        summary: "The family's shared TRANSIENT (play-once) motion math: named durations + easing curves + a Tween value + interpolation. Pure, Sendable, AppKit-free; the counterpart to Effects (which owns CYCLIC color motion). The app owns the clock and samples these per frame.",
+        consumes: "Pure functions — no view, no NSView, no instance. `import Motion`, then read tokens / sample math off a wall-clock `now` (CACurrentMediaTime()) inside your existing redraw loop: e.g. `let s = ThemedTransition.Tween(start: t0, duration: .move, easing: .easeOutCubic); pillX = s.value(at: now, from: x0, to: x1)`. Nothing to retain.",
+        keyAPI: [
+                 "ThemedTransition.Duration — named TimeInterval (seconds) tokens: .snap(0) / .exit(.12) / .enter(.16, default) / .move(.18) / .emphasis(.22) / .staggerStep(.03). Calibrated to the family's measured band, NOT MUI's slower web ladder",
+                 "ThemedTransition.Easing — a Sendable f(t)->value (input clamped 0…1, output not). Power: .linear/.easeOutQuad/.easeOutCubic(default)/.easeOutQuint/.easeInOutCubic. Material bezier (exact solver): .standard/.decelerate/.accelerate/.sharp. .spring(zeta:omega:) overshoots. .cubicBezier(x1,y1,x2,y2) for a custom curve",
+                 "ThemedTransition.Tween(start:duration:delay:easing:) — the (when, how-long, delay, curve) value every app re-derives. value(at:now) / value(at:from:to:) / rawProgress(at:) / isComplete(at:)",
+                 "ThemedTransition.progress(now:start:duration:delay:) -> 0…1 clamped; .eased(now:…:easing:) runs it through a curve",
+                 "ThemedTransition.lerp(a,b,t) — Double + (CoreGraphics) CGFloat/CGPoint/CGSize/CGRect overloads. spring(t,zeta:omega:) underdamped step. dampedSine(p,frequency:decay:) shake/vibrate envelope",
+                 "ThemedTransition.autoDuration(forExtent:) — MUI's size→duration heuristic (sublinear). scaled(_:by:) — clamp+multiply for an app speed knob (perch duration-scale)",
+             ],
+        variants: [
+                 "Duration ladder: snap / exit / enter / move / emphasis / staggerStep",
+                 "Easing: linear · easeOutQuad/Cubic/Quint · easeInOutCubic · standard/decelerate/accelerate/sharp (Material) · spring · custom cubicBezier",
+                 "Primitives: Tween · progress/eased · lerp (scalar + CG) · spring · dampedSine · autoDuration · scaled",
+                 "DIVISION OF LABOUR: Motion = one-shot (slide/fade/pop/reorder); Effects = cyclic (border breathe/flash, rainbow, line-pets). No timer/state here — app owns the clock (sill f(now) convention)",
+             ],
+        family: .motion),
 ]
 
 /// Look up a component by its public type name (the names are fixed in the gallery).

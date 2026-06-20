@@ -34,6 +34,7 @@ let package = Package(
         .library(name: "Palette", targets: ["Palette"]),
         .library(name: "PaletteKit", targets: ["PaletteKit"]),
         .library(name: "Effects", targets: ["Effects"]),
+        .library(name: "Motion", targets: ["Motion"]),
         .library(name: "ConfigSchema", targets: ["ConfigSchema"]),
         .library(name: "CLIKit", targets: ["CLIKit"]),
         .library(name: "ThemeKit", targets: ["ThemeKit"]),
@@ -78,6 +79,15 @@ let package = Package(
         // Declared before PaletteKit, which now depends on it.
         .target(name: "Effects", dependencies: ["Palette"]),
 
+        // Pure, Sendable, AppKit-free ONE-SHOT animation math — the
+        // `ThemedTransition` namespace (named Duration/Easing tokens, a
+        // `Tween` value, `progress`/`lerp`/`spring`/`dampedSine`). The
+        // counterpart to Effects (which owns CYCLIC color motion); this owns
+        // TRANSIENT play-once motion. A pure atom alongside Palette/CLIKit:
+        // zero AppKit (only `CGRect` lerp overloads behind a CoreGraphics
+        // gate), zero Palette — the math is theme-independent.
+        .target(name: "Motion"),
+
         // AppKit resolver. Depends on Effects for the `ResolvedPalette.
         // animated(forTheme:at:)` live-accent helper (composes an
         // `Effects.AnimatedFrame` onto a resolved palette).
@@ -109,12 +119,13 @@ let package = Package(
         // config.toml. Renders every catalog theme (all roles + font +
         // its OWN mock chrome specimens — never imports an app's View, so
         // no drift debt). The visual verification bench for the catalog.
-        .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "ThemeKit"]),
+        .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "Motion", "ThemeKit"]),
 
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit", "Effects"]),
         .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", "PaletteKit", "Palette", "Effects"]),
         .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette"]),
+        .testTarget(name: "MotionTests", dependencies: ["Motion"]),
         .testTarget(name: "ConfigSchemaTests",
                     dependencies: ["ConfigSchema",
                                    .product(name: "Toml", package: "swift-toml-edit")]),
