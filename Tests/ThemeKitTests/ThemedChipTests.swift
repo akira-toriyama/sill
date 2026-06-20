@@ -45,9 +45,9 @@ final class ThemedChipTests: XCTestCase {
         return prefersBlackForeground(fillRelLuminance: l) ? .black : .white
     }
 
-    private func laidOut(_ configure: (ThemedChip) -> Void = { _ in },
-                         title: String = "Chip", width: CGFloat = 120,
-                         height: CGFloat = 32) -> ThemedChip {
+    private func laidOut(title: String = "Chip", width: CGFloat = 120,
+                         height: CGFloat = 32,
+                         _ configure: (ThemedChip) -> Void = { _ in }) -> ThemedChip {
         let c = ThemedChip(palette: palette())
         c.title = title
         configure(c)
