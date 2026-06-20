@@ -322,6 +322,7 @@ struct ThemeCard: View {
             WidgetSection(kitComponent("ThemedButton"), p: p) { MockButton(p: p) }
             WidgetSection(kitComponent("ThemedButtonGroup"), p: p) { MockButtonGroup(p: p) }
             WidgetSection(kitComponent("ThemedToolBar"), p: p) { MockToolBar(p: p) }
+            WidgetSection(kitComponent("ThemedChip"), p: p) { MockChip(p: p) }
             WidgetSection(kitComponent("ThemedCheckbox"), p: p) { MockCheckbox(p: p) }
             WidgetSection(kitComponent("ThemedFAB"), p: p) { MockFAB(p: p) }
         case .feedback:

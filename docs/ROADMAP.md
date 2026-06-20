@@ -11,7 +11,8 @@
 - **#1（SVG アイコン基盤）= ✅ 完了（PR #52 merged + `v1.8.0` tagged 2026-06-19）。** 内容: SwiftDraw（`<0.25` ピン）・Phosphor/Simple Icons を使う分だけ vendor・`phosphorImage`/`simpleIconImage` ローダ・共有 `tintedBitmap`（SF は byte-identical）・新画像API（`ThemedButton/FAB.leadingImage`・`ThemedToolBar.ButtonItem.image`）・prism「Icons」タブ＋`family` 設定キー。敵対的レビュー反映済。詳細は下の #1 と Package.swift / `Sources/ThemeKit/Resources/README.md`。
 - **アイコン vendor 方針 = A「使う分だけ」で確定**（全カタログ ~12.5k/~6MB は入れない。発見可能性は README＋DEBUG ログ＋CLAUDE.md で担保済。#2 の sweep で実使用分が自然に増える）。
 - **#2（全 SF→Phosphor sweep）= ✅ 完了（PR #53 merged + `v1.9.0` tagged 2026-06-19）。** SF Symbol を Sources/ **と Tests/** から全廃（`*Symbol: String?` は型維持で Phosphor スラッグを受ける／内部リゾルバを `phosphorImage` に差し替え）・メニュー✓は `check`(bold)・prism 全 showcase の文字列＋`Image(systemName:)`→`phosphorIcon` ヘルパ・Phosphor regular SVG を 31 個 vendor。`swift build`＋prism ライブ撮影（text/action/collection/chrome 両 tint 経路）＋敵対的レビュー（指摘8件反映）＋CI `swift test`（full Xcode・385 tests）緑。**→ これで wand 移植が解除**（以降は wand リポで管理）。⚠教訓: sweep は **Tests/ も含める**（`swift test` は CLT ローカル不可＝CI だけが守るゲート。Button/FAB は icon 解決依存で nil slug→赤、TextField/ToolBar は文字列有無で確保）。メモリ [[sweep-include-tests]]。
-- **次にやる = #3（`ThemedChip` 新規）。** perch のヒント pill・facet のタグ・キー記号（⌘⇧）。詳細は下の #3。
+- **#3（`ThemedChip` 新規）= 🚧 着手中（PR #54・`feat/themed-chip`・→ `v1.10.0`）。** MUI `<Chip>`＋HTML `<kbd>` を1部品に。`public final class ThemedChip: NSControl`・`variant{filled,outlined,keycap}`・`size{small24,medium32}`・`role{neutral,primary,secondary,error}`・`title`/`leadingSymbol`/`leadingImage`/`isSelected`/`onTap?`(クリック可)/`onDelete?`(末尾×=`x-circle`)/`preview*`。perch のヒント**オーバーレイは設計上スコープ外**（CG ループ描画＝NSView 部品で代替不可）。実装＋prism showcase＋29 XCTest＋`swift build` 緑＋3テーマ ライブ撮影確認済。詳細は下の #3。
+- **次にやる（#3 の後）= #4（perch エフェクトを sill Effects に寄せる）。**
 
 ## アイコンを全面 SVG 化（Phosphor）— いま最優先（1〜2）
 
@@ -37,7 +38,14 @@
 
 ## sill に部品を足す — perch 用（3〜7）
 
-3. `ThemedChip` を新規 — perch のヒント pill・facet のタグ・キー記号（⌘⇧）
+3. **`ThemedChip` を新規 — 🚧 着手中（PR #54・→ `v1.10.0`）。** facet のタグ・ステータス pill・キー記号（⌘⇧）を **1部品**で。perch のヒント pill は当初想定に挙がったが、調査で **オーバーレイは CG ループ描画（`OverlayCanvas.PillLayout`／N個を bespoke アニメ）＝ NSView 1チップでは代替不可**と判明し**スコープ外**に確定（必要なら将来 Spec＋描画ヘルパで別途）。
+   - **設計（グリル Q1〜Q9 確定）**: 形＝普通の NSView 部品（ThemeKit 全部品と同骨格・`palette{didSet→applyTheme}`）。タイブレーカー＝**「MUI Chip のセマンティクス＋既存 ThemeKit 部品の慣習」**。
+   - **enum**: `Variant{filled, outlined, keycap}`／`Size{small(24h), medium(32h)}`（MUI Chip に large 無し）／`Role{neutral, primary, secondary, error}`（既定 neutral＝MUI `color="default"`。ThemedButton には無い `neutral` を MUI 根拠で追加）。
+   - **API**: `title`（uppercase しない）・`leadingSymbol`/`leadingImage`(image優先・trailing 汎用アイコンは無し)・`isSelected`・`onTap?`(非nil⇒クリック可＝hover/press/focus ring/Space)・`onDelete?`(非nil⇒末尾 `x-circle`・Backspace/Delete でも発火)・`preview{Hovered,Pressed,Focused}`。`keyEquivalent`/group seam 系は省略。`isInteractive`(clickable∨deletable)でフォーカス可否を判定（delete-only でも × にキーが届く）。
+   - **テーマ契約（正準ロールのみ）**: filled→ role不透明＋`onPrimary`/`onSecondary`/`bestContrast(error)`、neutral=`ink(.wash,of:.muted)`＋`foreground`。outlined→ clear＋role@0.5→hover full（neutral=`border`）。keycap→`ink(.faint,of:.foreground)`＋`foreground`＋`border`＋**mono**（role 無視）。state は ThemedButton 同型（クリック可時のみ）。`isSelected`→`selection`(neutral)/role wash。focus ring=`primary`。
+   - **寸法**: 高さ 24/32・font 13・**chip=pill(高さ/2)・keycap=5pt 角＋minWidth=高さ(単グリフ正方)**・chip minWidth 0(中身密着)・leading/×=14/16・gap 5。
+   - **prism**: `ChipShowcase.swift`（`ThemedChipView` 橋＋`MockChip`：LIVE/強制状態/role/size/variant＋**keycap 実グリフ `⌘ ⇧ ⌥ ⌘N ⇧⌘N Esc`**）＋Gallery `.action` 結線＋KitCatalog エントリ。
+   - **検証**: `swift build` 緑・3テーマ（terminal/github-light/blacklight）ライブ撮影で filled/outlined/keycap/×/isSelected/role(黒白コントラスト ink)/全 state 確認・`Tests/ThemeKitTests/ThemedChipTests.swift`(29 ケース・CI で実行)。
 4. perch の自前エフェクトを sill の既存 Effects に寄せる — 追加コードほぼ無し（perch の最初）
 5. perch の自前の色計算を sill の PaletteKit に寄せる
 6. アニメ用の計算 `ThemedTransition` を新規 — perch・facet・wand 共通
