@@ -1,6 +1,6 @@
 # sill やることリスト
 
-- 現行 **v1.12.0**（#7 完了 = `ParticleBurst` 新規＝紙吹雪/花火の pure closed-form パーティクル atom in `Effects`・PR #56 merged + `v1.12.0` tagged 2026-06-20／#6 完了 = `ThemedTransition` 新規 pure モジュール `Motion`・PR #55／#5 = perch PR #133・sill 無改変／#4 = perch PR #132／#3 = PR #54）。**番号が小さいほど先**にやる。**次は #8（文字を MUI 規約に照合して調整）。**
+- 現行 **v1.12.0**（#7 完了 = `ParticleBurst` 新規＝紙吹雪/花火の pure closed-form パーティクル atom in `Effects`・PR #56 merged + `v1.12.0` tagged 2026-06-20／#6 完了 = `ThemedTransition` 新規 pure モジュール `Motion`・PR #55／#5 = perch PR #133・sill 無改変／#4 = perch PR #132／#3 = PR #54）。**番号が小さいほど先**にやる（ただし **#8〜11 は順番入れ替え可**＝ユーザー裁定 2026-06-20・実行順 **#9→#11→#10→#8**）。**次は #9（wand エフェクト一式を sill へ・🔍 調査/設計中）。**
 - すべて sill 本体の作業（追加は additive・default-off）。
 - このファイルが残作業・進捗の**唯一の記録**（git 管理）。
 
@@ -55,6 +55,8 @@
 7. 紙吹雪 / 花火を Effects に足す — **✅ 完了（PR #56 merged + `v1.12.0` tagged 2026-06-20）。** 新規 `ParticleBurst` atom（pure closed-form パーティクル：`rollBurst`→`resolveParticles`→AppKit `drawParticles`）＝border flash（`FlashState`/`rollFlash`/`resolveBorder`/`drawLinePets`）と同型の「ロール→wall-clock 減衰」。Euler 積分なし・`f(now)`・Sendable（pure 層は UInt32/Double、CoreGraphics/AppKit は gate 内）。emission `.fireworks`(放射・グロー)/`.confetti`(ポッパー・回転紙片)・`EffectIntensity` で count/reach スケール（hard-cap 6…40）。perch `ParticleDriver` を一般化（wand burst も将来吸収・**アプリ移植は follow-up**＝build-best-then-migrate・本 PR は sill のみ additive）。prism「Particles」タブで両エフェクト live。検証: `swift build` 緑＋prism ライブ撮影（synthwave）＋敵対的レビュー（4観点×独立検証）＋**CI 緑（full Xcode `swift test`／build／lint）→ squash-merge 済**。⚠教訓: 初回 CI が**テスト専用 compile エラー**を捕捉＝`rollBurst(from: [])` 空配列リテラルがタプル/CGPoint 2オーバーロードに ambiguous（`swift build` は test を compile しない＝CI だけが守る）。メモリ [[sweep-include-tests]]。
 
 ## sill のその他（8〜11）
+
+> **実行順 = #9 → #11 → #10 → #8**（ユーザー裁定 2026-06-20「#8〜11 は順番入れ替え可」）。番号は安定参照として据え置き、着手はこの順。**現在 #9 を 🔍 調査/設計中。**
 
 8. **文字を MUI 規約に照合して調整** — 原典 grounding で精密比較（急がない）。
    読みづらい確定 = ThemedList の 2 行目（11pt regular muted）と TextField 補助文 → 12pt か medium。
