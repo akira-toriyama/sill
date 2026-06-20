@@ -1,6 +1,6 @@
 # sill やることリスト
 
-- 現行 **v1.11.0**（#6 完了 = `ThemedTransition` 新規 pure モジュール `Motion`・PR #55 merged + `v1.11.0` tagged 2026-06-20／#5 = perch PR #133 merged・sill 無改変／#4 = perch PR #132 merged／#3 = PR #54）。**番号が小さいほど先**にやる。**次は #7（紙吹雪/花火を Effects に足す）。**
+- 現行 **v1.11.0**（#6 完了 = `ThemedTransition` 新規 pure モジュール `Motion`・PR #55 merged + `v1.11.0` tagged 2026-06-20／#5 = perch PR #133 merged・sill 無改変／#4 = perch PR #132 merged／#3 = PR #54）。**番号が小さいほど先**にやる。**#7 着手中（紙吹雪/花火 = `ParticleBurst`・PR #56・CI 待ち）。次は #8。**
 - すべて sill 本体の作業（追加は additive・default-off）。
 - このファイルが残作業・進捗の**唯一の記録**（git 管理）。
 
@@ -51,7 +51,7 @@
 4. **perch の自前エフェクトを sill の既存 Effects に寄せる — ✅ 完了（perch PR #132 merged 2026-06-20・sill 変更なし）。** ネオン枠を perch 自前 hue テーブル→sill `Effects`（`borderEffectFor`/`resolveBorder`/`blendThrough`）に収束。決定 = sill をそのまま採用（facet と同じ list-blend・破壊的変更 OK）。詳細は上の 🧭現在地 #4。
 5. **perch の自前の色計算を sill の PaletteKit に寄せる — ✅ 完了（perch PR #133 merged 2026-06-20）**（#4 同型・sill 無改変・byte-identical・3 perch-ism の裁定は上の🧭参照）。
 6. アニメ用の計算 `ThemedTransition` を新規 — perch・facet・wand 共通 — **✅ 完了（PR #55 merged + `v1.11.0` tagged 2026-06-20）**（新規 pure モジュール `Motion`＝Duration/Easing(cubic-bezier solver)/Tween/lerp/spring/dampedSine/autoDuration・Effects=巡回 と住み分け・prism「Motion」タブ・CI 緑。詳細は上の 🧭 #6）。
-7. 紙吹雪 / 花火を Effects に足す
+7. 紙吹雪 / 花火を Effects に足す — **🚧 着手中（PR #56・CI 待ち）。** 新規 `ParticleBurst` atom（pure closed-form パーティクル：`rollBurst`→`resolveParticles`→AppKit `drawParticles`）＝border flash（`FlashState`/`rollFlash`/`resolveBorder`/`drawLinePets`）と同型の「ロール→wall-clock 減衰」。emission `.fireworks`(放射・グロー)/`.confetti`(ポッパー・回転紙片)・`EffectIntensity` で count/reach スケール。perch `ParticleDriver` を一般化（wand burst も将来吸収・移植は follow-up）。prism「Particles」タブで両エフェクト live。`swift build` 緑＋prism ライブ撮影＋敵対的レビュー（4観点×独立検証）。CI 緑で squash-merge＋`v1.12.0` tag＋本項 完了化。
 
 ## sill のその他（8〜11）
 
