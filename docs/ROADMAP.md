@@ -1,6 +1,6 @@
 # sill やることリスト
 
-- 現行 **v1.10.0**（#3 完了・PR #54 merged + tagged 2026-06-20）。**番号が小さいほど先**にやる。
+- 現行 **v1.10.0**（#4 完了 = perch PR #132 merged・**sill 変更なし**で perch を寄せた／#3 = PR #54 tagged 2026-06-20）。**番号が小さいほど先**にやる。
 - すべて sill 本体の作業（追加は additive・default-off）。
 - このファイルが残作業・進捗の**唯一の記録**（git 管理）。
 
@@ -12,7 +12,8 @@
 - **アイコン vendor 方針 = A「使う分だけ」で確定**（全カタログ ~12.5k/~6MB は入れない。発見可能性は README＋DEBUG ログ＋CLAUDE.md で担保済。#2 の sweep で実使用分が自然に増える）。
 - **#2（全 SF→Phosphor sweep）= ✅ 完了（PR #53 merged + `v1.9.0` tagged 2026-06-19）。** SF Symbol を Sources/ **と Tests/** から全廃（`*Symbol: String?` は型維持で Phosphor スラッグを受ける／内部リゾルバを `phosphorImage` に差し替え）・メニュー✓は `check`(bold)・prism 全 showcase の文字列＋`Image(systemName:)`→`phosphorIcon` ヘルパ・Phosphor regular SVG を 31 個 vendor。`swift build`＋prism ライブ撮影（text/action/collection/chrome 両 tint 経路）＋敵対的レビュー（指摘8件反映）＋CI `swift test`（full Xcode・385 tests）緑。**→ これで wand 移植が解除**（以降は wand リポで管理）。⚠教訓: sweep は **Tests/ も含める**（`swift test` は CLT ローカル不可＝CI だけが守るゲート。Button/FAB は icon 解決依存で nil slug→赤、TextField/ToolBar は文字列有無で確保）。メモリ [[sweep-include-tests]]。
 - **#3（`ThemedChip` 新規）= ✅ 完了（PR #54 merged + `v1.10.0` tagged 2026-06-20）。** MUI `<Chip>`＋HTML `<kbd>` を1部品に。`public final class ThemedChip: NSControl`・`variant{filled,outlined,keycap}`・`size{small24,medium32}`・`role{neutral,primary,secondary,error}`・`title`/`leadingSymbol`/`leadingImage`/`isSelected`/`onTap?`(クリック可)/`onDelete?`(末尾×=`x-circle`)/`preview*`。perch のヒント**オーバーレイは設計上スコープ外**（`OverlayCanvas.PillLayout` を CG ループで N 個 bespoke アニメ描画＝NSView 部品で代替不可）。実装＋prism showcase＋29 XCTest＋`swift build` 緑＋3テーマ ライブ撮影＋敵対的レビュー（5観点×2票・確定1件=`onTap` の動的 a11y role 再同期を修正）＋CI `swift test`（full Xcode）緑。⚠教訓: **テストは CI だけが守る**＝初回 CI で `laidOut` の trailing-closure 引数順 compile error を捕捉（`swift test` は CLT ローカル不可）。メモリ [[sweep-include-tests]]。
-- **次にやる = #4（perch のエフェクトを sill の既存 Effects に寄せる — perch の最初）。**
+- **#4（perch の自前エフェクトを sill の既存 Effects に寄せる）= ✅ 完了（perch PR #132 merged 2026-06-20・sill 変更なし）。** perch のネオン枠を自前 hue テーブル（`BorderEffect.baseHex`＋`rotateHue`＋`borderHueOffset`）から sill `Effects` に収束＝`borderEffectFor`→`resolveBorder`/`blendThrough` 委譲。perch は redraw クロック所有＋NSColor 化＋glow 合成を維持（sill の app 側 border 契約どおり）。決定（ユーザー Q1/Q2 2026-06-20）= **sill をそのまま採用**（neon/cyber/vapor/kawaii は facet と同じ list-blend に・rainbow 実質同じ／animatedPalette 結線は後回し）。実装: sill ピン 0.11.0→1.10.0（Palette/ConfigSchema/CLIKit はバイト一致＝ノーオペ）・`Effects` を PerchAdapterMacOS にリンク・`.random` を1回解決（draw 毎フリッカも解消）・`BorderEffectMappingTests`（perch↔sill 名前ドリフトを CI で検出）。CI 緑（swift build＋full Xcode swift test）。⚠ perch は headless＝視覚自動テスト無し（見た目は `./run.sh` 手動）。⚠教訓: **#4 は sill 無改変＝アプリ移植のみで完結**（build-best-then-migrate＝sill は既に best、適用は app repo の follow-up。wand 移植と同型で、以降の perch 作業も perch リポで管理）。
+- **次にやる = #5（perch の自前の色計算を sill の PaletteKit に寄せる）。** ⚠注意: perch の `resolvePalette`（HintPainter）は ① system-primary→`controlAccentColor` sentinel・② translucency（pillBgAlpha・frosted pill）・③ per-app `[overlay].accent` override の **3つの perch-ism** を持つ＝PaletteKit が吸収するか perch に残すか要設計（sill-first だが各アプリ UI は個別判断）。`NSColor(_ hex: HexColor)` ブリッジは Effects に既存（perch の `color(hex:)` と重複）。
 
 ## アイコンを全面 SVG 化（Phosphor）— いま最優先（1〜2）
 
@@ -46,7 +47,7 @@
    - **寸法**: 高さ 24/32・font 13・**chip=pill(高さ/2)・keycap=5pt 角＋minWidth=高さ(単グリフ正方)**・chip minWidth 0(中身密着)・leading/×=14/16・gap 5。
    - **prism**: `ChipShowcase.swift`（`ThemedChipView` 橋＋`MockChip`：LIVE/強制状態/role/size/variant＋**keycap 実グリフ `⌘ ⇧ ⌥ ⌘N ⇧⌘N Esc`**）＋Gallery `.action` 結線＋KitCatalog エントリ。
    - **検証**: `swift build` 緑・3テーマ（terminal/github-light/blacklight）ライブ撮影で filled/outlined/keycap/×/isSelected/role(黒白コントラスト ink)/全 state 確認・`Tests/ThemeKitTests/ThemedChipTests.swift`(29 ケース・CI で実行)。
-4. perch の自前エフェクトを sill の既存 Effects に寄せる — 追加コードほぼ無し（perch の最初）
+4. **perch の自前エフェクトを sill の既存 Effects に寄せる — ✅ 完了（perch PR #132 merged 2026-06-20・sill 変更なし）。** ネオン枠を perch 自前 hue テーブル→sill `Effects`（`borderEffectFor`/`resolveBorder`/`blendThrough`）に収束。決定 = sill をそのまま採用（facet と同じ list-blend・破壊的変更 OK）。詳細は上の 🧭現在地 #4。
 5. perch の自前の色計算を sill の PaletteKit に寄せる
 6. アニメ用の計算 `ThemedTransition` を新規 — perch・facet・wand 共通
 7. 紙吹雪 / 花火を Effects に足す
