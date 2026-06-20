@@ -98,17 +98,23 @@ public struct Particle: Sendable, Hashable {
     public var life: Double
     /// The silhouette to draw.
     public var shape: ParticleShape
+    /// Radius CHANGE rate in pt/s — `0` keeps a constant size; NEGATIVE shrinks
+    /// the particle as it ages (the cooling-spark / settling look CAEmitter got
+    /// via `scaleSpeed`). Closed-form: `radius = max(0, radius + radiusSpeed·t)`.
+    public var radiusSpeed: Double
 
     public init(x0: Double, y0: Double, vx: Double, vy: Double,
                 radius: Double, color: UInt32, spin: Double = 0,
                 sway: Double = 0, swayFreq: Double = 0, phase: Double = 0,
-                life: Double = 1, shape: ParticleShape = .spark) {
+                life: Double = 1, shape: ParticleShape = .spark,
+                radiusSpeed: Double = 0) {
         self.x0 = x0; self.y0 = y0
         self.vx = vx; self.vy = vy
         self.radius = radius; self.color = color
         self.spin = spin; self.sway = sway
         self.swayFreq = swayFreq; self.phase = phase
         self.life = life; self.shape = shape
+        self.radiusSpeed = radiusSpeed
     }
 }
 
@@ -185,6 +191,7 @@ public struct ResolvedParticle: Sendable {
 ///   * `x = x₀ + vx·t + sway·sin(swayFreq·t + phase)`  (flutter is closed-form)
 ///   * `y = y₀ + vy·t + ½·gravity·t²`                   (ballistic arc)
 ///   * `alpha = 1 − t / (duration·life)`                (per-particle linear fade)
+///   * `radius = max(0, radius + radiusSpeed·t)`        (cooling-shrink, opt-in)
 ///   * `rotation = spin·t`
 /// Particles past their own lifetime are dropped, so the returned count
 /// shrinks toward the end (the organic dissolve). Returns `[]` before the
@@ -200,8 +207,9 @@ public func resolveParticles(_ burst: ParticleBurst, now: Double) -> [ResolvedPa
         if localP >= 1 { continue }   // this particle has already faded out
         let x = p.x0 + p.vx * t + p.sway * sin(p.swayFreq * t + p.phase)
         let y = p.y0 + p.vy * t + 0.5 * burst.gravity * t * t
+        let r = max(0, p.radius + p.radiusSpeed * t)
         out.append(ResolvedParticle(
-            x: x, y: y, radius: p.radius, color: p.color,
+            x: x, y: y, radius: r, color: p.color,
             alpha: 1 - localP, rotation: p.spin * t, shape: p.shape))
     }
     return out
@@ -223,6 +231,9 @@ public func resolveParticles(_ burst: ParticleBurst, now: Double) -> [ResolvedPa
 ///
 /// `count` overrides the per-emitter particle count outright (skips the
 /// intensity-derived default) — for a bench or a deliberately dense pop.
+/// `radiusSpeed` (pt/s, default `0`) shrinks every particle as it ages when
+/// negative — the cooling/settling look (the CAEmitter `scaleSpeed` analog);
+/// `0` keeps the constant-size default.
 /// An empty `colors` falls back to white; empty `emitters` yields an inert
 /// (already-settled) burst.
 public func rollBurst(
@@ -232,7 +243,8 @@ public func rollBurst(
     intensity: EffectIntensity = .normal,
     now: Double,
     duration: TimeInterval = 1.1,
-    count: Int? = nil
+    count: Int? = nil,
+    radiusSpeed: Double = 0
 ) -> ParticleBurst {
     let palette = colors.isEmpty ? [0xFFFFFF] : colors
     let scale = intensity.multiplier
@@ -246,8 +258,8 @@ public func rollBurst(
     for e in emitters {
         for _ in 0..<perEmitter {
             particles.append(emission == .fireworks
-                ? rollSpark(at: e, palette: palette, scale: scale)
-                : rollPaper(at: e, palette: palette, scale: scale))
+                ? rollSpark(at: e, palette: palette, scale: scale, radiusSpeed: radiusSpeed)
+                : rollPaper(at: e, palette: palette, scale: scale, radiusSpeed: radiusSpeed))
         }
     }
     let gravity = emission == .fireworks ? 360.0 : 900.0
@@ -257,7 +269,7 @@ public func rollBurst(
 
 /// A radial firework spark: uniform random angle, 120–260 pt/s × intensity.
 private func rollSpark(at e: (x: Double, y: Double),
-                       palette: [UInt32], scale: Double) -> Particle {
+                       palette: [UInt32], scale: Double, radiusSpeed: Double) -> Particle {
     let angle = Double.random(in: 0 ..< (2 * .pi))
     let speed = Double.random(in: 120...260) * scale
     return Particle(
@@ -266,14 +278,15 @@ private func rollSpark(at e: (x: Double, y: Double),
         radius: Double.random(in: 1.6...3.2),
         color: palette.randomElement() ?? 0xFFFFFF,
         life: Double.random(in: 0.6...1.0),
-        shape: .spark)
+        shape: .spark,
+        radiusSpeed: radiusSpeed)
 }
 
 /// A confetti paper: a party-popper cone — shoots UP-and-out (negative `vy`)
 /// with a wide horizontal spread, then gravity arcs it down; given a tumble
 /// spin and a horizontal flutter so it reads as paper, not a falling dot.
 private func rollPaper(at e: (x: Double, y: Double),
-                       palette: [UInt32], scale: Double) -> Particle {
+                       palette: [UInt32], scale: Double, radiusSpeed: Double) -> Particle {
     let dx = Double.random(in: -150...150) * scale
     let dy = Double.random(in: -240 ... -90) * scale   // up-and-out
     return Particle(
@@ -286,7 +299,8 @@ private func rollPaper(at e: (x: Double, y: Double),
         swayFreq: Double.random(in: 3...6),
         phase: Double.random(in: 0 ..< (2 * .pi)),
         life: Double.random(in: 0.7...1.0),
-        shape: .paper)
+        shape: .paper,
+        radiusSpeed: radiusSpeed)
 }
 
 #if canImport(CoreGraphics)
@@ -302,12 +316,13 @@ public func rollBurst(
     intensity: EffectIntensity = .normal,
     now: Double,
     duration: TimeInterval = 1.1,
-    count: Int? = nil
+    count: Int? = nil,
+    radiusSpeed: Double = 0
 ) -> ParticleBurst {
     rollBurst(emission: emission,
               from: emitters.map { (x: Double($0.x), y: Double($0.y)) },
               colors: colors, intensity: intensity, now: now,
-              duration: duration, count: count)
+              duration: duration, count: count, radiusSpeed: radiusSpeed)
 }
 #endif
 

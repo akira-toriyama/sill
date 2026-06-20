@@ -86,6 +86,10 @@ final class ParticleBurstNSView: NSView {
     /// the two stages drift out of phase and the card is never fully still).
     private var period: Double { duration + 0.4 }
 
+    /// Fireworks cool + shrink as they fade (the new `radiusSpeed`); confetti
+    /// paper keeps its size while it flutters down.
+    private var radiusSpeed: Double { emission == .fireworks ? -2.0 : 0 }
+
     override func draw(_ dirtyRect: NSRect) {
         guard bounds.width > 1, bounds.height > 1 else { return }
 
@@ -93,7 +97,7 @@ final class ParticleBurstNSView: NSView {
         if let pt = previewT {
             let b = burst ?? rollBurst(emission: emission, from: [emitter],
                                        colors: colors, intensity: .bold,
-                                       now: 0, duration: duration)
+                                       now: 0, duration: duration, radiusSpeed: radiusSpeed)
             burst = b
             drawParticles(b, now: max(0, min(1, pt)) * duration, scale: uiScale)
             return
@@ -104,7 +108,7 @@ final class ParticleBurstNSView: NSView {
         if burst == nil || now - (burst?.startedAt ?? 0) >= period {
             burst = rollBurst(emission: emission, from: [emitter],
                               colors: colors, intensity: .bold,
-                              now: now, duration: duration)
+                              now: now, duration: duration, radiusSpeed: radiusSpeed)
         }
         if let b = burst { drawParticles(b, now: now, scale: uiScale) }
     }
