@@ -338,6 +338,7 @@ struct ThemeCard: View {
             WidgetSection(kitComponent("ThemedTransition"), p: p) { MockMotion(p: p) }
         case .particles:
             WidgetSection(kitComponent("ParticleBurst"), p: p) { MockParticles(p: p) }
+            WidgetSection(kitComponent("SplatterShape"), p: p) { MockSplatter(p: p) }
         case .chrome:
             Text("App chrome — fake perch / facet / wand / glance, drawn by prism (never imports an app's View).")
                 .font(sysFont(9, design: .monospaced))

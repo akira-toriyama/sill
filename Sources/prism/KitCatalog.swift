@@ -408,6 +408,24 @@ let kitCatalog: [KitComponent] = [
                  "DIVISION OF LABOUR: a burst is one-shot, but it lives in Effects (not Motion) — it is the color-dynamic FlashState pattern at scale, and reuses the EffectSpec palettes + NSColor bridge. No timer/state — app owns the clock (sill f(now) convention)",
              ],
         family: .particles),
+    KitComponent(
+        name: "SplatterShape", module: "Effects",
+        kind: "Ink-splat decal — Splatoon-style post-fire splatter. The roll → resolve-alpha → draw pattern, but a static shape that only fades (a stamp, not a burst)",
+        summary: "The family's shared ink-splatter decal: roll the whole geometry once (deterministic from a seed), resolve only its alpha per frame (hold ⅔ → fade ⅓), draw the rich look (2–3 tendril-blob units + wet rim + droplets) or your own. Pure + Sendable; the app owns the clock, NSColor, and the off gate — like the particle burst, but the shape is static.",
+        consumes: "Pure functions + an AppKit draw helper — no instance to retain. `import Effects`. On the celebratory moment: `decal = rollSplatter(at: pt, size: 120, colors: [accentHex] + festive, now: CACurrentMediaTime())` into one stored `SplatterShape?` cell; tick your redraw clock while `decal.isActive(now:)`; each frame call `drawInkSplatter(decal, now:)` (or fill `decal.units` yourself). Pass a fixed `seed:` for a reproducible shape; clear the cell when it settles.",
+        keyAPI: [
+                 "rollSplatter(at:size:colors:seed:now:duration:) -> SplatterShape — roll 2–3 ink-splat units at a point (Double-tuple or CGPoint). size = footprint pt; colors are 0xRRGGBB candidates each unit picks from (one decal can stack 2–3 colors); seed nil = fresh UInt64.random, fixed = reproducible",
+                 "SplatterShape — Sendable rolled value: units (each a tendril body + wet rim + droplet specks, as pure vertex rings in absolute coords) + startedAt + duration. alpha(now:) = hold holdFraction(0.66) then linear fade; isActive(now:) gates the clock",
+                 "SplatterShape.Unit — center, color (UInt32), body/rim/droplets vertex rings (smoothed at draw time)",
+                 "drawInkSplatter(_:now:) — @MainActor AppKit renderer (Catmull-Rom-smoothed blobs: darker wet rim → body → droplets) into the current NSGraphicsContext, faded to alpha(now:). Radial → orientation-agnostic",
+             ],
+        variants: [
+                 "Geometry (wand DecalManager port): lead unit near centre (largest) + 1–2 orbit units; each a 22–29-vertex 3-tier tendril blob (body 60% / short tendril 30% / long spike 10%) + 1.08× rim + 3–6 droplets",
+                 "Color: per-unit pick from the palette (Splatoon multi-shot); rim = darker blend of the unit ink",
+                 "Lifetime: hold 66% at full → linear fade to 0; static shape (only alpha moves)",
+                 "DIVISION OF LABOUR: lives in Effects with the particle burst (fire-moment FX). Pure vertices (Double tuples), Catmull-Rom + NSColor stay in the gated draw helper. No timer/state — app owns the clock",
+             ],
+        family: .particles),
 ]
 
 /// Look up a component by its public type name (the names are fixed in the gallery).
