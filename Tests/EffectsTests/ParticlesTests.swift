@@ -141,7 +141,10 @@ final class ParticlesTests: XCTestCase {
                           colors: [], now: 0)
         XCTAssertTrue(w.particles.allSatisfy { $0.color == 0xFFFFFF })
         // Empty emitters → an inert (no-particle) burst that resolves to [].
-        let empty = rollBurst(emission: .fireworks, from: [], colors: [1], now: 0)
+        // (Annotate the empty literal so it picks the tuple overload — a bare
+        // `[]` is ambiguous across the tuple + CGPoint overloads.)
+        let empty = rollBurst(emission: .fireworks, from: [] as [(x: Double, y: Double)],
+                              colors: [1], now: 0)
         XCTAssertTrue(empty.particles.isEmpty)
         XCTAssertTrue(resolveParticles(empty, now: 0.5).isEmpty)
     }
