@@ -111,18 +111,21 @@ public enum CanonicalSprite {
         "w": SpriteColor.eyeWhite,
         "b": SpriteColor.pupilBlue,
     ]
-    private static let feetA = ["rr.rr.rr.rr.rr", "r..rr..rr..rr."]
-    private static let feetB = [".rr.rr.rr.rr.r", "..rr..rr..rr.."]
+    // Canonical arcade Blinky, traced from the reference (全身.gif): a rounded
+    // dome, BIG eyes (4-wide white with a 2×2 pupil offset toward the look
+    // direction — here right/+x = travel), and the classic 2-pose foot shuffle.
+    private static let feetA = ["rr.rrr..rrr.rr", "r...rr..rr...r"]
+    private static let feetB = ["rrrr.rrrr.rrrr", ".rr...rr...rr."]
     private static func ghostRows(feet: [String]) -> [String] {
         [
-            "....rrrrrr....",
+            ".....rrrr.....",
+            "...rrrrrrrr...",
             "..rrrrrrrrrr..",
-            ".rrrrrrrrrrrr.",
-            "rrrrrrrrrrrrrr",
-            "rrwwwrrrrwwwrr",
-            "rrwwbrrrrwwbrr",
-            "rrwwwrrrrwwwrr",
-            "rrrrrrrrrrrrrr",
+            ".rrrwwrrrrwwr.",
+            ".rrwwwwrrwwww.",
+            ".rrwwbbrrwwbb.",
+            "rrrwwbbrrwwbbr",
+            "rrrrwwrrrrwwrr",
             "rrrrrrrrrrrrrr",
             "rrrrrrrrrrrrrr",
             "rrrrrrrrrrrrrr",
