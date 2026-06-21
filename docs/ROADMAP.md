@@ -40,7 +40,7 @@
   - **Ph4** ネオンコリドー（2 ストローク壁＋内角フィレット）＋ペレット列＋cherry/icon 分け＋ScaleTier（v1.20.0）
   - **Ph5** 食べ判定＋虹フラッシュ＋「+N」スコア = **合成 `ChompCorridor` 完成**・全ループ大カード（v1.21.0）
   - **Ph6**（任意・**wand リポ側**）完成度が高ければ backport
-- **進捗**: ✅ 計画セッション（spec＋項目登録）＋ **Ph1 実装（feat-chomp-12・commit 済・未 push）**。Ph1 = 上記すべて実装＋`swift build` 緑＋スプライト offscreen レンダ確認＋敵対的レビュー（geometry/architecture/tests/spec の4観点 workflow＝distribution/orientation は green と独立検証・**must-fix 2件修正**＝① reconciliation テストを `ThemeSpec.chomp` 実値照合に・② prism カード高さを `*uiScale` 追従に）。⚠ **agent 環境は画面収録権限なし**＝`screencapture` が真っ黒＝prism ウィンドウ撮影はユーザー側（offscreen NSImage レンダで絵柄は確認済）。⚠ **push ゲート**: prism の PixelArt カードをユーザーが sill でライブ確認するまで push しない（[[chomp-push-gate]]・後で「push OK」も「sill で確認済？」と再確認）。**次は Ph2**（既存 line-pet をピクセル統一＋`Motion.frameStep`・検証ゲート付き）。未達成は各フェーズ行で明示し暗黙にしない。
+- **進捗**: ✅ 計画セッション（spec＋項目登録）＋ **Ph1 実装（feat-chomp-12・commit 済・未 push）**。Ph1 = 上記すべて実装＋`swift build` 緑＋スプライト offscreen レンダ確認＋敵対的レビュー（geometry/architecture/tests/spec の4観点 workflow＝distribution/orientation は green と独立検証・**must-fix 2件修正**＝① reconciliation テストを `ThemeSpec.chomp` 実値照合に・② prism カード高さを `*uiScale` 追従に）。⚠ **agent 環境は画面収録権限なし**＝`screencapture` が真っ黒＝prism ウィンドウ撮影はユーザー側（offscreen NSImage レンダで絵柄は確認済）。⚠ **push ゲート**: prism の PixelArt カードをユーザーが sill でライブ確認するまで push しない（[[chomp-push-gate]]・後で「push OK」も「sill で確認済？」と再確認）。**ユーザーが見た目を承認（2026-06-21「いいと思う」）。ただし main マージは保留（ユーザー明示指示）・push もゲート継続**＝当面は `feat-chomp-12` にローカルコミットを積む（Ph2 以降も同ブランチにチェーン・マージ/タグはまとめて後日）。**次は Ph2**（既存 line-pet をピクセル統一＋`Motion.frameStep`＝口パク 5Hz `[0,0.5,1,0.5]`＋幽霊の脚 waddle・検証ゲート付き）。未達成は各フェーズ行で明示し暗黙にしない。
 
 ## アイコンを全面 SVG 化（Phosphor）— いま最優先（1〜2）
 
