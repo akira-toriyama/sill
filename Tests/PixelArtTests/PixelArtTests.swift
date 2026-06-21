@@ -132,6 +132,30 @@ final class PacManCellsTests: XCTestCase {
     }
 }
 
+// MARK: - Chomp mouth animation data
+
+final class ChompMouthAnimTests: XCTestCase {
+    func testFramesAreClosedHalfFullHalf() {
+        // The 4-pose swap pattern: closed → half → full → half (opens + closes
+        // once per cycle). Phases stay in 0…1 (mouthHalfRad's domain).
+        XCTAssertEqual(chompMouthFrames, [0, 0.5, 1, 0.5])
+        XCTAssertTrue(chompMouthFrames.allSatisfy { $0 >= 0 && $0 <= 1 })
+    }
+
+    func testNeverFullyClosedReadsAsChomp() {
+        // The full-gape frame must actually open the wedge (a closed circle is
+        // "not a Pac-Man"): phase 1 ⇒ a 60° half-angle ⇒ cells get removed.
+        let open = chompMouthFrames.max() ?? 0
+        let closed = pacManCells(diameterCells: 13, mouthHalfRad: mouthHalfRad(phase: 0)).count
+        let gaping = pacManCells(diameterCells: 13, mouthHalfRad: mouthHalfRad(phase: open)).count
+        XCTAssertLessThan(gaping, closed, "the open frame must remove mouth cells")
+    }
+
+    func testRateIsFiveHz() {
+        XCTAssertEqual(chompMouthHz, 5)
+    }
+}
+
 // MARK: - positionHash01
 
 final class PositionHashTests: XCTestCase {

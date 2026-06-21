@@ -49,6 +49,21 @@ public func mouthHalfRad(phase: Double) -> Double {
     (5.0 + 55.0 * phase) * .pi / 180.0
 }
 
+/// The canonical chomp MOUTH animation, as pure data: the gape `phase` steps
+/// through these four frames — closed → half → full → half — so the mouth opens
+/// and closes once per cycle. A discrete sprite SWAP (drive it with
+/// `Motion.frameStep`, NOT an interpolation), which is the retro "feel": the
+/// mouth never smoothly tweens, it snaps between four poses. Named HERE — beside
+/// `mouthHalfRad`, the wedge's one home — so the line-pet (Effects) and the
+/// prism card read the SAME sequence with no drift. `PixelArt` owns no clock;
+/// this is just the pattern, the `now` stays the caller's.
+public let chompMouthFrames: [Double] = [0, 0.5, 1, 0.5]
+
+/// Complete cycles through `chompMouthFrames` per second — the 5 Hz arcade
+/// chomp (the spec's "口パク 5Hz"). One pass takes 1/5 s; `frameStep` advances
+/// `chompMouthHz · chompMouthFrames.count` = 20 mouth-swaps per second.
+public let chompMouthHz: Double = 5
+
 /// Stable hash of an integer cell coordinate to `0..<1` — a deterministic
 /// per-cell jitter source with NO RNG state, so a re-draw paints the same cell
 /// the same way (a cherry stays a cherry). Knuth-multiplicative mix; overflow is

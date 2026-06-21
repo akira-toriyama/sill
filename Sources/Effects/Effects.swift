@@ -20,6 +20,12 @@
 // (a no-AppKit Core must validate config tokens without linking Effects).
 @_exported import Palette
 
+// #12 Ph2 — the line-pets are now PIXEL sprites: PixelArt supplies the chomp
+// mouth wedge + its swap pattern (`mouthHalfRad` / `chompMouthFrames`), Motion
+// supplies the discrete `frameStep` sampler that animates the mouth + waddle.
+import PixelArt
+import Motion
+
 #if canImport(AppKit)
 import AppKit
 #endif
@@ -505,10 +511,36 @@ private func linePetPosition(on r: CGRect, distance t: CGFloat)
     }
 }
 
-/// Yellow chomp wedge with the mouth opening / closing on a ~0.25 s
-/// cycle, centred on the current transform origin. `scale` keeps it
-/// proportional to the host surface.
+// Pixel line-pet metrics (#12 Ph2) — sized so the unified arcade sprites keep
+// the SAME on-screen footprint the smooth pets had (no layout shift for the
+// apps that already place line-pets). `scale` multiplies these per surface.
+private let chompFaceCells = 13                  // odd ⇒ the mouth wedge centres
+private let chompFaceFootprint: CGFloat = 14     // pt @ scale 1 (old smooth Ø)
+private let ghostFootprint: CGFloat = 14         // pt @ scale 1 (sprite is 14×14)
+
+/// Yellow PIXEL Pac-Man — the chomp line-pet, unified to the arcade sprite in
+/// #12 Ph2 (was a smooth cosine wedge; see `drawChompPetSmooth`, the gate
+/// fallback). The mouth SNAPS through `chompMouthFrames` at `chompMouthHz` via
+/// `Motion.frameStep` (a discrete swap — the retro feel). The wedge is y-
+/// symmetric (opens toward +x = travel, the caller having rotated by the lap
+/// tangent), so no flip is needed; just centre it on the transform origin.
+/// `@MainActor` (it calls the `@MainActor` `drawPacMan` blitter; the only caller
+/// is the `@MainActor` `drawLinePets`).
+@MainActor
 private func drawChompPet(now: CFTimeInterval, scale: CGFloat) {
+    let cell = scale * chompFaceFootprint / CGFloat(chompFaceCells)
+    let phase = ThemedTransition.frameStep(now: Double(now), hz: chompMouthHz,
+                                           frames: chompMouthFrames)
+    let w = CGFloat(chompFaceCells) * cell
+    drawPacMan(diameterCells: chompFaceCells, mouthHalfRad: mouthHalfRad(phase: phase),
+               cell: cell, at: CGPoint(x: -w / 2, y: -w / 2))
+}
+
+/// The pre-#12-Ph2 SMOOTH chomp wedge (cosine mouth on a ~0.25 s cycle). Kept
+/// as the verification-gate fallback: if the pixel sprites read poorly at the
+/// small line-pet size, flip `drawLinePets`' `.chomp` case back to this. Not
+/// called by default.
+private func drawChompPetSmooth(now: CFTimeInterval, scale: CGFloat) {
     let r: CGFloat = 7 * scale
     let chompPhase = 0.5 - 0.5 * cos(now * (2 * .pi / 0.25))
     let openRad = chompPhase * (35.0 * .pi / 180.0)
@@ -525,9 +557,36 @@ private func drawChompPet(now: CFTimeInterval, scale: CGFloat) {
     p.lineWidth = 0.5; p.stroke()
 }
 
-/// Red Blinky-style ghost: dome + 3-wave skirt + eyes pointing along
-/// travel direction, centred on the current transform origin.
+/// Red Blinky PIXEL ghost — the chomp line-pet's companion, unified in #12 Ph2
+/// (was a smooth bezier dome; see `drawGhostPetSmooth`, the gate fallback). The
+/// 2-pose skirt WADDLES via `Motion.frameStep` (ghost⇄ghostAlt at
+/// `CanonicalSprite.waddleHz`). The sprite is FLIPPED so row 0 (the dome) sits
+/// at the top of the local y-up line-pet frame — matching the old ghost's
+/// orientation — then centred on the transform origin; the caller's lap rotation
+/// carries it (eyes baked toward +x) along the travel direction. `@MainActor`
+/// (it calls the `@MainActor` `drawPixelSprite` blitter; only caller is
+/// `drawLinePets`).
+@MainActor
 private func drawGhostPet(now: CFTimeInterval, scale: CGFloat) {
+    let sprite = ThemedTransition.frameStep(now: Double(now), hz: CanonicalSprite.waddleHz,
+                                            frames: CanonicalSprite.waddleFrames)
+    let cell = scale * ghostFootprint / CGFloat(sprite.height)
+    let w = CGFloat(sprite.width) * cell
+    let h = CGFloat(sprite.height) * cell
+    NSGraphicsContext.saveGraphicsState()
+    let t = NSAffineTransform()
+    t.translateX(by: -w / 2, yBy: h / 2)   // top-left of the centred sprite (y-up)
+    t.scaleX(by: 1, yBy: -1)               // row 0 → top: rows now grow DOWNWARD
+    t.concat()
+    drawPixelSprite(sprite, cell: cell, at: .zero)
+    NSGraphicsContext.restoreGraphicsState()
+}
+
+/// The pre-#12-Ph2 SMOOTH Blinky ghost (bezier dome + 3-wave skirt + eyes along
+/// travel). Kept as the verification-gate fallback (flip `drawLinePets`'
+/// `.ghost` case back to this if the pixel sprite reads poorly at the small
+/// line-pet size). Not called by default.
+private func drawGhostPetSmooth(now: CFTimeInterval, scale: CGFloat) {
     let w: CGFloat = 14 * scale
     let h: CGFloat = 16 * scale
     let bob = CGFloat(sin(now * (2 * .pi / 0.4))) * 0.6 * scale

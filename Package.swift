@@ -97,8 +97,12 @@ let package = Package(
         .target(name: "PixelArt"),
 
         // Dynamic atom: Sendable EffectSpec + (macOS) AppKit animator.
-        // Declared before PaletteKit, which now depends on it.
-        .target(name: "Effects", dependencies: ["Palette", "PixelArt"]),
+        // Declared before PaletteKit, which now depends on it. Depends on
+        // Motion since #12 Ph2: the pixel line-pets (chomp mouth-flap / ghost
+        // waddle) step their sprites with `Motion.frameStep`. Acyclic — Motion
+        // is a pure leaf (it depends on nothing); halo, which links Effects
+        // alone, just transitively gains that zero-AppKit math atom.
+        .target(name: "Effects", dependencies: ["Palette", "PixelArt", "Motion"]),
 
         // Pure, Sendable, AppKit-free ONE-SHOT animation math — the
         // `ThemedTransition` namespace (named Duration/Easing tokens, a

@@ -277,6 +277,67 @@ final class DampedSineTests: XCTestCase {
     }
 }
 
+final class FrameStepTests: XCTestCase {
+    // All `now` values are EXACT binary fractions (multiples of 1/2, 1/4, 1/8,
+    // 1/16) so `floor(now·hz·count)` lands cleanly on the intended step — the #6
+    // float-boundary lesson (0.05 is NOT exact and would make these flaky).
+
+    func testFirstFrameAtZero() {
+        XCTAssertEqual(TT.frameStep(now: 0, hz: 5, frames: [10, 20, 30, 40]), 10)
+    }
+
+    func testCyclesThenWraps() {
+        // hz 1, 4 frames → a new frame every 0.25 s; one full pass per second.
+        let f = [10, 20, 30, 40]
+        XCTAssertEqual(TT.frameStep(now: 0, hz: 1, frames: f), 10)
+        XCTAssertEqual(TT.frameStep(now: 0.25, hz: 1, frames: f), 20)
+        XCTAssertEqual(TT.frameStep(now: 0.5, hz: 1, frames: f), 30)
+        XCTAssertEqual(TT.frameStep(now: 0.75, hz: 1, frames: f), 40)
+        XCTAssertEqual(TT.frameStep(now: 1.0, hz: 1, frames: f), 10, "wraps after one full pass (1/hz s)")
+    }
+
+    func testTwoFrameWaddleAlternates() {
+        let f = ["a", "b"]   // hz 1, 2 frames → swap every 0.5 s
+        XCTAssertEqual(TT.frameStep(now: 0, hz: 1, frames: f), "a")
+        XCTAssertEqual(TT.frameStep(now: 0.5, hz: 1, frames: f), "b")
+        XCTAssertEqual(TT.frameStep(now: 1.0, hz: 1, frames: f), "a")
+        XCTAssertEqual(TT.frameStep(now: 1.5, hz: 1, frames: f), "b")
+    }
+
+    func testHzScalesTheRate() {
+        // hz 2, 4 frames → a new frame every 1/8 s.
+        let f = ["a", "b", "c", "d"]
+        XCTAssertEqual(TT.frameStep(now: 0.125, hz: 2, frames: f), "b")
+        XCTAssertEqual(TT.frameStep(now: 0.25, hz: 2, frames: f), "c")
+        XCTAssertEqual(TT.frameStep(now: 0.375, hz: 2, frames: f), "d")
+        XCTAssertEqual(TT.frameStep(now: 0.5, hz: 2, frames: f), "a", "wraps at 1/hz = 0.5 s")
+    }
+
+    func testNegativeNowWrapsTotallyNoTrap() {
+        // floor(-1) = -1 → folded into 0..<4 = index 3 (no trap, no overflow).
+        let f = [10, 20, 30, 40]
+        XCTAssertEqual(TT.frameStep(now: -0.25, hz: 1, frames: f), 40)
+        XCTAssertEqual(TT.frameStep(now: -0.5, hz: 1, frames: f), 30)
+        XCTAssertEqual(TT.frameStep(now: -1.0, hz: 1, frames: f), 10, "a full negative pass lands back on frame 0")
+    }
+
+    func testSingleFrameAlwaysReturnsIt() {
+        XCTAssertEqual(TT.frameStep(now: 3.7, hz: 9, frames: [42]), 42)
+        XCTAssertEqual(TT.frameStep(now: -3.7, hz: 9, frames: [42]), 42)
+    }
+
+    func testCanonicalChompMouthPattern() {
+        // The real chomp sequence: [0, 0.5, 1, 0.5] @ 5 Hz (a step every 0.05 s).
+        // Sampled only at exact binary fractions that sit clearly inside a step.
+        let m = [0.0, 0.5, 1.0, 0.5]
+        XCTAssertEqual(TT.frameStep(now: 0, hz: 5, frames: m), 0.0)        // 0·20 = 0
+        XCTAssertEqual(TT.frameStep(now: 0.0625, hz: 5, frames: m), 0.5)   // 1.25 → step 1
+        XCTAssertEqual(TT.frameStep(now: 0.125, hz: 5, frames: m), 1.0)    // 2.5  → step 2 (full gape)
+        XCTAssertEqual(TT.frameStep(now: 0.1875, hz: 5, frames: m), 0.5)   // 3.75 → step 3
+        XCTAssertEqual(TT.frameStep(now: 0.25, hz: 5, frames: m), 0.5)     // 5 → step 5 % 4 = 1
+    }
+}
+
 final class AutoDurationTests: XCTestCase {
     func testNonPositiveExtentIsZero() {
         XCTAssertEqual(TT.autoDuration(forExtent: 0), 0)

@@ -94,6 +94,16 @@ public enum CanonicalSprite {
     public static let ghostAlt = PixelSprite(rows: ghostRows(feet: feetB),
                                              palette: ghostPalette)
 
+    /// The two skirt poses in waddle order — `Motion.frameStep` swaps between
+    /// them for the 2-frame leg shuffle. Named so the line-pet (Effects) and the
+    /// prism card drive the SAME poses from one place.
+    public static let waddleFrames: [PixelSprite] = [ghost, ghostAlt]
+
+    /// Complete ghost⇄ghostAlt cycles per second — deliberately SLOWER than the
+    /// 5 Hz mouth (`chompMouthHz`): the legs waddle, they don't chatter. One
+    /// pass takes 1/1.5 s; `frameStep` swaps the pose `1.5 · 2` = 3 times/sec.
+    public static let waddleHz: Double = 1.5
+
     // The ghost is identical above the skirt; only the two foot rows differ, so
     // both poses share one body + palette (no drift between them).
     private static let ghostPalette: [Character: UInt32] = [

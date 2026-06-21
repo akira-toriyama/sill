@@ -60,7 +60,35 @@ final class SpriteTests: XCTestCase {
         XCTAssertEqual(SpriteColor.pupilBlue, ThemeSpec.chomp.secondary?.rgb)
     }
 
+    // MARK: - Waddle animation data (#12 Ph2)
+
+    func testWaddleFramesAreTheTwoPoses() {
+        XCTAssertEqual(CanonicalSprite.waddleFrames, [CanonicalSprite.ghost, CanonicalSprite.ghostAlt])
+    }
+
+    func testLegsWaddleSlowerThanTheMouthChatters() {
+        // The retro look: a fast 5 Hz mouth over a slower leg shuffle.
+        XCTAssertGreaterThan(CanonicalSprite.waddleHz, 0)
+        XCTAssertLessThan(CanonicalSprite.waddleHz, chompMouthHz)
+    }
+
     // MARK: - AppKit draw (smoke — real visual proof is the prism live capture)
+
+    func testUnifiedPixelLinePetsDrawRuns() {
+        // The #12 Ph2 unified line-pets: drawLinePets now blits the PIXEL chomp +
+        // ghost (mouth-flap via frameStep, ghost waddle via ghost⇄ghostAlt, y-flip
+        // for the dome-up orientation). Smoke only — real proof is the prism live
+        // capture; this just exercises the frameStep + flip-transform path at a
+        // couple of clock values so a crash/regression reddens CI.
+        let img = NSImage(size: NSSize(width: 160, height: 120))
+        img.lockFocus()
+        for now in [0.0, 0.125, 0.4] {   // closed-ish, full-gape, a waddle swap
+            drawLinePets([.chomp, .ghost],
+                         on: CGRect(x: 10, y: 10, width: 140, height: 100),
+                         now: now, scale: 1.5)
+        }
+        img.unlockFocus()
+    }
 
     func testDrawRunsIntoAContext() {
         let img = NSImage(size: NSSize(width: 120, height: 120))
