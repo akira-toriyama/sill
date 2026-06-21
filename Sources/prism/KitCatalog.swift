@@ -465,9 +465,9 @@ let kitCatalog: [KitComponent] = [
         family: .particles),
     KitComponent(
         name: "PixelSprite", module: "PixelArt + Effects",
-        kind: "Pixel-art sprite atom — wand's chomp (Pac-Man) arcade decals as resolution-independent integer pixel grids (#12 Ph1+Ph2: line-pets unified to pixel, mouth/waddle via Motion.frameStep)",
+        kind: "Pixel-art sprite atom — wand's chomp (Pac-Man) arcade decals as resolution-independent integer pixel grids (#12 Ph1+Ph2: line-pets unified to pixel, mouth/waddle via Motion.frameStep; Ph3: ghost line-pet is UPRIGHT + directional)",
         summary: "Pure PixelArt grids (PixelSprite = rows:[String] + palette:[Character:UInt32], flattened by cells()) + the circle-minus-mouth pacManCells wedge + a stable positionHash01 jitter + a ScaleTier size knob; Effects owns the @MainActor blitter (drawPixelSprite/drawPacMan, antialias OFF for crisp pixels). Colours are INTRINSIC arcade constants (pac-yellow/ghost-red/eye-white/pupil-blue/cherry/brown), reconciled to ThemeSpec.chomp roles where one exists — so chomp reads identically across every theme (self-contained arcade look, not role-driven).",
-        consumes: "`import PixelArt` for the pure grids/geometry; `import Effects` for the @MainActor draw, hosted in an isFlipped view (row 0 = top). Pac-Man: `drawPacMan(diameterCells:mouthHalfRad:cell:at:)`. Generic: `drawPixelSprite(CanonicalSprite.ghost, cell:at:)`. Clock injected as now:Double. Ph2: the unified line-pets (drawLinePets) are now PIXEL — the mouth flaps via ThemedTransition.frameStep(now:hz:chompMouthHz, frames:chompMouthFrames) and the ghost waddles ghost⇄ghostAlt at CanonicalSprite.waddleHz.",
+        consumes: "`import PixelArt` for the pure grids/geometry; `import Effects` for the @MainActor draw, hosted in an isFlipped view (row 0 = top). Pac-Man: `drawPacMan(diameterCells:mouthHalfRad:cell:at:)`. Generic: `drawPixelSprite(CanonicalSprite.ghost, cell:at:)`. Clock injected as now:Double. Ph2: the unified line-pets (drawLinePets) are now PIXEL — the mouth flaps via ThemedTransition.frameStep(now:hz:chompMouthHz, frames:chompMouthFrames) and the ghost waddles at CanonicalSprite.waddleHz. Ph3: the ghost line-pet stays UPRIGHT (no longer tumbles with the lap) and only its eyes swivel — drawLinePets snaps the travel tangent to a cardinal via GhostLook.facing(dx:dy:) and blits CanonicalSprite.ghostFrames(look:); pac still rotates.",
         keyAPI: [
                  "PixelSprite { rows:[String], palette:[Character:UInt32] }.cells() -> [(col:Int,row:Int,color:UInt32)] — transparent sentinel '.' omitted, row-major; width/height/pixelSize(cell:)",
                  "pacManCells(diameterCells:mouthHalfRad:) -> [(col:Int,row:Int)] — circle minus mouth wedge (excl. cx²+cy²>r², excl. |atan2(cy,cx)|<mouthHalfRad); mouth opens +x",
@@ -476,11 +476,12 @@ let kitCatalog: [KitComponent] = [
                  "ScaleTier {.s,.m,.l}.multiplier -> 2 / 3 / 4.5 — generic size knob",
                  "drawPixelSprite(_:cell:at:color:) / drawPacMan(diameterCells:mouthHalfRad:cell:at:color:) — @MainActor AppKit blit, antialias OFF; color: overrides the sprite's intrinsic cells",
                  "CanonicalSprite.cherry (12×13) / .ghost / .ghostAlt (14×14, 2-pose waddle); .waddleFrames [ghost,ghostAlt] + .waddleHz 1.5; SpriteColor.* intrinsic 0xRRGGBB constants",
+                 "GhostLook {.up,.right,.down,.left} + .facing(dx:dy:) snaps a travel tangent to a cardinal (y-up); CanonicalSprite.ghostSprite(feet:look:) / .ghostFrames(look:) build the upright directional ghost (#12 Ph3 — body fixed, pupils track travel)",
              ],
         variants: [
-                 "Pac-Man = geometry (rigid grid; the draw context rotates by the travel tangent to aim the mouth) — cherry/ghost = literal authored sprites; ghost has a 2-pose skirt (ghost / ghostAlt) for the waddle",
+                 "Pac-Man = geometry (rigid grid; the draw context rotates by the travel tangent to aim the mouth) — cherry/ghost = literal authored sprites; ghost has a 2-pose skirt for the waddle and (Ph3) is UPRIGHT in the line-pet — only its pupils swivel to the travel cardinal, while pac keeps rotating",
                  "DIVISION OF LABOUR: pure grids + circle/wedge/hash math in PixelArt (zero AppKit, zero Palette — intrinsic UInt32 colours); NSRect fill behind canImport(AppKit) in Effects. Theme-INVARIANT by design (chomp is always yellow/red/blue/black)",
-                 "Ph roadmap (#12): Ph1 sprites+blitter ✓ → Ph2 unify line-pets + Motion.frameStep ✓ (this) → Ph3 PathPet (follow + ghost) → Ph4 neon corridor + pellets → Ph5 eat + rainbow flash + score",
+                 "Ph roadmap (#12): Ph1 sprites+blitter ✓ → Ph2 unify line-pets + Motion.frameStep ✓ → Ph3 upright directional-eye ghost ✓ (this) + PathPet next → Ph4 neon corridor + pellets → Ph5 eat + rainbow flash + score",
              ],
         family: .particles),
 ]

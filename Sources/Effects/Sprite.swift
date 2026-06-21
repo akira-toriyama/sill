@@ -52,6 +52,30 @@ public enum SpriteColor {
     public static let highlight: UInt32 = 0xFFFFFF
 }
 
+// MARK: - Ghost gaze (directional eyes, #12 Ph3)
+
+/// Which way a Blinky ghost's eyes look — the four cardinals of its travel. The
+/// UPRIGHT directional ghost (the line-pet no longer rotates with the lap tangent)
+/// keeps its body fixed and only swivels the pupils. A small draw-side enum, NOT
+/// the `Gesture.Direction` recogniser — `Effects` owns no gesture dependency, and
+/// "which way the eyes point" is a render concern, not gesture recognition.
+public enum GhostLook: Sendable, Hashable, CaseIterable {
+    case up, right, down, left
+
+    /// Snap a travel vector to the nearest cardinal gaze, in the line-pet's Y-UP
+    /// frame (`drawLinePets` walks a NON-flipped rect, so +y = up): +x→right,
+    /// −x→left, +y→up, −y→down. The dominant axis wins; an exact 45° tie breaks
+    /// to HORIZONTAL so a diagonal tangent never flickers the eyes up↔down.
+    public static func facing(dx: Double, dy: Double) -> GhostLook {
+        if abs(dx) >= abs(dy) { return dx >= 0 ? .right : .left }
+        return dy >= 0 ? .up : .down
+    }
+}
+
+/// The two skirt poses of the ghost's leg shuffle — `Motion.frameStep` alternates
+/// them for the 2-frame waddle.
+public enum GhostFeet: Sendable, Hashable, CaseIterable { case a, b }
+
 // MARK: - Canonical sprites (pure PixelSprite grids)
 
 /// The authored arcade decals for the chomp look. Pure grids — the draw side
@@ -84,19 +108,21 @@ public enum CanonicalSprite {
         "g": SpriteColor.leafGreen,
     ])
 
-    /// 14×14 ghost (Blinky pose A): red dome, two white eyes with blue pupils
-    /// looking right (travel direction), a 4-point waddling skirt.
-    public static let ghost = PixelSprite(rows: ghostRows(feet: feetA),
-                                          palette: ghostPalette)
+    /// 14×14 ghost (Blinky pose A): red dome, two 4-wide white eyes with blue
+    /// pupils looking RIGHT (the Ph2 travel direction = +x), a waddling skirt.
+    /// Built via `ghostSprite` so this literal and the Ph3 directional builder
+    /// share ONE grid (no drift).
+    public static let ghost = ghostSprite(feet: .a, look: .right)
 
     /// 14×14 ghost — skirt pose B (feet phase-shifted), the other half of the
     /// 2-frame waddle (`Motion.frameStep` alternates them in Ph2).
-    public static let ghostAlt = PixelSprite(rows: ghostRows(feet: feetB),
-                                             palette: ghostPalette)
+    public static let ghostAlt = ghostSprite(feet: .b, look: .right)
 
-    /// The two skirt poses in waddle order — `Motion.frameStep` swaps between
-    /// them for the 2-frame leg shuffle. Named so the line-pet (Effects) and the
-    /// prism card drive the SAME poses from one place.
+    /// The two RIGHT-looking skirt poses in waddle order — `Motion.frameStep`
+    /// swaps between them for the 2-frame leg shuffle. The line-pet (Effects) and
+    /// the prism static card drive the SAME poses from one place. For a ghost
+    /// whose eyes track travel (the upright directional line-pet), use
+    /// `ghostFrames(look:)`.
     public static let waddleFrames: [PixelSprite] = [ghost, ghostAlt]
 
     /// Complete ghost⇄ghostAlt cycles per second — deliberately SLOWER than the
@@ -104,33 +130,105 @@ public enum CanonicalSprite {
     /// pass takes 1/1.5 s; `frameStep` swaps the pose `1.5 · 2` = 3 times/sec.
     public static let waddleHz: Double = 1.5
 
-    // The ghost is identical above the skirt; only the two foot rows differ, so
-    // both poses share one body + palette (no drift between them).
+    /// The 2-pose waddle for a ghost whose EYES face `look` (#12 Ph3). Same leg
+    /// shuffle as `waddleFrames`, now look-aware — `Motion.frameStep` drives it.
+    /// The upright directional line-pet picks `look` from its travel tangent via
+    /// `GhostLook.facing`. The four pairs are CACHED statics (like `waddleFrames`)
+    /// so the 60 Hz draw path reuses them instead of rebuilding sprites per frame.
+    public static func ghostFrames(look: GhostLook) -> [PixelSprite] {
+        switch look {
+        case .up:    return upWaddle
+        case .right: return waddleFrames     // the Ph2 right-look pair, already cached
+        case .down:  return downWaddle
+        case .left:  return leftWaddle
+        }
+    }
+    private static let upWaddle   = [ghostSprite(feet: .a, look: .up),   ghostSprite(feet: .b, look: .up)]
+    private static let downWaddle = [ghostSprite(feet: .a, look: .down), ghostSprite(feet: .b, look: .down)]
+    private static let leftWaddle = [ghostSprite(feet: .a, look: .left), ghostSprite(feet: .b, look: .left)]
+
+    /// Assemble a 14×14 Blinky for a gaze + skirt pose: `lookRows` is the head
+    /// (rows 0–11) with the EYES translated toward `look`; `feetRows` appends the
+    /// 2-pose shuffle (rows 12–13). The SINGLE source of truth for the ghost grid.
+    public static func ghostSprite(feet: GhostFeet, look: GhostLook) -> PixelSprite {
+        PixelSprite(rows: lookRows(look) + feetRows(feet), palette: ghostPalette)
+    }
+
     private static let ghostPalette: [Character: UInt32] = [
         "r": SpriteColor.ghostRed,
         "w": SpriteColor.eyeWhite,
         "b": SpriteColor.pupilBlue,
     ]
-    // Canonical arcade Blinky, traced from the reference (全身.gif): a rounded
-    // dome, BIG eyes (4-wide white with a 2×2 pupil offset toward the look
-    // direction — here right/+x = travel), and the classic 2-pose foot shuffle.
     private static let feetA = ["rr.rrr..rrr.rr", "r...rr..rr...r"]
     private static let feetB = ["rrrr.rrrr.rrrr", ".rr...rr...rr."]
-    private static func ghostRows(feet: [String]) -> [String] {
-        [
-            ".....rrrr.....",
-            "...rrrrrrrr...",
-            "..rrrrrrrrrr..",
-            ".rrrwwrrrrwwr.",
-            ".rrwwwwrrwwww.",
-            ".rrwwbbrrwwbb.",
-            "rrrwwbbrrwwbbr",
-            "rrrrwwrrrrwwrr",
-            "rrrrrrrrrrrrrr",
-            "rrrrrrrrrrrrrr",
-            "rrrrrrrrrrrrrr",
-            "rrrrrrrrrrrrrr",
-        ] + feet
+    private static func feetRows(_ feet: GhostFeet) -> [String] {
+        switch feet { case .a: return feetA; case .b: return feetB }
+    }
+
+    /// The head (rows 0–11) per gaze, tuned with the user against the reference
+    /// 目.gif (2026-06-22). The red head SILHOUETTE is identical across all four
+    /// looks (the dome's round shape never changes — rows 3–5 are 12 wide, rows 6+
+    /// the full 14); only the eye content moves. `left`/`right` sit the pupils at
+    /// the eyes' outer edge, vertically centred (white ABOVE and BELOW, so the gaze
+    /// reads horizontal, not diagonal); `up`/`down` are vertical mirrors — the
+    /// pupils ride the white's top / bottom edge, white filling the other end.
+    /// `right` is the canonical forward pose, so `ghost`/`ghostAlt` are its two
+    /// skirt frames.
+    private static func lookRows(_ look: GhostLook) -> [String] {
+        switch look {
+        case .right:                       // eyes mid-height, pupils at the right edge
+            return [".....rrrr.....",
+                    "...rrrrrrrr...",
+                    "..rrrrrrrrrr..",
+                    ".rrrwwrrrrwwr.",
+                    ".rrwwwwrrwwww.",
+                    ".rrwwbbrrwwbb.",
+                    "rrrwwbbrrwwbbr",
+                    "rrrwwwwrrwwwwr",
+                    "rrrrwwrrrrwwrr",
+                    "rrrrrrrrrrrrrr",
+                    "rrrrrrrrrrrrrr",
+                    "rrrrrrrrrrrrrr"]
+        case .left:                        // mirror of right — pupils at the left edge
+            return [".....rrrr.....",
+                    "...rrrrrrrr...",
+                    "..rrrrrrrrrr..",
+                    ".rrrwwrrrrwwr.",
+                    ".rrwwwwrrwwww.",
+                    ".rrbbwwrrbbww.",
+                    "rrrbbwwrrbbwwr",
+                    "rrrwwwwrrwwwwr",
+                    "rrrrwwrrrrwwrr",
+                    "rrrrrrrrrrrrrr",
+                    "rrrrrrrrrrrrrr",
+                    "rrrrrrrrrrrrrr"]
+        case .up:                          // pupils at the eye's top edge; head keeps its round silhouette
+            return [".....rrrr.....",
+                    "...rrrrrrrr...",
+                    "..rrrrrrrrrr..",
+                    ".rrrbbrrrrbbr.",
+                    ".rrwbbwrrwbbw.",
+                    ".rrwwwwrrwwww.",
+                    "rrrwwwwrrwwwwr",
+                    "rrrrwwrrrrwwrr",
+                    "rrrrrrrrrrrrrr",
+                    "rrrrrrrrrrrrrr",
+                    "rrrrrrrrrrrrrr",
+                    "rrrrrrrrrrrrrr"]
+        case .down:                        // pupils low; eye bottom raised a row to meet them
+            return [".....rrrr.....",
+                    "...rrrrrrrr...",
+                    "..rrrrrrrrrr..",
+                    ".rrrwwrrrrwwr.",
+                    ".rrwwwwrrwwww.",
+                    ".rrwwwwrrwwww.",
+                    "rrrwbbwrrwbbwr",
+                    "rrrrbbrrrrbbrr",
+                    "rrrrrrrrrrrrrr",
+                    "rrrrrrrrrrrrrr",
+                    "rrrrrrrrrrrrrr",
+                    "rrrrrrrrrrrrrr"]
+        }
     }
 }
 

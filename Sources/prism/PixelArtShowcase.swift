@@ -167,6 +167,55 @@ struct LinePetWalkView: NSViewRepresentable {
     }
 }
 
+// MARK: - The directional-eye ghost strip (#12 Ph3)
+
+/// The four UPRIGHT Blinky gazes side by side — up · right · down · left — each
+/// WADDLING live. This is the #12 Ph3 directional ghost the line-pet now uses: it
+/// stays vertical (no tumbling with the lap) and only swivels its 2×2 pupils
+/// toward travel (`GhostLook.facing` snaps the tangent to a cardinal). Drawn big
+/// enough to read the gaze; `isFlipped` so row 0 (the dome) sits at the TOP.
+final class DirectionalGhostNSView: NSView {
+    var previewNow: Double?
+    private var timer: Timer?
+
+    override var isFlipped: Bool { true }
+
+    private let cell: CGFloat = 3.0 * uiScale
+    private let pad: CGFloat = 14 * uiScale
+    private let gap: CGFloat = 20 * uiScale
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { timer?.invalidate(); timer = nil; return }
+        guard timer == nil else { return }
+        timer = startRedrawTick(for: self, frozen: previewNow != nil)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard bounds.width > 1, bounds.height > 1 else { return }
+        NSColor(white: 0.04, alpha: 1).setFill()
+        bounds.fill()
+        let now = previewNow ?? CACurrentMediaTime()
+        var x = pad
+        for look in [GhostLook.up, .right, .down, .left] {
+            let pose = ThemedTransition.frameStep(
+                now: now, hz: CanonicalSprite.waddleHz,
+                frames: CanonicalSprite.ghostFrames(look: look))
+            drawPixelSprite(pose, cell: cell, at: CGPoint(x: x, y: pad))
+            x += CGFloat(pose.width) * cell + gap
+        }
+    }
+}
+
+struct DirectionalGhostView: NSViewRepresentable {
+    func makeNSView(context: Context) -> DirectionalGhostNSView {
+        let v = DirectionalGhostNSView()
+        v.previewNow = chompFreezeNow
+        return v
+    }
+    func updateNSView(_ v: DirectionalGhostNSView, context: Context) { v.needsDisplay = true }
+}
+
 // MARK: - The showcase mock (wired into Gallery's `.particles` family)
 
 /// The PixelArt specimen for one theme card: the canonical arcade sprites drawn
@@ -203,6 +252,19 @@ struct MockPixelArt: View {
 
             LinePetWalkView(scale: 1.6)
                 .frame(height: 96 * uiScale)
+                .frame(maxWidth: .infinity)
+                .background(RoundedRectangle(cornerRadius: 7)
+                    .fill(Color(nsColor: NSColor(white: 0.04, alpha: 1))))
+                .overlay(RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color(nsColor: p.border), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+
+            Text("directional ghost (#12 Ph3) — UPRIGHT: the body no longer tumbles with the lap; only the pupils swivel toward travel. up · right · down · left:")
+                .font(sysFont(7.5, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
+
+            DirectionalGhostView()
+                .frame(height: 80 * uiScale)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: 7)
                     .fill(Color(nsColor: NSColor(white: 0.04, alpha: 1))))

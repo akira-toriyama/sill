@@ -483,11 +483,19 @@ public func drawLinePets(_ pets: [LinePet], on rect: CGRect,
         NSGraphicsContext.saveGraphicsState()
         let tx = NSAffineTransform()
         tx.translateX(by: px, yBy: py)
-        tx.rotate(byRadians: rot)
-        tx.concat()
         switch pet {
-        case .chomp: drawChompPet(now: now, scale: scale)
-        case .ghost: drawGhostPet(now: now, scale: scale)
+        case .chomp:
+            // Pac-Man TUMBLES with the lap so its mouth opens along travel.
+            tx.rotate(byRadians: rot)
+            tx.concat()
+            drawChompPet(now: now, scale: scale)
+        case .ghost:
+            // The ghost stays UPRIGHT (#12 Ph3) — it does NOT tumble with the
+            // lap (no rotation). Only its eyes track travel, the cardinal gaze
+            // picked from the tangent (`+x→right … +y→up`, the y-up rect frame).
+            tx.concat()
+            let look = GhostLook.facing(dx: Double(cos(rot)), dy: Double(sin(rot)))
+            drawGhostPet(now: now, scale: scale, look: look)
         }
         NSGraphicsContext.restoreGraphicsState()
     }
@@ -558,18 +566,19 @@ private func drawChompPetSmooth(now: CFTimeInterval, scale: CGFloat) {
 }
 
 /// Red Blinky PIXEL ghost — the chomp line-pet's companion, unified in #12 Ph2
-/// (was a smooth bezier dome; see `drawGhostPetSmooth`, the gate fallback). The
-/// 2-pose skirt WADDLES via `Motion.frameStep` (ghost⇄ghostAlt at
-/// `CanonicalSprite.waddleHz`). The sprite is FLIPPED so row 0 (the dome) sits
-/// at the top of the local y-up line-pet frame — matching the old ghost's
-/// orientation — then centred on the transform origin; the caller's lap rotation
-/// carries it (eyes baked toward +x) along the travel direction. `@MainActor`
-/// (it calls the `@MainActor` `drawPixelSprite` blitter; only caller is
-/// `drawLinePets`).
+/// and made UPRIGHT + directional in #12 Ph3 (was a smooth bezier dome; see
+/// `drawGhostPetSmooth`, the gate fallback). The 2-pose skirt WADDLES via
+/// `Motion.frameStep` (poseA⇄poseB at `CanonicalSprite.waddleHz`). The ghost does
+/// NOT tumble with the lap — the caller leaves the context UNROTATED and passes
+/// `look` (the travel cardinal), so the body stays vertical and only the pupils
+/// swivel (`ghostFrames(look:)`). The sprite is FLIPPED so row 0 (the dome) sits
+/// at the TOP of the local y-up line-pet frame, then centred on the origin.
+/// `@MainActor` (it calls the `@MainActor` `drawPixelSprite` blitter; only caller
+/// is `drawLinePets`).
 @MainActor
-private func drawGhostPet(now: CFTimeInterval, scale: CGFloat) {
+private func drawGhostPet(now: CFTimeInterval, scale: CGFloat, look: GhostLook) {
     let sprite = ThemedTransition.frameStep(now: Double(now), hz: CanonicalSprite.waddleHz,
-                                            frames: CanonicalSprite.waddleFrames)
+                                            frames: CanonicalSprite.ghostFrames(look: look))
     let cell = scale * ghostFootprint / CGFloat(sprite.height)
     let w = CGFloat(sprite.width) * cell
     let h = CGFloat(sprite.height) * cell

@@ -72,6 +72,74 @@ final class SpriteTests: XCTestCase {
         XCTAssertLessThan(CanonicalSprite.waddleHz, chompMouthHz)
     }
 
+    // MARK: - Directional-eye upright ghost (#12 Ph3)
+
+    func testGhostLookFacingSnapsToCardinals() {
+        // y-up convention (drawLinePets passes a NON-flipped rect, "top" = maxY):
+        // +x→right, −x→left, +y→up, −y→down. These four are the perimeter
+        // tangents the loop walks (top/right/bottom/left edges).
+        XCTAssertEqual(GhostLook.facing(dx: 1, dy: 0), .right)
+        XCTAssertEqual(GhostLook.facing(dx: -1, dy: 0), .left)
+        XCTAssertEqual(GhostLook.facing(dx: 0, dy: 1), .up)
+        XCTAssertEqual(GhostLook.facing(dx: 0, dy: -1), .down)
+    }
+
+    func testGhostLookFacingBoundaryPrefersHorizontal() {
+        // On the exact 45° diagonal (|dx| == |dy|) the dominant-axis tie breaks
+        // to HORIZONTAL, so a perfectly diagonal tangent never flickers to up/down.
+        XCTAssertEqual(GhostLook.facing(dx: 1, dy: 1), .right)
+        XCTAssertEqual(GhostLook.facing(dx: -1, dy: -1), .left)
+        // Just past the diagonal the vertical axis wins.
+        XCTAssertEqual(GhostLook.facing(dx: 0.4, dy: 1), .up)
+        XCTAssertEqual(GhostLook.facing(dx: 0.4, dy: -1), .down)
+    }
+
+    func testDirectionalGhostSpritesAre14x14() {
+        for look in [GhostLook.up, .right, .down, .left] {
+            let s = CanonicalSprite.ghostSprite(feet: .a, look: look)
+            XCTAssertEqual(s.height, 14, "\(look)")
+            XCTAssertEqual(s.width, 14, "\(look)")
+            XCTAssertTrue(s.rows.allSatisfy { $0.count == 14 }, "ragged \(look) ghost: \(s.rows)")
+            let colors = Set(s.cells().map(\.color))
+            XCTAssertTrue(colors.contains(SpriteColor.eyeWhite), "\(look) missing eye white")
+            XCTAssertTrue(colors.contains(SpriteColor.pupilBlue), "\(look) missing pupil")
+            XCTAssertTrue(colors.contains(SpriteColor.ghostRed), "\(look) missing body")
+        }
+    }
+
+    func testPupilShiftsWithLook() {
+        // The blue 2×2 pupils sit TOWARD the look direction: left-look pupils are
+        // at lower columns than right-look; up-look pupils at lower rows than down.
+        func bluePupil(_ look: GhostLook) -> [(col: Int, row: Int)] {
+            CanonicalSprite.ghostSprite(feet: .a, look: look).cells()
+                .filter { $0.color == SpriteColor.pupilBlue }
+                .map { (col: $0.col, row: $0.row) }
+        }
+        XCTAssertLessThan(bluePupil(.left).map(\.col).min()!,
+                          bluePupil(.right).map(\.col).min()!)
+        XCTAssertLessThan(bluePupil(.up).map(\.row).min()!,
+                          bluePupil(.down).map(\.row).min()!)
+    }
+
+    func testGhostFramesShareBodyDifferInFeet() {
+        for look in [GhostLook.up, .right, .down, .left] {
+            let frames = CanonicalSprite.ghostFrames(look: look)
+            XCTAssertEqual(frames.count, 2, "\(look)")
+            XCTAssertEqual(Array(frames[0].rows.prefix(12)), Array(frames[1].rows.prefix(12)),
+                           "\(look): body+eyes must match across the waddle")
+            XCTAssertNotEqual(Array(frames[0].rows.suffix(2)), Array(frames[1].rows.suffix(2)),
+                              "\(look): the two skirt poses must differ")
+        }
+    }
+
+    func testCanonicalGhostIsRightLookPoseA() {
+        // The Ph2 right-looking ghost/ghostAlt are now the builder's outputs, so
+        // there is ONE source of truth for the grid (no drift between the literals
+        // and the Ph3 directional builder).
+        XCTAssertEqual(CanonicalSprite.ghost, CanonicalSprite.ghostSprite(feet: .a, look: .right))
+        XCTAssertEqual(CanonicalSprite.ghostAlt, CanonicalSprite.ghostSprite(feet: .b, look: .right))
+    }
+
     // MARK: - AppKit draw (smoke — real visual proof is the prism live capture)
 
     func testUnifiedPixelLinePetsDrawRuns() {
