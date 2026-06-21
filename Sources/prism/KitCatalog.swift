@@ -426,6 +426,23 @@ let kitCatalog: [KitComponent] = [
                  "DIVISION OF LABOUR: lives in Effects with the particle burst (fire-moment FX). Pure vertices (Double tuples), Catmull-Rom + NSColor stay in the gated draw helper. No timer/state — app owns the clock",
              ],
         family: .particles),
+    KitComponent(
+        name: "TrailGeometry", module: "Effects",
+        kind: "Path-geometry primitives — arc-length resampler + corner rounding (wand's gesture-trail tooling, generalized)",
+        summary: "Pure geometry the family re-implements to lay marks along, or round the corners of, a polyline. NOT an f(now) effect — coordinate-agnostic functions over (x:y:) points. resampleAlongPolyline drives every 'glyphs along a path' style; roundedCornerPath softens a snapped gesture polyline.",
+        consumes: "Pure functions + one AppKit path builder — no instance. `import Effects`. Lay glyphs: `for m in resampleAlongPolyline(points, interval: 24) { drawGlyph(at: m.point, angle: atan2(m.tangent.y, m.tangent.x)) }`. Round corners: `nsBezierPath(roundedCornerPath(corners, radius: lineWidth*4)).stroke()`. (Double-tuple or CGPoint overloads.)",
+        keyAPI: [
+                 "resampleAlongPolyline(_:interval:trimTail:) -> [TrailMark] — march a polyline emitting a point + UNIT tangent every `interval` of arc length (carry across joins). First + last always emitted; trimTail>0 stops that far short (wand's Chomp gap). [] for interval<=0 / empty / trimTail>length",
+                 "TrailMark — { point:(x,y), tangent:(x,y) } — place + orient a glyph",
+                 "roundedCornerPath(_:radius:) -> [PathStep] — cut each interior corner back by radius (capped to ½ each leg) + a quadratic bridge. PathStep = .move/.line/.quadCurve(to:control:). wand's lineWidth*4 radius",
+                 "nsBezierPath(_:lineWidth:) -> NSBezierPath — @MainActor: PathStep list → round-capped NSBezierPath (quadCurve → cubic w/ both controls at the corner). The drawLinePets-style AppKit materializer",
+             ],
+        variants: [
+                 "resampleAlongPolyline: drives pixel / ascii / arrow-chain / paws / chomp-pellet placement (uniform spacing through corners)",
+                 "roundedCornerPath: the straightened-gesture trail's corner softening (PathStep is cross-platform; NSBezierPath stays gated)",
+                 "DIVISION OF LABOUR: pure geometry in Effects (no f(now), no theming); NSBezierPath behind canImport(AppKit). Color cycling for a trail reuses Effects.blendThrough; fade reuses Motion",
+             ],
+        family: .particles),
 ]
 
 /// Look up a component by its public type name (the names are fixed in the gallery).
