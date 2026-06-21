@@ -34,13 +34,13 @@
 - **確定判断（ユーザー Q&A 2026-06-21）**: ① 到達点 = **フル再現（迷路まで）** ／ ② 色 = **固定アーケード色（常にパックマン）**＝テーマ不変・スプライト内部色も intrinsic 定数 ／ ③ 既存 line-pet との関係 = **統一（ピクセルに寄せる）** ／ ④ 解釈の自由度高（ドット絵の雰囲気が残れば独自 OK・ピクセル完全一致は不要）。
 - **アーキテクチャ**: 新規 pure モジュール **`PixelArt`**（`PixelSprite`＝文字列グリッド→セル・`pacManCells`＝円−口楔・`positionHash01`・`ScaleTier`）＋ **`Motion.frameStep`**（離散スプライト差し替え）＋ **`Effects` 拡張**（`drawPixelSprite`・正規スプライト 3 種・`drawChompCorridor`＝2 ストロークネオン壁＋内角フィレット＋ペレット列＋追従パックマン＋不一致幽霊・`eatCrossed` 食べ判定・虹フラッシュは `EffectSpec.chomp` 再利用・「+N」は Motion）。clock はアプリ/prism 注入（`f(now)`）。再利用: `Gesture`(#9d)・`TrailGeometry`(#9c)・`ParticleBurst`/`SplatterShape`・`Palette.chomp` 色。
 - **フェーズ（各 additive・独立 ship・prism live 撮影で検証・タグ番号は merge 時に未使用を再確認）**:
-  - **Ph1** `PixelArt`＋`drawPixelSprite`＋正規スプライト 3 種（顔/チェリー/幽霊）＋小 prism カード（v1.17.0 目安）
+  - **Ph1** `PixelArt`（`PixelSprite.cells()`＋`pacManCells`＝円−口楔＋`mouthHalfRad`＋`positionHash01`＝負座標安全 bitPattern＋`ScaleTier` 2/3/4.5）＋ `Effects`（`drawPixelSprite`/`drawPacMan`＝antialias OFF・AppKit gate＋正規スプライト 3 種=cherry 12×13・ghost/ghostAlt 14×14＋intrinsic `SpriteColor`＝chomp ロール一致）＋ prism カード（`.particles` タブ・**実描画を NSViewRepresentable で host**）＋ XCTest 2 本。**🚧 実装完了（ローカル `swift build` 緑・スプライトを offscreen NSImage レンダで視覚確認＝パックマン/チェリー/ゴーストと認識可・敵対的レビュー4観点反映）・未 push＝ユーザーの sill ライブ確認待ち**（v1.17.0 目安）
   - **Ph2** 既存 line-pet をピクセル統一＋`Motion.frameStep`（**検証ゲート**: 小サイズで崩れないか・最悪 line-pet は滑らか維持に差し戻し可）（v1.18.0）
   - **Ph3** **PathPet**（任意ジェスチャー線を歩く・追従パックマン・不一致幽霊）＝初の「動く」カード（v1.19.0）
   - **Ph4** ネオンコリドー（2 ストローク壁＋内角フィレット）＋ペレット列＋cherry/icon 分け＋ScaleTier（v1.20.0）
   - **Ph5** 食べ判定＋虹フラッシュ＋「+N」スコア = **合成 `ChompCorridor` 完成**・全ループ大カード（v1.21.0）
   - **Ph6**（任意・**wand リポ側**）完成度が高ければ backport
-- **進捗**: ✅ 計画セッション完了（spec＋本項目登録・commit 済・**未 push**＝push ゲート）。**次セッションは Ph1 から**。未達成は各フェーズ行で明示し暗黙にしない。
+- **進捗**: ✅ 計画セッション（spec＋項目登録）＋ **Ph1 実装（feat-chomp-12・commit 済・未 push）**。Ph1 = 上記すべて実装＋`swift build` 緑＋スプライト offscreen レンダ確認＋敵対的レビュー（geometry/architecture/tests/spec の4観点 workflow＝distribution/orientation は green と独立検証・**must-fix 2件修正**＝① reconciliation テストを `ThemeSpec.chomp` 実値照合に・② prism カード高さを `*uiScale` 追従に）。⚠ **agent 環境は画面収録権限なし**＝`screencapture` が真っ黒＝prism ウィンドウ撮影はユーザー側（offscreen NSImage レンダで絵柄は確認済）。⚠ **push ゲート**: prism の PixelArt カードをユーザーが sill でライブ確認するまで push しない（[[chomp-push-gate]]・後で「push OK」も「sill で確認済？」と再確認）。**次は Ph2**（既存 line-pet をピクセル統一＋`Motion.frameStep`・検証ゲート付き）。未達成は各フェーズ行で明示し暗黙にしない。
 
 ## アイコンを全面 SVG 化（Phosphor）— いま最優先（1〜2）
 

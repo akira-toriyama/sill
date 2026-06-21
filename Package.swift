@@ -38,6 +38,7 @@ let package = Package(
         .library(name: "ConfigSchema", targets: ["ConfigSchema"]),
         .library(name: "CLIKit", targets: ["CLIKit"]),
         .library(name: "Gesture", targets: ["Gesture"]),
+        .library(name: "PixelArt", targets: ["PixelArt"]),
         .library(name: "ThemeKit", targets: ["ThemeKit"]),
     ],
     dependencies: [
@@ -85,9 +86,19 @@ let package = Package(
         // Mechanism only — `Gesture` owns no vocabulary and no timing.
         .target(name: "Gesture"),
 
+        // Pure, Sendable, AppKit-free PIXEL-SPRITE atom — wand's chomp
+        // (Pac-Man-style) arcade decals reinterpreted as resolution-independent
+        // integer pixel grids: a `PixelSprite` (rows + palette), the
+        // circle-minus-mouth `pacManCells` wedge, a stable `positionHash01`
+        // jitter, and a `ScaleTier` size knob. A pure atom alongside Palette /
+        // Gesture / CLIKit: zero AppKit, zero Palette (sprite-internal detail
+        // colours are INTRINSIC, baked on the Effects draw side). atan2 comes
+        // from Foundation. Mechanism only — no theming, no clock.
+        .target(name: "PixelArt"),
+
         // Dynamic atom: Sendable EffectSpec + (macOS) AppKit animator.
         // Declared before PaletteKit, which now depends on it.
-        .target(name: "Effects", dependencies: ["Palette"]),
+        .target(name: "Effects", dependencies: ["Palette", "PixelArt"]),
 
         // Pure, Sendable, AppKit-free ONE-SHOT animation math — the
         // `ThemedTransition` namespace (named Duration/Easing tokens, a
@@ -129,17 +140,18 @@ let package = Package(
         // config.toml. Renders every catalog theme (all roles + font +
         // its OWN mock chrome specimens — never imports an app's View, so
         // no drift debt). The visual verification bench for the catalog.
-        .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "Motion", "ThemeKit"]),
+        .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "Motion", "ThemeKit", "PixelArt"]),
 
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit", "Effects"]),
         .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", "PaletteKit", "Palette", "Effects"]),
-        .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette"]),
+        .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette", "PixelArt"]),
         .testTarget(name: "MotionTests", dependencies: ["Motion"]),
         .testTarget(name: "ConfigSchemaTests",
                     dependencies: ["ConfigSchema",
                                    .product(name: "Toml", package: "swift-toml-edit")]),
         .testTarget(name: "CLIKitTests", dependencies: ["CLIKit"]),
         .testTarget(name: "GestureTests", dependencies: ["Gesture"]),
+        .testTarget(name: "PixelArtTests", dependencies: ["PixelArt"]),
     ]
 )

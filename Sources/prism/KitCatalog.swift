@@ -462,6 +462,26 @@ let kitCatalog: [KitComponent] = [
                  "DIVISION OF LABOUR: pure geometry in Effects (no f(now), no theming); NSBezierPath behind canImport(AppKit). Color cycling for a trail reuses Effects.blendThrough; fade reuses Motion",
              ],
         family: .particles),
+    KitComponent(
+        name: "PixelSprite", module: "PixelArt + Effects",
+        kind: "Pixel-art sprite atom — wand's chomp (Pac-Man) arcade decals as resolution-independent integer pixel grids (#12 Ph1)",
+        summary: "Pure PixelArt grids (PixelSprite = rows:[String] + palette:[Character:UInt32], flattened by cells()) + the circle-minus-mouth pacManCells wedge + a stable positionHash01 jitter + a ScaleTier size knob; Effects owns the @MainActor blitter (drawPixelSprite/drawPacMan, antialias OFF for crisp pixels). Colours are INTRINSIC arcade constants (pac-yellow/ghost-red/eye-white/pupil-blue/cherry/brown), reconciled to ThemeSpec.chomp roles where one exists — so chomp reads identically across every theme (self-contained arcade look, not role-driven).",
+        consumes: "`import PixelArt` for the pure grids/geometry; `import Effects` for the @MainActor draw, hosted in an isFlipped view (row 0 = top). Pac-Man: `drawPacMan(diameterCells:mouthHalfRad:cell:at:)`. Generic: `drawPixelSprite(CanonicalSprite.ghost, cell:at:)`. Clock injected as now:Double — Ph1 is static (a fixed mouth phase); Ph2 wires Motion.frameStep for the 5 Hz chomp + ghost waddle.",
+        keyAPI: [
+                 "PixelSprite { rows:[String], palette:[Character:UInt32] }.cells() -> [(col:Int,row:Int,color:UInt32)] — transparent sentinel '.' omitted, row-major; width/height/pixelSize(cell:)",
+                 "pacManCells(diameterCells:mouthHalfRad:) -> [(col:Int,row:Int)] — circle minus mouth wedge (excl. cx²+cy²>r², excl. |atan2(cy,cx)|<mouthHalfRad); mouth opens +x",
+                 "mouthHalfRad(phase:) -> Double — 5° + 55°·phase (the chomp gape; phase steps [0,0.5,1,0.5] @5Hz in Ph2)",
+                 "positionHash01(x:y:) -> Double in 0..<1 — stable per-cell jitter (Knuth-mult mix, wrapping, negative-safe)",
+                 "ScaleTier {.s,.m,.l}.multiplier -> 2 / 3 / 4.5 — generic size knob",
+                 "drawPixelSprite(_:cell:at:color:) / drawPacMan(diameterCells:mouthHalfRad:cell:at:color:) — @MainActor AppKit blit, antialias OFF; color: overrides the sprite's intrinsic cells",
+                 "CanonicalSprite.cherry (12×13) / .ghost / .ghostAlt (14×14, 2-pose waddle); SpriteColor.* intrinsic 0xRRGGBB constants",
+             ],
+        variants: [
+                 "Pac-Man = geometry (rigid grid; the draw context rotates by the travel tangent to aim the mouth) — cherry/ghost = literal authored sprites; ghost has a 2-pose skirt (ghost / ghostAlt) for the waddle",
+                 "DIVISION OF LABOUR: pure grids + circle/wedge/hash math in PixelArt (zero AppKit, zero Palette — intrinsic UInt32 colours); NSRect fill behind canImport(AppKit) in Effects. Theme-INVARIANT by design (chomp is always yellow/red/blue/black)",
+                 "Ph roadmap (#12): Ph1 sprites+blitter (this) → Ph2 unify line-pets + Motion.frameStep → Ph3 PathPet (follow + ghost) → Ph4 neon corridor + pellets → Ph5 eat + rainbow flash + score",
+             ],
+        family: .particles),
 ]
 
 /// Look up a component by its public type name (the names are fixed in the gallery).
