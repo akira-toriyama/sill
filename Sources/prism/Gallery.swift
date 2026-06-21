@@ -359,19 +359,19 @@ struct ThemeCard: View {
             WidgetSection(kitComponent("SplatterShape"), p: p) { MockSplatter(p: p) }
             WidgetSection(kitComponent("TrailGeometry"), p: p) { MockTrail(p: p) }
         case .facet:
-            appCaption(.facet)
+            appCaption(.facet, p: p)
             MockTree(p: p)
         case .wand:
-            appCaption(.wand)
+            appCaption(.wand, p: p)
             MockTome(p: p)
         case .perch:
-            appCaption(.perch)
+            appCaption(.perch, p: p)
             MockPill(p: p)
         case .halo:
-            appCaption(.halo)
+            appCaption(.halo, p: p)
             MockHalo(p: p, themeName: name, showEffects: showEffects)
         case .glance:
-            appCaption(.glance)
+            appCaption(.glance, p: p)
             MockMarkdown(p: p)
         }
     }
@@ -379,27 +379,24 @@ struct ThemeCard: View {
     /// The per-app tab caption — what this app's surface is + what it ACTUALLY
     /// consumes from sill + its notable themes (the consumer reality; apps barely
     /// use the ThemeKit widgets the Kit tabs showcase). Grounded data, see
-    /// `appChromes` in KitCatalog.swift.
+    /// `appChromes` in KitCatalog.swift. Takes the SAME `p` the sibling mocks get
+    /// (the card's live/animated palette) — no separate re-resolve.
     @ViewBuilder
-    private func appCaption(_ tab: KitFamily) -> some View {
-        let a = appChrome(tab)
-        let cp = resolve(paletteFor(name))
-        Group {
-            if let a {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(a.blurb)
-                        .font(sysFont(10, weight: .medium))
-                        .foregroundColor(Color(nsColor: cp.foreground))
-                    Text("uses: \(a.uses)")
-                        .font(sysFont(8.5, design: .monospaced))
-                        .foregroundColor(Color(nsColor: cp.muted))
-                    Text(a.themes)
-                        .font(sysFont(8.5, design: .monospaced))
-                        .foregroundColor(Color(nsColor: cp.muted))
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, 2)
+    private func appCaption(_ tab: KitFamily, p: ResolvedPalette) -> some View {
+        if let a = appChrome(tab) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(a.blurb)
+                    .font(sysFont(10, weight: .medium))
+                    .foregroundColor(Color(nsColor: p.foreground))
+                Text("uses: \(a.uses)")
+                    .font(sysFont(8.5, design: .monospaced))
+                    .foregroundColor(Color(nsColor: p.muted))
+                Text(a.themes)
+                    .font(sysFont(8.5, design: .monospaced))
+                    .foregroundColor(Color(nsColor: p.muted))
             }
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.bottom, 2)
         }
     }
 }
