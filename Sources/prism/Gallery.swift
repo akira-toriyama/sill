@@ -339,6 +339,7 @@ struct ThemeCard: View {
         case .particles:
             WidgetSection(kitComponent("ParticleBurst"), p: p) { MockParticles(p: p) }
             WidgetSection(kitComponent("SplatterShape"), p: p) { MockSplatter(p: p) }
+            WidgetSection(kitComponent("TrailGeometry"), p: p) { MockTrail(p: p) }
         case .chrome:
             Text("App chrome — fake perch / facet / wand / glance, drawn by prism (never imports an app's View).")
                 .font(sysFont(9, design: .monospaced))
