@@ -37,6 +37,7 @@ let package = Package(
         .library(name: "Motion", targets: ["Motion"]),
         .library(name: "ConfigSchema", targets: ["ConfigSchema"]),
         .library(name: "CLIKit", targets: ["CLIKit"]),
+        .library(name: "Gesture", targets: ["Gesture"]),
         .library(name: "ThemeKit", targets: ["ThemeKit"]),
     ],
     dependencies: [
@@ -74,6 +75,15 @@ let package = Package(
         // Palette: zero AppKit, zero Palette. Mechanism only — the
         // app supplies the verb arity table; CLIKit owns no vocabulary.
         .target(name: "CLIKit"),
+
+        // Pure, Sendable, AppKit-free GESTURE RECOGNITION — wand's mouse-
+        // stroke recogniser, generalised. Turns timestamped points into a
+        // coalesced 4-way direction string (`"DL"`); the app owns the action
+        // table, the clock, and the input plumbing. A pure atom alongside
+        // Palette / CLIKit: zero AppKit, zero Palette (only a `CGPoint` /
+        // `TimeInterval` `Sample` convenience behind a CoreGraphics gate).
+        // Mechanism only — `Gesture` owns no vocabulary and no timing.
+        .target(name: "Gesture"),
 
         // Dynamic atom: Sendable EffectSpec + (macOS) AppKit animator.
         // Declared before PaletteKit, which now depends on it.
@@ -130,5 +140,6 @@ let package = Package(
                     dependencies: ["ConfigSchema",
                                    .product(name: "Toml", package: "swift-toml-edit")]),
         .testTarget(name: "CLIKitTests", dependencies: ["CLIKit"]),
+        .testTarget(name: "GestureTests", dependencies: ["Gesture"]),
     ]
 )
