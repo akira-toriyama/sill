@@ -6,13 +6,32 @@
 
 import Foundation
 
-/// The gallery's top-level tabs. `palette` (theme foundations) and `chrome` (the
-/// fake app mocks) carry no kit component; the other four group the real widgets.
+/// The gallery's top-level tabs, in two GROUPS. The `kit` group is the library
+/// showcase — `palette` (theme foundations), `icon`, and the real widget
+/// families. The `app` group is one tab per family app, each rendering that
+/// app's signature chrome mock (the old single `chrome` tab, split per app).
 enum KitFamily: String, CaseIterable, Identifiable {
+    // Kit group — foundations + the real ThemeKit widgets.
     case palette = "Palette", icon = "Icons", text = "Text", action = "Action",
          feedback = "Feedback", collection = "Collection", motion = "Motion",
-         particles = "Particles", chrome = "Chrome"
+         particles = "Particles"
+    // App group — one per family app (replaces the single `chrome` tab).
+    case facet = "facet", wand = "wand", perch = "perch",
+         halo = "halo", glance = "glance"
     public var id: String { rawValue }
+
+    enum Group { case kit, app }
+    /// Which header row this tab lives in.
+    var group: Group {
+        switch self {
+        case .facet, .wand, .perch, .halo, .glance: return .app
+        default: return .kit
+        }
+    }
+    /// The Kit row (foundations + widgets), in declaration order.
+    static var kitCases: [KitFamily] { allCases.filter { $0.group == .kit } }
+    /// The Apps row (one per app), in declaration order.
+    static var appCases: [KitFamily] { allCases.filter { $0.group == .app } }
 }
 
 /// One ThemeKit component's identifying info — NOT its source. `referenceText`
@@ -450,4 +469,45 @@ func kitComponent(_ name: String) -> KitComponent {
     kitCatalog.first { $0.name == name }
         ?? KitComponent(name: name, module: "ThemeKit", kind: "", summary: "",
                         consumes: "", keyAPI: [], variants: [], family: .text)
+}
+
+/// Per-app prism-tab metadata: a one-line blurb + what the app ACTUALLY consumes
+/// from sill + its notable themes (grounded in the app-repo survey 2026-06-21).
+/// Drives the caption under each per-app tab so the bench shows the CONSUMER
+/// reality (apps are theme + effect-painted bespoke chrome — they barely use the
+/// ThemeKit widgets, which exist for build-best-then-migrate).
+struct AppChrome: Identifiable {
+    let tab: KitFamily       // .facet/.wand/.perch/.halo/.glance
+    let blurb: String        // what the app's surface is
+    let uses: String         // sill modules / widgets / effects it consumes
+    let themes: String       // notable themes it ships
+    var id: String { tab.rawValue }
+}
+
+let appChromes: [AppChrome] = [
+    AppChrome(tab: .facet,
+        blurb: "window/workspace manager — sidebar tree · grid · rail overlays",
+        uses: "Palette · PaletteKit · Effects · ThemedScroller · border/flash/pets",
+        themes: "14 themes (terminal · chomp · rainbow · …)"),
+    AppChrome(tab: .wand,
+        blurb: "gesture daemon — fullscreen trail + non-activating launcher tome",
+        uses: "Palette · Effects · CLIKit · line-pets (trail bespoke)",
+        themes: "7 themes (chomp · splatoon · neon · vapor · mono · …)"),
+    AppChrome(tab: .perch,
+        blurb: "keyboard hint overlay — frosted hint pills over clickables",
+        uses: "Palette · PaletteKit · Effects · CLIKit · border · particles",
+        themes: "8 themes (system · dracula · nord · …)"),
+    AppChrome(tab: .halo,
+        blurb: "focus ring — thin click-through glow around the focused window",
+        uses: "Palette · Effects · border · flash · line-pets (no widgets)",
+        themes: "6 themes (neon · cyber · vapor · kawaii · rainbow · chomp)"),
+    AppChrome(tab: .glance,
+        blurb: "markdown popover — non-activating panel, fixed dark preset",
+        uses: "Palette · PaletteKit only (no Effects, no theme switching)",
+        themes: "fixed catppuccin-mocha"),
+]
+
+/// The metadata for an app tab, or nil for a Kit tab.
+func appChrome(_ tab: KitFamily) -> AppChrome? {
+    appChromes.first { $0.tab == tab }
 }
