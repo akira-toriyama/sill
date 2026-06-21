@@ -2,6 +2,10 @@
 // rendition of an app's signature surface, drawn HERE in the resolved
 // palette. prism imports NO app View code — these mirror the apps by
 // eye, so the preview can't couple the library to any app.
+//
+// One per family app, each its own per-app tab (KitFamily.appCases):
+// MockTree (facet) · MockTome (wand) · MockPill (perch) · MockMarkdown
+// (glance) here; MockHalo (halo) lives in HaloShowcase.swift.
 
 import AppKit
 import SwiftUI

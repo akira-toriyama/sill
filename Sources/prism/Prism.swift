@@ -2,10 +2,11 @@
 //
 // The one executable in sill, and the one place with a `config.toml`.
 // It renders every catalog theme: all resolved roles as swatches, a font
-// specimen, the effect flash palette, and a row of MOCK chrome (a fake
-// perch pill / facet tree / wand tome / glance markdown) drawn ENTIRELY
-// inside prism — it never imports an app's View layer, so the preview
-// can't drift from the apps and the apps never depend on prism.
+// specimen, the effect flash palette, the real ThemeKit widgets, and one
+// per-app MOCK chrome tab (a fake facet tree / wand tome / perch pill /
+// halo ring / glance markdown) drawn ENTIRELY inside prism — it never imports
+// an app's View layer, so the preview can't drift from the apps and the apps
+// never depend on prism.
 //
 // Run it:  swift run prism      (reads ./prism.toml if present)
 //
@@ -48,9 +49,10 @@ struct PrismConfig {
     var fontScale: CGFloat = 1.0
     /// Show the effect flash palette strip for animatable themes.
     var showEffects: Bool = true
-    /// Which widget-family tab opens (a `KitFamily` raw value, case-insensitive;
-    /// e.g. `icons`, `action`). Lets a screenshot target a tab deterministically
-    /// instead of clicking. Default = `palette` (the foundations).
+    /// Which tab opens (a `KitFamily` raw value, case-insensitive; a Kit family
+    /// like `icons`/`action`, or an app tab like `facet`/`halo`). Lets a
+    /// screenshot target a tab deterministically instead of clicking. Default =
+    /// `palette` (the foundations).
     var family: String = "palette"
 
     static func load() -> PrismConfig {
