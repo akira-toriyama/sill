@@ -90,12 +90,19 @@ struct Gallery: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("prism — \(selected == "all" ? "\(Gallery.switchable.count) themes" : selected)")
-                .font(sysFont(12, weight: .semibold, design: .monospaced))
-                .foregroundColor(.secondary)
-            // A wrapping flow of theme buttons — "All" first, then the catalog
-            // in order. Each chip is tinted in its own theme colours, so the
-            // switch row doubles as an at-a-glance colour preview.
+            // Title row. The Effects 演出 master toggle lives HERE now (#11) — it
+            // is a THEME-axis control (effects animate themes), not a tab, so it
+            // sits with the title, clear of both tab groups below.
+            HStack(spacing: 10) {
+                Text("prism — \(selected == "all" ? "\(Gallery.switchable.count) themes" : selected)")
+                    .font(sysFont(12, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.secondary)
+                Spacer(minLength: 12)
+                EffectToggle(on: showEffects) { showEffects.toggle() }
+            }
+            // A wrapping flow of theme buttons — "All" first, then the catalog in
+            // order. Each chip is tinted in its own theme colours, so the switch
+            // row doubles as an at-a-glance colour preview.
             FlowLayout(spacing: 6, lineSpacing: 6) {
                 ThemeChip(name: "all", label: "All",
                           selected: selected == "all") { selected = "all" }
@@ -104,26 +111,37 @@ struct Gallery: View {
                               selected: selected == name) { selected = name }
                 }
             }
-            // A rule separating the two control axes: WHICH theme (the colour chips
-            // above) vs WHICH widget family (the tabs below).
+            // A rule separating the two control axes: WHICH theme (the colour
+            // chips above) vs WHICH content (the tabs below).
             Divider()
-            // Widget-family tabs — only the chosen family renders in each card, so
-            // the bench is browsable by family instead of one painfully tall stack.
-            HStack(spacing: 6) {
-                ForEach(KitFamily.allCases) { fam in
+            // Two tab groups (#10): the Kit library showcase, then one tab per
+            // app. Each group wraps so a narrow window stacks tabs instead of
+            // clipping them.
+            tabGroup(label: "Kit",  families: KitFamily.kitCases)
+            tabGroup(label: "Apps", families: KitFamily.appCases)
+        }
+        .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// One labeled, wrapping tab row (Kit or Apps). The leading label aligns the
+    /// two rows so the tabs start at the same x.
+    @ViewBuilder
+    private func tabGroup(label: String, families: [KitFamily]) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label.uppercased())
+                .font(sysFont(9, weight: .bold, design: .monospaced))
+                .foregroundColor(.secondary)
+                .frame(width: 32 * uiScale, alignment: .leading)
+                .padding(.top, 6)
+            FlowLayout(spacing: 6, lineSpacing: 6) {
+                ForEach(families) { fam in
                     FamilyTab(family: fam, selected: selectedFamily == fam) {
                         selectedFamily = fam
                     }
                 }
-                Spacer(minLength: 12)
-                // The effect 演出 master toggle — flips the live animation across the
-                // whole bench (派手 ON / 静か OFF). Trailing the family row so the two
-                // global controls (WHICH family · animate-or-not) sit together.
-                EffectToggle(on: showEffects) { showEffects.toggle() }
             }
         }
-        .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -340,17 +358,45 @@ struct ThemeCard: View {
             WidgetSection(kitComponent("ParticleBurst"), p: p) { MockParticles(p: p) }
             WidgetSection(kitComponent("SplatterShape"), p: p) { MockSplatter(p: p) }
             WidgetSection(kitComponent("TrailGeometry"), p: p) { MockTrail(p: p) }
-        case .chrome:
-            Text("App chrome — fake perch / facet / wand / glance, drawn by prism (never imports an app's View).")
-                .font(sysFont(9, design: .monospaced))
-                .foregroundColor(Color(nsColor: p.muted))
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .top, spacing: 12) {
-                MockTree(p: p)
-                MockPill(p: p)
-                MockTome(p: p)
-                MockMarkdown(p: p)
+        case .facet:
+            appCaption(.facet, p: p)
+            MockTree(p: p)
+        case .wand:
+            appCaption(.wand, p: p)
+            MockTome(p: p)
+        case .perch:
+            appCaption(.perch, p: p)
+            MockPill(p: p)
+        case .halo:
+            appCaption(.halo, p: p)
+            MockHalo(p: p, themeName: name, showEffects: showEffects)
+        case .glance:
+            appCaption(.glance, p: p)
+            MockMarkdown(p: p)
+        }
+    }
+
+    /// The per-app tab caption — what this app's surface is + what it ACTUALLY
+    /// consumes from sill + its notable themes (the consumer reality; apps barely
+    /// use the ThemeKit widgets the Kit tabs showcase). Grounded data, see
+    /// `appChromes` in KitCatalog.swift. Takes the SAME `p` the sibling mocks get
+    /// (the card's live/animated palette) — no separate re-resolve.
+    @ViewBuilder
+    private func appCaption(_ tab: KitFamily, p: ResolvedPalette) -> some View {
+        if let a = appChrome(tab) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(a.blurb)
+                    .font(sysFont(10, weight: .medium))
+                    .foregroundColor(Color(nsColor: p.foreground))
+                Text("uses: \(a.uses)")
+                    .font(sysFont(8.5, design: .monospaced))
+                    .foregroundColor(Color(nsColor: p.muted))
+                Text(a.themes)
+                    .font(sysFont(8.5, design: .monospaced))
+                    .foregroundColor(Color(nsColor: p.muted))
             }
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.bottom, 2)
         }
     }
 }
