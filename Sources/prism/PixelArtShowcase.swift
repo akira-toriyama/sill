@@ -387,14 +387,17 @@ struct MockPixelArt: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 5) {
-                Text("PixelArt + Effects · arcade decals — pacManCells wedge + 12×13 cherry + 14×14 ghost; mouth flaps 5 Hz, ghost waddles (Motion.frameStep)")
-                    .font(sysFont(9, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Color(nsColor: p.muted))
+            // Top row: live dot on the left, the ↺ replay pill on the right — its
+            // OWN line (not buried in the long caption) so it is easy to find.
+            HStack(spacing: 6) {
                 liveDot
                 Spacer(minLength: 6)
                 replayButton
             }
+
+            Text("PixelArt + Effects · arcade decals — pacManCells wedge + 12×13 cherry + 14×14 ghost; mouth flaps 5 Hz, ghost waddles (Motion.frameStep)")
+                .font(sysFont(9, weight: .semibold, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
 
             cards.id(replay)   // ↺ replay rebuilds every live card → clocks reset to t=0
         }
@@ -512,8 +515,12 @@ struct MockPixelArt: View {
     private var replayButton: some View {
         Button { replay += 1 } label: {
             Text("↺ replay")
-                .font(sysFont(8, weight: .bold, design: .monospaced))
+                .font(sysFont(9, weight: .bold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.primary))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .overlay(RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: p.primary), lineWidth: 1))
         }
         .buttonStyle(.plain)
         .help("最初から再生")
