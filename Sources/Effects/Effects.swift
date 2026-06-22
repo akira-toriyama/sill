@@ -604,6 +604,11 @@ private func drawCenteredSprite(_ sprite: PixelSprite, cell: CGFloat, at c: CGPo
 }
 
 /// Draw a pre-resolved app-icon bonus centred at `c`, fit to a `box`-pt square.
+/// NO y-flip here (unlike `drawCenteredSprite`): `NSImage.draw(in:)` ORIENTS
+/// ITSELF in a non-flipped (y-up) host, so the icon stands upright as-is —
+/// only the row-0-at-bottom `drawPixelSprite` blitter needs the manual flip.
+/// (Verified by an offscreen arrow-render 2026-06-22; adding a flip here would
+/// invert it — don't "fix" this.)
 @MainActor
 private func drawCorridorIcon(_ icon: NSImage, at c: CGPoint, box: CGFloat) {
     icon.draw(in: CGRect(x: c.x - box / 2, y: c.y - box / 2, width: box, height: box),
@@ -660,6 +665,9 @@ public func drawChompCorridor(_ path: [CGPoint], now: CFTimeInterval,
     NSColor.black.setFill()
     for c in interiorCorners(path) {
         let d  = Double(roadHalf) / cos(abs(c.turn) / 2)
+        // Radius: spec says `wallThick * 0.5`, but the round join already softens
+        // the corner so 0.5 is invisible. Kept at 1.15 (the larger, just-visible
+        // value) per the user's live review (2026-06-22 "このままでOK").
         let fr = Double(wallThick) * 1.15
         let cx = c.vertex.x + c.bisector.x * d, cy = c.vertex.y + c.bisector.y * d
         NSBezierPath(ovalIn: CGRect(x: cx - fr, y: cy - fr,
