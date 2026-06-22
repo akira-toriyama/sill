@@ -521,7 +521,8 @@ public func drawLinePets(_ pets: [LinePet], on rect: CGRect,
 @MainActor
 public func drawChompPath(_ path: [CGPoint], now: CFTimeInterval, valid: Bool = true,
                           scale: CGFloat = 1, speed: CGFloat = 60,
-                          faceLag: CGFloat = 0, showGuide: Bool = true) {
+                          faceLag: CGFloat = 0, showGuide: Bool = true,
+                          showHead: Bool = true) {
     guard path.count >= 2, speed > 0 else { return }
     let total = polylineLength(path)   // arc length = the loop period (in points)
     guard total > 0 else { return }
@@ -542,7 +543,7 @@ public func drawChompPath(_ path: [CGPoint], now: CFTimeInterval, valid: Bool = 
 
     // The chased head — a small glowing pellet-dot (only when valid + lagging; a
     // mismatch has no target). Makes the faceLag gap legible before pellets (Ph4).
-    if valid, faceLag > 0, let head = markAtArcLength(path, distance: headDist) {
+    if showHead, valid, faceLag > 0, let head = markAtArcLength(path, distance: headDist) {
         let r: CGFloat = 2.5 * scale
         let yellow = NSColor(HexColor(SpriteColor.pacYellow))
         NSGraphicsContext.saveGraphicsState()
