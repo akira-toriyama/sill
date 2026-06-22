@@ -63,7 +63,7 @@
 ## C6 — inline Elevation struct を `palette.shadow(.dpN)` に統合
 - `ThemedButton.swift:354-365`: 4 状態が #13 ladder と**完全一致**（pressed→`.dp8` / focused→`.dp6` / hovered→`.dp4` / rest→`.dp2` / disabled・non-contained→`.flat`）。struct 削除→`palette.shadow(...)`。呼側は `e.opacity/.radius/.offsetY` でラベル一致＝無改変。
 - `ThemedButtonGroup.swift:232-250`: inline literal 0.20/3/-1 ＝**完全 dp2**。`let e = palette.shadow(.dp2)` で 3 prop 代入に。
-- `ThemedFAB.swift:282-290`: pressed (0.34/12/-7)＝**完全 dp12**。rest (0.30/8/-3)＝**off-ladder**（radius8/dy3 は dp8 一致だが opacity 0.30≠dp8 の 0.28）。**【要判断①】** (a) `.dp8` に snap（rest 影が ~7% 薄く・#13 doc が既に「#14a で snap」と明記＝**推奨**）／(b) dp ladder に 0.30 rung 追加／(c) FAB-rest だけ literal 据置で pressed のみ DRY。
+- `ThemedFAB.swift:282-290`: pressed (0.34/12/-7)＝**完全 dp12**。rest (0.30/8/-3)＝**off-ladder**（radius8/dy3 は dp8 一致だが opacity 0.30≠dp8 の 0.28）。**✅確定（ユーザー承認 2026-06-22）= `.dp8` に snap**（rest 影 ~7% 薄・#13 doc 予告どおり）＝FAB は rest→`.dp8`／pressed→`.dp12` で完全に ladder へ。FAB-rest 専用 literal 廃止。XCTest/probe の FAB-rest 期待値を **0.28** に更新。
 - `ThemedToolBar.swift:318-322`: **連続 formula（elevation 0..24・opacity 定数 0.24・radius/offset 線形）＝ladder の case でない**＝**formula 据置**。任意 DRY: 同じ tuple 型なので `palette.shadow(continuousDp: Int)` overload を PaletteKit に足して formula をそこへ移すのは additive（必須でない）。
 - **符号**: `shadow(_:)` は既に dy を負化（`-t.dy`）＝採用側は結果をそのまま使い**再負化しない**（現 struct は手書き負値で内部整合・1:1 swap）。
 - **リスク**: Button/Group/FAB-pressed/ToolBar = ~0。唯一の視覚変化は FAB-rest snap（判断①）。証跡: probe（shadowOpacity/Radius/OffsetY）を CI XCTest で旧値照合（FAB-rest のみ期待値変更を明記）+ prism FAB rest/pressed・Button 全状態・Group を before/after。
@@ -81,7 +81,7 @@
   ```
   任意で `onColor(for:)`（contrast-ink ミラー＝C2 と連動: primary→onPrimary()/secondary→onSecondary()/error→bestContrast(on:error)/neutral→foreground）も同居させ FAB `roleInk`/Chip `inkColor`/ToolBar `barInk` を畳む。
 - **各 widget は自分の public enum を維持**（FAB に .error 無し等は意図的 API＝**広げない**）→ 呼側で ControlRole にマップ（薄い adapter）。**role arm のみ** `color(for:)` 委譲・非 role arm（surface/transparent/none/custom/wash）は据置。
-- **【要判断②】** `color(for: .neutral)` = **foreground**（Chip 一致＝推奨）。Badge の neutral は **muted のまま**（wash tuple 側で明示・shared を通さない）。
+- **✅確定（ユーザー承認 2026-06-22）**: `color(for: .neutral)` = **foreground**（Chip 一致）。Badge の neutral は **muted のまま**（wash tuple 側で明示・shared を通さない）。
 - **リスク**: 純 role switch は低（byte-identical）。集中点: neutral 意味・subset enum・非 role arm の取りこぼし（exhaustive switch が構造破綻は捕捉、誤 default は捕捉せず＝arm 逐語維持）。証跡: prism Chip/FAB/ButtonGroup/ToolBar/List-badge を全テーマ before/after + List DEBUG 色 probe（`_badgeFill` 等）を CI で照合。**公開 enum 不変＝facet/wand/perch 無影響**を確認。
 
 ## C4 — `CornerPath` 抽出（単一消費者・任意/低優先）
@@ -92,11 +92,11 @@
 
 ---
 
-## 実装開始時に maintainer へ確認する判断（2つ）
-1. **FAB-rest elevation 0.30→dp8(0.28) に snap**（推奨・~7% 薄い rest 影・#13 doc 既に予告）か、FAB-rest を literal 据置か。
-2. **`color(for: .neutral)` = foreground**（推奨・Chip 一致）でよいか。Badge neutral は muted のまま。
+## ✅ 確定した判断（ユーザー承認 2026-06-22・両方「推奨でOK」）
+1. ✅ **FAB-rest elevation 0.30 → `.dp8`(0.28) に snap**（rest 影 ~7% 薄・#13 doc 予告どおり）。FAB は rest→`.dp8`／pressed→`.dp12` で完全に ladder へ寄せる＝**FAB-rest 専用 literal は廃止**。XCTest/probe の FAB-rest 期待値は **0.28**（旧 0.30 から更新）。
+2. ✅ **`color(for: .neutral)` = foreground**（Chip 一致）。Badge の neutral ink は **muted のまま**（wash tuple 側で明示・shared を通さない）。
 
-（C4 を #14a に含めるか/別出しか、も軽く確認可。）
+C4（CornerPath）の #14a 同梱可否は任意（単一消費者）＝実装時に scope を見て判断（含めても外しても可）。
 
 ## ROADMAP 反映
 着手で `#14` を「**着手中: PR #N**」、merge で `完了`（PR #N + `v1.20.0`）。本丸 `ThemedControl` 基底は **#14b（別 PR・要設計）**として明示し、暗黙にしない。
