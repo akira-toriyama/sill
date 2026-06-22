@@ -41,6 +41,45 @@ final class ThemedListTests: XCTestCase {
         XCTAssertEqual(an.alphaComponent, bn.alphaComponent, accuracy: 0.01, msg, file: file, line: line)
     }
 
+    /// NSFontDescriptor weight trait (≈0.0 regular, 0.23 medium).
+    private func weightTrait(_ f: NSFont) -> CGFloat {
+        let t = f.fontDescriptor.object(forKey: .traits) as? [NSFontDescriptor.TraitKey: Any]
+        return (t?[.weight] as? CGFloat) ?? 0
+    }
+
+    // MARK: - Typography (#8 — type scale)
+
+    /// The 2nd line is `.secondaryBody` = 11pt MEDIUM (the readability fix),
+    /// and the mono branch (wand URLs) carries the same weight + size.
+    func testSecondaryLineIsElevenMediumInclMono() {
+        let l = makeList([row("a", secondary: "sub")])
+        let prop = l._secondaryFont(mono: false)
+        XCTAssertEqual(prop.pointSize, 11, accuracy: 0.01)
+        XCTAssertGreaterThan(weightTrait(prop), 0.1, "secondary line must be medium, not regular")
+        let mono = l._secondaryFont(mono: true)
+        XCTAssertEqual(mono.pointSize, 11, accuracy: 0.01)
+        XCTAssertTrue(mono.isFixedPitch, "mono secondary stays monospaced")
+        XCTAssertGreaterThan(weightTrait(mono), 0.1, "mono secondary is ALSO medium")
+    }
+
+    /// The badge label is 10pt across BOTH densities — the old 9pt compact
+    /// value (below the macOS labelFontSize floor) is gone.
+    func testBadgeIsTenPointBothDensities() {
+        let l = makeList([row("a")])
+        XCTAssertEqual(l._badgeFont().pointSize, 10, accuracy: 0.01)
+        l.density = .compact
+        XCTAssertEqual(l._badgeFont().pointSize, 10, accuracy: 0.01, "compact badge raised 9→10")
+    }
+
+    /// Under a rounded-font theme (`rainbow`) the list resolves the rounded
+    /// family — before #8 the per-widget helper dropped it → plain system.
+    func testRoundedThemeResolvesRoundedFamily() {
+        let rounded = makeList([row("a", secondary: "s")], theme("rainbow"))
+        let plain = NSFont.systemFont(ofSize: 11, weight: .medium)
+        XCTAssertNotEqual(rounded._secondaryFont(mono: false).fontName, plain.fontName,
+                          "rounded theme must apply the rounded design, not plain system")
+    }
+
     // MARK: - Geometry / layout cache
 
     func testComfortableRowHeightsAndCumulativeOffsets() {

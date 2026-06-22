@@ -23,6 +23,28 @@ final class ThemedTextFieldTests: XCTestCase {
 
     private func palette() -> ResolvedPalette { resolve(.terminal) }   // dark, primary 0x33FF66
 
+    // MARK: - Typography (#8 — type scale)
+
+    private func weightTrait(_ f: NSFont) -> CGFloat {
+        let t = f.fontDescriptor.object(forKey: .traits) as? [NSFontDescriptor.TraitKey: Any]
+        return (t?[.weight] as? CGFloat) ?? 0
+    }
+
+    /// The supporting/helper line is `.secondaryBody` = 11pt MEDIUM (the #8
+    /// readability fix), no longer 11pt regular borrowed from `floatSize`.
+    func testSupportLineIsElevenMedium() {
+        let s = ThemedTextField(palette: palette())._supportFont()
+        XCTAssertEqual(s.pointSize, 11, accuracy: 0.01)
+        XCTAssertGreaterThan(weightTrait(s), 0.1, "support line must be medium")
+    }
+
+    /// Decoupling the helper line from `floatSize` left the floated-label
+    /// animation ratio untouched (11/13).
+    func testFloatLabelScaleUnchanged() {
+        XCTAssertEqual(ThemedTextField(palette: palette())._floatScale,
+                       11.0 / 13.0, accuracy: 0.0001)
+    }
+
     /// Focus reconciles from the settled first-responder state on the NEXT
     /// runloop tick (`DispatchQueue.main.async`). The main queue is FIFO, so
     /// enqueuing a fulfilment AFTER the reconcile and waiting guarantees the
