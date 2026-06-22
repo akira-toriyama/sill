@@ -206,4 +206,24 @@ final class ScaleTierTests: XCTestCase {
     func testAllCases() {
         XCTAssertEqual(ScaleTier.allCases, [.s, .m, .l])
     }
+
+    // MARK: - Bonus pool (#12 Ph5)
+
+    func testChompBonusPoolIsTheArcadeLadder() {
+        XCTAssertEqual(chompBonusPool, [100, 200, 300, 500, 700, 1000, 2000, 5000])
+    }
+
+    func testBonusValueIsStableAndInPool() {
+        let v = bonusValue(x: 3, y: 7)
+        XCTAssertTrue(chompBonusPool.contains(v))
+        XCTAssertEqual(v, bonusValue(x: 3, y: 7))                 // deterministic
+    }
+
+    func testBonusValueVariesByCell() {
+        // Decorrelated from the <0.08 selection band (swapped-coord hash), so
+        // neighbouring bonuses are not all 100 — at least two distinct values
+        // appear across a small spread of cells.
+        let vals = Set((0..<16).map { bonusValue(x: $0 * 13, y: $0 * 7 + 1) })
+        XCTAssertGreaterThan(vals.count, 1)
+    }
 }
