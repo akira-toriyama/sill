@@ -318,6 +318,7 @@ struct ThemeCard: View {
         Text("AaBbCcGg 0123 — The quick brown fox jumps")
             .font(themeFont(spec.font, size: 15 * scale))
             .foregroundColor(Color(nsColor: p.foreground))
+        TypeScaleSpecimen(p: p)
         if showEffects, let fx = borderEffectFor(name) {
             LiveEffectStrip(fx: fx, name: name, fallback: p.primary)
         }
@@ -546,6 +547,43 @@ struct SwatchRow: View {
             ForEach(roles, id: \.0) { role in
                 Swatch(label: role.0, color: role.1, ink: p.foreground, muted: p.muted)
             }
+        }
+    }
+}
+
+/// The #8 type scale, live — every `TypeRole` drawn at its REAL resolved
+/// font (`p.uiFont(role)`, so the rounded/menu family fix shows too), with
+/// its pt·weight annotated. On the static `.palette` tab for deterministic
+/// capture; re-themes per card like the swatches.
+struct TypeScaleSpecimen: View {
+    let p: ResolvedPalette
+    private let roles: [(TypeRole, String)] = [
+        (.body, "body"), (.secondaryBody, "secondaryBody"), (.caption, "caption"),
+        (.sectionHeader, "sectionHeader"), (.sectionTitle, "sectionTitle"),
+        (.badge, "badge"), (.shortcut, "shortcut"), (.tooltip, "tooltip"),
+    ]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ForEach(roles, id: \.1) { role, label in
+                let t = role.token
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text("\(label) — Quick brown fox 0123")
+                        .font(Font(p.uiFont(role) as CTFont))
+                        .foregroundColor(Color(nsColor: muted(role) ? p.muted : p.foreground))
+                    Spacer(minLength: 8)
+                    Text("\(Int(t.pt))pt · \(weightLabel(t.weight))")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(Color(nsColor: p.tertiary))
+                }
+            }
+        }
+    }
+    private func muted(_ r: TypeRole) -> Bool { r == .secondaryBody || r == .caption }
+    private func weightLabel(_ w: TypeWeight) -> String {
+        switch w {
+        case .regular:  return "regular"
+        case .medium:   return "medium"
+        case .semibold: return "semibold"
         }
     }
 }

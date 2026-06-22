@@ -164,6 +164,10 @@ public final class ThemedTextField: NSView {
     private let helperGap: CGFloat = 4
     private var topPad: CGFloat { label == nil ? 0 : 9 }   // room for the float
     private var bodySize: CGFloat { 13 }
+    /// The floated-label shrink RATIO (`floatSize / bodySize`) and the
+    /// outlined-notch width — NOT a text size. The supporting/helper line
+    /// is its own `.secondaryBody` role now, so this only governs the label
+    /// animation + notch geometry.
     private var floatSize: CGFloat { 11 }
 
     public override var isFlipped: Bool { false }
@@ -231,13 +235,10 @@ public final class ThemedTextField: NSView {
     }
 
     // MARK: - Theming
-
-    private func themedFont(_ size: CGFloat, _ weight: NSFont.Weight = .regular) -> NSFont {
-        switch palette.font {
-        case .mono: return .monospacedSystemFont(ofSize: size, weight: weight)
-        default:    return .systemFont(ofSize: size, weight: weight)
-        }
-    }
+    // Fonts come from `palette.uiFont(_:)` — the shared type-scale resolver:
+    // `.body` (13pt) for the input + floating label, `.secondaryBody` (11pt
+    // medium) for the supporting line. The old local `themedFont` only
+    // branched `.mono` vs system and dropped `.rounded`/`.menu`.
 
     /// Focus appearance — real first-responder OR the preview override.
     private var isFocused: Bool { focused || previewFocused }
@@ -252,7 +253,7 @@ public final class ThemedTextField: NSView {
     private var surface: NSColor { surfaceColor ?? palette.background ?? .textBackgroundColor }
 
     public func applyTheme() {
-        field.font = themedFont(bodySize)
+        field.font = palette.uiFont(.body)
         field.textColor = palette.foreground
         syncPlaceholder()
         syncAccessibility()
@@ -263,7 +264,7 @@ public final class ThemedTextField: NSView {
         // own layerTxn(animated: true) path is untouched).
         layerTxn(animated: false) {
             self.labelLayer.foregroundColor = self.labelColor.cgColor
-            self.labelLayer.font = self.themedFont(self.bodySize)   // base; scaled via transform
+            self.labelLayer.font = self.palette.uiFont(.body)   // base; scaled via transform
             self.labelLayer.fontSize = self.bodySize
         }
         sizeLabel()
@@ -284,7 +285,7 @@ public final class ThemedTextField: NSView {
         // With a floating label the placeholder only shows once the label has
         // floated up (focused + empty); otherwise the label IS the prompt.
         let show = label == nil || (floated && field.stringValue.isEmpty)
-        let f = field.font ?? themedFont(bodySize)
+        let f = field.font ?? palette.uiFont(.body)
         field.placeholderAttributedString = NSAttributedString(
             string: show ? placeholder : "",
             attributes: [.foregroundColor: palette.muted, .font: f])
@@ -304,7 +305,7 @@ public final class ThemedTextField: NSView {
     /// label text at the body font (the float just scales via transform).
     private func sizeLabel() {
         let s = ((label ?? "") as NSString)
-            .size(withAttributes: [.font: themedFont(bodySize)])
+            .size(withAttributes: [.font: palette.uiFont(.body)])
         layerTxn(animated: false) {           // snap the bounds change (see applyTheme)
             self.labelLayer.bounds = CGRect(x: 0, y: 0,
                                             width: ceil(s.width) + 2, height: ceil(s.height))
@@ -427,7 +428,7 @@ public final class ThemedTextField: NSView {
         let geo = geometry()
         let f = floatSize / bodySize
         let w = ceil((lbl as NSString)
-            .size(withAttributes: [.font: themedFont(bodySize)]).width) * f + 8
+            .size(withAttributes: [.font: palette.uiFont(.body)]).width) * f + 8
         let ruleY = geo.box.maxY - 1            // stroke centre line
         let h: CGFloat = 6                       // ≥ 2 pt stroke + margin both sides
         notchLayer.backgroundColor = surface.cgColor
@@ -484,7 +485,7 @@ public final class ThemedTextField: NSView {
             textMaxX = trail2!.minX - 8
         }
 
-        let lineH = ceil((field.font ?? themedFont(bodySize)).boundingRectForFont.height)
+        let lineH = ceil((field.font ?? palette.uiFont(.body)).boundingRectForFont.height)
         let textRect = NSRect(x: textMinX, y: box.midY - lineH / 2,
                               width: max(textMaxX - textMinX, 0), height: lineH)
 
@@ -552,7 +553,7 @@ public final class ThemedTextField: NSView {
             let msg = errorText ?? helperText ?? ""
             let color = isError ? palette.error : palette.muted
             let attrs: [NSAttributedString.Key: Any] = [
-                .font: themedFont(floatSize),
+                .font: palette.uiFont(.secondaryBody),
                 .foregroundColor: color]
             (msg as NSString).draw(
                 at: NSPoint(x: padX, y: 0), withAttributes: attrs)
@@ -704,5 +705,12 @@ extension ThemedTextField {
     /// The GROUND-TRUTH first-responder state (field or its field editor), for an
     /// embedding ThemedComboBox to assert the popup never stole focus.
     var isFirstResponderNow: Bool { isFieldFirstResponder }
+
+    /// The supporting/helper-line font — `.secondaryBody` (11pt medium),
+    /// the #8 readability fix. Distinct code path from the floated label.
+    func _supportFont() -> NSFont { palette.uiFont(.secondaryBody) }
+    /// The floated-label shrink ratio. Guards that decoupling the helper
+    /// line from `floatSize` left the label animation untouched (11/13).
+    var _floatScale: CGFloat { floatSize / bodySize }
 }
 #endif

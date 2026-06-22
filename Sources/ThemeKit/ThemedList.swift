@@ -520,11 +520,12 @@ public final class ThemedList: NSView {
         let singleRow, twoLineRow, header1, header2: CGFloat
         let leadingInset, trailingInset, imageBox, iconGlyph, gapImageToText: CGFloat
         let twoLineTop, lineGap: CGFloat
-        let primaryPt, secondaryPt: CGFloat
         let accentBar, roundedRadius, roundedHInset: CGFloat
-        let badgeHeight, badgeHPad, badgeSymbolPt, badgePt, badgeGap: CGFloat
-        let chevronPt, shortcutHeight, shortcutHPad, shortcutRadius, shortcutPt: CGFloat
-        let header1Pt, header2TitlePt, header2SubPt: CGFloat
+        // Text sizes/weights now come from `TypeRole` (the type scale); these
+        // are geometry only. `badgeSymbolPt` is the badge's leading-icon box,
+        // `chevronPt`/`disclosurePt` are glyph sizes — not text roles.
+        let badgeHeight, badgeHPad, badgeSymbolPt, badgeGap: CGFloat
+        let chevronPt, shortcutHeight, shortcutHPad, shortcutRadius: CGFloat
         let clusterGap, budgetMargin, separatorBand: CGFloat
         let indentStep, disclosurePt, disclosureGap: CGFloat
         var textXOrigin: CGFloat { leadingInset + imageBox + gapImageToText }
@@ -538,11 +539,10 @@ public final class ThemedList: NSView {
         case .comfortable:
             return Metrics(singleRow: 30, twoLineRow: 46, header1: 28, header2: 40,
                            leadingInset: 12, trailingInset: 12, imageBox: 24, iconGlyph: 18, gapImageToText: 8,
-                           twoLineTop: 8, lineGap: 2, primaryPt: 13, secondaryPt: 11,
+                           twoLineTop: 8, lineGap: 2,
                            accentBar: 3, roundedRadius: 6, roundedHInset: 3,
-                           badgeHeight: 16, badgeHPad: 6, badgeSymbolPt: 11, badgePt: 10, badgeGap: 4,
-                           chevronPt: 11, shortcutHeight: 16, shortcutHPad: 5, shortcutRadius: 4, shortcutPt: 10,
-                           header1Pt: 11, header2TitlePt: 13, header2SubPt: 11,
+                           badgeHeight: 16, badgeHPad: 6, badgeSymbolPt: 11, badgeGap: 4,
+                           chevronPt: 11, shortcutHeight: 16, shortcutHPad: 5, shortcutRadius: 4,
                            clusterGap: 6, budgetMargin: 8, separatorBand: 9,
                            indentStep: 16, disclosurePt: 11, disclosureGap: 5)
         case .compact:
@@ -550,11 +550,10 @@ public final class ThemedList: NSView {
             // doesn't shrink with density, so a shorter row clipped the subtitle.
             return Metrics(singleRow: 26, twoLineRow: 40, header1: 24, header2: 40,
                            leadingInset: 10, trailingInset: 10, imageBox: 20, iconGlyph: 16, gapImageToText: 6,
-                           twoLineTop: 6, lineGap: 2, primaryPt: 13, secondaryPt: 11,
+                           twoLineTop: 6, lineGap: 2,
                            accentBar: 3, roundedRadius: 6, roundedHInset: 3,
-                           badgeHeight: 14, badgeHPad: 6, badgeSymbolPt: 11, badgePt: 9, badgeGap: 4,
-                           chevronPt: 10, shortcutHeight: 14, shortcutHPad: 5, shortcutRadius: 4, shortcutPt: 10,
-                           header1Pt: 11, header2TitlePt: 13, header2SubPt: 11,
+                           badgeHeight: 14, badgeHPad: 6, badgeSymbolPt: 11, badgeGap: 4,
+                           chevronPt: 10, shortcutHeight: 14, shortcutHPad: 5, shortcutRadius: 4,
                            clusterGap: 6, budgetMargin: 8, separatorBand: 7,
                            indentStep: 14, disclosurePt: 10, disclosureGap: 5)
         }
@@ -655,11 +654,14 @@ public final class ThemedList: NSView {
     /// nil means "don't paint" (vs the opaque scroll-view fallback).
     private var effectiveSurface: NSColor? { surfaceColor ?? palette.background }
 
-    private func themedFont(_ size: CGFloat, _ weight: NSFont.Weight = .regular) -> NSFont {
-        switch palette.font {
-        case .mono: return .monospacedSystemFont(ofSize: size, weight: weight)
-        default:    return .systemFont(ofSize: size, weight: weight)
-        }
+    /// The 2nd-line font: `.secondaryBody` from the type scale (11pt
+    /// medium), forced monospaced for `secondaryMono` rows (e.g. wand's
+    /// URLs) regardless of the theme's `FontKind`. Both branches read the
+    /// SAME token, so the readability weight applies to mono rows too.
+    private func secondaryFont(mono: Bool) -> NSFont {
+        let t = TypeRole.secondaryBody.token
+        return mono ? .monospacedSystemFont(ofSize: CGFloat(t.pt), weight: t.weight.nsWeight)
+                    : palette.uiFont(.secondaryBody)
     }
 
     // MARK: Data / layout
@@ -841,8 +843,8 @@ public final class ThemedList: NSView {
             let textX = (item.isHeader ? m.leadingInset + (item.headerCollapsed != nil ? m.disclosureGutter : 0) : rowTextX)
                 + indentInset(item)
             let pFont: NSFont = item.isHeader
-                ? (item.headerSubtitle != nil ? themedFont(m.header2TitlePt, .medium) : themedFont(m.header1Pt, .semibold))
-                : themedFont(m.primaryPt)
+                ? (item.headerSubtitle != nil ? palette.uiFont(.sectionTitle) : palette.uiFont(.sectionHeader))
+                : palette.uiFont(.body)
             let isOneLineHeader = item.isHeader && item.headerSubtitle == nil
             let pText = isOneLineHeader ? item.primary.uppercased() : item.primary
             // A 1-line header is DRAWN with `headerKern` per character — measure it
@@ -851,12 +853,11 @@ public final class ThemedList: NSView {
                 ? ceil((pText as NSString).size(withAttributes: [.font: pFont, .kern: ThemedList.headerKern]).width)
                 : measureWidth(pText, font: pFont)
             if let secondary = item.secondary {
-                let sFont = item.secondaryMono ? .monospacedSystemFont(ofSize: m.secondaryPt, weight: .regular)
-                                               : themedFont(m.secondaryPt)
+                let sFont = secondaryFont(mono: item.secondaryMono)
                 textW = max(textW, measureWidth(secondary, font: sFont))
             }
             if let sub = item.headerSubtitle {
-                textW = max(textW, measureWidth(sub, font: themedFont(m.header2SubPt)))
+                textW = max(textW, measureWidth(sub, font: palette.uiFont(.caption)))
             }
             let trailing = item.isHeader ? 0 : trailingClusterWidth(item)
             let rowW = textX + textW + (trailing > 0 ? trailing + m.budgetMargin : 0) + m.trailingInset
@@ -1183,10 +1184,10 @@ extension ThemedList {
         let r = CGRect(x: 0, y: 0, width: width, height: m.singleRow)
         if let label = emptyLabel {
             if effectiveHighlightIndex == 0 { paintSelectionBackground(r, onAccent: false) }
-            drawLine(label, font: themedFont(m.primaryPt), color: palette.foreground,
+            drawLine(label, font: palette.uiFont(.body), color: palette.foreground,
                      x: m.leadingInset, maxWidth: width - m.leadingInset * 2, row: r, mode: .byTruncatingTail)
         } else {
-            drawLine(noOptionsText, font: themedFont(m.primaryPt), color: palette.muted,
+            drawLine(noOptionsText, font: palette.uiFont(.body), color: palette.muted,
                      x: m.leadingInset, maxWidth: width - m.leadingInset * 2, row: r, mode: .byTruncatingTail)
         }
     }
@@ -1238,17 +1239,17 @@ extension ThemedList {
         let textMax = max(0, r.maxX - m.trailingInset - (trailingW > 0 ? trailingW + m.budgetMargin : 0) - xText)
         let primaryColor = primaryTextColor(disabled: item.isDisabled, onAccent: onAccent)
         if let secondary = item.secondary {
-            let pFont = themedFont(m.primaryPt)
+            let pFont = palette.uiFont(.body)
             let pH = (pFont.ascender - pFont.descender)
             let pRow = CGRect(x: 0, y: r.minY + m.twoLineTop, width: r.width, height: pH)
             drawLine(item.primary, font: pFont, color: primaryColor, x: xText, maxWidth: textMax, row: pRow, mode: textBreakMode)
-            let sFont = item.secondaryMono ? .monospacedSystemFont(ofSize: m.secondaryPt, weight: .regular) : themedFont(m.secondaryPt)
+            let sFont = secondaryFont(mono: item.secondaryMono)
             let sColor = secondaryTextColor(disabled: item.isDisabled, onAccent: onAccent)
             let sRow = CGRect(x: 0, y: pRow.maxY + m.lineGap, width: r.width, height: sFont.ascender - sFont.descender)
             drawLine(secondary, font: sFont, color: sColor, x: xText, maxWidth: textMax, row: sRow,
                      mode: horizontalContentScroll ? .byClipping : (item.secondaryMono ? .byTruncatingMiddle : .byTruncatingTail))
         } else {
-            drawLine(item.primary, font: themedFont(m.primaryPt), color: primaryColor,
+            drawLine(item.primary, font: palette.uiFont(.body), color: primaryColor,
                      x: xText, maxWidth: textMax, row: r, mode: textBreakMode)
         }
 
@@ -1369,16 +1370,16 @@ extension ThemedList {
         let gripReserve = (showsReorderGrip && isDragSource(item)) ? reorderGripWidth + m.clusterGap : 0
         let textMax = max(0, width - leadX - m.leadingInset - gripReserve)
         if let subtitle = item.headerSubtitle {
-            let title = themedFont(m.header2TitlePt, .medium)
+            let title = palette.uiFont(.sectionTitle)
             let tRow = CGRect(x: 0, y: r.minY + 6, width: r.width, height: title.ascender - title.descender)
             drawLine(item.primary, font: title, color: palette.foreground,
                      x: leadX, maxWidth: textMax, row: tRow, mode: .byTruncatingTail)
-            let sub = themedFont(m.header2SubPt)
+            let sub = palette.uiFont(.caption)
             let sRow = CGRect(x: 0, y: tRow.maxY + m.lineGap, width: r.width, height: sub.ascender - sub.descender)
             drawLine(subtitle, font: sub, color: palette.muted,
                      x: leadX, maxWidth: textMax, row: sRow, mode: .byTruncatingTail)
         } else {
-            let f = themedFont(m.header1Pt, .semibold)
+            let f = palette.uiFont(.sectionHeader)
             let attrs: [NSAttributedString.Key: Any] = [.font: f, .foregroundColor: palette.muted, .kern: ThemedList.headerKern]
             let label = item.primary.uppercased() as NSString
             let size = label.size(withAttributes: attrs)
@@ -1493,7 +1494,7 @@ extension ThemedList {
         case .none:      return 0
         case .chevron:   return m.chevronPt
         case .shortcut(let s):
-            let w = (s as NSString).size(withAttributes: [.font: themedFont(m.shortcutPt, .medium)]).width
+            let w = (s as NSString).size(withAttributes: [.font: palette.uiFont(.shortcut)]).width
             return ceil(w) + m.shortcutHPad * 2
         case .custom(let img):
             guard img.size.height > 0 else { return m.badgeHeight }
@@ -1515,7 +1516,7 @@ extension ThemedList {
             let path = NSBezierPath(roundedRect: lozenge, xRadius: m.shortcutRadius, yRadius: m.shortcutRadius)
             (onAccent ? palette.onPrimary(0.4) : palette.border).setStroke()
             path.lineWidth = 1; path.stroke()
-            let attrs: [NSAttributedString.Key: Any] = [.font: themedFont(m.shortcutPt, .medium),
+            let attrs: [NSAttributedString.Key: Any] = [.font: palette.uiFont(.shortcut),
                                                          .foregroundColor: onAccent ? palette.onPrimary(1) : palette.muted]
             let str = s as NSString
             let size = str.size(withAttributes: attrs)
@@ -1529,7 +1530,7 @@ extension ThemedList {
 
     private func badgeSize(_ b: Badge) -> CGSize {
         let m = metrics
-        let attrs: [NSAttributedString.Key: Any] = [.font: themedFont(m.badgePt, .medium)]
+        let attrs: [NSAttributedString.Key: Any] = [.font: palette.uiFont(.badge)]
         var w = ceil((b.text as NSString).size(withAttributes: attrs).width) + m.badgeHPad * 2
         if b.symbol != nil { w += m.badgeSymbolPt + 3 }
         return CGSize(width: w, height: m.badgeHeight)
@@ -1548,7 +1549,7 @@ extension ThemedList {
             drawImage(symbol, fitting: box, tint: ink)
             x += m.badgeSymbolPt + 3
         }
-        let attrs: [NSAttributedString.Key: Any] = [.font: themedFont(m.badgePt, .medium), .foregroundColor: ink]
+        let attrs: [NSAttributedString.Key: Any] = [.font: palette.uiFont(.badge), .foregroundColor: ink]
         let str = b.text as NSString
         let size = str.size(withAttributes: attrs)
         str.draw(at: NSPoint(x: x, y: pill.midY - size.height / 2), withAttributes: attrs)
@@ -2010,7 +2011,7 @@ extension ThemedList {
     private func chunkBadge(on base: NSImage, count: Int) -> NSImage {
         guard count > 1 else { return base }
         let label = "\(count) items" as NSString
-        let font = themedFont(10, .semibold)
+        let font = palette.uiFont(10, .semibold)
         let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: palette.onPrimary(1)]
         let textSize = label.size(withAttributes: attrs)
         let h: CGFloat = 16, padH: CGFloat = 7
@@ -2434,6 +2435,13 @@ extension ThemedList {
     }
     /// Resolved badge fill for a role (colour-equality assert).
     func _badgeFill(_ role: BadgeRole, onAccent: Bool) -> NSColor { badgeColors(role, onAccent: onAccent).fill }
+    /// The resolved 2nd-line font — the REAL renderer path, so the #8
+    /// readability fix (11pt medium, mono rows included) can't silently
+    /// regress.
+    func _secondaryFont(mono: Bool) -> NSFont { secondaryFont(mono: mono) }
+    /// The resolved badge-label font (`.badge` = 10pt medium across both
+    /// densities — the old 9pt compact value is gone).
+    func _badgeFont() -> NSFont { palette.uiFont(.badge) }
 
     // MARK: Drag seams (the state machine + target resolution, window-independent —
     // the ghost is a live-only child window, hand-checked in prism)

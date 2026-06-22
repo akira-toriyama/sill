@@ -186,12 +186,8 @@ public final class ThemedCheckbox: NSControl {
     private var fxIndeterminate: Bool { previewIndeterminate ?? isIndeterminate }
     private var eff: Bool { fxChecked || fxIndeterminate }   // box is "filled"
 
-    private func themedFont(_ s: CGFloat, _ w: NSFont.Weight = .regular) -> NSFont {
-        switch palette.font {
-        case .mono: return .monospacedSystemFont(ofSize: s, weight: w)
-        default:    return .systemFont(ofSize: s, weight: w)
-        }
-    }
+    // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
+    // (honours .mono/.rounded/.menu; the old local helper dropped two).
 
     /// Best-contrast ink on a fill (same WCAG path PaletteKit.onPrimary uses).
     private func ink(on c: NSColor) -> NSColor {
@@ -255,7 +251,7 @@ public final class ThemedCheckbox: NSControl {
     }
 
     private func rebuildLabel() {
-        let f = themedFont(metrics.labelFont)
+        let f = palette.uiFont(metrics.labelFont)
         let s = label ?? ""
         let attr = NSAttributedString(string: s, attributes: [.font: f, .foregroundColor: labelColor])
         labelTextSize = attr.size()

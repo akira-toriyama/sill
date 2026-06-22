@@ -296,27 +296,60 @@ public func setPalette(named name: String, bgOverride: HexColor? = nil) {
 
 // MARK: - Fonts
 
-/// Theme-aware font factory honoring `pal.font`. `.menu` is the system
-/// UI font (matches native menus); `.mono` / `.rounded` / `.system` as
-/// in facet.
+/// Theme-aware font factory honoring the module-level `pal.font`. A thin
+/// shim over `ResolvedPalette.uiFont(_:_:)` kept for `pal`-based callers;
+/// widgets resolve against their own `palette` via that extension.
 @MainActor
 public func uiFont(_ size: CGFloat, _ weight: NSFont.Weight = .regular) -> NSFont {
-    switch pal.font {
-    case .mono:
-        return .monospacedSystemFont(ofSize: size, weight: weight)
-    case .rounded:
-        let base = NSFont.systemFont(ofSize: size, weight: weight)
-        if let d = base.fontDescriptor.withDesign(.rounded) {
-            return NSFont(descriptor: d, size: size) ?? base
+    pal.uiFont(size, weight)
+}
+
+// MARK: - Type scale resolution
+
+public extension TypeWeight {
+    /// The AppKit weight this tier paints at.
+    var nsWeight: NSFont.Weight {
+        switch self {
+        case .regular:  return .regular
+        case .medium:   return .medium
+        case .semibold: return .semibold
         }
-        return base
-    case .menu:
-        // The system UI font at the requested size; menus use the
-        // standard system font, so this is `.systemFont` with the
-        // menu-appropriate weight default applied by the caller.
-        return NSFont.menuFont(ofSize: size)
-    case .system:
-        return .systemFont(ofSize: size, weight: weight)
+    }
+}
+
+public extension ResolvedPalette {
+    /// Theme-aware font for an explicit point size + weight, honoring the
+    /// resolved `FontKind`: `.mono`→monospaced, `.rounded`→rounded design,
+    /// `.menu`→the native menu font (no weight variant), `.system`→system.
+    ///
+    /// This is the SINGLE font factory ThemeKit widgets use. It replaces
+    /// ten per-widget `themedFont` helpers that branched only `.mono` vs
+    /// system and SILENTLY DROPPED `.rounded`/`.menu` — so under the
+    /// catalog's six rounded themes (and the menu preset) every widget had
+    /// been rendering the wrong family.
+    func uiFont(_ size: CGFloat, _ weight: NSFont.Weight = .regular) -> NSFont {
+        switch font {
+        case .mono:
+            return .monospacedSystemFont(ofSize: size, weight: weight)
+        case .rounded:
+            let base = NSFont.systemFont(ofSize: size, weight: weight)
+            if let d = base.fontDescriptor.withDesign(.rounded) {
+                return NSFont(descriptor: d, size: size) ?? base
+            }
+            return base
+        case .menu:
+            // The native menu font, which has no weight variant.
+            return NSFont.menuFont(ofSize: size)
+        case .system:
+            return .systemFont(ofSize: size, weight: weight)
+        }
+    }
+
+    /// Theme-aware font for a fixed `TypeRole` from sill's type scale: the
+    /// size + weight come from the role's token, the family from the live
+    /// `FontKind`.
+    func uiFont(_ role: TypeRole) -> NSFont {
+        uiFont(CGFloat(role.token.pt), role.token.weight.nsWeight)
     }
 }
 

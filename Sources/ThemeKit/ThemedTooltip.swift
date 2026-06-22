@@ -300,12 +300,8 @@ public final class ThemedTooltip: NSObject {
 
     // MARK: - Content (measure + theme the bubble; size is text-driven)
 
-    private func themedFont(_ size: CGFloat, _ weight: NSFont.Weight = .regular) -> NSFont {
-        switch palette.font {
-        case .mono: return .monospacedSystemFont(ofSize: size, weight: weight)
-        default:    return .systemFont(ofSize: size, weight: weight)
-        }
-    }
+    // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
+    // (honours .mono/.rounded/.menu; the old local helper dropped two).
 
     /// Black or white, whichever best contrasts a fill — the same WCAG crossover
     /// `onPrimary` uses, via the pure `Palette` helpers (no drift). PaletteKit's
@@ -328,7 +324,7 @@ public final class ThemedTooltip: NSObject {
     /// Re-measure the text, re-theme the layers, and reposition a shown bubble.
     /// Snapped (a theme / text swap should not smear).
     private func rebuild() {
-        let font = themedFont(11, .medium)
+        let font = palette.uiFont(.tooltip)
         let para = NSMutableParagraphStyle()
         para.alignment = .center
         para.lineBreakMode = .byWordWrapping

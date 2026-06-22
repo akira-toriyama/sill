@@ -82,7 +82,7 @@ public final class ThemedSkeleton: NSView {
 
     /// Text-row height from the themed font (MUI's `scale(1, 0.6)` squash, here
     /// ~0.6 of the font's line box).
-    private var lineHeight: CGFloat { ceil(themedFont(13).boundingRectForFont.height * 0.6) }
+    private var lineHeight: CGFloat { ceil(palette.uiFont(.body).boundingRectForFont.height * 0.6) }
 
     public override var intrinsicContentSize: NSSize {
         switch variant {
@@ -148,12 +148,8 @@ public final class ThemedSkeleton: NSView {
 
     // MARK: - Theming
 
-    private func themedFont(_ size: CGFloat, _ weight: NSFont.Weight = .regular) -> NSFont {
-        switch palette.font {
-        case .mono: return .monospacedSystemFont(ofSize: size, weight: weight)
-        default:    return .systemFont(ofSize: size, weight: weight)
-        }
-    }
+    // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
+    // (honours .mono/.rounded/.menu; the old local helper dropped two).
 
     /// The wash — `muted` at the `.subtle` alpha tier (≈0.16). Translucent on
     /// purpose: it alpha-blends over the host backdrop, and the pulse breathes

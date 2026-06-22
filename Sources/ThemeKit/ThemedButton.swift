@@ -278,12 +278,8 @@ public final class ThemedButton: NSControl {
 
     // MARK: - Theming
 
-    private func themedFont(_ size: CGFloat, _ weight: NSFont.Weight = .regular) -> NSFont {
-        switch palette.font {
-        case .mono: return .monospacedSystemFont(ofSize: size, weight: weight)
-        default:    return .systemFont(ofSize: size, weight: weight)
-        }
-    }
+    // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
+    // (honours .mono/.rounded/.menu; the old local helper dropped two).
 
     private var roleColor: NSColor {
         switch role {
@@ -411,7 +407,7 @@ public final class ThemedButton: NSControl {
     /// Push the uppercased, tracked title into the text layer (snapped, sized to
     /// the text — a CATextLayer renders nothing with zero bounds).
     private func rebuildTitle() {
-        let f = themedFont(metrics.font, .medium)
+        let f = palette.uiFont(metrics.font, .medium)
         let s = title.uppercased()
         let attr = NSAttributedString(string: s, attributes: [
             .font: f, .kern: 0.4, .foregroundColor: titleColor])
