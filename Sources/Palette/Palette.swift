@@ -780,3 +780,86 @@ public enum EffectIntensity: String, Sendable, Hashable, CaseIterable {
         EffectIntensity(rawValue: raw.trimmingCharacters(in: .whitespaces).lowercased())
     }
 }
+
+// MARK: - TypeScale
+
+/// The weight tier a `TypeRole` paints at — a pure mirror of the three
+/// `NSFont.Weight`s sill actually uses. PaletteKit maps it to the AppKit
+/// weight at the resolve boundary, so this enum stays AppKit-free (a
+/// `Palette`-only consumer never links AppKit).
+public enum TypeWeight: Sendable, Hashable, CaseIterable {
+    case regular, medium, semibold
+}
+
+/// A resolved type token: a point size + a weight. `pt` is a `Double` so
+/// the table carries no CoreGraphics type — callers wanting `CGFloat` wrap
+/// at the use site (same discipline as `EffectIntensity`).
+public struct TypeToken: Sendable, Hashable {
+    public let pt: Double
+    public let weight: TypeWeight
+    public init(_ pt: Double, _ weight: TypeWeight) {
+        self.pt = pt
+        self.weight = weight
+    }
+}
+
+/// sill's FIXED internal type scale — the ONE place the widget kit's text
+/// sizes + weights live, replacing the per-widget hardcoded `Metrics`
+/// literals (and the ten copy-pasted `themedFont` helpers).
+///
+/// Grounded in MUI's type scale (`createTypography.js`: body1 16px/400 ·
+/// body2 14px/400 · subtitle2 14px/500 · caption 12px/400 · button
+/// 14px/500) mapped **by role, not by pixel** onto macOS-native point
+/// sizes (`NSFont.systemFontSize` 13 · `smallSystemFontSize` 11 ·
+/// `labelFontSize` 10). MUI's portable lesson — lift small supporting
+/// text with WEIGHT (the 500 of subtitle2/button), not by stacking
+/// size + muted colour + regular weight — is why `secondaryBody` is 11pt
+/// *medium* rather than a larger regular.
+///
+/// FIXED, not themable: this is layout, not theme. Only `FontKind` (the
+/// typeface family) is themed (DESIGN.md GQ#9); these sizes never come
+/// from a `ThemeSpec`/config. PaletteKit's `uiFont(_:)` resolves a role
+/// against the live `FontKind`, so `.mono`/`.rounded`/`.menu` honour the
+/// theme while the size + weight stay constant. Colour is the widget's
+/// concern (the token is size + weight only).
+public enum TypeRole: Sendable, Hashable, CaseIterable {
+    /// Primary body text — list row title, text-field input, chip label.
+    /// MUI body1 · macOS body (13pt).
+    case body
+    /// Secondary / supporting body — list 2nd line, text-field helper &
+    /// error. 11pt **medium**: the readability fix. MUI emphasises small
+    /// supporting text by weight (subtitle2 14px/500), not size; 11pt is
+    /// macOS `smallSystemFontSize`, so growing it would crowd the 13pt
+    /// title — medium restores legibility with zero metrics risk.
+    case secondaryBody
+    /// Quiet caption — divider label, 2-line-header subtitle. MUI caption
+    /// (12px) · macOS caption1 (11pt).
+    case caption
+    /// Single-line section header. MUI overline (emphasised) · macOS
+    /// grouped-table header.
+    case sectionHeader
+    /// 2-line section-header title. MUI subtitle2 (14px/500).
+    case sectionTitle
+    /// List badge label. 10pt medium = `labelFontSize` floor; the old 9pt
+    /// compact badge dipped below every native + MUI floor.
+    case badge
+    /// Keyboard shortcut / keycap. `labelFontSize` (10pt), medium.
+    case shortcut
+    /// Tooltip text. Kept distinct from `secondaryBody` (same metrics
+    /// today, different concern) so the two can diverge independently.
+    case tooltip
+
+    /// The FIXED size + weight this role paints at.
+    public var token: TypeToken {
+        switch self {
+        case .body:          return TypeToken(13, .regular)
+        case .secondaryBody: return TypeToken(11, .medium)
+        case .caption:       return TypeToken(11, .regular)
+        case .sectionHeader: return TypeToken(11, .semibold)
+        case .sectionTitle:  return TypeToken(13, .medium)
+        case .badge:         return TypeToken(10, .medium)
+        case .shortcut:      return TypeToken(10, .medium)
+        case .tooltip:       return TypeToken(11, .medium)
+        }
+    }
+}
