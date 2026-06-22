@@ -648,16 +648,54 @@ public func drawChompCorridor(_ path: [CGPoint], now: CFTimeInterval,
     let pelletGap = 5.2 * s
     let roadHalf  = roadWidth / 2
 
-    // 1) Black road + 2-stroke neon walls on ONE rounded centreline.
+    // #12 Ph5 — eating is a PURE function of `now`: the face (the eater) is the
+    // trailing `pathPetCursors` cursor; pellets behind it are eaten, a bonus
+    // crossing flashes the walls + floats a "+N". `valid == false` (the panicking
+    // ghost) doesn't eat — it keeps Ph4's static pellets.
+    let total = Double(polylineLength(path))
+    let faceLag = valid ? roadWidth * 1.4 : 0
+    let cursors = pathPetCursors(total: total, speed: Double(speed),
+                                 now: Double(now), faceLag: Double(faceLag))
+    let faceArc = cursors.pet                       // the eating arc-length
+
+    // Classify the pellet row up front (the wall colour depends on bonus eats).
+    enum Kind { case dot, cherry, icon }
+    struct Pellet { let point: CGPoint; let arc: Double; let kind: Kind; let value: Int }
+    let marks = resampleAlongPolyline(path, interval: Double(pelletGap))
+    var pellets: [Pellet] = []
+    for (i, m) in marks.enumerated() where i > 0 {
+        let pt = CGPoint(x: m.point.x, y: m.point.y)
+        let arc = min(Double(i) * Double(pelletGap), total)
+        let ix = Int(m.point.x.rounded()), iy = Int(m.point.y.rounded())
+        let h = positionHash01(x: ix, y: iy)
+        let kind: Kind = h < 0.04 ? .cherry : (h < 0.08 && icon != nil ? .icon : .dot)
+        pellets.append(Pellet(point: pt, arc: arc, kind: kind,
+                              value: bonusValue(x: ix, y: iy)))
+    }
+    let bonusArcs = valid ? pellets.filter { $0.kind != .dot }.map(\.arc) : []
+    let flash = chompFlashPhase(eventArcs: bonusArcs, total: total, speed: Double(speed),
+                                now: Double(now), faceLag: Double(faceLag),
+                                dur: chompEatFlashDur)
+
+    // 1) Black road + 2-stroke neon walls on ONE rounded centreline. While a bonus
+    //    flash is in flight the wall sweeps EffectSpec.chomp.flash (the rainbow
+    //    flash) instead of resting blue, with a brighter glow.
     let steps = roundedCornerPath(path, radius: Double(roadHalf))
     let wall  = nsBezierPath(steps, lineWidth: roadWidth + 2 * wallThick)
     let road  = nsBezierPath(steps, lineWidth: roadWidth)
-    let blue  = NSColor(HexColor(SpriteColor.pupilBlue))
+    let wallColor: NSColor
+    if let flash {
+        let c = blendThrough(EffectSpec.chomp.flash, at: flash)
+        wallColor = NSColor(srgbRed: CGFloat(c.r), green: CGFloat(c.g),
+                            blue: CGFloat(c.b), alpha: 1)
+    } else {
+        wallColor = NSColor(HexColor(SpriteColor.pupilBlue))
+    }
     NSGraphicsContext.saveGraphicsState()
     let glow = NSShadow()
-    glow.shadowColor = blue.withAlphaComponent(0.85)
-    glow.shadowBlurRadius = 3 * s; glow.shadowOffset = .zero; glow.set()
-    blue.setStroke(); wall.stroke()
+    glow.shadowColor = wallColor.withAlphaComponent(flash != nil ? 1 : 0.85)
+    glow.shadowBlurRadius = (flash != nil ? 5 : 3) * s; glow.shadowOffset = .zero; glow.set()
+    wallColor.setStroke(); wall.stroke()
     NSGraphicsContext.restoreGraphicsState()
     NSColor.black.setStroke(); road.stroke()
 
@@ -675,31 +713,41 @@ public func drawChompCorridor(_ path: [CGPoint], now: CFTimeInterval,
                                     width: 2 * fr, height: 2 * fr)).fill()
     }
 
-    // 3) Central pellet row — positionHash01 bands cherry (4%) / icon (4%) / dot;
-    //    skip the FIRST mark (under the live cursor, it would flicker on wrap).
-    let marks     = resampleAlongPolyline(path, interval: Double(pelletGap))
+    // 3) Central pellet row — skip the FIRST mark (live cursor) AND any pellet the
+    //    face has already eaten this lap (valid only; the ghost keeps them static).
     let yellow    = NSColor(HexColor(SpriteColor.pacYellow))
     let bonusCell = roadWidth * 0.62 / 12        // cherry is 12 cells wide
     let iconBox   = roadWidth * 0.66
-    for (i, m) in marks.enumerated() where i > 0 {
-        let c = CGPoint(x: m.point.x, y: m.point.y)
-        let h = positionHash01(x: Int(m.point.x.rounded()), y: Int(m.point.y.rounded()))
-        if h < 0.04 {
-            drawCenteredSprite(CanonicalSprite.cherry, cell: bonusCell, at: c)
-        } else if h < 0.08, let icon {
-            drawCorridorIcon(icon, at: c, box: iconBox)
-        } else {
+    for p in pellets {
+        if valid, faceArc >= p.arc { continue }   // eaten — gone until the lap wraps
+        switch p.kind {
+        case .cherry:
+            drawCenteredSprite(CanonicalSprite.cherry, cell: bonusCell, at: p.point)
+        case .icon:
+            if let icon { drawCorridorIcon(icon, at: p.point, box: iconBox) }
+        case .dot:
             yellow.setFill()
-            NSBezierPath(ovalIn: CGRect(x: c.x - pelletR, y: c.y - pelletR,
+            NSBezierPath(ovalIn: CGRect(x: p.point.x - pelletR, y: p.point.y - pelletR,
                                         width: 2 * pelletR, height: 2 * pelletR)).fill()
         }
     }
 
-    // 4) The walking pac / panicking ghost — reuse Ph3 (no guide; the walls show
-    //    the road). Pac ≈ 0.78 of the road; the head leads by ~1.4 road widths.
+    // 4) The walking pac / panicking ghost — reuse Ph3 (no guide, no chased dot;
+    //    the pellets are the targets now).
     let petScale = roadWidth * 0.78 / chompFaceFootprint
     drawChompPath(path, now: now, valid: valid, scale: petScale,
-                  speed: speed, faceLag: valid ? roadWidth * 1.4 : 0, showGuide: false)
+                  speed: speed, faceLag: faceLag, showGuide: false, showHead: false)
+
+    // 5) Floating "+N" score pops for bonuses eaten in the last ~0.8s (valid only).
+    if valid {
+        let pops = chompScorePops(
+            bonuses: pellets.filter { $0.kind != .dot }
+                .map { (point: (x: Double($0.point.x), y: Double($0.point.y)),
+                        arc: $0.arc, value: $0.value) },
+            total: total, speed: Double(speed), now: Double(now),
+            faceLag: Double(faceLag), dur: chompScorePopDur)
+        for pop in pops { drawScorePop(pop, scale: s) }
+    }
 }
 
 /// Walk `rect`'s perimeter linearly (top → right → bottom → left) and

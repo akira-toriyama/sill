@@ -66,6 +66,20 @@ final class CorridorTests: XCTestCase {
     }
 
     @MainActor
+    func testDrawChompCorridorEatFrameSmoke() {
+        // A frozen `now` partway through a lap (pellets eaten + possibly flashing +
+        // a pop) must render without trapping. Orthogonal U-maze, y-up host.
+        let path = [CGPoint(x: 20, y: 20), CGPoint(x: 180, y: 20),
+                    CGPoint(x: 180, y: 80), CGPoint(x: 20, y: 80)]
+        let img = NSImage(size: NSSize(width: 200, height: 100))
+        img.lockFocus()
+        drawChompCorridor(path, now: 1.3, valid: true, tier: .s, scale: 1, speed: 60)
+        drawChompCorridor(path, now: 2.7, valid: false, tier: .s, scale: 1, speed: 60)
+        img.unlockFocus()
+        XCTAssertEqual(img.size.height, 100, accuracy: 1e-9)
+    }
+
+    @MainActor
     func testDrawScorePopSmoke() {
         // Render into an offscreen image — proves the text draw path doesn't trap.
         let img = NSImage(size: NSSize(width: 64, height: 32))
