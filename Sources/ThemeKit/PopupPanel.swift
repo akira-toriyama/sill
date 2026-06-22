@@ -296,17 +296,11 @@ struct PopupFade {
         }
     }
 
-    /// A snapped (or `duration`-eased) layer mutation — the shared `layerTxn`.
+    /// A snapped (or `duration`-eased) layer mutation. Delegates to the shared
+    /// `layerTxn`, passing this fade's own length (combo / tooltip) as the
+    /// animated duration.
     func transact(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(duration)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
+        layerTxn(animated: animated, duration: duration, body)
     }
 }
 

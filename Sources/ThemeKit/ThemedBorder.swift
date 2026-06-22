@@ -98,7 +98,7 @@ public final class ThemedBorder: NSView {
         super.init(frame: .zero)
         wantsLayer = true
         layer?.masksToBounds = false                     // the glow blooms outward
-        let s = NSScreen.main?.backingScaleFactor ?? 2
+        let s = themeBackingScale
         for l in [glowLayer, strokeLayer] {              // glow added FIRST → drawn behind
             l.contentsScale = s
             l.fillColor = NSColor.clear.cgColor
@@ -154,8 +154,7 @@ public final class ThemedBorder: NSView {
 
     public override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
-        strokeLayer.contentsScale = window?.backingScaleFactor
-            ?? NSScreen.main?.backingScaleFactor ?? 2
+        strokeLayer.contentsScale = themeBackingScale
     }
 
     // MARK: - Ambient-animation lifecycle (mirrors ThemedSkeleton)

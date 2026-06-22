@@ -262,11 +262,10 @@ public final class ThemedComboBox: NSObject {
         // container edge + surface are ALSO read back by `comboProbe` as the real
         // rendered state, so keep painting them here even though the hosted list
         // paints its own surface on top.
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        container.layer?.backgroundColor = listSurface.cgColor
-        container.layer?.borderColor = palette.border.cgColor
-        CATransaction.commit()
+        layerTxn(animated: false) {
+            container.layer?.backgroundColor = listSurface.cgColor
+            container.layer?.borderColor = palette.border.cgColor
+        }
         list?.palette = palette
         list?.surfaceColor = listSurface
     }

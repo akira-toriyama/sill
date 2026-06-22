@@ -31,6 +31,19 @@ import Palette
 import PaletteKit
 import Motion
 
+extension ThemedButton.Role {
+    /// Bridge to the shared `ControlRole` so the role → colour selection lives in
+    /// `ResolvedPalette.color(for:)`. Shared by ThemedButton AND ThemedButtonGroup
+    /// (both key off this same `Role` enum).
+    var control: ControlRole {
+        switch self {
+        case .primary:   return .primary
+        case .secondary: return .secondary
+        case .error:     return .error
+        }
+    }
+}
+
 @MainActor
 public final class ThemedButton: NSControl {
 
@@ -282,30 +295,13 @@ public final class ThemedButton: NSControl {
     // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
     // (honours .mono/.rounded/.menu; the old local helper dropped two).
 
-    private var roleColor: NSColor {
-        switch role {
-        case .primary:   return palette.primary
-        case .secondary: return palette.secondary
-        case .error:     return palette.error
-        }
-    }
-
-    /// Black or white, whichever best contrasts a fill — the same WCAG
-    /// crossover `PaletteKit.onPrimary` uses (shared pure Palette helpers, so a
-    /// secondary / error fill gets correct ink, not just primary).
-    private func ink(on c: NSColor) -> NSColor {
-        let s = c.usingColorSpace(.sRGB) ?? c
-        let l = wcagRelativeLuminance(r: Double(s.redComponent),
-                                      g: Double(s.greenComponent),
-                                      b: Double(s.blueComponent))
-        return prefersBlackForeground(fillRelLuminance: l) ? .black : .white
-    }
+    private var roleColor: NSColor { palette.color(for: role.control) }
 
     /// Label + icon ink for the current state.
     private var titleColor: NSColor {
         guard isEnabled else { return palette.muted }
         switch variant {
-        case .contained:        return ink(on: roleColor)
+        case .contained:        return palette.bestContrast(on: roleColor)
         case .text, .outlined:  return roleColor
         }
     }
@@ -331,7 +327,7 @@ public final class ThemedButton: NSControl {
         guard isEnabled else { return .clear }
         switch variant {
         case .contained:
-            let on = ink(on: roleColor)
+            let on = palette.bestContrast(on: roleColor)
             if fxPressed { return on.withAlphaComponent(0.12) }
             if fxHovered { return on.withAlphaComponent(0.08) }
             return .clear
@@ -351,17 +347,16 @@ public final class ThemedButton: NSControl {
         return roleColor.withAlphaComponent(0.5)
     }
 
-    private struct Elevation { let opacity: Float; let radius: CGFloat; let offsetY: CGFloat }
-    /// Contained elevation per state (≈ MUI dp 2 / 4 / 6 / 8); flat otherwise.
-    /// Order pressed → focused → hovered so adding an interaction never LOWERS
-    /// the shadow (MUI's focus dp6 sits above hover dp4; hovering a focused
-    /// button must not dip to dp4).
-    private var elevation: Elevation {
-        guard variant == .contained, isEnabled else { return Elevation(opacity: 0, radius: 0, offsetY: 0) }
-        if fxPressed { return Elevation(opacity: 0.28, radius: 8, offsetY: -3) }
-        if fxFocused { return Elevation(opacity: 0.26, radius: 6, offsetY: -2) }
-        if fxHovered { return Elevation(opacity: 0.24, radius: 5, offsetY: -2) }
-        return Elevation(opacity: 0.20, radius: 3, offsetY: -1)
+    /// Contained elevation per state (the #13 dp ladder: rest dp2 → hover dp4 →
+    /// focus dp6 → press dp8); flat otherwise. Order pressed → focused → hovered
+    /// so adding an interaction never LOWERS the shadow (focus dp6 sits above
+    /// hover dp4; hovering a focused button must not dip to dp4).
+    private var elevation: (opacity: Float, radius: CGFloat, offsetY: CGFloat) {
+        guard variant == .contained, isEnabled else { return palette.shadow(.flat) }
+        if fxPressed { return palette.shadow(.dp8) }
+        if fxFocused { return palette.shadow(.dp6) }
+        if fxHovered { return palette.shadow(.dp4) }
+        return palette.shadow(.dp2)
     }
 
     private var showFocusRing: Bool { fxFocused }
@@ -517,9 +512,7 @@ public final class ThemedButton: NSControl {
 
     // MARK: - Layout
 
-    private var backingScale: CGFloat {
-        window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-    }
+    private var backingScale: CGFloat { themeBackingScale }
 
     public override func layout() {
         super.layout()
@@ -587,21 +580,6 @@ public final class ThemedButton: NSControl {
         focusRingLayer.contentsScale = s
         rebuildIcons()      // re-rasterize at the new device scale
         needsLayout = true
-    }
-
-    // MARK: - Snap-vs-animate (verbatim ThemedTextField idiom)
-
-    private func layerTxn(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
-            CATransaction.setAnimationTimingFunction(
-                CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
     }
 
     // MARK: - Hover (tracking area)

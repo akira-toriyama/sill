@@ -174,9 +174,7 @@ public final class ThemedCheckbox: NSControl {
     public required init?(coder: NSCoder) { nil }
 
     private func relayout() { invalidateIntrinsicContentSize(); needsLayout = true }
-    private var backingScale: CGFloat {
-        window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-    }
+    private var backingScale: CGFloat { themeBackingScale }
 
     // MARK: - State helpers
 
@@ -190,15 +188,6 @@ public final class ThemedCheckbox: NSControl {
     // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
     // (honours .mono/.rounded/.menu; the old local helper dropped two).
 
-    /// Best-contrast ink on a fill (same WCAG path PaletteKit.onPrimary uses).
-    private func ink(on c: NSColor) -> NSColor {
-        let s = c.usingColorSpace(.sRGB) ?? c
-        let l = wcagRelativeLuminance(r: Double(s.redComponent),
-                                      g: Double(s.greenComponent),
-                                      b: Double(s.blueComponent))
-        return prefersBlackForeground(fillRelLuminance: l) ? .black : .white
-    }
-
     private var boxFillColor: NSColor {
         guard eff else { return .clear }
         return isEnabled ? palette.primary : palette.muted
@@ -207,7 +196,7 @@ public final class ThemedCheckbox: NSControl {
         isEnabled ? palette.ink(.strong, of: .foreground) : palette.muted
     }
     private var glyphColor: NSColor {
-        ink(on: isEnabled ? palette.primary : palette.muted)
+        palette.bestContrast(on: isEnabled ? palette.primary : palette.muted)
     }
     /// The circular state layer tint (hover/press/focus), rooted on `primary`
     /// when the box is set, else `foreground` — MUI's checked-vs-unchecked ripple.
@@ -338,20 +327,6 @@ public final class ThemedCheckbox: NSControl {
         }
         labelLayer.contentsScale = s
         needsLayout = true
-    }
-
-    // MARK: - Snap-vs-animate (verbatim ThemedTextField idiom)
-
-    private func layerTxn(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
     }
 
     // MARK: - Hover
