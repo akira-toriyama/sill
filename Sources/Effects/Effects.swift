@@ -665,6 +665,13 @@ public func drawChompCorridor(_ path: [CGPoint], now: CFTimeInterval,
     var pellets: [Pellet] = []
     for (i, m) in marks.enumerated() where i > 0 {
         let pt = CGPoint(x: m.point.x, y: m.point.y)
+        // Arc of mark i: resampleAlongPolyline emits marks at UNIFORM pelletGap
+        // spacing, so mark i sits at exactly i*pelletGap (an invariant of uniform
+        // resampling). The appended tail mark (when the length isn't a whole
+        // multiple) is clamped to `total`; a pellet with arc + faceLag > total is
+        // in the face's trailing dead-zone — never eaten this lap, always visible.
+        // Disappearance AND flash/score coherently exclude it (the plan's
+        // "ラップ境界の既知の小事"), so the i*gap reconstruction needs no arc query.
         let arc = min(Double(i) * Double(pelletGap), total)
         let ix = Int(m.point.x.rounded()), iy = Int(m.point.y.rounded())
         let h = positionHash01(x: ix, y: iy)

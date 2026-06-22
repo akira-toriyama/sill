@@ -42,6 +42,11 @@ public struct ScorePop: Sendable, Equatable {
 /// (the `pathPetCursors` / `frameStep` convention). Callers guard `total`/`speed`.
 private func corridorLapPhase(total: Double, speed: Double, now: Double) -> Double {
     let period = total / speed
+    // `truncatingRemainder` truncates TOWARD ZERO (not floor), so it yields a
+    // negative result for a negative `now` — and could under precision loss. The
+    // `+ period` guard folds either case forward into `[0, period)`; load-bearing
+    // for the deterministic freeze, and the SAME fold `pathPetCursors` applies, so
+    // `faceArc` and the crossing times `(arc+faceLag)/speed` share one lap phase.
     let lp = now.truncatingRemainder(dividingBy: period)
     return lp < 0 ? lp + period : lp
 }
