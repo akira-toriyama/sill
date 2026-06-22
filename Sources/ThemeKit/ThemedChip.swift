@@ -29,6 +29,7 @@
 import AppKit
 import Palette
 import PaletteKit
+import Motion
 
 @MainActor
 public final class ThemedChip: NSControl {
@@ -167,7 +168,7 @@ public final class ThemedChip: NSControl {
         case .keycap:            hpad = small ? 6 : 8
         case .filled, .outlined: hpad = small ? 8 : 12
         }
-        let radius: CGFloat = variant == .keycap ? 5 : h / 2   // pill, except the key
+        let radius: CGFloat = variant == .keycap ? CGFloat(Radius.sm) : h / 2   // pill, except the key
         let minWidth: CGFloat = variant == .keycap ? h : 0     // a 1-glyph key is square
         let border: CGFloat = (variant == .outlined || variant == .keycap) ? 1 : 0
         return Metrics(height: h, hpad: hpad, radius: radius, font: font,
@@ -538,7 +539,7 @@ public final class ThemedChip: NSControl {
     private func layerTxn(animated: Bool, _ body: () -> Void) {
         CATransaction.begin()
         if animated {
-            CATransaction.setAnimationDuration(0.16)
+            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
             CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
         } else {
             CATransaction.setDisableActions(true)

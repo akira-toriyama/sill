@@ -37,6 +37,7 @@
 import AppKit
 import Palette
 import PaletteKit
+import Motion
 
 @MainActor
 public final class ThemedToolBar: NSView {
@@ -125,7 +126,7 @@ public final class ThemedToolBar: NSView {
         didSet { invalidateIntrinsicContentSize(); needsLayout = true }
     }
     /// Gap between adjacent content items (AppKit has no implicit MUI `mr`).
-    public var itemSpacing: CGFloat = 8 {
+    public var itemSpacing: CGFloat = CGFloat(Space.md) {
         didSet { invalidateIntrinsicContentSize(); needsLayout = true }
     }
     /// Override the composed buttons' size; `nil` = derived from the variant.
@@ -178,7 +179,7 @@ public final class ThemedToolBar: NSView {
     private var controlHeight: CGFloat {
         switch resolvedControlSize { case .small: return 30; case .medium: return 36; case .large: return 42 }
     }
-    private var cornerRadius: CGFloat { corners == .rounded ? 8 : 0 }
+    private var cornerRadius: CGFloat { corners == .rounded ? CGFloat(Radius.lg) : 0 }
     private var dividerHeight: CGFloat { max(16, minHeight * 0.5) }
     private var hairlineThickness: CGFloat { 1.0 / backingScale }
 
@@ -522,7 +523,7 @@ public final class ThemedToolBar: NSView {
     private func layerTxn(animated: Bool, _ body: () -> Void) {
         CATransaction.begin()
         if animated {
-            CATransaction.setAnimationDuration(0.16)
+            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
             CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
         } else {
             CATransaction.setDisableActions(true)

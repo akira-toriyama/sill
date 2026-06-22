@@ -36,6 +36,7 @@ import AppKit
 import QuartzCore
 import Palette
 import PaletteKit
+import Motion
 
 @MainActor
 public final class ThemedTooltip: NSObject {
@@ -105,7 +106,7 @@ public final class ThemedTooltip: NSObject {
     private var fadeGen = 0
 
     /// The shared 0.16 s fade (MUI Tooltip timing) + host glue.
-    private let fade = PopupFade(duration: 0.16)
+    private let fade = PopupFade(duration: ThemedTransition.Duration.enter)
     private let glue = PopupGlue()
 
     /// Last measured fill (surface) size, padding included; arrow excluded.
@@ -118,11 +119,11 @@ public final class ThemedTooltip: NSObject {
 
     // MARK: - Metrics (MUI v5 Tooltip values + macOS placement constants)
 
-    private let gap: CGFloat = 8            // anchor edge → arrow tip
+    private let gap: CGFloat = CGFloat(Space.md)            // anchor edge → arrow tip
     // (the visible-frame margin now lives in the shared `popupScreenMargin`)
-    private let cornerRadius: CGFloat = 4
-    private let hpad: CGFloat = 8           // MUI padding 4×8
-    private let vpad: CGFloat = 4
+    private let cornerRadius: CGFloat = CGFloat(Radius.sm)
+    private let hpad: CGFloat = CGFloat(Space.md)           // MUI padding 4×8
+    private let vpad: CGFloat = CGFloat(Space.xs)
     private let maxWidth: CGFloat = 300     // wrap past this
     private let arrowBase: CGFloat = 11     // triangle base width
     private let arrowLen: CGFloat = 8       // triangle protrusion (≈ base / √2)

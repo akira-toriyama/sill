@@ -319,6 +319,7 @@ struct ThemeCard: View {
             .font(themeFont(spec.font, size: 15 * scale))
             .foregroundColor(Color(nsColor: p.foreground))
         TypeScaleSpecimen(p: p)
+        TokenSpecimen(p: p)
         if showEffects, let fx = borderEffectFor(name) {
             LiveEffectStrip(fx: fx, name: name, fallback: p.primary)
         }
@@ -584,6 +585,90 @@ struct TypeScaleSpecimen: View {
         case .regular:  return "regular"
         case .medium:   return "medium"
         case .semibold: return "semibold"
+        }
+    }
+}
+
+/// #13 design-token specimen — sill's fixed `Space` / `Radius` / `Elevation`
+/// scales rendered live so the maintainer can eyeball the ramps per theme.
+/// The Elevation row drives `ResolvedPalette.shadow(_:)` (the PaletteKit
+/// resolver), so this is also the live exercise of that table while the
+/// widgets still hand-roll their own elevation (consolidation is #14a).
+struct TokenSpecimen: View {
+    let p: ResolvedPalette
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Radius ramp — a filled tile per step, rounded by the token.
+            tokenRow("Radius") {
+                ForEach(Radius.scale, id: \.name) { step in
+                    swatchCol("\(step.name)·\(Int(step.pt))") {
+                        RoundedRectangle(cornerRadius: CGFloat(step.pt) * uiScale)
+                            .fill(Color(nsColor: p.primary).opacity(0.85))
+                            .frame(width: 44 * uiScale, height: 30 * uiScale)
+                    }
+                }
+            }
+            // Space ramp — two accent bars separated by the token's gap.
+            tokenRow("Space") {
+                ForEach(Space.scale, id: \.name) { step in
+                    swatchCol("\(step.name)·\(Int(step.pt))") {
+                        HStack(spacing: 0) {
+                            accentBar
+                            Color.clear.frame(width: CGFloat(step.pt) * uiScale)
+                            accentBar
+                        }
+                        .frame(height: 28 * uiScale)
+                    }
+                }
+            }
+            // Elevation ladder — a surface card per depth, shadow from the
+            // resolver (offsetY is pre-negated for AppKit y-up; SwiftUI's y is
+            // down, so re-negate here).
+            tokenRow("Elevation") {
+                ForEach(Elevation.allCases, id: \.self) { level in
+                    let s = p.shadow(level)
+                    swatchCol(elevationLabel(level)) {
+                        RoundedRectangle(cornerRadius: CGFloat(Radius.sm) * uiScale)
+                            .fill(Color(nsColor: p.background ?? .windowBackgroundColor))
+                            .frame(width: 40 * uiScale, height: 30 * uiScale)
+                            .overlay(RoundedRectangle(cornerRadius: CGFloat(Radius.sm) * uiScale)
+                                .stroke(Color(nsColor: p.border), lineWidth: 1))
+                            .shadow(color: .black.opacity(Double(s.opacity)),
+                                    radius: s.radius, x: 0, y: -s.offsetY)
+                            .padding(4 * uiScale)
+                    }
+                }
+            }
+        }
+    }
+
+    private var accentBar: some View {
+        Rectangle().fill(Color(nsColor: p.primary)).frame(width: 4 * uiScale)
+    }
+    private func swatchCol<C: View>(_ label: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(spacing: 3) {
+            content()
+            Text(label)
+                .font(.system(size: 8.5, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.tertiary))
+        }
+    }
+    @ViewBuilder private func tokenRow<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(sysFont(10, weight: .semibold))
+                .foregroundColor(Color(nsColor: p.muted))
+            HStack(alignment: .bottom, spacing: 10 * uiScale) { content() }
+        }
+    }
+    private func elevationLabel(_ e: Elevation) -> String {
+        switch e {
+        case .flat: return "flat"
+        case .dp2:  return "dp2"
+        case .dp4:  return "dp4"
+        case .dp6:  return "dp6"
+        case .dp8:  return "dp8"
+        case .dp12: return "dp12"
         }
     }
 }

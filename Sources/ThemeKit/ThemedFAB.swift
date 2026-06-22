@@ -28,6 +28,7 @@
 import AppKit
 import Palette
 import PaletteKit
+import Motion
 
 @MainActor
 public final class ThemedFAB: NSControl {
@@ -145,7 +146,7 @@ public final class ThemedFAB: NSControl {
         let font:     CGFloat = size == .small ? 13 : 14
         let hpad:     CGFloat = size == .small ? 8 : 16
         return Metrics(diameter: diameter, height: height, hpad: hpad,
-                       iconPt: iconPt, font: font, gap: 8, ringInset: 2)
+                       iconPt: iconPt, font: font, gap: CGFloat(Space.md), ringInset: 2)
     }
 
     public override var intrinsicContentSize: NSSize {
@@ -439,7 +440,7 @@ public final class ThemedFAB: NSControl {
     private func layerTxn(animated: Bool, _ body: () -> Void) {
         CATransaction.begin()
         if animated {
-            CATransaction.setAnimationDuration(0.16)
+            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
             CATransaction.setAnimationTimingFunction(
                 CAMediaTimingFunction(name: .easeOut))
         } else {

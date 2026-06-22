@@ -21,6 +21,7 @@
 import AppKit
 import Palette
 import PaletteKit
+import Motion
 
 @MainActor
 public final class ThemedButtonGroup: NSView {
@@ -308,7 +309,7 @@ public final class ThemedButtonGroup: NSView {
             groupShadowLayer.frame = union
             groupShadowLayer.shadowPath = CGPath(
                 roundedRect: CGRect(origin: .zero, size: union.size),
-                cornerWidth: 4, cornerHeight: 4, transform: nil)
+                cornerWidth: CGFloat(Radius.sm), cornerHeight: CGFloat(Radius.sm), transform: nil)
         }
         guard variant != .outlined, children.count > 1 else { return }
         let scale = backingScale
@@ -373,7 +374,7 @@ public final class ThemedButtonGroup: NSView {
     private func layerTxn(animated: Bool, _ body: () -> Void) {
         CATransaction.begin()
         if animated {
-            CATransaction.setAnimationDuration(0.16)
+            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
             CATransaction.setAnimationTimingFunction(
                 CAMediaTimingFunction(name: .easeOut))
         } else {

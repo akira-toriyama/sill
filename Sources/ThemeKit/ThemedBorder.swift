@@ -60,7 +60,7 @@ public final class ThemedBorder: NSView {
     public var effectsEnabled: Bool = true { didSet { rebuild() } }
 
     /// Corner radius of the stroked rounded-rect (match the host surface).
-    public var cornerRadius: CGFloat = 12 { didSet { relayout() } }
+    public var cornerRadius: CGFloat = CGFloat(Radius.xl) { didSet { relayout() } }
 
     /// Resting stroke width. The live effect breathes between this and `breathMultiplier`×.
     public var lineWidth: CGFloat = 1.5 { didSet { relayout() } }

@@ -32,6 +32,7 @@ import AppKit
 import QuartzCore
 import Palette
 import PaletteKit
+import Motion
 
 @MainActor
 public final class ThemedComboBox: NSObject {
@@ -188,7 +189,7 @@ public final class ThemedComboBox: NSObject {
     nonisolated(unsafe) private var localMon: Any?
 
     /// The shared 0.12 s fade + host glue (combo dismisses on the host resigning key).
-    private let fade = PopupFade(duration: 0.12)
+    private let fade = PopupFade(duration: ThemedTransition.Duration.exit)
     private let glue = PopupGlue()
 
     // Probe state (set by reframe()).
@@ -198,8 +199,8 @@ public final class ThemedComboBox: NSObject {
     // MARK: Metrics (final — not configurable in BASIC)
     fileprivate let rowHeight: CGFloat = 30       // == ThemedList `.comfortable` singleRow
     private let maxVisibleRows = 8
-    private let gap: CGFloat = 4
-    private let cornerRadius: CGFloat = 8
+    private let gap: CGFloat = CGFloat(Space.xs)
+    private let cornerRadius: CGFloat = CGFloat(Radius.lg)
     // (the visible-frame margin now lives in the shared `popupScreenMargin`;
     //  row insets / fonts / accent-bar now live in ThemedList `.comfortable`.)
 

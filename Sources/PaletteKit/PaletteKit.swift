@@ -353,6 +353,27 @@ public extension ResolvedPalette {
     }
 }
 
+// MARK: - Elevation resolution
+
+public extension ResolvedPalette {
+    /// CALayer drop-shadow parameters for an `Elevation` level — the AppKit
+    /// side of sill's elevation scale, the direct analogue of `uiFont(_ role:)`:
+    /// the pure `Double` token lives in `Palette`, the platform-typed wrap
+    /// lives here at the resolve boundary.
+    ///
+    /// Returns `(opacity, radius, offsetY)` ready for `layer.shadowOpacity` /
+    /// `.shadowRadius` / `.shadowOffset` — the shadow COLOUR stays the widget's
+    /// `NSColor.black.cgColor`, the kit's universal drop-shadow ink. `offsetY`
+    /// is ALREADY NEGATED for sill's y-up (`isFlipped == false`) layer space,
+    /// where a downward shadow sits at −y, so widgets stop hand-writing the
+    /// minus. (Free of `self` today — attached to `ResolvedPalette`, not a
+    /// free func, so a future depth-tinted shadow can read the palette.)
+    func shadow(_ level: Elevation) -> (opacity: Float, radius: CGFloat, offsetY: CGFloat) {
+        let t = level.token
+        return (Float(t.opacity), CGFloat(t.blur), CGFloat(-t.dy))
+    }
+}
+
 // MARK: - blendThrough (re-exported for AppKit callers)
 
 /// Smoothly loop through `colors` by `phase` (0…1), blending

@@ -126,7 +126,7 @@ let package = Package(
         // adornments, focus-accent transition, helper/error, IME-aware. Themed
         // by assigning `palette`. @MainActor / AppKit.
         .target(name: "ThemeKit",
-                dependencies: ["PaletteKit", "Palette",
+                dependencies: ["PaletteKit", "Palette", "Motion",
                                .product(name: "SwiftDraw", package: "SwiftDraw")],
                 exclude: ["Resources/README.md"],   // doc, not a bundled resource
                 resources: [.copy("Resources/Phosphor"),

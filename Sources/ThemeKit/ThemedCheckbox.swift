@@ -17,6 +17,7 @@
 import AppKit
 import Palette
 import PaletteKit
+import Motion
 
 @MainActor
 public final class ThemedCheckbox: NSControl {
@@ -108,8 +109,8 @@ public final class ThemedCheckbox: NSControl {
     }
     private var metrics: Metrics {
         switch size {
-        case .small:  return Metrics(target: 38, box: 18, radius: 2, stroke: 1.5, labelFont: 14, labelGap: 4, focusInset: -2)
-        case .medium: return Metrics(target: 42, box: 20, radius: 2, stroke: 2,   labelFont: 16, labelGap: 4, focusInset: -2)
+        case .small:  return Metrics(target: 38, box: 18, radius: CGFloat(Radius.xs), stroke: 1.5, labelFont: 14, labelGap: CGFloat(Space.xs), focusInset: -2)
+        case .medium: return Metrics(target: 42, box: 20, radius: CGFloat(Radius.xs), stroke: 2,   labelFont: 16, labelGap: CGFloat(Space.xs), focusInset: -2)
         }
     }
 
@@ -344,7 +345,7 @@ public final class ThemedCheckbox: NSControl {
     private func layerTxn(animated: Bool, _ body: () -> Void) {
         CATransaction.begin()
         if animated {
-            CATransaction.setAnimationDuration(0.16)
+            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
             CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
         } else {
             CATransaction.setDisableActions(true)
