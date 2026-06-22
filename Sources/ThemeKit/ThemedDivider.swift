@@ -140,14 +140,8 @@ public final class ThemedDivider: NSView {
 
     // MARK: - Theming
 
-    /// Themed font for the label (mirrors ThemedTextField: mono themes get a
-    /// monospaced caption, everything else the system face).
-    private func themedFont(_ size: CGFloat, _ weight: NSFont.Weight = .regular) -> NSFont {
-        switch palette.font {
-        case .mono: return .monospacedSystemFont(ofSize: size, weight: weight)
-        default:    return .systemFont(ofSize: size, weight: weight)
-        }
-    }
+    // The label is `.caption` (11pt) via `palette.uiFont(_:)` — the shared
+    // type-scale resolver (honours .mono/.rounded/.menu).
 
     private var surface: NSColor { surfaceColor ?? palette.background ?? .textBackgroundColor }
 
@@ -159,7 +153,7 @@ public final class ThemedDivider: NSView {
             self.ruleLayer.backgroundColor = self.palette.border.cgColor
             self.gapLayer.backgroundColor = self.surface.cgColor
             self.labelLayer.foregroundColor = self.palette.muted.cgColor
-            self.labelLayer.font = self.themedFont(self.labelSize)
+            self.labelLayer.font = self.palette.uiFont(.caption)
             self.labelLayer.fontSize = self.labelSize
         }
         sizeLabel()
@@ -180,7 +174,7 @@ public final class ThemedDivider: NSView {
     /// label text at the caption font.
     private func sizeLabel() {
         let s = ((label ?? "") as NSString)
-            .size(withAttributes: [.font: themedFont(labelSize)])
+            .size(withAttributes: [.font: palette.uiFont(.caption)])
         layerTxn(animated: false) {
             self.labelLayer.bounds = CGRect(x: 0, y: 0,
                                             width: ceil(s.width) + 2, height: ceil(s.height))

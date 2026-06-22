@@ -269,12 +269,8 @@ public final class ThemedToolBar: NSView {
 
     // MARK: - Theming
 
-    private func themedFont(_ size: CGFloat, _ weight: NSFont.Weight = .regular) -> NSFont {
-        switch palette.font {
-        case .mono: return .monospacedSystemFont(ofSize: size, weight: weight)
-        default:    return .systemFont(ofSize: size, weight: weight)
-        }
-    }
+    // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
+    // (honours .mono/.rounded/.menu; the old local helper dropped two).
 
     /// MUI AppBar `color` → the surface fill. `surface` honors `backgroundAlpha`
     /// (the panel translucency knob); `transparent` paints nothing.
@@ -350,7 +346,7 @@ public final class ThemedToolBar: NSView {
 
     private func themeLabel(_ f: NSTextField) {
         let pt: CGFloat = variant == .regular ? 14 : 13
-        f.font = themedFont(pt, .medium)
+        f.font = palette.uiFont(pt, .medium)
         f.textColor = barInk
     }
 

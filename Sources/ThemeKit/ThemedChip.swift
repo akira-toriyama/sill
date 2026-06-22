@@ -249,13 +249,9 @@ public final class ThemedChip: NSControl {
 
     // MARK: - Theming
 
-    private func themedFont(_ size: CGFloat, _ weight: NSFont.Weight = .regular) -> NSFont {
-        if variant == .keycap { return .monospacedSystemFont(ofSize: size, weight: .medium) }
-        switch palette.font {
-        case .mono: return .monospacedSystemFont(ofSize: size, weight: weight)
-        default:    return .systemFont(ofSize: size, weight: weight)
-        }
-    }
+    // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
+    // (honours .mono/.rounded/.menu). The `.keycap` variant forces a
+    // monospaced face inline at the label call site.
 
     private var roleColor: NSColor {
         switch role {
@@ -403,7 +399,9 @@ public final class ThemedChip: NSControl {
     }
 
     private func rebuildTitle() {
-        let f = themedFont(metrics.font, .regular)
+        let f: NSFont = variant == .keycap
+            ? .monospacedSystemFont(ofSize: metrics.font, weight: .medium)
+            : palette.uiFont(.body)
         let attr = NSAttributedString(string: title, attributes: [
             .font: f, .foregroundColor: inkColor])
         let sz = attr.size()
