@@ -258,7 +258,7 @@ extension model**.
 | 6 effect | `accent` (static) ⊻ `EffectSpec.steady` (active) = **mode selector**, documented; motion app-side |
 | 7 codeTheme | glance's Highlightr theme = **opaque pass-through** on a glance-LOCAL extension + a bg-strip contract; sill never models syntax tokens |
 | 8 selFill | **unify to 0.18** (static = animated); preserve authored overrides (**rainbow `accent@0.22`**) |
-| 9 font | **`FontKind` only** — weight / size / heading-ramp stay app-local layout, not themed |
+| 9 font | **`FontKind` (family) is the only *themed* axis.** Since #8 the kit's sizes/weights are a FIXED internal `TypeScale` (`TypeRole`) — centralised + MUI-grounded but NOT themable (never on `ThemeSpec`/config); an app's heading-ramp beyond the kit stays app-local. See §5 "The type scale". |
 | 10 wand state | wand's match/no-match surface swap stays **app-local** (single-app; defer a "stateful role pair" concept) |
 
 ### New surface (v2)
@@ -358,8 +358,9 @@ a utility preset not needed in a tight set; revive individually if wanted).
 survive there as `[border] effect` values even though cut as themes).
 
 Still deferred (block 2c, not in this pass): `Intensity` shared enum (Q9),
-`canonical(_:)`/`suggest(_:)` validation helpers (Q10), `TypeScale` font-size
-scale (Q7 — held until rule-of-three).
+`canonical(_:)`/`suggest(_:)` validation helpers (Q10). *(`TypeScale` (Q7) was
+held until rule-of-three — **shipped in #8** as the fixed internal `TypeRole`,
+the ten copy-pasted `themedFont` helpers being the trigger; see §5.)*
 
 **Post-Phase-V growth (0.24–0.25):** the blessed-12 set above is the Phase-V
 *base*; the catalog has since grown to **32 themes + `system`** (33 entries).
@@ -465,6 +466,42 @@ master switch:
 same flag feeds `ThemedBorder.effectsEnabled` AND `animated(…enabled:)`, so
 border + widget accents animate or rest *together* (see §3, "the kit earns the
 shared motion").
+
+### The type scale (#8 — MUI-grounded, macOS-tuned)
+
+The kit's text sizes + weights are a **FIXED internal scale**, `Palette.TypeRole`
+→ `TypeToken(pt, weight)`, resolved to an `NSFont` by `ResolvedPalette.uiFont(_:)`
+in PaletteKit. It replaced ten copy-pasted per-widget `themedFont` helpers — the
+rule-of-three trigger (Q7's deferred `TypeScale`, now earned). Two wins beyond
+tidiness: those helpers branched only `.mono` vs system and **silently dropped
+`.rounded`/`.menu`**, so the six rounded catalog themes had been rendering plain
+system; routing every widget through the one resolver fixes that. And the
+readability nits the audit flagged become *role values*, not scattered literals.
+
+**Grounded by ROLE, not by pixel.** MUI is web (px, 16px base); macOS is native
+(pt, 13pt body). You map the *role*, then pick the macOS-native point size — and
+take MUI's portable lesson: lift small supporting text with **weight** (its
+subtitle2/button are 500), not by stacking size + muted colour + regular weight.
+
+| `TypeRole` | sill | MUI analog (px/wt) | macOS analog | used by |
+|---|---|---|---|---|
+| `body` | 13 / regular | body1 16/400 | body 13 | list title · field input · chip |
+| `secondaryBody` | **11 / medium** | body2 14/400 → subtitle2 500 | smallSystemFontSize 11 | list 2nd line · field helper/error |
+| `caption` | 11 / regular | caption 12/400 | caption1 11 | divider label · header subtitle |
+| `sectionHeader` | 11 / semibold | overline (emph) | grouped header | list 1-line section header |
+| `sectionTitle` | 13 / medium | subtitle2 14/500 | body emph | list 2-line header title |
+| `badge` | **10 / medium** | caption emph | labelFontSize 10 | list badge (was 9 compact) |
+| `shortcut` | 10 / medium | — | keycap 10 | list keycap / shortcut |
+| `tooltip` | 11 / medium | caption emph | — | tooltip |
+
+The two **readability fixes** are `secondaryBody` 11→*medium* (was regular; lands
+on the mono-URL branch too via one shared token) and the compact `badge` **9→10**
+(9pt sat below `labelFontSize` and every MUI floor). Control-size-scaled labels
+(button 13/14/15, checkbox 14/16, toolbar 14/13, FAB 13/14) keep their **size** in
+the widget's `Metrics` — that's legitimate control-size layout, MUI-faithful (its
+button variant scales pt by size) — and route only **weight + family** through the
+resolver. `ThemedTextField.floatSize` (11) is the float-label shrink ratio + notch
+width, *not* a text size; the helper line was decoupled onto `.secondaryBody`.
 
 ### Adding a widget (rule-of-three + the prism mandate)
 
