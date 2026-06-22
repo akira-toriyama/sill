@@ -16,6 +16,7 @@
 import AppKit
 import Palette
 import PaletteKit
+import Motion
 
 @MainActor
 public final class ThemedTextField: NSView {
@@ -158,10 +159,10 @@ public final class ThemedTextField: NSView {
 
     // Metrics
     private let boxH: CGFloat = 40
-    private let padX: CGFloat = 12
+    private let padX: CGFloat = CGFloat(Space.lg)
     private let iconSize: CGFloat = 17
     private let helperH: CGFloat = 14
-    private let helperGap: CGFloat = 4
+    private let helperGap: CGFloat = CGFloat(Space.xs)
     private var topPad: CGFloat { label == nil ? 0 : 9 }   // room for the float
     private var bodySize: CGFloat { 13 }
     /// The floated-label shrink RATIO (`floatSize / bodySize`) and the
@@ -366,7 +367,7 @@ public final class ThemedTextField: NSView {
     private func layerTxn(animated: Bool, _ body: () -> Void) {
         CATransaction.begin()
         if animated {
-            CATransaction.setAnimationDuration(0.16)
+            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
             CATransaction.setAnimationTimingFunction(
                 CAMediaTimingFunction(name: .easeOut))
         } else {
@@ -406,7 +407,7 @@ public final class ThemedTextField: NSView {
         switch variant {
         case .outlined:
             return CGPath(roundedRect: box.insetBy(dx: 1, dy: 1),
-                          cornerWidth: 8, cornerHeight: 8, transform: nil)
+                          cornerWidth: CGFloat(Radius.lg), cornerHeight: CGFloat(Radius.lg), transform: nil)
         case .filled, .standard:
             let p = CGMutablePath()
             p.move(to: CGPoint(x: box.minX, y: box.minY + 1))
@@ -533,7 +534,7 @@ public final class ThemedTextField: NSView {
         // Border / rule / notch are animated CALayers (see updateStroke);
         // drawRect paints only the filled-variant interior + icons + helper.
         if variant == .filled {
-            let r = NSBezierPath(roundedRect: box, xRadius: 8, yRadius: 8)
+            let r = NSBezierPath(roundedRect: box, xRadius: CGFloat(Radius.lg), yRadius: CGFloat(Radius.lg))
             fieldFill.setFill(); r.fill()
         }
 

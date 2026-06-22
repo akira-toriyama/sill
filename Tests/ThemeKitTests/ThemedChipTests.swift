@@ -70,12 +70,14 @@ final class ThemedChipTests: XCTestCase {
                           "a 1-char chip is far narrower than a button's 64 floor")
     }
 
-    /// Pill corner = height/2 for filled/outlined; the keycap is a 5 pt key.
+    /// Pill corner = height/2 for filled/outlined (size-derived, stays a
+    /// literal); the keycap is the fixed `Radius.sm` key — 4 pt since #13
+    /// snapped it from its old bespoke 5 onto the shared radius scale.
     func testCornerRadiusPillVsKeycap() {
         XCTAssertEqual(laidOut { $0.variant = .filled; $0.size = .medium }.chipProbe.cornerRadius, 16)
         XCTAssertEqual(laidOut { $0.variant = .filled; $0.size = .small }.chipProbe.cornerRadius, 12)
         XCTAssertEqual(laidOut { $0.variant = .outlined; $0.size = .medium }.chipProbe.cornerRadius, 16)
-        XCTAssertEqual(laidOut { $0.variant = .keycap }.chipProbe.cornerRadius, 5)
+        XCTAssertEqual(laidOut { $0.variant = .keycap }.chipProbe.cornerRadius, CGFloat(Radius.sm))
     }
 
     /// A single-glyph keycap is at least square (minWidth = height).

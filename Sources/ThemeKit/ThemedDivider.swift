@@ -14,6 +14,7 @@
 import AppKit
 import Palette
 import PaletteKit
+import Motion
 
 @MainActor
 public final class ThemedDivider: NSView {
@@ -77,8 +78,8 @@ public final class ThemedDivider: NSView {
 
     // Metrics
     private let labelPadX: CGFloat = 10          // breathing room each side of the label
-    private let middleInset: CGFloat = 16        // MUI spacing(2) — horizontal `.middle` long-axis margin
-    private let middleVerticalInset: CGFloat = 8 // MUI spacing(1) — vertical `.middle` long-axis (top/bottom) margin
+    private let middleInset: CGFloat = CGFloat(Space.xl)        // MUI spacing(2) — horizontal `.middle` long-axis margin
+    private let middleVerticalInset: CGFloat = CGFloat(Space.md) // MUI spacing(1) — vertical `.middle` long-axis (top/bottom) margin
     private var labelSize: CGFloat { 11 }        // small caption tier
 
     public override var isFlipped: Bool { false }   // symmetric, y-up bottom-origin
@@ -275,7 +276,7 @@ public final class ThemedDivider: NSView {
     private func layerTxn(animated: Bool, _ body: () -> Void) {
         CATransaction.begin()
         if animated {
-            CATransaction.setAnimationDuration(0.16)
+            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
             CATransaction.setAnimationTimingFunction(
                 CAMediaTimingFunction(name: .easeOut))
         } else {

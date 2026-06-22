@@ -21,6 +21,7 @@ import AppKit
 import QuartzCore
 import Palette
 import PaletteKit
+import Motion
 
 @MainActor
 public final class ThemedSkeleton: NSView {
@@ -99,8 +100,8 @@ public final class ThemedSkeleton: NSView {
     private var cornerRadius: CGFloat {
         switch variant {
         case .rectangular: return 0
-        case .rounded:     return 4               // ~MUI theme.shape.borderRadius
-        case .text:        return 4               // approximated uniform (MUI's ellipse radius)
+        case .rounded:     return CGFloat(Radius.sm)   // ~MUI theme.shape.borderRadius
+        case .text:        return CGFloat(Radius.sm)   // approximated uniform (MUI's ellipse radius)
         case .circular:    return min(bounds.width, bounds.height) / 2
         }
     }
@@ -322,7 +323,7 @@ public final class ThemedSkeleton: NSView {
     private func layerTxn(animated: Bool, _ body: () -> Void) {
         CATransaction.begin()
         if animated {
-            CATransaction.setAnimationDuration(0.16)
+            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
             CATransaction.setAnimationTimingFunction(
                 CAMediaTimingFunction(name: .easeOut))
         } else {

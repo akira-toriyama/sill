@@ -160,7 +160,7 @@ public final class ThemedMenu: NSObject {
     private weak var anchorView: NSView?
     private var pointInHost: CGPoint?
     private weak var hostWindow: NSWindow?
-    private var anchorGap: CGFloat = 4
+    private var anchorGap: CGFloat = CGFloat(Space.xs)
     private var resolvedCorner: PopupCorner = .topLeading
 
     // Submenu cascade (ONE level). A submenu row owns a CHILD ThemedMenu placed beside
@@ -185,8 +185,8 @@ public final class ThemedMenu: NSObject {
     private let glue = PopupGlue()
 
     // Metrics (native-menu trims — MUI's 48/8 px touch metrics shrunk for macOS).
-    private let cornerRadius: CGFloat = 6
-    private let menuVPad: CGFloat = 4            // breathing room above/below the rows
+    private let cornerRadius: CGFloat = CGFloat(Radius.md)
+    private let menuVPad: CGFloat = CGFloat(Space.xs)            // breathing room above/below the rows
     private let minWidth: CGFloat = 120
     private let maxWidth: CGFloat = 320
     private let maxHeight: CGFloat = 480         // taller menus scroll (NSMenu does too)
@@ -273,7 +273,7 @@ public final class ThemedMenu: NSObject {
     // MARK: - Present (drop-down from an anchor, or a context menu at a point)
 
     /// Open the menu as a drop-down below `anchor` (flipping above on underflow).
-    public func present(from anchor: NSView, gap: CGFloat = 4) {
+    public func present(from anchor: NSView, gap: CGFloat = CGFloat(Space.xs)) {
         guard anchor.window != nil else { return }
         anchorView = anchor
         pointInHost = nil
@@ -323,7 +323,7 @@ public final class ThemedMenu: NSObject {
         anchorView = anchor
         pointInHost = nil
         hostWindow = anchor.window
-        anchorGap = 4
+        anchorGap = CGFloat(Space.xs)
         open(animated: false, installDismiss: false)
     }
 

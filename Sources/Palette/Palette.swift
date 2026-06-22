@@ -863,3 +863,165 @@ public enum TypeRole: Sendable, Hashable, CaseIterable {
         }
     }
 }
+
+// MARK: - Token-scale iteration
+
+/// One named step of a dimensional token ramp (a `name` + its `pt` value).
+/// The iterable form of the `Space`/`Radius` `static let` namespaces — for
+/// the prism specimen and the drift tests, where a `[ScaleStep]` is more
+/// ergonomic (key-path `id:` / `\.pt`) than a labelled tuple. `Double` keeps
+/// it CoreGraphics-free like the scales it describes.
+public struct ScaleStep: Sendable, Hashable {
+    public let name: String
+    public let pt: Double
+    public init(_ name: String, _ pt: Double) {
+        self.name = name
+        self.pt = pt
+    }
+}
+
+// MARK: - Space
+
+/// sill's FIXED spacing ramp — the shared vocabulary for inter-element
+/// gaps, content padding, and popup anchor offsets, replacing the scattered
+/// literals (the recurring `gap: 8` / `padX: 12` / popup `gap: 4`) that the
+/// widget kit copy-pasted file by file.
+///
+/// A 2·4·6·8·12·16 ramp grounded in MUI's 8pt spacing base (`spacing(1)` = 8,
+/// `spacing(2)` = 16, with the 4/6/12 half-steps) and Tailwind's 4pt grid.
+/// Values are `Double` so the table stays CoreGraphics-free — callers wrap
+/// to `CGFloat` at the use site (same discipline as `TypeToken.pt`). A
+/// caseless namespace of `static let`s, matching `ThemedTransition.Duration`,
+/// the sibling dimensional ramp this kit also tokenises.
+///
+/// FIXED, not themable: this is layout, not theme — these never come from a
+/// `ThemeSpec`/config (same rule as `TypeRole`). Control-size-dependent
+/// layout (per-variant `hpad` bands, control heights, per-density insets)
+/// stays in each widget's `Metrics`; `Space` is the size-invariant design
+/// constants only.
+public enum Space {
+    /// 2pt — hairline-adjacent breathing (badge inter-line gap, 1px-border pad).
+    public static let xxs: Double = 2
+    /// 4pt — the tight gap: popup anchor offsets, helper-line gap, small vpad.
+    public static let xs: Double = 4
+    /// 6pt — the dense gap (compact-density image↔text, label height pad).
+    public static let sm: Double = 6
+    /// 8pt — THE default gap: icon↔label, toolbar item spacing, bubble padding.
+    public static let md: Double = 8
+    /// 12pt — content padding: text-field side pad, list row leading inset.
+    public static let lg: Double = 12
+    /// 16pt — section spacing: divider middle margin, tree indent step.
+    public static let xl: Double = 16
+
+    /// The ramp as ordered steps — for the prism showcase + drift tests.
+    public static let scale: [ScaleStep] =
+        [ScaleStep("xxs", xxs), ScaleStep("xs", xs), ScaleStep("sm", sm),
+         ScaleStep("md", md), ScaleStep("lg", lg), ScaleStep("xl", xl)]
+}
+
+// MARK: - Radius
+
+/// sill's FIXED corner-radius ramp — the shared vocabulary for rounded
+/// rects, replacing the scattered `radius: 4` / `cornerRadius: 8` literals
+/// across the widget kit.
+///
+/// A 2·4·6·8·12 ramp grounded in MUI's `theme.shape.borderRadius` (4, the
+/// base — already called out verbatim in `ThemedSkeleton`/`ThemedButton`)
+/// and Tailwind's radius scale (`sm` 2 · base 4 · `md` 6 · `lg` 8 · `xl` 12).
+/// `Double` keeps the table CoreGraphics-free; callers wrap to `CGFloat`.
+///
+/// FIXED, not themable (same rule as `TypeRole`). Size-DERIVED rounding —
+/// the pill (`height/2`) and circle (`min(w,h)/2`) of chips, FABs, the
+/// scroller knob, the count badges — is NOT a token: it tracks the control's
+/// own size, so it stays computed at the draw site.
+public enum Radius {
+    /// 2pt — the crispest tile: the checkbox box (Tailwind `rounded-sm`).
+    public static let xs: Double = 2
+    /// 4pt — the base control radius: button, tooltip bubble, list focus
+    /// ring + shortcut lozenge, skeleton (MUI `theme.shape.borderRadius`).
+    public static let sm: Double = 4
+    /// 6pt — the surface radius: menu popup, list selection pill + drag
+    /// ghost (Tailwind `rounded-md`).
+    public static let md: Double = 6
+    /// 8pt — the large surface: text field, toolbar backdrop, combo-box
+    /// dropdown (Tailwind `rounded-lg`).
+    public static let lg: Double = 8
+    /// 12pt — the decorative ring: `ThemedBorder`'s default (Tailwind
+    /// `rounded-xl`).
+    public static let xl: Double = 12
+
+    /// The ramp as ordered steps — for the prism showcase + drift tests.
+    public static let scale: [ScaleStep] =
+        [ScaleStep("xs", xs), ScaleStep("sm", sm), ScaleStep("md", md),
+         ScaleStep("lg", lg), ScaleStep("xl", xl)]
+}
+
+// MARK: - Elevation
+
+/// A resolved elevation token: the three knobs of a black drop shadow —
+/// `opacity` (0…1), `blur` radius, and `dy` vertical offset (POSITIVE =
+/// downward). All `Double` so the table carries no CoreGraphics/AppKit type;
+/// PaletteKit's `ResolvedPalette.shadow(_:)` wraps to `Float`/`CGFloat` and
+/// applies the y-up sign flip at the resolve boundary (same split as
+/// `TypeToken` → `uiFont`).
+public struct ElevationToken: Sendable, Hashable {
+    /// Black-shadow alpha, 0…1.
+    public let opacity: Double
+    /// Shadow blur radius, in points.
+    public let blur: Double
+    /// Vertical offset, in points, POSITIVE = downward. Widgets drawing in a
+    /// y-up (`isFlipped == false`) layer negate it; `ResolvedPalette.shadow`
+    /// bakes that negation in so widgets stop hand-writing the minus.
+    public let dy: Double
+    public init(opacity: Double, blur: Double, dy: Double) {
+        self.opacity = opacity
+        self.blur = blur
+        self.dy = dy
+    }
+}
+
+/// sill's FIXED elevation scale — the shared depth ladder for drop shadows,
+/// the ONE place the kit's `(opacity, blur, dy)` tuples live (today each of
+/// `ThemedButton`/`ThemedFAB`/`ThemedButtonGroup`/`ThemedToolBar` re-derives
+/// its own inline `Elevation` struct + magic numbers).
+///
+/// Grounded in Material/MUI elevation measured in **dp** — the case names
+/// are the dp tiers the widget comments already reference. The numbers are
+/// the kit's real authored values regularised onto a monotonic ladder:
+/// higher dp ⇒ more opacity + blur + offset. A contained button maps 1:1 —
+/// `dp2` rest → `dp4` hover → `dp6` focus → `dp8` press (and a button-group
+/// rests at `dp2`); a FAB floats higher, ≈`dp8` at rest → `dp12` pressed.
+/// The FAB's resting opacity (0.30) is the lone authored value slightly off
+/// the ladder; #14a snaps it when it migrates the widgets onto the resolver.
+///
+/// FIXED, not themable (same rule as `TypeRole`). Shadow COLOUR is not part
+/// of the token — it is `NSColor.black` in every widget today (the resolver
+/// supplies it); only depth varies here. Native window-shadowed popups
+/// (menu/tooltip/combo dropdown) are NOT on this ladder — their silhouette
+/// is the OS panel shadow, which has no tunable opacity/blur/dy.
+public enum Elevation: Sendable, Hashable, CaseIterable {
+    /// Flat on the surface — no shadow (a hairline separates a flat bar).
+    case flat
+    /// dp2 — a contained control at rest (button / button-group).
+    case dp2
+    /// dp4 — a control under the pointer (button hover).
+    case dp4
+    /// dp6 — a focused control.
+    case dp6
+    /// dp8 — a pressed control.
+    case dp8
+    /// dp12 — a pressed FAB / the highest transient lift.
+    case dp12
+
+    /// The FIXED `(opacity, blur, dy)` this depth paints at.
+    public var token: ElevationToken {
+        switch self {
+        case .flat: return ElevationToken(opacity: 0,    blur: 0,  dy: 0)
+        case .dp2:  return ElevationToken(opacity: 0.20, blur: 3,  dy: 1)
+        case .dp4:  return ElevationToken(opacity: 0.24, blur: 5,  dy: 2)
+        case .dp6:  return ElevationToken(opacity: 0.26, blur: 6,  dy: 2)
+        case .dp8:  return ElevationToken(opacity: 0.28, blur: 8,  dy: 3)
+        case .dp12: return ElevationToken(opacity: 0.34, blur: 12, dy: 7)
+        }
+    }
+}

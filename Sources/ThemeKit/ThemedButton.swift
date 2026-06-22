@@ -29,6 +29,7 @@
 import AppKit
 import Palette
 import PaletteKit
+import Motion
 
 @MainActor
 public final class ThemedButton: NSControl {
@@ -197,9 +198,9 @@ public final class ThemedButton: NSControl {
         case (.outlined, .medium):  hpad = 15
         case (.outlined, .large):   hpad = 21
         }
-        return Metrics(height: h, hpad: hpad, radius: 4, font: font, minWidth: 64,
+        return Metrics(height: h, hpad: hpad, radius: CGFloat(Radius.sm), font: font, minWidth: 64,
                        border: variant == .outlined ? 1 : 0,
-                       iconPt: iconPt, gap: 8, outerAdj: outerAdj)
+                       iconPt: iconPt, gap: CGFloat(Space.md), outerAdj: outerAdj)
     }
 
     public override var intrinsicContentSize: NSSize {
@@ -593,7 +594,7 @@ public final class ThemedButton: NSControl {
     private func layerTxn(animated: Bool, _ body: () -> Void) {
         CATransaction.begin()
         if animated {
-            CATransaction.setAnimationDuration(0.16)
+            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
             CATransaction.setAnimationTimingFunction(
                 CAMediaTimingFunction(name: .easeOut))
         } else {

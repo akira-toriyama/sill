@@ -540,9 +540,9 @@ public final class ThemedList: NSView {
             return Metrics(singleRow: 30, twoLineRow: 46, header1: 28, header2: 40,
                            leadingInset: 12, trailingInset: 12, imageBox: 24, iconGlyph: 18, gapImageToText: 8,
                            twoLineTop: 8, lineGap: 2,
-                           accentBar: 3, roundedRadius: 6, roundedHInset: 3,
+                           accentBar: 3, roundedRadius: CGFloat(Radius.md), roundedHInset: 3,
                            badgeHeight: 16, badgeHPad: 6, badgeSymbolPt: 11, badgeGap: 4,
-                           chevronPt: 11, shortcutHeight: 16, shortcutHPad: 5, shortcutRadius: 4,
+                           chevronPt: 11, shortcutHeight: 16, shortcutHPad: 5, shortcutRadius: CGFloat(Radius.sm),
                            clusterGap: 6, budgetMargin: 8, separatorBand: 9,
                            indentStep: 16, disclosurePt: 11, disclosureGap: 5)
         case .compact:
@@ -551,9 +551,9 @@ public final class ThemedList: NSView {
             return Metrics(singleRow: 26, twoLineRow: 40, header1: 24, header2: 40,
                            leadingInset: 10, trailingInset: 10, imageBox: 20, iconGlyph: 16, gapImageToText: 6,
                            twoLineTop: 6, lineGap: 2,
-                           accentBar: 3, roundedRadius: 6, roundedHInset: 3,
+                           accentBar: 3, roundedRadius: CGFloat(Radius.md), roundedHInset: 3,
                            badgeHeight: 14, badgeHPad: 6, badgeSymbolPt: 11, badgeGap: 4,
-                           chevronPt: 10, shortcutHeight: 14, shortcutHPad: 5, shortcutRadius: 4,
+                           chevronPt: 10, shortcutHeight: 14, shortcutHPad: 5, shortcutRadius: CGFloat(Radius.sm),
                            clusterGap: 6, budgetMargin: 8, separatorBand: 7,
                            indentStep: 14, disclosurePt: 10, disclosureGap: 5)
         }
@@ -1153,7 +1153,7 @@ public final class ThemedList: NSView {
     private func updateFocusRingPath() {
         guard let ring = focusRingLayer, !ring.isHidden else { return }
         ring.frame = bounds
-        ring.path = CGPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), cornerWidth: 4, cornerHeight: 4, transform: nil)
+        ring.path = CGPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), cornerWidth: CGFloat(Radius.sm), cornerHeight: CGFloat(Radius.sm), transform: nil)
     }
 }
 
@@ -2065,7 +2065,7 @@ extension ThemedList {
         switch placement {
         case .onto(let id):
             guard !chunkActive, let i = indexOf(id) else { return }   // a chunk reorders, never drops ONTO
-            let path = NSBezierPath(roundedRect: rowRect(i).insetBy(dx: 1.5, dy: 1.5), xRadius: 5, yRadius: 5)
+            let path = NSBezierPath(roundedRect: rowRect(i).insetBy(dx: 1.5, dy: 1.5), xRadius: CGFloat(Radius.md), yRadius: CGFloat(Radius.md))
             palette.primary.withAlphaComponent(0.12).setFill(); path.fill()
             palette.primary.setStroke(); path.lineWidth = 2; path.stroke()
         case .between(let beforeID):
@@ -2212,7 +2212,7 @@ private final class DragGhost {
         panel = themedPopupPanel(interactive: false, role: .unknown)   // click-through, out of AX
         imageView.imageScaling = .scaleAxesIndependently               // the snapshot is already row-sized → 1:1
         imageView.wantsLayer = true
-        imageView.layer?.cornerRadius = 6
+        imageView.layer?.cornerRadius = CGFloat(Radius.md)
         imageView.layer?.masksToBounds = true
         panel.contentView = imageView
         panel.alphaValue = 0.9                                          // the translucent drag look
