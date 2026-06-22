@@ -437,12 +437,12 @@ struct MockPixelArt: View {
                     .stroke(Color(nsColor: p.border), lineWidth: 1))
                 .clipShape(RoundedRectangle(cornerRadius: 7))
 
-            Text("Neon Corridor (#12 Ph4) — the maze: 2-stroke neon walls (one rounded centreline stroked WIDE-blue then NARROW-black) + interior fillets on the inner corners + a central pellet row (positionHash01 bands cherry / icon / dot) + the Ph3 pac walking it. Orthogonal 90° path = a real Pac-Man maze:")
+            Text("ChompCorridor (#12 Ph5) — the FULL loop: the pac walks the maze EATING the pellet row (each vanishes as the mouth reaches it, all respawn on the lap wrap); a cherry / app-icon eat flashes the walls (EffectSpec.chomp.flash, ~450ms) and floats a +N score (bonus ladder, rise+fade). All derived PURELY from now — PRISM_CHOMP_T freezes it:")
                 .font(sysFont(7.5, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
             NeonCorridorView(valid: true, tier: .s)
-                .frame(height: 178 * uiScale)
+                .frame(height: 200 * uiScale)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: 7)
                     .fill(Color(nsColor: NSColor(white: 0.04, alpha: 1))))
