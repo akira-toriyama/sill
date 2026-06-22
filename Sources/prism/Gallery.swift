@@ -358,6 +358,7 @@ struct ThemeCard: View {
             WidgetSection(kitComponent("ParticleBurst"), p: p) { MockParticles(p: p) }
             WidgetSection(kitComponent("SplatterShape"), p: p) { MockSplatter(p: p) }
             WidgetSection(kitComponent("TrailGeometry"), p: p) { MockTrail(p: p) }
+            WidgetSection(kitComponent("PixelSprite"), p: p) { MockPixelArt(p: p) }
         case .facet:
             appCaption(.facet, p: p)
             MockTree(p: p)

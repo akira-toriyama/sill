@@ -20,6 +20,12 @@
 // (a no-AppKit Core must validate config tokens without linking Effects).
 @_exported import Palette
 
+// #12 Ph2 — the line-pets are now PIXEL sprites: PixelArt supplies the chomp
+// mouth wedge + its swap pattern (`mouthHalfRad` / `chompMouthFrames`), Motion
+// supplies the discrete `frameStep` sampler that animates the mouth + waddle.
+import PixelArt
+import Motion
+
 #if canImport(AppKit)
 import AppKit
 #endif
@@ -477,13 +483,281 @@ public func drawLinePets(_ pets: [LinePet], on rect: CGRect,
         NSGraphicsContext.saveGraphicsState()
         let tx = NSAffineTransform()
         tx.translateX(by: px, yBy: py)
-        tx.rotate(byRadians: rot)
-        tx.concat()
         switch pet {
-        case .chomp: drawChompPet(now: now, scale: scale)
-        case .ghost: drawGhostPet(now: now, scale: scale)
+        case .chomp:
+            // Pac-Man TUMBLES with the lap so its mouth opens along travel.
+            tx.rotate(byRadians: rot)
+            tx.concat()
+            drawChompPet(now: now, scale: scale)
+        case .ghost:
+            // The ghost stays UPRIGHT (#12 Ph3) — it does NOT tumble with the
+            // lap (no rotation). Only its eyes track travel, the cardinal gaze
+            // picked from the tangent (`+x→right … +y→up`, the y-up rect frame).
+            tx.concat()
+            let look = GhostLook.facing(dx: Double(cos(rot)), dy: Double(sin(rot)))
+            drawGhostPet(now: now, scale: scale, look: look)
         }
         NSGraphicsContext.restoreGraphicsState()
+    }
+}
+
+/// Draw a Pac-Man — or, when `valid` is false, a panicking Blinky ghost —
+/// walking the ARBITRARY polyline `path` at wall-clock `now`: the #12 Ph3
+/// "PathPet", the open-path counterpart to `drawLinePets`' closed perimeter lap.
+/// A head cursor advances `speed` pt/s along the arc length (looping at the end);
+/// the pet FOLLOWS `faceLag` points behind it (`markAtArcLength(head − faceLag)`,
+/// which clamps a negative offset to the start), so the head leads and the face
+/// chases — wand's Chomp gap. Orientation comes from the local tangent:
+///   * pac TUMBLES (rotates) so its mouth opens along travel — the mouth flaps
+///     via `Motion.frameStep`, the same discrete swap the line-pets use;
+///   * the ghost stays UPRIGHT — only its eyes swivel to the travel cardinal
+///     (`GhostLook.facing`) — and PANICS with a 2-D `dampedSine` buzz (a gesture
+///     that matched no rule).
+/// `path` is in the caller's space; host in a NON-flipped (y-up) view so "+y up"
+/// matches `GhostLook.facing` and the sprites' internal flip (the `drawLinePets`
+/// convention). `showGuide` strokes a faint rounded trail so the path reads
+/// before the Ph4 pellets/corridor exist. The caller owns the view + redraw
+/// clock; `now` is injected (deterministic freeze / XCTest).
+@MainActor
+public func drawChompPath(_ path: [CGPoint], now: CFTimeInterval, valid: Bool = true,
+                          scale: CGFloat = 1, speed: CGFloat = 60,
+                          faceLag: CGFloat = 0, showGuide: Bool = true,
+                          showHead: Bool = true) {
+    guard path.count >= 2, speed > 0 else { return }
+    let total = polylineLength(path)   // arc length = the loop period (in points)
+    guard total > 0 else { return }
+
+    if showGuide {
+        let guide = nsBezierPath(roundedCornerPath(path, radius: Double(6 * scale)),
+                                 lineWidth: 1.5 * scale)
+        NSColor(HexColor(SpriteColor.pupilBlue)).withAlphaComponent(0.22).setStroke()
+        guide.stroke()
+    }
+
+    // Head marches the arc length and loops; the pet trails it by `faceLag`. The
+    // pure cursor math lives in `pathPetCursors` (CI-guardable; a negative `now`
+    // wraps forward like `Motion.frameStep`, not into a clamped dead-zone).
+    // markAtArcLength then clamps a negative `petDist` to the start (head leads).
+    let (headDist, petDist) = pathPetCursors(total: total, speed: Double(speed),
+                                             now: Double(now), faceLag: Double(faceLag))
+
+    // The chased head — a small glowing pellet-dot (only when valid + lagging; a
+    // mismatch has no target). Makes the faceLag gap legible before pellets (Ph4).
+    if showHead, valid, faceLag > 0, let head = markAtArcLength(path, distance: headDist) {
+        let r: CGFloat = 2.5 * scale
+        let yellow = NSColor(HexColor(SpriteColor.pacYellow))
+        NSGraphicsContext.saveGraphicsState()
+        let glow = NSShadow(); glow.shadowColor = yellow
+        glow.shadowBlurRadius = 4 * scale; glow.shadowOffset = .zero; glow.set()
+        yellow.setFill()
+        NSBezierPath(ovalIn: CGRect(x: CGFloat(head.point.x) - r, y: CGFloat(head.point.y) - r,
+                                    width: 2 * r, height: 2 * r)).fill()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    guard let mark = markAtArcLength(path, distance: petDist) else { return }
+    let px = CGFloat(mark.point.x), py = CGFloat(mark.point.y)
+
+    NSGraphicsContext.saveGraphicsState()
+    let tx = NSAffineTransform()
+    if valid {
+        // Pac TUMBLES so the mouth (canonical +x) opens along travel.
+        tx.translateX(by: px, yBy: py)
+        tx.rotate(byRadians: atan2(CGFloat(mark.tangent.y), CGFloat(mark.tangent.x)))
+        tx.concat()
+        drawChompPet(now: now, scale: scale)
+    } else {
+        // Ghost stays UPRIGHT (no rotate) and PANICS — a sustained 2-D buzz
+        // (co-prime 6/7, decay 0 so it doesn't fade), eyes on the travel cardinal.
+        var pp = (Double(now) * pathPetPanicHz).truncatingRemainder(dividingBy: 1)
+        if pp < 0 { pp += 1 }   // fold a negative `now` forward (frameStep's convention)
+        let amp = 1.6 * scale
+        let jx = CGFloat(ThemedTransition.dampedSine(pp, frequency: 6, decay: 0)) * amp
+        let jy = CGFloat(ThemedTransition.dampedSine(pp, frequency: 7, decay: 0)) * amp
+        tx.translateX(by: px + jx, yBy: py + jy)
+        tx.concat()
+        drawGhostPet(now: now, scale: scale,
+                     look: GhostLook.facing(dx: mark.tangent.x, dy: mark.tangent.y))
+    }
+    NSGraphicsContext.restoreGraphicsState()
+}
+
+/// Panic-buzz cycles/sec for the mismatch ghost in `drawChompPath` — the rate the
+/// 2-D `dampedSine` tremble repeats. Named so the prism card and any future
+/// corridor read the same shake speed.
+private let pathPetPanicHz: Double = 1.5
+
+// MARK: - Neon corridor (#12 Ph4) — the composite arcade maze scene
+
+/// Blit a `PixelSprite` CENTRED at `c` and FLIPPED so row 0 is the TOP — the
+/// corridor pellets share the upright sprites' NON-flipped (y-up) frame, so a
+/// bonus decal needs the `drawGhostPet` y-flip to stand the right way up.
+@MainActor
+private func drawCenteredSprite(_ sprite: PixelSprite, cell: CGFloat, at c: CGPoint) {
+    let w = CGFloat(sprite.width) * cell, h = CGFloat(sprite.height) * cell
+    NSGraphicsContext.saveGraphicsState()
+    let t = NSAffineTransform()
+    t.translateX(by: c.x - w / 2, yBy: c.y + h / 2)   // top-left of the centred sprite
+    t.scaleX(by: 1, yBy: -1)                          // row 0 → top: rows grow DOWNWARD
+    t.concat()
+    drawPixelSprite(sprite, cell: cell, at: .zero)
+    NSGraphicsContext.restoreGraphicsState()
+}
+
+/// Draw a pre-resolved app-icon bonus centred at `c`, fit to a `box`-pt square.
+/// NO y-flip here (unlike `drawCenteredSprite`): `NSImage.draw(in:)` ORIENTS
+/// ITSELF in a non-flipped (y-up) host, so the icon stands upright as-is —
+/// only the row-0-at-bottom `drawPixelSprite` blitter needs the manual flip.
+/// (Verified by an offscreen arrow-render 2026-06-22; adding a flip here would
+/// invert it — don't "fix" this.)
+@MainActor
+private func drawCorridorIcon(_ icon: NSImage, at c: CGPoint, box: CGFloat) {
+    icon.draw(in: CGRect(x: c.x - box / 2, y: c.y - box / 2, width: box, height: box),
+              from: .zero, operation: .sourceOver, fraction: 1)
+}
+
+/// Draw the chomp NEON CORRIDOR along `path` (#12 Ph4): a black road bordered by
+/// 2-stroke neon walls, interior fillets that soften the inner notches, a central
+/// row of pellets (cherry / app-icon bonuses banded by `positionHash01`), and the
+/// Ph3 PathPet — the pac, or a panicking Blinky when `valid == false` — walking it.
+/// `tier` is the discrete arcade size step (road / wall / pellet / face / lag all
+/// scale off `tier.multiplier`); `scale` multiplies it again for the host's render
+/// resolution. Pellets are STATIC here; eating + the rainbow flash + the score pop
+/// arrive in Ph5.
+///
+/// The walls use the 2-stroke trick: stroke ONE rounded centreline WIDE in neon
+/// blue (road + both walls), then NARROWER in black (the road), so only the
+/// `wallThick` difference band reads as wall — no boundary-polygon vertex
+/// artefacts. COLOUR is intrinsic arcade (wall = `SpriteColor.pupilBlue`,
+/// pellet/pac = `pacYellow`), theme-invariant like the sprites. Host in a
+/// NON-flipped (y-up) view (the `drawChompPath` contract) so the sprites stand
+/// upright; `now` is injected (deterministic freeze / XCTest). `icon` (optional,
+/// pre-resolved) is the app-icon bonus; nil falls back to a plain pellet there.
+/// `showBonuses` false makes EVERY pellet a plain dot (no cherry / icon) — the
+/// mismatch (panicking-ghost) corridor wants a quiet dots-only row, since the
+/// ghost never eats and the bonus decals just clutter it.
+@MainActor
+public func drawChompCorridor(_ path: [CGPoint], now: CFTimeInterval,
+                              valid: Bool = true, tier: ScaleTier = .m,
+                              scale: CGFloat = 1, speed: CGFloat = 60,
+                              icon: NSImage? = nil, showBonuses: Bool = true) {
+    guard path.count >= 2 else { return }
+    // `tier` is the discrete arcade step (2/3/4.5); `scale` is the render
+    // resolution (a host's device / gallery knob) — both legitimately multiply.
+    let s = CGFloat(tier.multiplier) * scale
+    let roadWidth = 11 * s
+    let wallThick = max(1, 0.9 * s)
+    let pelletR   = 0.8 * s
+    let pelletGap = 5.2 * s
+    let roadHalf  = roadWidth / 2
+
+    // #12 Ph5 — eating is a PURE function of `now`: the face (the eater) is the
+    // trailing `pathPetCursors` cursor; pellets behind it are eaten, a bonus
+    // crossing flashes the walls + floats a "+N". `valid == false` (the panicking
+    // ghost) doesn't eat — it keeps Ph4's static pellets.
+    let total = Double(polylineLength(path))
+    let faceLag = valid ? roadWidth * 1.4 : 0
+    let cursors = pathPetCursors(total: total, speed: Double(speed),
+                                 now: Double(now), faceLag: Double(faceLag))
+    let faceArc = cursors.pet                       // the eating arc-length
+
+    // Classify the pellet row up front (the wall colour depends on bonus eats).
+    enum Kind { case dot, cherry, icon }
+    struct Pellet { let point: CGPoint; let arc: Double; let kind: Kind; let value: Int }
+    let marks = resampleAlongPolyline(path, interval: Double(pelletGap))
+    var pellets: [Pellet] = []
+    for (i, m) in marks.enumerated() where i > 0 {
+        let pt = CGPoint(x: m.point.x, y: m.point.y)
+        // Arc of mark i: resampleAlongPolyline emits marks at UNIFORM pelletGap
+        // spacing, so mark i sits at exactly i*pelletGap (an invariant of uniform
+        // resampling). The appended tail mark (when the length isn't a whole
+        // multiple) is clamped to `total`; a pellet with arc + faceLag > total is
+        // in the face's trailing dead-zone — never eaten this lap, always visible.
+        // Disappearance AND flash/score coherently exclude it (the plan's
+        // "ラップ境界の既知の小事"), so the i*gap reconstruction needs no arc query.
+        let arc = min(Double(i) * Double(pelletGap), total)
+        let ix = Int(m.point.x.rounded()), iy = Int(m.point.y.rounded())
+        let h = positionHash01(x: ix, y: iy)
+        let kind: Kind = !showBonuses ? .dot
+                       : (h < 0.04 ? .cherry : (h < 0.08 && icon != nil ? .icon : .dot))
+        pellets.append(Pellet(point: pt, arc: arc, kind: kind,
+                              value: bonusValue(x: ix, y: iy)))
+    }
+    let bonusArcs = valid ? pellets.filter { $0.kind != .dot }.map(\.arc) : []
+    let flash = chompFlashPhase(eventArcs: bonusArcs, total: total, speed: Double(speed),
+                                now: Double(now), faceLag: Double(faceLag),
+                                dur: chompEatFlashDur)
+
+    // 1) Black road + 2-stroke neon walls on ONE rounded centreline. While a bonus
+    //    flash is in flight the wall sweeps EffectSpec.chomp.flash (the rainbow
+    //    flash) instead of resting blue, with a brighter glow.
+    let steps = roundedCornerPath(path, radius: Double(roadHalf))
+    let wall  = nsBezierPath(steps, lineWidth: roadWidth + 2 * wallThick)
+    let road  = nsBezierPath(steps, lineWidth: roadWidth)
+    let wallColor: NSColor
+    if let flash {
+        let c = blendThrough(EffectSpec.chomp.flash, at: flash)
+        wallColor = NSColor(srgbRed: CGFloat(c.r), green: CGFloat(c.g),
+                            blue: CGFloat(c.b), alpha: 1)
+    } else {
+        wallColor = NSColor(HexColor(SpriteColor.pupilBlue))
+    }
+    NSGraphicsContext.saveGraphicsState()
+    let glow = NSShadow()
+    glow.shadowColor = wallColor.withAlphaComponent(flash != nil ? 1 : 0.85)
+    glow.shadowBlurRadius = (flash != nil ? 5 : 3) * s; glow.shadowOffset = .zero; glow.set()
+    wallColor.setStroke(); wall.stroke()
+    NSGraphicsContext.restoreGraphicsState()
+    NSColor.black.setStroke(); road.stroke()
+
+    // 2) Interior fillets — a black disc erodes each inner neon notch the round
+    //    join leaves. Centre = vertex + bisector · roadHalf/cos(|turn|/2).
+    NSColor.black.setFill()
+    for c in interiorCorners(path) {
+        let d  = Double(roadHalf) / cos(abs(c.turn) / 2)
+        // Radius: spec says `wallThick * 0.5`, but the round join already softens
+        // the corner so 0.5 is invisible. Kept at 1.15 (the larger, just-visible
+        // value) per the user's live review (2026-06-22 "このままでOK").
+        let fr = Double(wallThick) * 1.15
+        let cx = c.vertex.x + c.bisector.x * d, cy = c.vertex.y + c.bisector.y * d
+        NSBezierPath(ovalIn: CGRect(x: cx - fr, y: cy - fr,
+                                    width: 2 * fr, height: 2 * fr)).fill()
+    }
+
+    // 3) Central pellet row — skip the FIRST mark (live cursor) AND any pellet the
+    //    face has already eaten this lap (valid only; the ghost keeps them static).
+    let yellow    = NSColor(HexColor(SpriteColor.pacYellow))
+    let bonusCell = roadWidth * 0.62 / 12        // cherry is 12 cells wide
+    let iconBox   = roadWidth * 0.66
+    for p in pellets {
+        if valid, faceArc >= p.arc { continue }   // eaten — gone until the lap wraps
+        switch p.kind {
+        case .cherry:
+            drawCenteredSprite(CanonicalSprite.cherry, cell: bonusCell, at: p.point)
+        case .icon:
+            if let icon { drawCorridorIcon(icon, at: p.point, box: iconBox) }
+        case .dot:
+            yellow.setFill()
+            NSBezierPath(ovalIn: CGRect(x: p.point.x - pelletR, y: p.point.y - pelletR,
+                                        width: 2 * pelletR, height: 2 * pelletR)).fill()
+        }
+    }
+
+    // 4) The walking pac / panicking ghost — reuse Ph3 (no guide, no chased dot;
+    //    the pellets are the targets now).
+    let petScale = roadWidth * 0.78 / chompFaceFootprint
+    drawChompPath(path, now: now, valid: valid, scale: petScale,
+                  speed: speed, faceLag: faceLag, showGuide: false, showHead: false)
+
+    // 5) Floating "+N" score pops for bonuses eaten in the last ~0.8s (valid only).
+    if valid {
+        let pops = chompScorePops(
+            bonuses: pellets.filter { $0.kind != .dot }
+                .map { (point: (x: Double($0.point.x), y: Double($0.point.y)),
+                        arc: $0.arc, value: $0.value) },
+            total: total, speed: Double(speed), now: Double(now),
+            faceLag: Double(faceLag), dur: chompScorePopDur)
+        for pop in pops { drawScorePop(pop, scale: s) }
     }
 }
 
@@ -505,10 +779,36 @@ private func linePetPosition(on r: CGRect, distance t: CGFloat)
     }
 }
 
-/// Yellow chomp wedge with the mouth opening / closing on a ~0.25 s
-/// cycle, centred on the current transform origin. `scale` keeps it
-/// proportional to the host surface.
+// Pixel line-pet metrics (#12 Ph2) — sized so the unified arcade sprites keep
+// the SAME on-screen footprint the smooth pets had (no layout shift for the
+// apps that already place line-pets). `scale` multiplies these per surface.
+private let chompFaceCells = 13                  // odd ⇒ the mouth wedge centres
+private let chompFaceFootprint: CGFloat = 14     // pt @ scale 1 (old smooth Ø)
+private let ghostFootprint: CGFloat = 14         // pt @ scale 1 (sprite is 14×14)
+
+/// Yellow PIXEL Pac-Man — the chomp line-pet, unified to the arcade sprite in
+/// #12 Ph2 (was a smooth cosine wedge; see `drawChompPetSmooth`, the gate
+/// fallback). The mouth SNAPS through `chompMouthFrames` at `chompMouthHz` via
+/// `Motion.frameStep` (a discrete swap — the retro feel). The wedge is y-
+/// symmetric (opens toward +x = travel, the caller having rotated by the lap
+/// tangent), so no flip is needed; just centre it on the transform origin.
+/// `@MainActor` (it calls the `@MainActor` `drawPacMan` blitter; the only caller
+/// is the `@MainActor` `drawLinePets`).
+@MainActor
 private func drawChompPet(now: CFTimeInterval, scale: CGFloat) {
+    let cell = scale * chompFaceFootprint / CGFloat(chompFaceCells)
+    let phase = ThemedTransition.frameStep(now: Double(now), hz: chompMouthHz,
+                                           frames: chompMouthFrames)
+    let w = CGFloat(chompFaceCells) * cell
+    drawPacMan(diameterCells: chompFaceCells, mouthHalfRad: mouthHalfRad(phase: phase),
+               cell: cell, at: CGPoint(x: -w / 2, y: -w / 2))
+}
+
+/// The pre-#12-Ph2 SMOOTH chomp wedge (cosine mouth on a ~0.25 s cycle). Kept
+/// as the verification-gate fallback: if the pixel sprites read poorly at the
+/// small line-pet size, flip `drawLinePets`' `.chomp` case back to this. Not
+/// called by default.
+private func drawChompPetSmooth(now: CFTimeInterval, scale: CGFloat) {
     let r: CGFloat = 7 * scale
     let chompPhase = 0.5 - 0.5 * cos(now * (2 * .pi / 0.25))
     let openRad = chompPhase * (35.0 * .pi / 180.0)
@@ -525,9 +825,37 @@ private func drawChompPet(now: CFTimeInterval, scale: CGFloat) {
     p.lineWidth = 0.5; p.stroke()
 }
 
-/// Red Blinky-style ghost: dome + 3-wave skirt + eyes pointing along
-/// travel direction, centred on the current transform origin.
-private func drawGhostPet(now: CFTimeInterval, scale: CGFloat) {
+/// Red Blinky PIXEL ghost — the chomp line-pet's companion, unified in #12 Ph2
+/// and made UPRIGHT + directional in #12 Ph3 (was a smooth bezier dome; see
+/// `drawGhostPetSmooth`, the gate fallback). The 2-pose skirt WADDLES via
+/// `Motion.frameStep` (poseA⇄poseB at `CanonicalSprite.waddleHz`). The ghost does
+/// NOT tumble with the lap — the caller leaves the context UNROTATED and passes
+/// `look` (the travel cardinal), so the body stays vertical and only the pupils
+/// swivel (`ghostFrames(look:)`). The sprite is FLIPPED so row 0 (the dome) sits
+/// at the TOP of the local y-up line-pet frame, then centred on the origin.
+/// `@MainActor` (it calls the `@MainActor` `drawPixelSprite` blitter; only caller
+/// is `drawLinePets`).
+@MainActor
+private func drawGhostPet(now: CFTimeInterval, scale: CGFloat, look: GhostLook) {
+    let sprite = ThemedTransition.frameStep(now: Double(now), hz: CanonicalSprite.waddleHz,
+                                            frames: CanonicalSprite.ghostFrames(look: look))
+    let cell = scale * ghostFootprint / CGFloat(sprite.height)
+    let w = CGFloat(sprite.width) * cell
+    let h = CGFloat(sprite.height) * cell
+    NSGraphicsContext.saveGraphicsState()
+    let t = NSAffineTransform()
+    t.translateX(by: -w / 2, yBy: h / 2)   // top-left of the centred sprite (y-up)
+    t.scaleX(by: 1, yBy: -1)               // row 0 → top: rows now grow DOWNWARD
+    t.concat()
+    drawPixelSprite(sprite, cell: cell, at: .zero)
+    NSGraphicsContext.restoreGraphicsState()
+}
+
+/// The pre-#12-Ph2 SMOOTH Blinky ghost (bezier dome + 3-wave skirt + eyes along
+/// travel). Kept as the verification-gate fallback (flip `drawLinePets`'
+/// `.ghost` case back to this if the pixel sprite reads poorly at the small
+/// line-pet size). Not called by default.
+private func drawGhostPetSmooth(now: CFTimeInterval, scale: CGFloat) {
     let w: CGFloat = 14 * scale
     let h: CGFloat = 16 * scale
     let bob = CGFloat(sin(now * (2 * .pi / 0.4))) * 0.6 * scale

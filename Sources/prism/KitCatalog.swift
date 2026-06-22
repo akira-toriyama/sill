@@ -390,8 +390,8 @@ let kitCatalog: [KitComponent] = [
         family: .collection),
     KitComponent(
         name: "ThemedTransition", module: "Motion",
-        kind: "MUI theme.transitions analog — pure one-shot animation math (Duration/Easing tokens, Tween, lerp, spring)",
-        summary: "The family's shared TRANSIENT (play-once) motion math: named durations + easing curves + a Tween value + interpolation. Pure, Sendable, AppKit-free; the counterpart to Effects (which owns CYCLIC color motion). The app owns the clock and samples these per frame.",
+        kind: "MUI theme.transitions analog — pure one-shot animation math (Duration/Easing tokens, Tween, lerp, spring, frameStep)",
+        summary: "The family's shared TRANSIENT (play-once) motion math: named durations + easing curves + a Tween value + interpolation + a DISCRETE frame sampler. Pure, Sendable, AppKit-free; the counterpart to Effects (which owns CYCLIC color motion). The app owns the clock and samples these per frame.",
         consumes: "Pure functions — no view, no NSView, no instance. `import Motion`, then read tokens / sample math off a wall-clock `now` (CACurrentMediaTime()) inside your existing redraw loop: e.g. `let s = ThemedTransition.Tween(start: t0, duration: .move, easing: .easeOutCubic); pillX = s.value(at: now, from: x0, to: x1)`. Nothing to retain.",
         keyAPI: [
                  "ThemedTransition.Duration — named TimeInterval (seconds) tokens: .snap(0) / .exit(.12) / .enter(.16, default) / .move(.18) / .emphasis(.22) / .staggerStep(.03). Calibrated to the family's measured band, NOT MUI's slower web ladder",
@@ -399,12 +399,13 @@ let kitCatalog: [KitComponent] = [
                  "ThemedTransition.Tween(start:duration:delay:easing:) — the (when, how-long, delay, curve) value every app re-derives. value(at:now) / value(at:from:to:) / rawProgress(at:) / isComplete(at:)",
                  "ThemedTransition.progress(now:start:duration:delay:) -> 0…1 clamped; .eased(now:…:easing:) runs it through a curve",
                  "ThemedTransition.lerp(a,b,t) — Double + (CoreGraphics) CGFloat/CGPoint/CGSize/CGRect overloads. spring(t,zeta:omega:) underdamped step. dampedSine(p,frequency:decay:) shake/vibrate envelope",
+                 "ThemedTransition.frameStep(now:hz:frames:[T]) -> T — DISCRETE sprite-swap sampler (the counterpart to the continuous curves): index = floor(now·hz·count) wrapped, so frames cycle hz complete times/sec. Hard cuts, not blends — the chomp mouth [0,0.5,1,0.5]@5Hz, a 2-pose ghost waddle, a blinking caret. Negative-now total; frames must be non-empty",
                  "ThemedTransition.autoDuration(forExtent:) — MUI's size→duration heuristic (sublinear). scaled(_:by:) — clamp+multiply for an app speed knob (perch duration-scale)",
              ],
         variants: [
                  "Duration ladder: snap / exit / enter / move / emphasis / staggerStep",
                  "Easing: linear · easeOutQuad/Cubic/Quint · easeInOutCubic · standard/decelerate/accelerate/sharp (Material) · spring · custom cubicBezier",
-                 "Primitives: Tween · progress/eased · lerp (scalar + CG) · spring · dampedSine · autoDuration · scaled",
+                 "Primitives: Tween · progress/eased · lerp (scalar + CG) · spring · dampedSine · frameStep (discrete) · autoDuration · scaled",
                  "DIVISION OF LABOUR: Motion = one-shot (slide/fade/pop/reorder); Effects = cyclic (border breathe/flash, rainbow, line-pets). No timer/state here — app owns the clock (sill f(now) convention)",
              ],
         family: .motion),
@@ -460,6 +461,27 @@ let kitCatalog: [KitComponent] = [
                  "resampleAlongPolyline: drives pixel / ascii / arrow-chain / paws / chomp-pellet placement (uniform spacing through corners)",
                  "roundedCornerPath: the straightened-gesture trail's corner softening (PathStep is cross-platform; NSBezierPath stays gated)",
                  "DIVISION OF LABOUR: pure geometry in Effects (no f(now), no theming); NSBezierPath behind canImport(AppKit). Color cycling for a trail reuses Effects.blendThrough; fade reuses Motion",
+             ],
+        family: .particles),
+    KitComponent(
+        name: "PixelSprite", module: "PixelArt + Effects",
+        kind: "Pixel-art sprite atom — wand's chomp (Pac-Man) arcade decals as resolution-independent integer pixel grids (#12 Ph1+Ph2: line-pets unified to pixel, mouth/waddle via Motion.frameStep; Ph3: ghost line-pet is UPRIGHT + directional)",
+        summary: "Pure PixelArt grids (PixelSprite = rows:[String] + palette:[Character:UInt32], flattened by cells()) + the circle-minus-mouth pacManCells wedge + a stable positionHash01 jitter + a ScaleTier size knob; Effects owns the @MainActor blitter (drawPixelSprite/drawPacMan, antialias OFF for crisp pixels). Colours are INTRINSIC arcade constants (pac-yellow/ghost-red/eye-white/pupil-blue/cherry/brown), reconciled to ThemeSpec.chomp roles where one exists — so chomp reads identically across every theme (self-contained arcade look, not role-driven).",
+        consumes: "`import PixelArt` for the pure grids/geometry; `import Effects` for the @MainActor draw, hosted in an isFlipped view (row 0 = top). Pac-Man: `drawPacMan(diameterCells:mouthHalfRad:cell:at:)`. Generic: `drawPixelSprite(CanonicalSprite.ghost, cell:at:)`. Clock injected as now:Double. Ph2: the unified line-pets (drawLinePets) are now PIXEL — the mouth flaps via ThemedTransition.frameStep(now:hz:chompMouthHz, frames:chompMouthFrames) and the ghost waddles at CanonicalSprite.waddleHz. Ph3: the ghost line-pet stays UPRIGHT (no longer tumbles with the lap) and only its eyes swivel — drawLinePets snaps the travel tangent to a cardinal via GhostLook.facing(dx:dy:) and blits CanonicalSprite.ghostFrames(look:); pac still rotates.",
+        keyAPI: [
+                 "PixelSprite { rows:[String], palette:[Character:UInt32] }.cells() -> [(col:Int,row:Int,color:UInt32)] — transparent sentinel '.' omitted, row-major; width/height/pixelSize(cell:)",
+                 "pacManCells(diameterCells:mouthHalfRad:) -> [(col:Int,row:Int)] — circle minus mouth wedge (excl. cx²+cy²>r², excl. |atan2(cy,cx)|<mouthHalfRad); mouth opens +x",
+                 "mouthHalfRad(phase:) -> Double — 5° + 55°·phase (the chomp gape). chompMouthFrames [0,0.5,1,0.5] + chompMouthHz 5 = the canonical mouth swap (fed to Motion.frameStep)",
+                 "positionHash01(x:y:) -> Double in 0..<1 — stable per-cell jitter (Knuth-mult mix, wrapping, negative-safe)",
+                 "ScaleTier {.s,.m,.l}.multiplier -> 2 / 3 / 4.5 — generic size knob",
+                 "drawPixelSprite(_:cell:at:color:) / drawPacMan(diameterCells:mouthHalfRad:cell:at:color:) — @MainActor AppKit blit, antialias OFF; color: overrides the sprite's intrinsic cells",
+                 "CanonicalSprite.cherry (12×13) / .ghost / .ghostAlt (14×14, 2-pose waddle); .waddleFrames [ghost,ghostAlt] + .waddleHz 1.5; SpriteColor.* intrinsic 0xRRGGBB constants",
+                 "GhostLook {.up,.right,.down,.left} + .facing(dx:dy:) snaps a travel tangent to a cardinal (y-up); CanonicalSprite.ghostSprite(feet:look:) / .ghostFrames(look:) build the upright directional ghost (#12 Ph3 — body fixed, pupils track travel)",
+             ],
+        variants: [
+                 "Pac-Man = geometry (rigid grid; the draw context rotates by the travel tangent to aim the mouth) — cherry/ghost = literal authored sprites; ghost has a 2-pose skirt for the waddle and (Ph3) is UPRIGHT in the line-pet — only its pupils swivel to the travel cardinal, while pac keeps rotating",
+                 "DIVISION OF LABOUR: pure grids + circle/wedge/hash math in PixelArt (zero AppKit, zero Palette — intrinsic UInt32 colours); NSRect fill behind canImport(AppKit) in Effects. Theme-INVARIANT by design (chomp is always yellow/red/blue/black)",
+                 "Ph roadmap (#12): Ph1 sprites+blitter ✓ → Ph2 unify line-pets + Motion.frameStep ✓ → Ph3 upright directional-eye ghost ✓ (this) + PathPet next → Ph4 neon corridor + pellets → Ph5 eat + rainbow flash + score",
              ],
         family: .particles),
 ]
