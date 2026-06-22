@@ -169,6 +169,26 @@ final class TrailTests: XCTestCase {
         XCTAssertEqual(z.pet, -10, accuracy: 1e-9)
     }
 
+    // MARK: - eatCrossed (the per-frame eat primitive, #12 Ph5)
+
+    func testEatCrossedForwardInterval() {
+        // arc 50 lies in (40, 60] → crossed this frame.
+        XCTAssertTrue(eatCrossed(arc: 50, prev: 40, cur: 60))
+        // half-open: arc == cur is INCLUDED, arc == prev is EXCLUDED.
+        XCTAssertTrue(eatCrossed(arc: 50, prev: 40, cur: 50))
+        XCTAssertFalse(eatCrossed(arc: 50, prev: 50, cur: 60))
+    }
+
+    func testEatCrossedNotReachedOrAlreadyPast() {
+        XCTAssertFalse(eatCrossed(arc: 70, prev: 40, cur: 60))   // ahead of the face
+        XCTAssertFalse(eatCrossed(arc: 30, prev: 40, cur: 60))   // already behind
+    }
+
+    func testEatCrossedWrapIsNotACrossing() {
+        // A loop restart (cur < prev) is NOT a crossing — the caller resets per lap.
+        XCTAssertFalse(eatCrossed(arc: 10, prev: 90, cur: 5))
+    }
+
     // MARK: - roundedCornerPath
 
     func testRoundedCornerCutsAndBridges() {

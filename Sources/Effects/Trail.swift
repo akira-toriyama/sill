@@ -187,6 +187,19 @@ public func pathPetCursors(total: Double, speed: Double, now: Double, faceLag: D
     return (head: head, pet: head - faceLag)
 }
 
+/// True when an eater advancing from face arc-length `prev` to `cur` in one frame
+/// CROSSES a token at arc-length `arc` — i.e. `arc ∈ (prev, cur]` (half-open:
+/// `cur` included, `prev` excluded, so a token is eaten exactly once as the mouth
+/// reaches it). Clock-free + deterministic: the per-frame primitive an app pairs
+/// with `resampleAlongPolyline` / `pathPetCursors` to fire a discrete eat event
+/// (a sound, a real score). Forward motion only — a wrap (`cur < prev`, the loop
+/// restart) is NOT a crossing; the caller resets its per-lap bookkeeping there.
+/// The corridor's own showcase derives eating purely from `now` instead (see
+/// `chompFlashPhase` / `chompScorePops`), so it needs no frame-to-frame state.
+public func eatCrossed(arc: Double, prev: Double, cur: Double) -> Bool {
+    prev < arc && arc <= cur
+}
+
 // MARK: - Rounded-corner path (wand's buildHybridPath, as a pure description)
 
 /// One step of a pure path description — the cross-platform analog of the few
