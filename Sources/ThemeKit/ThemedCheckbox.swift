@@ -20,7 +20,7 @@ import PaletteKit
 import Motion
 
 @MainActor
-public final class ThemedCheckbox: NSControl {
+public final class ThemedCheckbox: ThemedControl {
 
     /// MUI size — only the box glyph shrinks; the padded square hit/hover area
     /// stays constant (MUI padding 9 both sizes).
@@ -31,8 +31,6 @@ public final class ThemedCheckbox: NSControl {
     public enum Role { case primary }
 
     // MARK: - Public configuration
-
-    public var palette: ResolvedPalette { didSet { applyTheme() } }
 
     public var size: Size = .medium { didSet { applyTheme(); relayout() } }
     public var role: Role = .primary { didSet { applyTheme() } }
@@ -51,38 +49,11 @@ public final class ThemedCheckbox: NSControl {
     /// programmatic `isChecked =`. Argument = the value the box toggled TO.
     public var onChange: ((Bool) -> Void)?
 
-    /// Optional key equivalent (MUI has none). Matched in performKeyEquivalent.
-    public var keyEquivalent: String = ""
-    public var keyEquivalentModifierMask: NSEvent.ModifierFlags = []
-
     /// Force a state without events — deterministic still capture. Disabled
     /// boxes ignore the interaction ones; `previewChecked`/`previewIndeterminate`
     /// override the drawn glyph without mutating the host's bound value.
-    public var previewHovered = false { didSet { applyState(animated: false) } }
-    public var previewPressed = false { didSet { applyState(animated: false) } }
-    public var previewFocused = false { didSet { applyState(animated: false) } }
     public var previewChecked: Bool?       = nil { didSet { syncAccessibility(); applyState(animated: false) } }
     public var previewIndeterminate: Bool? = nil { didSet { syncAccessibility(); applyState(animated: false) } }
-
-    // MARK: - NSControl overrides (custom storage — cell-less)
-
-    private var _enabled = true
-    public override var isEnabled: Bool {
-        get { _enabled }
-        set {
-            guard _enabled != newValue else { return }
-            _enabled = newValue
-            if !newValue {
-                isHovered = false; isPressed = false
-                if window?.firstResponder === self { window?.makeFirstResponder(nil) }
-            }
-            applyTheme()
-        }
-    }
-    private weak var _target: AnyObject?
-    private var _action: Selector?
-    public override var target: AnyObject? { get { _target } set { _target = newValue } }
-    public override var action: Selector?  { get { _action } set { _action = newValue } }
 
     // MARK: - Internals
 
@@ -91,26 +62,18 @@ public final class ThemedCheckbox: NSControl {
     private let boxStrokeLayer = CAShapeLayer()    // outline ring when unchecked
     private let glyphLayer    = CAShapeLayer()     // the check / dash (strokeEnd draws in)
     private let labelLayer    = CATextLayer()
-    private let focusRingLayer = CAShapeLayer()    // themed primary ring (hugs the box)
 
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false
-    private var isPressed = false
-    private var isKeyFocused = false
-    private var isFlashing = false
     private var labelTextSize: CGSize = .zero
-
-    public override var isFlipped: Bool { false }
 
     // MARK: - Metrics
 
     private struct Metrics {
-        let target, box, radius, stroke, labelFont, labelGap, focusInset: CGFloat
+        let target, box, radius, stroke, labelFont, labelGap: CGFloat
     }
     private var metrics: Metrics {
         switch size {
-        case .small:  return Metrics(target: 38, box: 18, radius: CGFloat(Radius.xs), stroke: 1.5, labelFont: 14, labelGap: CGFloat(Space.xs), focusInset: -2)
-        case .medium: return Metrics(target: 42, box: 20, radius: CGFloat(Radius.xs), stroke: 2,   labelFont: 16, labelGap: CGFloat(Space.xs), focusInset: -2)
+        case .small:  return Metrics(target: 38, box: 18, radius: CGFloat(Radius.xs), stroke: 1.5, labelFont: 14, labelGap: CGFloat(Space.xs))
+        case .medium: return Metrics(target: 42, box: 20, radius: CGFloat(Radius.xs), stroke: 2,   labelFont: 16, labelGap: CGFloat(Space.xs))
         }
     }
 
@@ -127,14 +90,10 @@ public final class ThemedCheckbox: NSControl {
 
     // MARK: - Init
 
-    public init(palette: ResolvedPalette) {
-        self.palette = palette
-        super.init(frame: .zero)
-        wantsLayer = true
-        layer?.masksToBounds = false
-        focusRingType = .none
+    public override init(palette: ResolvedPalette) {
+        super.init(palette: palette)
 
-        let s = backingScale
+        let s = themeBackingScale
         hoverCircleLayer.contentsScale = s
         hoverCircleLayer.masksToBounds = true
         layer?.addSublayer(hoverCircleLayer)
@@ -160,12 +119,6 @@ public final class ThemedCheckbox: NSControl {
         labelLayer.isWrapped = false
         layer?.addSublayer(labelLayer)
 
-        focusRingLayer.contentsScale = s
-        focusRingLayer.fillColor = NSColor.clear.cgColor
-        focusRingLayer.lineWidth = 2
-        focusRingLayer.opacity = 0
-        layer?.addSublayer(focusRingLayer)
-
         setAccessibilityRole(.checkBox)
         applyTheme()
     }
@@ -174,13 +127,9 @@ public final class ThemedCheckbox: NSControl {
     public required init?(coder: NSCoder) { nil }
 
     private func relayout() { invalidateIntrinsicContentSize(); needsLayout = true }
-    private var backingScale: CGFloat { themeBackingScale }
 
     // MARK: - State helpers
 
-    private var fxHovered: Bool { (isHovered || previewHovered) && isEnabled }
-    private var fxPressed: Bool { (isPressed || previewPressed) && isEnabled }
-    private var fxFocused: Bool { (isKeyFocused || previewFocused) && isEnabled }
     private var fxChecked: Bool { previewChecked ?? isChecked }
     private var fxIndeterminate: Bool { previewIndeterminate ?? isIndeterminate }
     private var eff: Bool { fxChecked || fxIndeterminate }   // box is "filled"
@@ -208,39 +157,15 @@ public final class ThemedCheckbox: NSControl {
         return .clear
     }
     private var labelColor: NSColor { isEnabled ? palette.foreground : palette.muted }
-    private var showFocusRing: Bool { fxFocused }
 
     // MARK: - Theming
 
-    public func applyTheme() {
-        layerTxn(animated: false) {
-            self.focusRingLayer.strokeColor = self.palette.primary.cgColor
-            self.boxStrokeLayer.lineWidth = self.metrics.stroke
-            self.glyphLayer.lineWidth = self.metrics.box * 2 / 24
-        }
-        rebuildLabel()
-        syncAccessibility()
-        applyState(animated: false)
-        needsLayout = true
+    override func applyThemeSnap() {
+        boxStrokeLayer.lineWidth = metrics.stroke
+        glyphLayer.lineWidth = metrics.box * 2 / 24
     }
 
-    private func applyState(animated: Bool) {
-        // The glyph PATH (tick vs dash) snaps; only its strokeEnd draw-in animates.
-        // Assign only when there IS a glyph — on uncheck we keep the prior path so
-        // strokeEnd 1→0 retracts it (assigning nil would snap the tick away).
-        layerTxn(animated: false) { if let path = self.glyphPath() { self.glyphLayer.path = path } }
-        layerTxn(animated: animated) {
-            self.boxFillLayer.fillColor = self.boxFillColor.cgColor
-            self.boxStrokeLayer.strokeColor = self.boxStrokeColor.cgColor
-            self.boxStrokeLayer.opacity = self.eff ? 0 : 1     // ring fades as the fill arrives
-            self.glyphLayer.strokeColor = self.glyphColor.cgColor
-            self.glyphLayer.strokeEnd = self.eff ? 1 : 0       // draw-in
-            self.hoverCircleLayer.backgroundColor = self.hoverCircleColor.cgColor
-            self.focusRingLayer.opacity = self.showFocusRing ? 1 : 0
-        }
-    }
-
-    private func rebuildLabel() {
+    override func rebuildContent() {
         let f = palette.uiFont(metrics.labelFont)
         let s = label ?? ""
         let attr = NSAttributedString(string: s, attributes: [.font: f, .foregroundColor: labelColor])
@@ -254,11 +179,25 @@ public final class ThemedCheckbox: NSControl {
         }
     }
 
-    private func syncAccessibility() {
+    override func syncAccessibility() {
         setAccessibilityLabel(label)
         setAccessibilityEnabled(isEnabled)
         // -1 mixed (indeterminate) / 1 on / 0 off
         setAccessibilityValue(fxIndeterminate ? -1 : (fxChecked ? 1 : 0))
+    }
+
+    override func applyState(animated: Bool) {
+        layerTxn(animated: false) { if let path = self.glyphPath() { self.glyphLayer.path = path } }
+        super.applyState(animated: animated)
+    }
+
+    override func applyInteractionState() {
+        boxFillLayer.fillColor = boxFillColor.cgColor
+        boxStrokeLayer.strokeColor = boxStrokeColor.cgColor
+        boxStrokeLayer.opacity = eff ? 0 : 1
+        glyphLayer.strokeColor = glyphColor.cgColor
+        glyphLayer.strokeEnd = eff ? 1 : 0
+        hoverCircleLayer.backgroundColor = hoverCircleColor.cgColor
     }
 
     // MARK: - Glyph paths (box-local coords, y-up)
@@ -283,137 +222,56 @@ public final class ThemedCheckbox: NSControl {
 
     // MARK: - Layout
 
-    public override func layout() {
-        super.layout()
+    override func positionLayers(in bounds: CGRect, local: CGRect) {
         let m = metrics
-        layerTxn(animated: false) {
-            let targetRect = NSRect(x: 0, y: (self.bounds.height - m.target) / 2,
-                                    width: m.target, height: m.target)
-            let boxRect = NSRect(x: targetRect.midX - m.box / 2, y: targetRect.midY - m.box / 2,
-                                 width: m.box, height: m.box)
-            let boxLocal = CGRect(origin: .zero, size: boxRect.size)
-
-            self.hoverCircleLayer.frame = targetRect
-            self.hoverCircleLayer.cornerRadius = m.target / 2
-
-            self.boxFillLayer.frame = boxRect
-            self.boxFillLayer.path = CGPath(roundedRect: boxLocal,
-                cornerWidth: m.radius, cornerHeight: m.radius, transform: nil)
-
-            self.boxStrokeLayer.frame = boxRect
-            let si = m.stroke / 2
-            let ringRadius = max(0, m.radius - si)   // stay concentric with the fill's corner
-            self.boxStrokeLayer.path = CGPath(roundedRect: boxLocal.insetBy(dx: si, dy: si),
-                cornerWidth: ringRadius, cornerHeight: ringRadius, transform: nil)
-
-            self.glyphLayer.frame = boxRect   // path is box-local
-
-            self.focusRingLayer.frame = boxRect
-            self.focusRingLayer.path = CGPath(
-                roundedRect: boxLocal.insetBy(dx: m.focusInset, dy: m.focusInset),
-                cornerWidth: m.radius - m.focusInset, cornerHeight: m.radius - m.focusInset, transform: nil)
-
-            if !(self.label ?? "").isEmpty {
-                self.labelLayer.position = CGPoint(x: boxRect.maxX + m.labelGap, y: targetRect.midY)
-            }
+        let targetRect = NSRect(x: 0, y: (bounds.height - m.target) / 2,
+                                width: m.target, height: m.target)
+        let boxRect = NSRect(x: targetRect.midX - m.box / 2, y: targetRect.midY - m.box / 2,
+                             width: m.box, height: m.box)
+        let boxLocal = CGRect(origin: .zero, size: boxRect.size)
+        hoverCircleLayer.frame = targetRect
+        hoverCircleLayer.cornerRadius = m.target / 2
+        boxFillLayer.frame = boxRect
+        boxFillLayer.path = CGPath(roundedRect: boxLocal,
+            cornerWidth: m.radius, cornerHeight: m.radius, transform: nil)
+        boxStrokeLayer.frame = boxRect
+        let si = m.stroke / 2
+        let ringRadius = max(0, m.radius - si)
+        boxStrokeLayer.path = CGPath(roundedRect: boxLocal.insetBy(dx: si, dy: si),
+            cornerWidth: ringRadius, cornerHeight: ringRadius, transform: nil)
+        glyphLayer.frame = boxRect
+        if !(label ?? "").isEmpty {
+            labelLayer.position = CGPoint(x: boxRect.maxX + m.labelGap, y: targetRect.midY)
         }
     }
 
-    public override func viewDidChangeBackingProperties() {
-        super.viewDidChangeBackingProperties()
-        let s = backingScale
-        for l in [hoverCircleLayer, boxFillLayer, boxStrokeLayer, glyphLayer, focusRingLayer] {
+    override func focusRingPath(in rect: CGRect) -> CGPath {
+        let m = metrics
+        let targetRect = NSRect(x: 0, y: (rect.height - m.target) / 2,
+                                width: m.target, height: m.target)
+        let boxRect = NSRect(x: targetRect.midX - m.box / 2, y: targetRect.midY - m.box / 2,
+                             width: m.box, height: m.box)
+        return concentricRingPath(in: boxRect, radius: CGFloat(m.radius))
+    }
+
+    // MARK: - Contents scale
+
+    override func updateContentsScale(_ s: CGFloat) {
+        for l in [hoverCircleLayer, boxFillLayer, boxStrokeLayer, glyphLayer] {
             l.contentsScale = s
         }
         labelLayer.contentsScale = s
         needsLayout = true
     }
 
-    // MARK: - Hover
+    // MARK: - Activation
 
-    public override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let t = trackingArea { removeTrackingArea(t); trackingArea = nil }
-        let t = NSTrackingArea(rect: .zero,
-            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
-            owner: self, userInfo: nil)
-        addTrackingArea(t); trackingArea = t
-        if isHovered, let w = window {
-            let local = convert(w.mouseLocationOutsideOfEventStream, from: nil)
-            if !bounds.contains(local) { isHovered = false; applyState(animated: false) }
-        }
-    }
-    public override func mouseEntered(with event: NSEvent) {
-        guard isEnabled else { return }
-        isHovered = true; applyState(animated: true)
-    }
-    public override func mouseExited(with event: NSEvent) {
-        guard isHovered else { return }
-        isHovered = false; applyState(animated: true)
+    override func activate() {
+        toggle(fromUser: true)
     }
 
-    // MARK: - Press (toggles on mouse-up inside; the whole control incl. label)
-
-    public override func acceptsFirstMouse(for event: NSEvent?) -> Bool { isEnabled }
-    public override func mouseDown(with event: NSEvent) {
-        guard isEnabled else { return }
-        isPressed = true; applyState(animated: true)
-    }
-    public override func mouseDragged(with event: NSEvent) {
-        guard isEnabled else { return }
-        let inside = bounds.contains(convert(event.locationInWindow, from: nil))
-        if inside != isPressed { isPressed = inside; applyState(animated: true) }
-    }
-    public override func mouseUp(with event: NSEvent) {
-        guard isEnabled else { return }
-        let inside = bounds.contains(convert(event.locationInWindow, from: nil))
-        if isPressed { isPressed = false; applyState(animated: true) }
-        if inside { toggle(fromUser: true) }
-    }
-
-    // MARK: - Keyboard + focus
-
-    public override var acceptsFirstResponder: Bool { isEnabled }
-    public override func becomeFirstResponder() -> Bool {
-        let ok = super.becomeFirstResponder()
-        if ok { isKeyFocused = true; applyState(animated: true) }
-        return ok
-    }
-    public override func resignFirstResponder() -> Bool {
-        let ok = super.resignFirstResponder()
-        if ok { isKeyFocused = false; applyState(animated: true) }
-        return ok
-    }
-    public override func keyDown(with event: NSEvent) {
-        if isEnabled, event.keyCode == 49 {   // Space toggles
-            if !event.isARepeat { flashAndToggle() }
-            return
-        }
-        super.keyDown(with: event)
-    }
-    public override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard isEnabled, !keyEquivalent.isEmpty,
-              event.charactersIgnoringModifiers == keyEquivalent,
-              mods == keyEquivalentModifierMask else {
-            return super.performKeyEquivalent(with: event)
-        }
-        flashAndToggle()
-        return true
-    }
-
-    /// A visible press bump, then toggle — keyboard has no natural down/up. The
-    /// `isFlashing` guard makes it atomic; the deferred path re-checks isEnabled.
-    private func flashAndToggle() {
-        guard !isFlashing else { return }
-        isFlashing = true
-        isPressed = true; applyState(animated: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
-            guard let self else { return }
-            self.isFlashing = false
-            self.isPressed = false; self.applyState(animated: true)
-            self.toggle(fromUser: true)
-        }
+    override func keyboardActivate() {
+        flashThenActivate { [weak self] in self?.toggle(fromUser: true) }
     }
 
     /// unchecked→checked→unchecked; indeterminate→checked (cleared). Fires
@@ -432,7 +290,7 @@ public final class ThemedCheckbox: NSControl {
         }
         if fromUser {
             onChange?(next)
-            if let a = _action { NSApp.sendAction(a, to: _target, from: self) }
+            sendActionToTarget()
         }
     }
 }
@@ -479,7 +337,7 @@ extension ThemedCheckbox {
     func toggleForTesting() { toggle(fromUser: true) }
     /// Drive the real Space-key plumbing (flash + isFlashing guard + deferred
     /// toggle) — the keyboard entry the bare toggleForTesting bypasses.
-    func spaceKeyForTesting() { flashAndToggle() }
+    func spaceKeyForTesting() { keyboardActivate() }
     var isFlashingForTesting: Bool { isFlashing }
 }
 #endif
