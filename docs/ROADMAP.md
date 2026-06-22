@@ -3,6 +3,34 @@
 - 現行 **v1.18.0**（**#8 文字 MUI 照合完了 = MUI-grounded 内部 TypeScale + font-fidelity 修正・PR #63 + `v1.18.0`・2026-06-22／**#12 chomp「ChompCorridor」完了 = PR #62 + `v1.17.0`（Ph1–Ph5 一括 squash・ユーザー本採用 2026-06-22）**／#9d 完了 = `Gesture`（wand 由来の純粋 4-way 認識アトム）・PR #60 + `v1.16.0` tagged 2026-06-21／#9c = `TrailGeometry`・PR #59 + `v1.15.0`／#9b = `SplatterShape`・PR #58 + `v1.14.0`／#9a = `ParticleBurst.radiusSpeed`・PR #57 + `v1.13.0`／#7 = `ParticleBurst`・PR #56 + `v1.12.0`／#6 = `Motion`・PR #55／#5 = perch PR #133／#4 = perch PR #132／#3 = PR #54）。**番号が小さいほど先**にやる（ただし **#8〜11 は順番入れ替え可**＝ユーザー裁定 2026-06-20）。**#9 完了（wand effect 一式を sill へ・スコープ=full／連作 9a→9b→9c→9d ✅。9e=wand 本体移植は不要＝ユーザー裁定 2026-06-21＝sill 側 #9 は 9d で完結）。#11+#10 = ✅ 完了（PR #61・prism のみ＝タグ無し・2026-06-21）→ **#12 完了（PR #62 + `v1.17.0`・2026-06-22）→ #8 完了（PR #63 + `v1.18.0`・2026-06-22）= 全 #1–#12 完了。**
 - すべて sill 本体の作業（追加は additive・default-off）。
 - このファイルが残作業・進捗の**唯一の記録**（git 管理）。
+- **🆕 次の大型テーマ #13〜（sill 汎用化 + SwiftUI 化 + 各アプリ適用）= 設計合意済・実装未着手**。設計と根拠は [`docs/superpowers/specs/2026-06-22-sill-generalization-and-swiftui-design.md`](superpowers/specs/2026-06-22-sill-generalization-and-swiftui-design.md)（14-agent 調査 + 4観点敵対レビューで固めた版）。下の「## 次の大型テーマ」節を参照。
+
+## 次の大型テーマ — #13〜（sill 汎用化 + SwiftUI 化 + 各アプリ適用）
+
+> **設計合意済（ユーザー方向確定 2026-06-22）・実装未着手。** 詳細設計＝上記 spec。番号小さいほど先。各フェーズはセッション分割可。**未達成は各行で明示（暗黙にしない）。**
+>
+> **要望の再解釈（調査で確定）**: ①「ブラッシュアップ」= Radix/Tailwind/MUI の良所取り＋トークン/DRY 化。②「各アプリ適用＝脱AppKit→SwiftUI」は文字通りには不成立（5アプリ全部 100% AppKit overlay daemon・ThemeKit 利用ゼロ・SwiftUI は窓を作ると必ずアクティブ化＝非アクティブ overlay を壊す）。→ **ハイブリッド**で進める: sill に SwiftUI 層を足し、アプリは **AppKit の殻 + 中身 SwiftUI-on-sill**（`NSHostingView`）に。「脱AppKit」自体は達成しない（中身のみ SwiftUI＝ユーザー合意済）。
+>
+> **前提（ユーザー 2026-06-22）**: 個人開発・破壊的変更/長時間リファクタ全てOK・品質重視・プラン再作成OK。
+
+### Phase 1 — sill ブラッシュアップ（全部 sill 内・additive/リファクタ・B の前工事）
+- **#13 トークン基盤** — pure `Palette` に `Space`/`Radius`/`Elevation` スケール + `PaletteKit` に Elevation 解決表（新規）。`Motion` は**既存**（`ThemedTransition.Duration.enter`/`Easing.standard`）＝新規追加でなく **ThemeKit を `Motion` に配線**し 14 ファイルの `0.16` リテラル＋散乱 radius/gap をトークン化。control-size レイアウトは各 `Metrics` に残す。halo タッチアップ随時。
+- **#14 DRY 集約 + 共有基盤** — #14a（トークン非依存・即着手可: 共有 `layerTransaction`・`bestContrast` public 化・`themeBackingScale`・`CornerPath`・`ControlRole`/`palette.color(for:)`・`Elevation` struct 統合）→ #14b（リテラル→#13 トークン配線）。本丸 `ThemedControl` 基底（hover/press/focus/focus-ring/`preview*`/`fx*` 一本化＝Button/FAB/Checkbox/Chip+ToolBar 採用、他は leaf ヘルパのみ）。prism before/after 撮影ゲート（+ToolBar/ComboBox）。
+- **#15 ヘッドレス純粋核 + 相互作用/a11y** — **ThemedList 核を先に**抽出→ComboBox/Menu 核が List 核に依存（コンポーズ関係踏襲）。純粋核は Foundation/Sendable/**CLT で XCTest 可**。controlled/uncontrolled seam。a11y は**監査→不足補完**（全 15 部品は既に NSAccessibility 参照済）。
+
+### Phase 2 — sill を SwiftUI 化（A→B）
+- **#16 SwiftUI 提供層（A）** — prism の**ウィジェット橋 ~14個**を公開 `ThemeKitUI`（deps=ThemeKit/PaletteKit）に昇格（Effects/PixelArt/デモ橋は除外）。**prism を最初の consumer に**＝in-tree 橋を削除して `import ThemeKitUI`（ドリフト禁止）。palette は `Color(nsColor:)`（動的 appearance 維持）・**resolver は @MainActor のまま**。CLT ビルド可維持（Xcode 専用マクロ禁止）。Phase 1 完了を待たず #14a と並行可。
+- **#17 ネイティブ SwiftUI 部品（B・部品ごと）** — #13+#15 後。簡単（Divider/Chip/Skeleton）→ 複雑（TextField/ComboBox/ToolBar）は当面 A ラップ。**決定論プレビュー seam を実装**。**アニメ/見た目は maintainer 実機確認ゲート**（[[chomp-push-gate]] 同型・agent は画面収録不可）。Effects/装飾の Canvas 化はスコープ外（当面 AppKit ラップ）。
+
+### Phase 3 — 各アプリへ適用（各 app repo の follow-up・殻は AppKit のまま・**#16 依存/#17 非依存**）
+> 順 = **glance → perch → wand → facet（facet 最後・ユーザー指示）**。halo は描画のみで SwiftUI 検証にならず先頭から除外（#13 トークン消費のタッチアップ）。**facet/wand 着手前に「非 key パネル内 SwiftUI 入力（TextField/focus-ring/@FocusState）」の spike 必須。**
+- **#18 glance** — 先頭・最小（~2k LOC）・既に PaletteKit 消費・実 NSPanel chrome＝`NSHostingView` 検証台。
+- **#19 perch** — overlay/eventtap/AX 殻維持・ヒント pill 描画の sill 化。
+- **#20 wand** — overlay/launcher 殻維持・中身 sill 化 + `NSColorParse`→`PaletteKit` 収束。
+- **#21 facet** — 最大（~9k LOC）・最後。KeyablePanel/overlay/AX 殻維持・sidebar/grid/rail を SwiftUI-on-sill 再構築・自前 `ThemedScroller` 等を sill へ収束。
+
+### 順序・依存（要点）
+- クリティカルパス **#13 → #15 → #17**。#14a と #16(A) は並行可。#14b は #13 後、#17(B) は #13+#15 後。Phase 3 は **#16 依存・#17 非依存**（早期アプリは A で着手・B は裏で並行）。
 
 ## 🧭 現在地（引き継ぎ — 最新セッション 2026-06-21）
 
