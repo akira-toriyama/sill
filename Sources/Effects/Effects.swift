@@ -523,8 +523,7 @@ public func drawChompPath(_ path: [CGPoint], now: CFTimeInterval, valid: Bool = 
                           scale: CGFloat = 1, speed: CGFloat = 60,
                           faceLag: CGFloat = 0, showGuide: Bool = true) {
     guard path.count >= 2, speed > 0 else { return }
-    var total: CGFloat = 0     // arc length = the loop period (in points)
-    for i in 1..<path.count { total += hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y) }
+    let total = polylineLength(path)   // arc length = the loop period (in points)
     guard total > 0 else { return }
 
     if showGuide {
@@ -534,13 +533,16 @@ public func drawChompPath(_ path: [CGPoint], now: CFTimeInterval, valid: Bool = 
         guide.stroke()
     }
 
-    // Head marches the arc length and loops; the pet trails it by `faceLag`.
-    let headDist = CGFloat(now).truncatingRemainder(dividingBy: total / speed) * speed
-    let petDist = Double(headDist - faceLag)   // markAtArcLength clamps < 0 to the start
+    // Head marches the arc length and loops; the pet trails it by `faceLag`. The
+    // pure cursor math lives in `pathPetCursors` (CI-guardable; a negative `now`
+    // wraps forward like `Motion.frameStep`, not into a clamped dead-zone).
+    // markAtArcLength then clamps a negative `petDist` to the start (head leads).
+    let (headDist, petDist) = pathPetCursors(total: total, speed: Double(speed),
+                                             now: Double(now), faceLag: Double(faceLag))
 
     // The chased head — a small glowing pellet-dot (only when valid + lagging; a
     // mismatch has no target). Makes the faceLag gap legible before pellets (Ph4).
-    if valid, faceLag > 0, let head = markAtArcLength(path, distance: Double(headDist)) {
+    if valid, faceLag > 0, let head = markAtArcLength(path, distance: headDist) {
         let r: CGFloat = 2.5 * scale
         let yellow = NSColor(HexColor(SpriteColor.pacYellow))
         NSGraphicsContext.saveGraphicsState()
@@ -566,7 +568,8 @@ public func drawChompPath(_ path: [CGPoint], now: CFTimeInterval, valid: Bool = 
     } else {
         // Ghost stays UPRIGHT (no rotate) and PANICS — a sustained 2-D buzz
         // (co-prime 6/7, decay 0 so it doesn't fade), eyes on the travel cardinal.
-        let pp = (Double(now) * pathPetPanicHz).truncatingRemainder(dividingBy: 1)
+        var pp = (Double(now) * pathPetPanicHz).truncatingRemainder(dividingBy: 1)
+        if pp < 0 { pp += 1 }   // fold a negative `now` forward (frameStep's convention)
         let amp = 1.6 * scale
         let jx = CGFloat(ThemedTransition.dampedSine(pp, frequency: 6, decay: 0)) * amp
         let jy = CGFloat(ThemedTransition.dampedSine(pp, frequency: 7, decay: 0)) * amp

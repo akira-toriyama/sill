@@ -96,6 +96,79 @@ final class TrailTests: XCTestCase {
         XCTAssertTrue(one!.tangent == (x: 1, y: 0))
     }
 
+    func testMarkAtArcLengthPastEndTangentMultiLeg() {
+        // Past the end of an L-shape → clamp to the last point with the LAST leg's
+        // tangent (drawChompPath rotates the pac / gazes the ghost by this tangent,
+        // and headDist can sit at the loop terminal).
+        let m = markAtArcLength([(x: 0, y: 0), (x: 50, y: 0), (x: 50, y: 50)], distance: 999)
+        XCTAssertEqual(m!.point.x, 50, accuracy: 1e-9)
+        XCTAssertEqual(m!.point.y, 50, accuracy: 1e-9)
+        XCTAssertEqual(m!.tangent.x, 0, accuracy: 1e-9)
+        XCTAssertEqual(m!.tangent.y, 1, accuracy: 1e-9)
+    }
+
+    func testMarkAtArcLengthZeroLengthSegments() {
+        // Leading zero-length segment: the leading-tangent peek skips it and orients
+        // along the first NON-zero leg (parity with resampleAlongPolyline).
+        let lead = markAtArcLength([(x: 0, y: 0), (x: 0, y: 0), (x: 0, y: 10)], distance: 0)
+        XCTAssertEqual(lead!.point.x, 0, accuracy: 1e-9)
+        XCTAssertEqual(lead!.point.y, 0, accuracy: 1e-9)
+        XCTAssertEqual(lead!.tangent.x, 0, accuracy: 1e-9)
+        XCTAssertEqual(lead!.tangent.y, 1, accuracy: 1e-9)
+        // Interior zero-length segment is skipped mid-march (still lands at 25 up leg 2).
+        let mid = markAtArcLength([(x: 0, y: 0), (x: 50, y: 0), (x: 50, y: 0), (x: 50, y: 50)],
+                                  distance: 75)
+        XCTAssertEqual(mid!.point.x, 50, accuracy: 1e-9)
+        XCTAssertEqual(mid!.point.y, 25, accuracy: 1e-9)
+        XCTAssertEqual(mid!.tangent.y, 1, accuracy: 1e-9)
+        // All-degenerate multi-point path → the point, default (1,0) tangent.
+        let deg = markAtArcLength([(x: 0, y: 0), (x: 0, y: 0)], distance: 5)
+        XCTAssertEqual(deg!.point.x, 0, accuracy: 1e-9)
+        XCTAssertTrue(deg!.tangent == (x: 1, y: 0))
+    }
+
+    // MARK: - polylineLength + pathPetCursors (the PathPet loop/lag math, #12 Ph3)
+
+    func testPolylineLength() {
+        XCTAssertEqual(polylineLength([(x: 0, y: 0), (x: 100, y: 0)]), 100, accuracy: 1e-9)
+        XCTAssertEqual(polylineLength([(x: 0, y: 0), (x: 50, y: 0), (x: 50, y: 50)]),
+                       100, accuracy: 1e-9)
+        // < 2 points or all-degenerate → 0.
+        XCTAssertEqual(polylineLength([] as [(x: Double, y: Double)]), 0)
+        XCTAssertEqual(polylineLength([(x: 1, y: 2)]), 0)
+        XCTAssertEqual(polylineLength([(x: 7, y: 7), (x: 7, y: 7)]), 0, accuracy: 1e-9)
+    }
+
+    func testPathPetCursorsHeadLeadsPetTrails() {
+        // total 100, speed 50 → period 2s. At now 1 the head is half-way (50) and
+        // the pet trails faceLag (10) behind → 40 (the head leads the face).
+        let c = pathPetCursors(total: 100, speed: 50, now: 1, faceLag: 10)
+        XCTAssertEqual(c.head, 50, accuracy: 1e-9)
+        XCTAssertEqual(c.pet, 40, accuracy: 1e-9)
+    }
+
+    func testPathPetCursorsLoopWrap() {
+        // now == period → head resets to 0 (loop restart); pet goes negative (the
+        // caller clamps it to the start via markAtArcLength).
+        let wrap = pathPetCursors(total: 100, speed: 50, now: 2, faceLag: 10)
+        XCTAssertEqual(wrap.head, 0, accuracy: 1e-9)
+        XCTAssertEqual(wrap.pet, -10, accuracy: 1e-9)
+        // now past one period keeps marching (now 3 → same phase as now 1).
+        XCTAssertEqual(pathPetCursors(total: 100, speed: 50, now: 3, faceLag: 0).head,
+                       50, accuracy: 1e-9)
+    }
+
+    func testPathPetCursorsNegativeNowWrapsForward() {
+        // A negative injected `now` folds FORWARD (frameStep's rule), not into a
+        // negative/clamped dead-zone: now -1, period 2 ⇒ phase 1 ⇒ head 50.
+        XCTAssertEqual(pathPetCursors(total: 100, speed: 50, now: -1, faceLag: 0).head,
+                       50, accuracy: 1e-9)
+        // Degenerate total/speed → (0, -faceLag), no divide-by-zero.
+        let z = pathPetCursors(total: 0, speed: 50, now: 1, faceLag: 10)
+        XCTAssertEqual(z.head, 0, accuracy: 1e-9)
+        XCTAssertEqual(z.pet, -10, accuracy: 1e-9)
+    }
+
     // MARK: - roundedCornerPath
 
     func testRoundedCornerCutsAndBridges() {

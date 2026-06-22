@@ -42,6 +42,19 @@ public struct TrailMark: Sendable, Equatable {
     }
 }
 
+/// Total arc length of the polyline — the loop PERIOD a walker repeats over.
+/// `0` for fewer than two points (or an all-degenerate path). The single length
+/// sum `resampleAlongPolyline` (trim cutoff) and `drawChompPath` (loop period)
+/// both need; pure.
+public func polylineLength(_ points: [(x: Double, y: Double)]) -> Double {
+    guard points.count >= 2 else { return 0 }
+    var total = 0.0
+    for i in 1..<points.count {
+        total += hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y)
+    }
+    return total
+}
+
 /// March `points` and return a mark every `interval` points of ARC LENGTH,
 /// each carrying the local unit-tangent. The first point is always emitted
 /// (oriented along the first non-zero segment, or `(1,0)` if none); the LAST
@@ -63,10 +76,7 @@ public func resampleAlongPolyline(
     // Trim cutoff (total length − trimTail), computed once.
     let cutoff: Double?
     if trimTail > 0 {
-        var total = 0.0
-        for i in 1..<points.count {
-            total += hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y)
-        }
+        let total = polylineLength(points)
         if total <= trimTail { return [] }
         cutoff = total - trimTail
     } else {
@@ -160,6 +170,23 @@ public func markAtArcLength(
     return TrailMark(point: points[points.count - 1], tangent: lastTangent)
 }
 
+/// The looping head + trailing follower arc-length cursors for a "PathPet"
+/// (#12 Ph3) walking a polyline of arc length `total` at `speed` pt/s, sampled
+/// at injected `now`. The head marches `[0, total)` and LOOPS — a FLOORED modulo
+/// so a negative `now` wraps forward (the `Motion.frameStep` rule) instead of a
+/// clamped dead-zone — and the follower trails `faceLag` behind it (a negative
+/// `pet` is the caller's cue to clamp to the path start, which `markAtArcLength`
+/// does). Pure + deterministic in `now`. `(0, -faceLag)` for non-positive
+/// `total`/`speed`.
+public func pathPetCursors(total: Double, speed: Double, now: Double, faceLag: Double)
+    -> (head: Double, pet: Double) {
+    guard total > 0, speed > 0 else { return (head: 0, pet: -faceLag) }
+    let period = total / speed
+    let wrapped = now.truncatingRemainder(dividingBy: period)
+    let head = (wrapped < 0 ? wrapped + period : wrapped) * speed
+    return (head: head, pet: head - faceLag)
+}
+
 // MARK: - Rounded-corner path (wand's buildHybridPath, as a pure description)
 
 /// One step of a pure path description — the cross-platform analog of the few
@@ -222,6 +249,11 @@ public func roundedCornerPath(_ points: [CGPoint], radius: Double) -> [PathStep]
 /// `CGPoint` convenience for `markAtArcLength`.
 public func markAtArcLength(_ points: [CGPoint], distance: Double) -> TrailMark? {
     markAtArcLength(points.map { (x: Double($0.x), y: Double($0.y)) }, distance: distance)
+}
+
+/// `CGPoint` convenience for `polylineLength`.
+public func polylineLength(_ points: [CGPoint]) -> Double {
+    polylineLength(points.map { (x: Double($0.x), y: Double($0.y)) })
 }
 #endif
 

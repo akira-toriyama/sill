@@ -158,6 +158,22 @@ final class SpriteTests: XCTestCase {
         img.unlockFocus()
     }
 
+    func testDrawChompPathRuns() {
+        // The #12 Ph3 PathPet: drawChompPath walks a pac (valid, with a leading
+        // head-dot) / an upright panicking ghost (invalid) along an ARBITRARY
+        // polyline. Smoke only — real proof is the prism live capture; this
+        // exercises the pathPetCursors wrap, the head-dot gate, and the panic buzz
+        // at a few clock values (incl. past one loop) so a crash/regression CIs red.
+        let img = NSImage(size: NSSize(width: 180, height: 120))
+        img.lockFocus()
+        let path = [CGPoint(x: 10, y: 10), CGPoint(x: 90, y: 70), CGPoint(x: 170, y: 20)]
+        for now in [0.0, 0.3, 1.7] {   // start, mid, past one loop
+            drawChompPath(path, now: now, valid: true, scale: 1.5, faceLag: 20)
+            drawChompPath(path, now: now, valid: false, scale: 1.5)
+        }
+        img.unlockFocus()
+    }
+
     func testDrawRunsIntoAContext() {
         let img = NSImage(size: NSSize(width: 120, height: 120))
         img.lockFocus()
