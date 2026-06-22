@@ -45,7 +45,7 @@ extension ThemedButton.Role {
 }
 
 @MainActor
-public final class ThemedButton: NSControl {
+public final class ThemedButton: ThemedControl {
 
     /// MUI variant. `text` = bare label, ink-only (the MUI default); `contained`
     /// = filled in the role colour with an elevation shadow; `outlined` = a
@@ -73,9 +73,6 @@ public final class ThemedButton: NSControl {
     }
 
     // MARK: - Public configuration
-
-    /// The theme. Assigning re-themes the whole button.
-    public var palette: ResolvedPalette { didSet { applyTheme() } }
 
     public var variant: Variant = .text   { didSet { applyTheme(); relayout() } }
     public var size:    Size    = .medium { didSet { applyTheme(); relayout() } }
@@ -108,19 +105,6 @@ public final class ThemedButton: NSControl {
     /// `keyEquivalent`.
     public var onTap: (() -> Void)?
 
-    /// Optional key equivalent (MUI has none; AppKit dialogs want a default
-    /// button). Set to `"\r"` to make this the Return-activated default button.
-    /// Matched in `performKeyEquivalent` against `keyEquivalentModifierMask`.
-    public var keyEquivalent: String = ""
-    public var keyEquivalentModifierMask: NSEvent.ModifierFlags = []
-
-    /// Force the hovered / pressed / focused APPEARANCE without real events —
-    /// for previews / screenshots only (the bench shows the LIVE 演出; these
-    /// make a static capture deterministic). Disabled buttons ignore them.
-    public var previewHovered = false { didSet { applyState(animated: false) } }
-    public var previewPressed = false { didSet { applyState(animated: false) } }
-    public var previewFocused = false { didSet { applyState(animated: false) } }
-
     // MARK: - Grouping (ThemedButtonGroup composes these; defaults = standalone)
 
     /// Which corners get the corner radius; the rest are squared. Default = all
@@ -139,30 +123,6 @@ public final class ThemedButton: NSControl {
     /// Default false (a standalone contained button keeps its own shadow).
     public var groupedShadow = false { didSet { applyState(animated: false) } }
 
-    // MARK: - NSControl overrides (custom storage — a cell-less NSControl must
-    //         NOT lean on the cell-backed isEnabled / target / action).
-
-    private var _enabled = true
-    public override var isEnabled: Bool {
-        get { _enabled }
-        set {
-            guard _enabled != newValue else { return }
-            _enabled = newValue
-            // Actively clear any in-flight hover / press — a disable can strand
-            // them with no matching exit / up event (the stuck-hover gotcha).
-            if !newValue {
-                isHovered = false; isPressed = false
-                if window?.firstResponder === self { window?.makeFirstResponder(nil) }
-            }
-            applyTheme()
-        }
-    }
-
-    private weak var _target: AnyObject?
-    private var _action: Selector?
-    public override var target: AnyObject? { get { _target } set { _target = newValue } }
-    public override var action: Selector?  { get { _action } set { _action = newValue } }
-
     // MARK: - Internals
 
     private let shadowLayer  = CALayer()          // contained elevation — UNCLIPPED, explicit shadowPath
@@ -172,19 +132,10 @@ public final class ThemedButton: NSControl {
     private let leadingIconLayer  = CALayer()
     private let trailingIconLayer = CALayer()
     private let titleLayer   = CATextLayer()
-    private let focusRingLayer = CAShapeLayer()   // themed keyboard-focus ring (top, unclipped)
-
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false
-    private var isPressed = false
-    private var isKeyFocused = false
-    private var isFlashing = false   // a keyboard-flash activation is in flight
 
     /// Rendered icon point-sizes (nil ⇒ no icon) — drive layout + intrinsic width.
     private var leadingImageSize: CGSize?
     private var trailingImageSize: CGSize?
-
-    public override var isFlipped: Bool { false }   // y-up: a downward shadow is −y
 
     // MARK: - Metrics (MUI v5 Button source values; heights rounded from MUI's
     //         fractional line-box to device-friendly integers, content centred)
@@ -232,14 +183,9 @@ public final class ThemedButton: NSControl {
 
     // MARK: - Init
 
-    public init(palette: ResolvedPalette) {
-        self.palette = palette
-        super.init(frame: .zero)
-        wantsLayer = true
-        layer?.masksToBounds = false        // the focus ring / shadow live outside bounds
-        focusRingType = .none               // we draw our own themed ring
-
-        let s = backingScale
+    public override init(palette: ResolvedPalette) {
+        super.init(palette: palette)
+        let s = themeBackingScale
 
         // Shadow (bottom) — never clipped, explicit rounded silhouette.
         shadowLayer.masksToBounds = false
@@ -271,12 +217,6 @@ public final class ThemedButton: NSControl {
         titleLayer.truncationMode = .end
         titleLayer.isWrapped = false
         layer?.addSublayer(titleLayer)
-
-        focusRingLayer.fillColor = NSColor.clear.cgColor
-        focusRingLayer.lineWidth = 2
-        focusRingLayer.opacity = 0
-        focusRingLayer.contentsScale = s
-        layer?.addSublayer(focusRingLayer)
 
         setAccessibilityRole(.button)
         applyTheme()
@@ -314,10 +254,6 @@ public final class ThemedButton: NSControl {
         case .text, .outlined:  return .clear
         }
     }
-
-    private var fxHovered: Bool { (isHovered || previewHovered) && isEnabled }
-    private var fxPressed: Bool { (isPressed || previewPressed) && isEnabled }
-    private var fxFocused: Bool { (isKeyFocused || previewFocused) && isEnabled }
 
     /// The hover / press / focus state layer (animated). For contained it is the
     /// contrast ink (darkens a light fill, lightens a dark fill — theme-robust,
@@ -359,45 +295,32 @@ public final class ThemedButton: NSControl {
         return palette.shadow(.dp2)
     }
 
-    private var showFocusRing: Bool { fxFocused }
+    // MARK: - Base hook overrides
 
-    /// Re-theme: snaps the STABLE visuals (fill / title / icons / structure),
-    /// then settles the state layer. Snapping (not cross-fading) matches the
-    /// other widgets — a theme switch shouldn't smear, and these sublayers have
-    /// no action-disabling delegate.
-    public func applyTheme() {
-        layerTxn(animated: false) {
-            self.fillLayer.backgroundColor = self.baseFillColor.cgColor
-            self.borderLayer.isHidden = (self.variant != .outlined)
-            self.borderLayer.lineWidth = self.metrics.border
-            self.shadowLayer.isHidden = (self.variant != .contained)
-            self.focusRingLayer.strokeColor = self.palette.primary.cgColor
-        }
+    override func applyThemeSnap() {
+        fillLayer.backgroundColor = baseFillColor.cgColor
+        borderLayer.isHidden = (variant != .outlined)
+        borderLayer.lineWidth = metrics.border
+        shadowLayer.isHidden = (variant != .contained)
+    }
+
+    override func rebuildContent() {
         rebuildTitle()
         rebuildIcons()
-        syncAccessibility()
-        applyState(animated: false)
-        needsLayout = true
     }
 
-    /// The interaction-driven layer props — animated on a real hover / press /
-    /// focus change, snapped from `applyTheme` / previews / layout.
-    private func applyState(animated: Bool) {
-        layerTxn(animated: animated) {
-            self.overlayLayer.backgroundColor = self.overlayColor.cgColor
-            self.borderLayer.strokeColor = self.borderColor.cgColor
-            let e = self.elevation
-            // A grouped member forgoes its own shadow — the group owns one.
-            self.shadowLayer.shadowOpacity = self.groupedShadow ? 0 : e.opacity
-            self.shadowLayer.shadowRadius  = e.radius
-            self.shadowLayer.shadowOffset  = CGSize(width: 0, height: e.offsetY)
-            self.focusRingLayer.opacity = self.showFocusRing ? 1 : 0
-        }
-    }
-
-    private func syncAccessibility() {
-        setAccessibilityLabel(title.isEmpty ? nil : title)   // original case for VoiceOver
+    override func syncAccessibility() {
+        setAccessibilityLabel(title.isEmpty ? nil : title)
         setAccessibilityEnabled(isEnabled)
+    }
+
+    override func applyInteractionState() {
+        overlayLayer.backgroundColor = overlayColor.cgColor
+        borderLayer.strokeColor = borderColor.cgColor
+        let e = elevation
+        shadowLayer.shadowOpacity = groupedShadow ? 0 : e.opacity
+        shadowLayer.shadowRadius  = e.radius
+        shadowLayer.shadowOffset  = CGSize(width: 0, height: e.offsetY)
     }
 
     /// Push the uppercased, tracked title into the text layer (snapped, sized to
@@ -418,7 +341,7 @@ public final class ThemedButton: NSControl {
     }
 
     private func rebuildIcons() {
-        let scale = backingScale, pt = metrics.iconPt, tint = titleColor
+        let scale = themeBackingScale, pt = metrics.iconPt, tint = titleColor
         leadingImageSize  = applyIcon(leadingIconLayer,  symbol: leadingSymbol,
                                       image: leadingImage,  pt: pt, tint: tint, scale: scale)
         trailingImageSize = applyIcon(trailingIconLayer, symbol: trailingSymbol,
@@ -455,9 +378,6 @@ public final class ThemedButton: NSControl {
 
     // MARK: - Corner-aware paths (standalone = a plain rounded rect; a grouped
     //         member squares the seam corners and drops the shared edge)
-
-    private static let allCorners: CACornerMask =
-        [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner, .layerMinXMaxYCorner]
 
     /// A CLOSED rounded-rect path rounding only `corners` (the rest squared).
     /// Byte-identical to `CGPath(roundedRect:)` when all four corners are set, so
@@ -510,39 +430,30 @@ public final class ThemedButton: NSControl {
         return p
     }
 
-    // MARK: - Layout
+    // MARK: - Layout hooks
 
-    private var backingScale: CGFloat { themeBackingScale }
-
-    public override func layout() {
-        super.layout()
+    override func positionLayers(in bounds: CGRect, local: CGRect) {
         let m = metrics
-        layerTxn(animated: false) {
-            let b = self.bounds
-            let local = CGRect(origin: .zero, size: b.size)
+        let b = bounds
+        shadowLayer.frame = b
+        shadowLayer.shadowPath = closedCornerPath(local, radius: m.radius, corners: roundedCorners)
+        fillLayer.frame = b
+        fillLayer.cornerRadius = m.radius
+        fillLayer.maskedCorners = roundedCorners
+        overlayLayer.frame = local
+        overlayLayer.cornerRadius = m.radius
+        overlayLayer.maskedCorners = roundedCorners
+        borderLayer.frame = b
+        let inset = m.border / 2
+        borderLayer.path = borderPath(local.insetBy(dx: inset, dy: inset),
+            radius: m.radius, corners: roundedCorners, edges: drawnBorderEdges)
+        layoutContent(in: b, m: m)
+    }
 
-            self.shadowLayer.frame = b
-            self.shadowLayer.shadowPath = self.closedCornerPath(local, radius: m.radius,
-                corners: self.roundedCorners)
-
-            self.fillLayer.frame = b
-            self.fillLayer.cornerRadius = m.radius
-            self.fillLayer.maskedCorners = self.roundedCorners
-            self.overlayLayer.frame = local
-            self.overlayLayer.cornerRadius = m.radius
-            self.overlayLayer.maskedCorners = self.roundedCorners
-
-            self.borderLayer.frame = b
-            let inset = m.border / 2
-            self.borderLayer.path = self.borderPath(local.insetBy(dx: inset, dy: inset),
-                radius: m.radius, corners: self.roundedCorners, edges: self.drawnBorderEdges)
-
-            self.focusRingLayer.frame = b
-            self.focusRingLayer.path = self.closedCornerPath(local.insetBy(dx: -2, dy: -2),
-                radius: m.radius + 2, corners: self.roundedCorners)
-
-            self.layoutContent(in: b, m: m)
-        }
+    override func focusRingPath(in rect: CGRect) -> CGPath {
+        closedCornerPath(rect.insetBy(dx: -focusRingOutset, dy: -focusRingOutset),
+                         radius: metrics.radius + focusRingOutset,
+                         corners: roundedCorners)
     }
 
     /// Centre the leading-icon / title / trailing-icon row, with `gap` between
@@ -567,131 +478,20 @@ public final class ThemedButton: NSControl {
         }
     }
 
-    /// Keep text / strokes / symbols crisp across a display-scale change —
-    /// `contentsScale` was captured once at init (before a window), and the
-    /// rasterized symbol bitmaps must be re-rendered at the new scale.
-    public override func viewDidChangeBackingProperties() {
-        super.viewDidChangeBackingProperties()
-        let s = backingScale
-        for l in [shadowLayer, fillLayer, overlayLayer, leadingIconLayer,
-                  trailingIconLayer] { l.contentsScale = s }
+    override func updateContentsScale(_ s: CGFloat) {
+        for l in [shadowLayer, fillLayer, overlayLayer, leadingIconLayer, trailingIconLayer] { l.contentsScale = s }
         titleLayer.contentsScale = s
         borderLayer.contentsScale = s
-        focusRingLayer.contentsScale = s
-        rebuildIcons()      // re-rasterize at the new device scale
+        rebuildIcons()
         needsLayout = true
     }
 
-    // MARK: - Hover (tracking area)
+    // MARK: - Activation
 
-    public override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let t = trackingArea { removeTrackingArea(t); trackingArea = nil }
-        let t = NSTrackingArea(rect: .zero,
-            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
-            owner: self, userInfo: nil)
-        addTrackingArea(t); trackingArea = t
-        // A geometry change can move the view out from under a stationary
-        // pointer with no exit event — clear a now-false hover.
-        if isHovered, let w = window {
-            let local = convert(w.mouseLocationOutsideOfEventStream, from: nil)
-            if !bounds.contains(local) { isHovered = false; applyState(animated: false) }
-        }
-    }
-
-    public override func mouseEntered(with event: NSEvent) {
+    override func activate() {
         guard isEnabled else { return }
-        isHovered = true; applyState(animated: true)
-    }
-    public override func mouseExited(with event: NSEvent) {
-        guard isHovered else { return }
-        isHovered = false; applyState(animated: true)
-    }
-
-    // MARK: - Press (mouseDown/Dragged/Up trio — keeps the run loop turning so
-    //         the overlay / elevation animate during the press)
-
-    public override func acceptsFirstMouse(for event: NSEvent?) -> Bool { isEnabled }
-
-    // A click presses + activates but deliberately does NOT take first
-    // responder — standard macOS push-button behaviour (keyboard focus + the
-    // themed ring arrive via Tab; Return via performKeyEquivalent). Diverges
-    // from ThemedTextField.mouseDown, which DOES focus its field, on purpose.
-    public override func mouseDown(with event: NSEvent) {
-        guard isEnabled else { return }
-        isPressed = true; applyState(animated: true)
-    }
-    public override func mouseDragged(with event: NSEvent) {
-        guard isEnabled else { return }
-        let inside = bounds.contains(convert(event.locationInWindow, from: nil))
-        if inside != isPressed { isPressed = inside; applyState(animated: true) }
-    }
-    public override func mouseUp(with event: NSEvent) {
-        guard isEnabled else { return }
-        let inside = bounds.contains(convert(event.locationInWindow, from: nil))
-        if isPressed { isPressed = false; applyState(animated: true) }
-        if inside { activate() }
-    }
-
-    // MARK: - Keyboard + focus
-
-    public override var acceptsFirstResponder: Bool { isEnabled }
-
-    public override func becomeFirstResponder() -> Bool {
-        let ok = super.becomeFirstResponder()
-        if ok { isKeyFocused = true; applyState(animated: true) }
-        return ok
-    }
-    public override func resignFirstResponder() -> Bool {
-        let ok = super.resignFirstResponder()
-        if ok { isKeyFocused = false; applyState(animated: true) }
-        return ok
-    }
-
-    public override func keyDown(with event: NSEvent) {
-        if isEnabled, event.keyCode == 49 {   // Space activates the focused button
-            // Activate once per press; swallow auto-repeat (a held Space must
-            // not re-fire) — consume the repeat too, so it doesn't beep.
-            if !event.isARepeat { flashAndActivate() }
-            return
-        }
-        super.keyDown(with: event)
-    }
-
-    /// Return / a set key equivalent activates via the window's default-button
-    /// path (delivered BEFORE keyDown, regardless of first responder).
-    public override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard isEnabled, !keyEquivalent.isEmpty,
-              event.charactersIgnoringModifiers == keyEquivalent,
-              mods == keyEquivalentModifierMask else {
-            return super.performKeyEquivalent(with: event)
-        }
-        flashAndActivate()
-        return true
-    }
-
-    /// A brief visible press before firing — keyboard activation has no natural
-    /// down/up, so synthesize the flash. The `isFlashing` guard makes a single
-    /// flash atomic: a second Space/Return arriving inside the 0.12 s window is
-    /// dropped (no double-fire), and the deferred block re-checks `isEnabled`
-    /// (via `activate`) so an async disable mid-flash cancels the activation.
-    private func flashAndActivate() {
-        guard !isFlashing else { return }
-        isFlashing = true
-        isPressed = true; applyState(animated: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
-            guard let self else { return }
-            self.isFlashing = false
-            self.isPressed = false; self.applyState(animated: true)
-            self.activate()
-        }
-    }
-
-    private func activate() {
-        guard isEnabled else { return }   // authoritative even against an in-flight flash
         onTap?()
-        if let a = _action { NSApp.sendAction(a, to: _target, from: self) }
+        super.activate()
     }
 }
 
