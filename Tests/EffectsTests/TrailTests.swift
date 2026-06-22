@@ -56,6 +56,46 @@ final class TrailTests: XCTestCase {
         XCTAssertTrue(one[0].tangent == (x: 1, y: 0))
     }
 
+    // MARK: - markAtArcLength (single-offset query — the PathPet faceLag anchor)
+
+    func testMarkAtArcLengthMidSegment() {
+        // 100pt line along +x; distance 30 → (30,0), tangent +x.
+        let m = markAtArcLength([(x: 0, y: 0), (x: 100, y: 0)], distance: 30)
+        XCTAssertNotNil(m)
+        XCTAssertEqual(m!.point.x, 30, accuracy: 1e-9)
+        XCTAssertEqual(m!.point.y, 0, accuracy: 1e-9)
+        XCTAssertEqual(m!.tangent.x, 1, accuracy: 1e-9)
+        XCTAssertEqual(m!.tangent.y, 0, accuracy: 1e-9)
+    }
+
+    func testMarkAtArcLengthClampsBothEnds() {
+        let line = [(x: 0.0, y: 0.0), (x: 100.0, y: 0.0)]
+        // at/before the start → the first point.
+        XCTAssertEqual(markAtArcLength(line, distance: -10)!.point.x, 0, accuracy: 1e-9)
+        XCTAssertEqual(markAtArcLength(line, distance: 0)!.point.x, 0, accuracy: 1e-9)
+        // at/past the end → the last point.
+        XCTAssertEqual(markAtArcLength(line, distance: 999)!.point.x, 100, accuracy: 1e-9)
+    }
+
+    func testMarkAtArcLengthAcrossCorner() {
+        // L-shape right 50 then up 50 (total 100); distance 75 → 25 up the 2nd
+        // leg → (50,25), tangent +y. Carry across the corner like the resampler.
+        let m = markAtArcLength([(x: 0, y: 0), (x: 50, y: 0), (x: 50, y: 50)], distance: 75)
+        XCTAssertEqual(m!.point.x, 50, accuracy: 1e-9)
+        XCTAssertEqual(m!.point.y, 25, accuracy: 1e-9)
+        XCTAssertEqual(m!.tangent.x, 0, accuracy: 1e-9)
+        XCTAssertEqual(m!.tangent.y, 1, accuracy: 1e-9)
+    }
+
+    func testMarkAtArcLengthEdgeCases() {
+        XCTAssertNil(markAtArcLength([] as [(x: Double, y: Double)], distance: 5))
+        // single point → itself, default tangent (matches resampleAlongPolyline).
+        let one = markAtArcLength([(x: 3, y: 4)], distance: 10)
+        XCTAssertEqual(one!.point.x, 3, accuracy: 1e-9)
+        XCTAssertEqual(one!.point.y, 4, accuracy: 1e-9)
+        XCTAssertTrue(one!.tangent == (x: 1, y: 0))
+    }
+
     // MARK: - roundedCornerPath
 
     func testRoundedCornerCutsAndBridges() {

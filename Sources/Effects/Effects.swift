@@ -501,6 +501,88 @@ public func drawLinePets(_ pets: [LinePet], on rect: CGRect,
     }
 }
 
+/// Draw a Pac-Man — or, when `valid` is false, a panicking Blinky ghost —
+/// walking the ARBITRARY polyline `path` at wall-clock `now`: the #12 Ph3
+/// "PathPet", the open-path counterpart to `drawLinePets`' closed perimeter lap.
+/// A head cursor advances `speed` pt/s along the arc length (looping at the end);
+/// the pet FOLLOWS `faceLag` points behind it (`markAtArcLength(head − faceLag)`,
+/// which clamps a negative offset to the start), so the head leads and the face
+/// chases — wand's Chomp gap. Orientation comes from the local tangent:
+///   * pac TUMBLES (rotates) so its mouth opens along travel — the mouth flaps
+///     via `Motion.frameStep`, the same discrete swap the line-pets use;
+///   * the ghost stays UPRIGHT — only its eyes swivel to the travel cardinal
+///     (`GhostLook.facing`) — and PANICS with a 2-D `dampedSine` buzz (a gesture
+///     that matched no rule).
+/// `path` is in the caller's space; host in a NON-flipped (y-up) view so "+y up"
+/// matches `GhostLook.facing` and the sprites' internal flip (the `drawLinePets`
+/// convention). `showGuide` strokes a faint rounded trail so the path reads
+/// before the Ph4 pellets/corridor exist. The caller owns the view + redraw
+/// clock; `now` is injected (deterministic freeze / XCTest).
+@MainActor
+public func drawChompPath(_ path: [CGPoint], now: CFTimeInterval, valid: Bool = true,
+                          scale: CGFloat = 1, speed: CGFloat = 60,
+                          faceLag: CGFloat = 0, showGuide: Bool = true) {
+    guard path.count >= 2, speed > 0 else { return }
+    var total: CGFloat = 0     // arc length = the loop period (in points)
+    for i in 1..<path.count { total += hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y) }
+    guard total > 0 else { return }
+
+    if showGuide {
+        let guide = nsBezierPath(roundedCornerPath(path, radius: Double(6 * scale)),
+                                 lineWidth: 1.5 * scale)
+        NSColor(HexColor(SpriteColor.pupilBlue)).withAlphaComponent(0.22).setStroke()
+        guide.stroke()
+    }
+
+    // Head marches the arc length and loops; the pet trails it by `faceLag`.
+    let headDist = CGFloat(now).truncatingRemainder(dividingBy: total / speed) * speed
+    let petDist = Double(headDist - faceLag)   // markAtArcLength clamps < 0 to the start
+
+    // The chased head — a small glowing pellet-dot (only when valid + lagging; a
+    // mismatch has no target). Makes the faceLag gap legible before pellets (Ph4).
+    if valid, faceLag > 0, let head = markAtArcLength(path, distance: Double(headDist)) {
+        let r: CGFloat = 2.5 * scale
+        let yellow = NSColor(HexColor(SpriteColor.pacYellow))
+        NSGraphicsContext.saveGraphicsState()
+        let glow = NSShadow(); glow.shadowColor = yellow
+        glow.shadowBlurRadius = 4 * scale; glow.shadowOffset = .zero; glow.set()
+        yellow.setFill()
+        NSBezierPath(ovalIn: CGRect(x: CGFloat(head.point.x) - r, y: CGFloat(head.point.y) - r,
+                                    width: 2 * r, height: 2 * r)).fill()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    guard let mark = markAtArcLength(path, distance: petDist) else { return }
+    let px = CGFloat(mark.point.x), py = CGFloat(mark.point.y)
+
+    NSGraphicsContext.saveGraphicsState()
+    let tx = NSAffineTransform()
+    if valid {
+        // Pac TUMBLES so the mouth (canonical +x) opens along travel.
+        tx.translateX(by: px, yBy: py)
+        tx.rotate(byRadians: atan2(CGFloat(mark.tangent.y), CGFloat(mark.tangent.x)))
+        tx.concat()
+        drawChompPet(now: now, scale: scale)
+    } else {
+        // Ghost stays UPRIGHT (no rotate) and PANICS — a sustained 2-D buzz
+        // (co-prime 6/7, decay 0 so it doesn't fade), eyes on the travel cardinal.
+        let pp = (Double(now) * pathPetPanicHz).truncatingRemainder(dividingBy: 1)
+        let amp = 1.6 * scale
+        let jx = CGFloat(ThemedTransition.dampedSine(pp, frequency: 6, decay: 0)) * amp
+        let jy = CGFloat(ThemedTransition.dampedSine(pp, frequency: 7, decay: 0)) * amp
+        tx.translateX(by: px + jx, yBy: py + jy)
+        tx.concat()
+        drawGhostPet(now: now, scale: scale,
+                     look: GhostLook.facing(dx: mark.tangent.x, dy: mark.tangent.y))
+    }
+    NSGraphicsContext.restoreGraphicsState()
+}
+
+/// Panic-buzz cycles/sec for the mismatch ghost in `drawChompPath` — the rate the
+/// 2-D `dampedSine` tremble repeats. Named so the prism card and any future
+/// corridor read the same shake speed.
+private let pathPetPanicHz: Double = 1.5
+
 /// Walk `rect`'s perimeter linearly (top → right → bottom → left) and
 /// return the centre + travel-direction rotation at `distance`. Each
 /// pet's draw code stays in a canonical "facing-right" frame; the

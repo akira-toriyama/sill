@@ -116,6 +116,50 @@ public func resampleAlongPolyline(
     return marks
 }
 
+/// The single point + unit tangent at arc-length `distance` along `points` — the
+/// point-query companion to `resampleAlongPolyline` (which marches a mark every
+/// `interval`; this answers ONE arbitrary offset). `distance` is CLAMPED to
+/// `[0, totalLength]`: at/before the start you get the first point (oriented
+/// along the first non-zero segment, the resampler's leading-tangent rule),
+/// at/past the end the last point (oriented along the last non-zero segment).
+/// The PathPet (#12 Ph3) places its follower at `head − faceLag` this way — the
+/// resampler returns a SERIES, not a lone offset. `nil` only for an empty
+/// polyline; a single point returns itself with the default `(1, 0)` tangent.
+public func markAtArcLength(
+    _ points: [(x: Double, y: Double)], distance: Double
+) -> TrailMark? {
+    guard let first = points.first else { return nil }
+    if points.count == 1 { return TrailMark(point: first, tangent: (1, 0)) }
+
+    // Leading tangent: peek to the first non-zero segment (resampler's rule).
+    var leadTangent = (x: 1.0, y: 0.0)
+    for i in 1..<points.count {
+        let dx = points[i].x - points[i - 1].x, dy = points[i].y - points[i - 1].y
+        let len = hypot(dx, dy)
+        if len > 0 { leadTangent = (x: dx / len, y: dy / len); break }
+    }
+    if distance <= 0 { return TrailMark(point: first, tangent: leadTangent) }
+
+    var traveled = 0.0
+    var lastTangent = leadTangent
+    for i in 1..<points.count {
+        let a = points[i - 1], b = points[i]
+        let dx = b.x - a.x, dy = b.y - a.y
+        let segLen = hypot(dx, dy)
+        if segLen <= 0 { continue }
+        let ux = dx / segLen, uy = dy / segLen
+        lastTangent = (x: ux, y: uy)
+        if traveled + segLen >= distance {
+            let t = distance - traveled
+            return TrailMark(point: (x: a.x + ux * t, y: a.y + uy * t),
+                             tangent: lastTangent)
+        }
+        traveled += segLen
+    }
+    // distance past the end → clamp to the last point, last travel direction.
+    return TrailMark(point: points[points.count - 1], tangent: lastTangent)
+}
+
 // MARK: - Rounded-corner path (wand's buildHybridPath, as a pure description)
 
 /// One step of a pure path description — the cross-platform analog of the few
@@ -173,6 +217,11 @@ public func resampleAlongPolyline(
 /// `CGPoint` convenience for `roundedCornerPath`.
 public func roundedCornerPath(_ points: [CGPoint], radius: Double) -> [PathStep] {
     roundedCornerPath(points.map { (x: Double($0.x), y: Double($0.y)) }, radius: radius)
+}
+
+/// `CGPoint` convenience for `markAtArcLength`.
+public func markAtArcLength(_ points: [CGPoint], distance: Double) -> TrailMark? {
+    markAtArcLength(points.map { (x: Double($0.x), y: Double($0.y)) }, distance: distance)
 }
 #endif
 

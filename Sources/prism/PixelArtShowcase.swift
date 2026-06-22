@@ -216,6 +216,66 @@ struct DirectionalGhostView: NSViewRepresentable {
     func updateNSView(_ v: DirectionalGhostNSView, context: Context) { v.needsDisplay = true }
 }
 
+// MARK: - The PathPet — pac/ghost walking an arbitrary gesture line (#12 Ph3)
+
+/// A zigzag gesture polyline inset into `r` (y-up): x marches left→right in equal
+/// steps; y alternates min/max so the pet TUMBLES through sharp corners — the
+/// tangent orientation + the faceLag follow are obvious at a glance. `segs` is
+/// the corner count.
+private func zigzagPath(in r: CGRect, segs: Int = 4) -> [CGPoint] {
+    guard segs >= 1, r.width > 0, r.height > 0 else { return [] }
+    return (0...segs).map { i in
+        CGPoint(x: r.minX + r.width * CGFloat(i) / CGFloat(segs),
+                y: (i % 2 == 0) ? r.minY : r.maxY)
+    }
+}
+
+/// Hosts the REAL `drawChompPath` walking a zigzag at this view's scale — the
+/// #12 Ph3 "first MOVING card". NON-flipped (y-up), per `drawChompPath`'s
+/// contract ("+y up" = `GhostLook.facing`). `valid == false` swaps the chasing
+/// pac for the UPRIGHT Blinky panicking in place (2-D `dampedSine` buzz).
+final class PathPetNSView: NSView {
+    var valid = true
+    var petScale: CGFloat = 2.4
+    var previewNow: Double?
+    private var timer: Timer?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { timer?.invalidate(); timer = nil; return }
+        guard timer == nil else { return }
+        timer = startRedrawTick(for: self, frozen: previewNow != nil)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard bounds.width > 1, bounds.height > 1 else { return }
+        NSColor(white: 0.04, alpha: 1).setFill()
+        bounds.fill()
+        let now = previewNow ?? CACurrentMediaTime()
+        let track = bounds.insetBy(dx: 26 * uiScale, dy: 22 * uiScale)
+        // faceLag ≈ one pac diameter (footprint 14pt × petScale) so the head
+        // clearly leads the face by a body length at any tier; 0 for the ghost.
+        let lag = valid ? petScale * 15 * uiScale : 0
+        drawChompPath(zigzagPath(in: track), now: now, valid: valid,
+                      scale: petScale * uiScale, speed: 60 * uiScale, faceLag: lag)
+    }
+}
+
+struct PathPetView: NSViewRepresentable {
+    var valid = true
+    var scale: CGFloat = 2.4
+    func makeNSView(context: Context) -> PathPetNSView {
+        let v = PathPetNSView()
+        v.valid = valid
+        v.petScale = scale
+        v.previewNow = chompFreezeNow
+        return v
+    }
+    func updateNSView(_ v: PathPetNSView, context: Context) {
+        v.valid = valid; v.petScale = scale; v.needsDisplay = true
+    }
+}
+
 // MARK: - The showcase mock (wired into Gallery's `.particles` family)
 
 /// The PixelArt specimen for one theme card: the canonical arcade sprites drawn
@@ -265,6 +325,32 @@ struct MockPixelArt: View {
 
             DirectionalGhostView()
                 .frame(height: 80 * uiScale)
+                .frame(maxWidth: .infinity)
+                .background(RoundedRectangle(cornerRadius: 7)
+                    .fill(Color(nsColor: NSColor(white: 0.04, alpha: 1))))
+                .overlay(RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color(nsColor: p.border), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+
+            Text("PathPet (#12 Ph3) — the first MOVING card: pac walks an arbitrary gesture line. drawChompPath marches a head (the glowing dot) along the arc length; the face FOLLOWS by faceLag, tumbling so the mouth opens along travel (markAtArcLength + tangent):")
+                .font(sysFont(7.5, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
+
+            PathPetView(valid: true, scale: 2.4)
+                .frame(height: 124 * uiScale)
+                .frame(maxWidth: .infinity)
+                .background(RoundedRectangle(cornerRadius: 7)
+                    .fill(Color(nsColor: NSColor(white: 0.04, alpha: 1))))
+                .overlay(RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color(nsColor: p.border), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+
+            Text("mismatch — the gesture matched no rule: pac SWAPS to the upright Blinky (eyes track the travel cardinal) panicking as it follows — a 2-D dampedSine buzz (co-prime 6/7):")
+                .font(sysFont(7.5, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
+
+            PathPetView(valid: false, scale: 1.9)
+                .frame(height: 84 * uiScale)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: 7)
                     .fill(Color(nsColor: NSColor(white: 0.04, alpha: 1))))
