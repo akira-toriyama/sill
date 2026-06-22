@@ -44,8 +44,7 @@ extension ThemedChip.Role {
     }
 }
 
-@MainActor
-public final class ThemedChip: NSControl {
+public final class ThemedChip: ThemedControl {
 
     /// Visual style. `filled` = MUI's default chip (a calm `muted` wash for
     /// `neutral`, an opaque role fill otherwise); `outlined` = a stroked, clear
@@ -62,9 +61,6 @@ public final class ThemedChip: NSControl {
     public enum Role { case neutral, primary, secondary, error }
 
     // MARK: - Public configuration
-
-    /// The theme. Assigning re-themes the whole chip.
-    public var palette: ResolvedPalette { didSet { applyTheme() } }
 
     public var variant: Variant = .filled  { didSet { applyTheme(); relayout() } }
     public var size:    Size    = .medium  { didSet { applyTheme(); relayout() } }
@@ -101,33 +97,6 @@ public final class ThemedChip: NSControl {
         }
     }
 
-    /// Force the hovered / pressed / focused APPEARANCE without real events —
-    /// previews / screenshots only. Static (non-clickable) chips ignore them.
-    public var previewHovered = false { didSet { applyState(animated: false) } }
-    public var previewPressed = false { didSet { applyState(animated: false) } }
-    public var previewFocused = false { didSet { applyState(animated: false) } }
-
-    // MARK: - NSControl overrides (cell-less custom storage, as ThemedButton)
-
-    private var _enabled = true
-    public override var isEnabled: Bool {
-        get { _enabled }
-        set {
-            guard _enabled != newValue else { return }
-            _enabled = newValue
-            if !newValue {
-                isHovered = false; isDeleteHovered = false; pressTarget = .none
-                if window?.firstResponder === self { window?.makeFirstResponder(nil) }
-            }
-            applyTheme()
-        }
-    }
-
-    private weak var _target: AnyObject?
-    private var _action: Selector?
-    public override var target: AnyObject? { get { _target } set { _target = newValue } }
-    public override var action: Selector?  { get { _action } set { _action = newValue } }
-
     // MARK: - Internals
 
     private let fillLayer     = CALayer()       // rounded fill (clips the overlay child) + own border
@@ -135,11 +104,7 @@ public final class ThemedChip: NSControl {
     private let leadingIconLayer = CALayer()
     private let titleLayer    = CATextLayer()
     private let deleteIconLayer  = CALayer()    // the trailing × (own hover tint)
-    private let focusRingLayer = CAShapeLayer() // themed keyboard-focus ring (top, unclipped)
 
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false
-    private var isKeyFocused = false
     private var isDeleteHovered = false
 
     /// What a mouse-down armed, so mouse-up routes to the right action.
@@ -147,15 +112,13 @@ public final class ThemedChip: NSControl {
     private var pressTarget: PressTarget = .none
     /// Whether the pointer is still over the armed target (gates the press visual;
     /// a drag off cancels it, a drag back re-arms — mouse-up only fires inside).
-    private var pressInside = false
+    private var pressArmed = false
 
     /// Rendered icon point-sizes (nil ⇒ absent) — drive layout + intrinsic width.
     private var leadingImageSize: CGSize?
     private var deleteImageSize: CGSize?
     /// The × frame (expanded) for hit-testing, in view coords. Set in `layout`.
     private var deleteHitRect: CGRect = .null
-
-    public override var isFlipped: Bool { false }
 
     private var isClickable: Bool { onTap != nil && isEnabled }
     private var isDeletable: Bool { onDelete != nil }
@@ -204,12 +167,8 @@ public final class ThemedChip: NSControl {
 
     // MARK: - Init
 
-    public init(palette: ResolvedPalette) {
-        self.palette = palette
-        super.init(frame: .zero)
-        wantsLayer = true
-        layer?.masksToBounds = false        // the focus ring lives outside bounds
-        focusRingType = .none
+    public override init(palette: ResolvedPalette) {
+        super.init(palette: palette)
 
         let s = backingScale
 
@@ -233,17 +192,8 @@ public final class ThemedChip: NSControl {
         titleLayer.isWrapped = false
         layer?.addSublayer(titleLayer)
 
-        focusRingLayer.fillColor = NSColor.clear.cgColor
-        focusRingLayer.lineWidth = 2
-        focusRingLayer.opacity = 0
-        focusRingLayer.contentsScale = s
-        layer?.addSublayer(focusRingLayer)
-
         applyTheme()
     }
-
-    @available(*, unavailable)
-    public required init?(coder: NSCoder) { nil }
 
     private func relayout() {
         invalidateIntrinsicContentSize()
@@ -260,6 +210,26 @@ public final class ThemedChip: NSControl {
         syncAccessibility()
         applyState(animated: false)
     }
+
+    // MARK: - Disable hook
+
+    override func didDisable() {
+        isDeleteHovered = false
+        pressTarget = .none
+    }
+
+    // MARK: - Gates
+
+    override var appearanceGate: Bool { isClickable }
+    override var focusGate: Bool { isInteractive }
+
+    // MARK: - fx overrides
+
+    override var fxPressed: Bool {
+        ((pressTarget == .body && pressArmed) || previewPressed) && isClickable
+    }
+
+    override var showFocusRing: Bool { (isKeyFocused || previewFocused) && isInteractive }
 
     // MARK: - Theming
 
@@ -324,10 +294,6 @@ public final class ThemedChip: NSControl {
         return palette.muted
     }
 
-    private var fxHovered: Bool { (isHovered || previewHovered) && isClickable }
-    private var fxPressed: Bool { ((pressTarget == .body && pressInside) || previewPressed) && isClickable }
-    private var fxFocused: Bool { (isKeyFocused || previewFocused) && isClickable }
-
     /// The hover / press / focus state layer (animated) — only on a clickable
     /// body. Mirrors ThemedButton: contrast-ink overlay on an opaque role fill,
     /// role / foreground tint otherwise.
@@ -359,39 +325,30 @@ public final class ThemedChip: NSControl {
         }
     }
 
-    private var showFocusRing: Bool { (isKeyFocused || previewFocused) && isInteractive }
+    // MARK: - Theming hooks
 
-    /// Re-theme: snap the STABLE visuals (fill / border / title / icons), then
-    /// settle the state layer.
-    public func applyTheme() {
+    override func applyThemeSnap() {
         let m = metrics
-        layerTxn(animated: false) {
-            self.fillLayer.backgroundColor = self.baseFillColor.cgColor
-            self.fillLayer.borderWidth = m.border
-            self.fillLayer.borderColor = self.borderColor.cgColor
-            self.focusRingLayer.strokeColor = self.palette.primary.cgColor
-        }
+        fillLayer.backgroundColor = baseFillColor.cgColor
+        fillLayer.borderWidth = m.border
+        fillLayer.borderColor = borderColor.cgColor
+    }
+
+    override func rebuildContent() {
         rebuildTitle()
         rebuildIcons()
-        syncAccessibility()
-        applyState(animated: false)
-        needsLayout = true
     }
 
-    /// The interaction-driven props — animated on a real change, snapped otherwise.
-    private func applyState(animated: Bool) {
-        layerTxn(animated: animated) {
-            self.overlayLayer.backgroundColor = self.overlayColor.cgColor
-            self.fillLayer.borderColor = self.borderColor.cgColor
-            self.deleteIconLayer.contents = self.renderedDelete()
-            self.focusRingLayer.opacity = self.showFocusRing ? 1 : 0
-        }
-    }
-
-    private func syncAccessibility() {
+    override func syncAccessibility() {
         setAccessibilityRole(isClickable ? .button : .staticText)
         setAccessibilityLabel(title.isEmpty ? nil : title)
         setAccessibilityEnabled(isEnabled)
+    }
+
+    override func applyInteractionState() {
+        overlayLayer.backgroundColor = overlayColor.cgColor
+        fillLayer.borderColor = borderColor.cgColor
+        deleteIconLayer.contents = renderedDelete()
     }
 
     private func rebuildTitle() {
@@ -467,24 +424,17 @@ public final class ThemedChip: NSControl {
 
     private var backingScale: CGFloat { themeBackingScale }
 
-    public override func layout() {
-        super.layout()
+    override func positionLayers(in bounds: CGRect, local: CGRect) {
         let m = metrics
-        layerTxn(animated: false) {
-            let b = self.bounds
-            let local = CGRect(origin: .zero, size: b.size)
+        fillLayer.frame = bounds
+        fillLayer.cornerRadius = m.radius
+        overlayLayer.frame = local
+        overlayLayer.cornerRadius = m.radius
+        layoutContent(in: bounds, m: m)
+    }
 
-            self.fillLayer.frame = b
-            self.fillLayer.cornerRadius = m.radius
-            self.overlayLayer.frame = local
-            self.overlayLayer.cornerRadius = m.radius
-
-            self.focusRingLayer.frame = b
-            self.focusRingLayer.path = CGPath(roundedRect: local.insetBy(dx: -2, dy: -2),
-                cornerWidth: m.radius + 2, cornerHeight: m.radius + 2, transform: nil)
-
-            self.layoutContent(in: b, m: m)
-        }
+    override func focusRingPath(in rect: CGRect) -> CGPath {
+        concentricRingPath(in: rect, radius: metrics.radius)
     }
 
     /// Centre the leading-icon / title / × row, with `gap` between present pieces.
@@ -515,38 +465,28 @@ public final class ThemedChip: NSControl {
         }
     }
 
-    public override func viewDidChangeBackingProperties() {
-        super.viewDidChangeBackingProperties()
-        let s = backingScale
-        for l in [fillLayer, overlayLayer, leadingIconLayer, deleteIconLayer] {
-            l.contentsScale = s
-        }
+    override func updateContentsScale(_ s: CGFloat) {
+        for l in [fillLayer, overlayLayer, leadingIconLayer, deleteIconLayer] { l.contentsScale = s }
         titleLayer.contentsScale = s
-        focusRingLayer.contentsScale = s
         rebuildIcons()
         needsLayout = true
     }
 
     // MARK: - Hover (chip body + the × sub-region)
 
+    override var trackingOptions: NSTrackingArea.Options {
+        [.mouseEnteredAndExited, .mouseMoved, .activeInActiveApp, .inVisibleRect]
+    }
+
     public override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let t = trackingArea { removeTrackingArea(t); trackingArea = nil }
-        let t = NSTrackingArea(rect: .zero,
-            options: [.mouseEnteredAndExited, .mouseMoved, .activeInActiveApp, .inVisibleRect],
-            owner: self, userInfo: nil)
-        addTrackingArea(t); trackingArea = t
-        if isHovered, let w = window {
+        super.updateTrackingAreas()   // base removes/re-adds with trackingOptions + reconciles isHovered
+        if isDeleteHovered, let w = window {
             let local = convert(w.mouseLocationOutsideOfEventStream, from: nil)
-            if !bounds.contains(local) { clearHover() }
+            if !bounds.contains(local) { isDeleteHovered = false; applyState(animated: false) }
         }
     }
 
-    private func clearHover() {
-        guard isHovered || isDeleteHovered else { return }
-        isHovered = false; isDeleteHovered = false
-        applyState(animated: false)
-    }
+    public override func acceptsFirstMouse(for event: NSEvent?) -> Bool { isEnabled }
 
     public override func mouseEntered(with event: NSEvent) {
         guard isEnabled else { return }
@@ -575,8 +515,6 @@ public final class ThemedChip: NSControl {
 
     // MARK: - Press / activate
 
-    public override func acceptsFirstMouse(for event: NSEvent?) -> Bool { isEnabled }
-
     /// Is `p` over the armed target (× for `.delete`, the body for `.body`)?
     private func pointer(_ p: CGPoint, over target: PressTarget) -> Bool {
         switch target {
@@ -589,28 +527,22 @@ public final class ThemedChip: NSControl {
     public override func mouseDown(with event: NSEvent) {
         guard isEnabled else { return }
         let p = convert(event.locationInWindow, from: nil)
-        if isDeletable, deleteHitRect.contains(p) {
-            pressTarget = .delete
-        } else if isClickable {
-            pressTarget = .body
-        } else {
-            pressTarget = .none
-        }
-        pressInside = pressTarget != .none
+        if isDeletable, deleteHitRect.contains(p) { pressTarget = .delete }
+        else if isClickable { pressTarget = .body }
+        else { pressTarget = .none }
+        pressArmed = pressTarget != .none
         applyState(animated: true)
     }
-
     public override func mouseDragged(with event: NSEvent) {
         guard isEnabled, pressTarget != .none else { return }
         let inside = pointer(convert(event.locationInWindow, from: nil), over: pressTarget)
-        if inside != pressInside { pressInside = inside; applyState(animated: false) }
+        if inside != pressArmed { pressArmed = inside; applyState(animated: false) }
     }
-
     public override func mouseUp(with event: NSEvent) {
         guard isEnabled else { pressTarget = .none; return }
         let p = convert(event.locationInWindow, from: nil)
         let target = pressTarget
-        pressTarget = .none; pressInside = false
+        pressTarget = .none; pressArmed = false
         if pointer(p, over: target) {
             if target == .delete { onDelete?() } else if target == .body { activate() }
         }
@@ -618,19 +550,6 @@ public final class ThemedChip: NSControl {
     }
 
     // MARK: - Keyboard + focus
-
-    public override var acceptsFirstResponder: Bool { isInteractive }
-
-    public override func becomeFirstResponder() -> Bool {
-        let ok = super.becomeFirstResponder()
-        if ok { isKeyFocused = true; applyState(animated: true) }
-        return ok
-    }
-    public override func resignFirstResponder() -> Bool {
-        let ok = super.resignFirstResponder()
-        if ok { isKeyFocused = false; applyState(animated: true) }
-        return ok
-    }
 
     public override func keyDown(with event: NSEvent) {
         guard isEnabled else { super.keyDown(with: event); return }
@@ -646,10 +565,10 @@ public final class ThemedChip: NSControl {
         super.keyDown(with: event)
     }
 
-    private func activate() {
+    override func activate() {
         guard isClickable else { return }
         onTap?()
-        if let a = _action { NSApp.sendAction(a, to: _target, from: self) }
+        sendActionToTarget()
     }
 }
 
