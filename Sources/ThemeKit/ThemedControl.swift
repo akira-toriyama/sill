@@ -151,7 +151,7 @@ public class ThemedControl: NSControl {
     /// selective-corner builder, FAB with a circle, Checkbox with a small
     /// rounded box, Chip with a full pill. `local` is the bounds-origin rect.
     func focusRingPath(in rect: CGRect) -> CGPath {
-        concentricRingPath(in: rect, radius: 0, corners: Self.allCorners)
+        concentricRingPath(in: rect, radius: 0)
     }
 
     /// The shared concentric-ring builder: insets `rect` by `-focusRingOutset`
@@ -160,8 +160,7 @@ public class ThemedControl: NSControl {
     /// All-corners ⇒ a plain `CGPath(roundedRect:)` (byte-identical to the old
     /// per-widget code); selective-corner ring construction stays inline in
     /// Button (CornerPath is deliberately NOT extracted — rule-of-three unmet).
-    func concentricRingPath(in rect: CGRect, radius: CGFloat,
-                            corners: CACornerMask = ThemedControl.allCorners) -> CGPath {
+    func concentricRingPath(in rect: CGRect, radius: CGFloat) -> CGPath {
         let r = rect.insetBy(dx: -focusRingOutset, dy: -focusRingOutset)
         return CGPath(roundedRect: r,
                       cornerWidth: radius + focusRingOutset,

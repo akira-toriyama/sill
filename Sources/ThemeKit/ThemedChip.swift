@@ -434,7 +434,7 @@ public final class ThemedChip: ThemedControl {
     }
 
     override func focusRingPath(in rect: CGRect) -> CGPath {
-        concentricRingPath(in: rect, radius: metrics.radius, corners: Self.allCorners)
+        concentricRingPath(in: rect, radius: metrics.radius)
     }
 
     /// Centre the leading-icon / title / × row, with `gap` between present pieces.

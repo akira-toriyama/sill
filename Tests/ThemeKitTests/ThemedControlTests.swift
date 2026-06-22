@@ -88,10 +88,6 @@ final class ThemedControlTests: XCTestCase {
 
     // MARK: - Step 4: concentric focusRingOutset math (4 literal-2 → Space.xxs)
 
-    private func ringOutsetDelta(_ v: NSView, ringBox: CGRect) -> (dx: CGFloat, dy: CGFloat) {
-        // base.layout() sets focusRingLayer.frame = bounds, path in LOCAL coords inset by -outset
-        (dx: ringBox.minX, dy: ringBox.minY)   // local-rect origin = -outset on each axis
-    }
     func testFocusRingOutsetIsTwoOnEverySubclass() {
         // Button — selective-corner ring, still concentric-outset 2
         let b = ThemedButton(palette: palette()); b.title = "B"; b.previewFocused = true
