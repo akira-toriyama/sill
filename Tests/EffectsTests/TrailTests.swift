@@ -202,6 +202,60 @@ final class TrailTests: XCTestCase {
                        [.move(x: 0, y: 0), .line(x: 5, y: 5)])
     }
 
+    // MARK: - interiorCorners (concave fillet anchors — #12 Ph4 neon corridor)
+
+    func testInteriorCornersLeftTurn() {
+        // ⌐ right-then-up: a LEFT (CCW) turn at (10,0). The concave side faces
+        // up-left, so the inner bisector is (-1,1)/√2; signed turn +π/2.
+        let c = interiorCorners([(x: 0, y: 0), (x: 10, y: 0), (x: 10, y: 10)])
+        XCTAssertEqual(c.count, 1)
+        XCTAssertEqual(c[0].vertex.x, 10, accuracy: 1e-9)
+        XCTAssertEqual(c[0].vertex.y, 0, accuracy: 1e-9)
+        XCTAssertEqual(c[0].bisector.x, -0.7071067811865476, accuracy: 1e-9)
+        XCTAssertEqual(c[0].bisector.y,  0.7071067811865476, accuracy: 1e-9)
+        XCTAssertEqual(c[0].turn, .pi / 2, accuracy: 1e-9)
+    }
+
+    func testInteriorCornersRightTurn() {
+        // right-then-down: a RIGHT (CW) turn at (10,0): inner bisector (-1,-1)/√2,
+        // signed turn −π/2.
+        let c = interiorCorners([(x: 0, y: 0), (x: 10, y: 0), (x: 10, y: -10)])
+        XCTAssertEqual(c.count, 1)
+        XCTAssertEqual(c[0].bisector.x, -0.7071067811865476, accuracy: 1e-9)
+        XCTAssertEqual(c[0].bisector.y, -0.7071067811865476, accuracy: 1e-9)
+        XCTAssertEqual(c[0].turn, -.pi / 2, accuracy: 1e-9)
+    }
+
+    func testInteriorCornersSkipsCollinear() {
+        // A straight run continues in the same direction → no corner to fillet.
+        XCTAssertTrue(interiorCorners([(x: 0, y: 0), (x: 10, y: 0), (x: 20, y: 0)]).isEmpty)
+    }
+
+    func testInteriorCornersOrthogonalSnake() {
+        // ⊓ right, up, left → two LEFT turns at (10,0) and (10,10). The second
+        // (up-then-left) has inner bisector (-1,-1)/√2, turn +π/2.
+        let c = interiorCorners([(x: 0, y: 0), (x: 10, y: 0), (x: 10, y: 10), (x: 0, y: 10)])
+        XCTAssertEqual(c.count, 2)
+        XCTAssertEqual(c[0].vertex.x, 10, accuracy: 1e-9)
+        XCTAssertEqual(c[0].vertex.y, 0, accuracy: 1e-9)
+        XCTAssertEqual(c[1].vertex.x, 10, accuracy: 1e-9)
+        XCTAssertEqual(c[1].vertex.y, 10, accuracy: 1e-9)
+        XCTAssertEqual(c[1].bisector.x, -0.7071067811865476, accuracy: 1e-9)
+        XCTAssertEqual(c[1].bisector.y, -0.7071067811865476, accuracy: 1e-9)
+        XCTAssertEqual(c[1].turn, .pi / 2, accuracy: 1e-9)
+    }
+
+    func testInteriorCornersEdgeCases() {
+        // No interior vertex → nothing (empty, single point, lone segment).
+        XCTAssertTrue(interiorCorners([] as [(x: Double, y: Double)]).isEmpty)
+        XCTAssertTrue(interiorCorners([(x: 1, y: 2)]).isEmpty)
+        XCTAssertTrue(interiorCorners([(x: 0, y: 0), (x: 10, y: 0)]).isEmpty)
+        // A zero-length segment adjacent to the vertex is skipped (no NaN bisector):
+        // i=1 has a degenerate OUT seg, i=2 a degenerate IN seg → both skipped.
+        XCTAssertTrue(interiorCorners([(x: 0, y: 0), (x: 10, y: 0),
+                                       (x: 10, y: 0), (x: 10, y: 10)]).isEmpty)
+    }
+
     // MARK: - AppKit path builder
 
     @MainActor

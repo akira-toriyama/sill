@@ -586,6 +586,113 @@ public func drawChompPath(_ path: [CGPoint], now: CFTimeInterval, valid: Bool = 
 /// corridor read the same shake speed.
 private let pathPetPanicHz: Double = 1.5
 
+// MARK: - Neon corridor (#12 Ph4) — the composite arcade maze scene
+
+/// Blit a `PixelSprite` CENTRED at `c` and FLIPPED so row 0 is the TOP — the
+/// corridor pellets share the upright sprites' NON-flipped (y-up) frame, so a
+/// bonus decal needs the `drawGhostPet` y-flip to stand the right way up.
+@MainActor
+private func drawCenteredSprite(_ sprite: PixelSprite, cell: CGFloat, at c: CGPoint) {
+    let w = CGFloat(sprite.width) * cell, h = CGFloat(sprite.height) * cell
+    NSGraphicsContext.saveGraphicsState()
+    let t = NSAffineTransform()
+    t.translateX(by: c.x - w / 2, yBy: c.y + h / 2)   // top-left of the centred sprite
+    t.scaleX(by: 1, yBy: -1)                          // row 0 → top: rows grow DOWNWARD
+    t.concat()
+    drawPixelSprite(sprite, cell: cell, at: .zero)
+    NSGraphicsContext.restoreGraphicsState()
+}
+
+/// Draw a pre-resolved app-icon bonus centred at `c`, fit to a `box`-pt square.
+@MainActor
+private func drawCorridorIcon(_ icon: NSImage, at c: CGPoint, box: CGFloat) {
+    icon.draw(in: CGRect(x: c.x - box / 2, y: c.y - box / 2, width: box, height: box),
+              from: .zero, operation: .sourceOver, fraction: 1)
+}
+
+/// Draw the chomp NEON CORRIDOR along `path` (#12 Ph4): a black road bordered by
+/// 2-stroke neon walls, interior fillets that soften the inner notches, a central
+/// row of pellets (cherry / app-icon bonuses banded by `positionHash01`), and the
+/// Ph3 PathPet — the pac, or a panicking Blinky when `valid == false` — walking it.
+/// `tier` is the discrete arcade size step (road / wall / pellet / face / lag all
+/// scale off `tier.multiplier`); `scale` multiplies it again for the host's render
+/// resolution. Pellets are STATIC here; eating + the rainbow flash + the score pop
+/// arrive in Ph5.
+///
+/// The walls use the 2-stroke trick: stroke ONE rounded centreline WIDE in neon
+/// blue (road + both walls), then NARROWER in black (the road), so only the
+/// `wallThick` difference band reads as wall — no boundary-polygon vertex
+/// artefacts. COLOUR is intrinsic arcade (wall = `SpriteColor.pupilBlue`,
+/// pellet/pac = `pacYellow`), theme-invariant like the sprites. Host in a
+/// NON-flipped (y-up) view (the `drawChompPath` contract) so the sprites stand
+/// upright; `now` is injected (deterministic freeze / XCTest). `icon` (optional,
+/// pre-resolved) is the app-icon bonus; nil falls back to a plain pellet there.
+@MainActor
+public func drawChompCorridor(_ path: [CGPoint], now: CFTimeInterval,
+                              valid: Bool = true, tier: ScaleTier = .m,
+                              scale: CGFloat = 1, speed: CGFloat = 60,
+                              icon: NSImage? = nil) {
+    guard path.count >= 2 else { return }
+    // `tier` is the discrete arcade step (2/3/4.5); `scale` is the render
+    // resolution (a host's device / gallery knob) — both legitimately multiply.
+    let s = CGFloat(tier.multiplier) * scale
+    let roadWidth = 11 * s
+    let wallThick = max(1, 0.9 * s)
+    let pelletR   = 0.8 * s
+    let pelletGap = 5.2 * s
+    let roadHalf  = roadWidth / 2
+
+    // 1) Black road + 2-stroke neon walls on ONE rounded centreline.
+    let steps = roundedCornerPath(path, radius: Double(roadHalf))
+    let wall  = nsBezierPath(steps, lineWidth: roadWidth + 2 * wallThick)
+    let road  = nsBezierPath(steps, lineWidth: roadWidth)
+    let blue  = NSColor(HexColor(SpriteColor.pupilBlue))
+    NSGraphicsContext.saveGraphicsState()
+    let glow = NSShadow()
+    glow.shadowColor = blue.withAlphaComponent(0.85)
+    glow.shadowBlurRadius = 3 * s; glow.shadowOffset = .zero; glow.set()
+    blue.setStroke(); wall.stroke()
+    NSGraphicsContext.restoreGraphicsState()
+    NSColor.black.setStroke(); road.stroke()
+
+    // 2) Interior fillets — a black disc erodes each inner neon notch the round
+    //    join leaves. Centre = vertex + bisector · roadHalf/cos(|turn|/2).
+    NSColor.black.setFill()
+    for c in interiorCorners(path) {
+        let d  = Double(roadHalf) / cos(abs(c.turn) / 2)
+        let fr = Double(wallThick) * 1.15
+        let cx = c.vertex.x + c.bisector.x * d, cy = c.vertex.y + c.bisector.y * d
+        NSBezierPath(ovalIn: CGRect(x: cx - fr, y: cy - fr,
+                                    width: 2 * fr, height: 2 * fr)).fill()
+    }
+
+    // 3) Central pellet row — positionHash01 bands cherry (4%) / icon (4%) / dot;
+    //    skip the FIRST mark (under the live cursor, it would flicker on wrap).
+    let marks     = resampleAlongPolyline(path, interval: Double(pelletGap))
+    let yellow    = NSColor(HexColor(SpriteColor.pacYellow))
+    let bonusCell = roadWidth * 0.62 / 12        // cherry is 12 cells wide
+    let iconBox   = roadWidth * 0.66
+    for (i, m) in marks.enumerated() where i > 0 {
+        let c = CGPoint(x: m.point.x, y: m.point.y)
+        let h = positionHash01(x: Int(m.point.x.rounded()), y: Int(m.point.y.rounded()))
+        if h < 0.04 {
+            drawCenteredSprite(CanonicalSprite.cherry, cell: bonusCell, at: c)
+        } else if h < 0.08, let icon {
+            drawCorridorIcon(icon, at: c, box: iconBox)
+        } else {
+            yellow.setFill()
+            NSBezierPath(ovalIn: CGRect(x: c.x - pelletR, y: c.y - pelletR,
+                                        width: 2 * pelletR, height: 2 * pelletR)).fill()
+        }
+    }
+
+    // 4) The walking pac / panicking ghost — reuse Ph3 (no guide; the walls show
+    //    the road). Pac ≈ 0.78 of the road; the head leads by ~1.4 road widths.
+    let petScale = roadWidth * 0.78 / chompFaceFootprint
+    drawChompPath(path, now: now, valid: valid, scale: petScale,
+                  speed: speed, faceLag: valid ? roadWidth * 1.4 : 0, showGuide: false)
+}
+
 /// Walk `rect`'s perimeter linearly (top → right → bottom → left) and
 /// return the centre + travel-direction rotation at `distance`. Each
 /// pet's draw code stays in a canonical "facing-right" frame; the

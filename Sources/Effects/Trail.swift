@@ -230,6 +230,62 @@ public func roundedCornerPath(
     return steps
 }
 
+// MARK: - Interior corners (concave fillet anchors — #12 Ph4 neon corridor)
+
+/// One interior (concave) corner of a polyline — where a 2-stroke neon corridor
+/// wall (`drawChompCorridor`) folds a sharp INNER notch the fillet softens.
+/// `bisector` is the UNIT direction from `vertex` toward the concave side (the
+/// inside of the turn); `turn` is the signed bend (+ left/CCW in y-up, − right/CW).
+/// The draw side drops a black disc at `vertex + bisector·d`, `d = roadHalf /
+/// cos(|turn|/2)` (= `roadHalf·√2` at a right angle — chomp is 90°-snapped). Pure.
+public struct InteriorCorner: Sendable, Equatable {
+    public let vertex: (x: Double, y: Double)
+    public let bisector: (x: Double, y: Double)
+    public let turn: Double
+
+    public init(vertex: (x: Double, y: Double),
+                bisector: (x: Double, y: Double), turn: Double) {
+        self.vertex = vertex
+        self.bisector = bisector
+        self.turn = turn
+    }
+
+    public static func == (a: InteriorCorner, b: InteriorCorner) -> Bool {
+        a.vertex == b.vertex && a.bisector == b.bisector && a.turn == b.turn
+    }
+}
+
+/// The concave corners of `points`: every interior vertex whose travel direction
+/// CHANGES (a straight continuation has no corner). `bisector = normalize(outU −
+/// inU)` points to the inside of the turn (the standard "difference of unit
+/// tangents points toward the centre of curvature"); `turn = atan2(cross, dot)`
+/// is the signed bend. Endpoints and any vertex with a zero-length adjacent
+/// segment are skipped, so every `bisector` is finite (no NaN). Pure +
+/// coordinate-agnostic, like the rest of Trail — the Ph4 corridor drops a black
+/// fillet disc on each inner neon notch this returns.
+public func interiorCorners(_ points: [(x: Double, y: Double)]) -> [InteriorCorner] {
+    guard points.count >= 3 else { return [] }
+    var corners: [InteriorCorner] = []
+    for i in 1..<(points.count - 1) {
+        let a = points[i - 1], b = points[i], c = points[i + 1]
+        let inLen = hypot(b.x - a.x, b.y - a.y)
+        let outLen = hypot(c.x - b.x, c.y - b.y)
+        if inLen <= 0 || outLen <= 0 { continue }        // degenerate adjacent seg → skip
+        let inU = (x: (b.x - a.x) / inLen, y: (b.y - a.y) / inLen)
+        let outU = (x: (c.x - b.x) / outLen, y: (c.y - b.y) / outLen)
+        let dot = inU.x * outU.x + inU.y * outU.y
+        if dot >= 1 - 1e-12 { continue }                  // unchanged direction → no corner
+        let cross = inU.x * outU.y - inU.y * outU.x
+        var bx = outU.x - inU.x, by = outU.y - inU.y
+        let blen = hypot(bx, by)
+        if blen <= 0 { continue }                         // safety (unreachable while dot < 1)
+        bx /= blen; by /= blen
+        corners.append(InteriorCorner(vertex: b, bisector: (x: bx, y: by),
+                                      turn: atan2(cross, dot)))
+    }
+    return corners
+}
+
 #if canImport(CoreGraphics)
 import CoreGraphics
 
@@ -254,6 +310,11 @@ public func markAtArcLength(_ points: [CGPoint], distance: Double) -> TrailMark?
 /// `CGPoint` convenience for `polylineLength`.
 public func polylineLength(_ points: [CGPoint]) -> Double {
     polylineLength(points.map { (x: Double($0.x), y: Double($0.y)) })
+}
+
+/// `CGPoint` convenience for `interiorCorners`.
+public func interiorCorners(_ points: [CGPoint]) -> [InteriorCorner] {
+    interiorCorners(points.map { (x: Double($0.x), y: Double($0.y)) })
 }
 #endif
 

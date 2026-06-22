@@ -184,4 +184,28 @@ final class SpriteTests: XCTestCase {
                    cell: 3, at: NSPoint(x: 0, y: 60))
         img.unlockFocus()
     }
+
+    func testDrawChompCorridorRuns() {
+        // The #12 Ph4 composite: drawChompCorridor strokes 2-stroke neon walls +
+        // interior fillets + a pellet row (cherry/icon/dot bands via positionHash01)
+        // along an ORTHOGONAL maze, then reuses drawChompPath for the walking pac /
+        // panicking ghost. Smoke only — real proof is the prism live capture; this
+        // exercises the wall/fillet/pellet/pet path at a few clocks (valid + mismatch,
+        // with and without a bonus icon) so a crash/regression reddens CI.
+        let img = NSImage(size: NSSize(width: 200, height: 160))
+        img.lockFocus()
+        let maze = [CGPoint(x: 20, y: 20), CGPoint(x: 180, y: 20),
+                    CGPoint(x: 180, y: 80), CGPoint(x: 20, y: 80),
+                    CGPoint(x: 20, y: 140), CGPoint(x: 180, y: 140)]
+        let icon = NSImage(size: NSSize(width: 12, height: 12))
+        for now in [0.0, 0.4, 2.3] {   // start, mid, past one loop
+            drawChompCorridor(maze, now: now, valid: true, tier: .s, icon: icon)
+            drawChompCorridor(maze, now: now, valid: false, tier: .m)   // mismatch, no icon
+        }
+        // Degenerate paths are a no-op (must not crash): empty, single, 2-point.
+        drawChompCorridor([], now: 0)
+        drawChompCorridor([CGPoint(x: 5, y: 5)], now: 0)
+        drawChompCorridor([CGPoint(x: 0, y: 0), CGPoint(x: 50, y: 0)], now: 0)
+        img.unlockFocus()
+    }
 }

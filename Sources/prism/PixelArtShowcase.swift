@@ -23,7 +23,8 @@ import AppKit
 import PaletteKit   // ResolvedPalette
 import PixelArt     // pacManCells, mouthHalfRad, chompMouthFrames/Hz, ScaleTier
 import Motion       // ThemedTransition.frameStep — the discrete sprite-swap sampler
-import Effects      // CanonicalSprite, SpriteColor, drawPixelSprite, drawPacMan, drawLinePets
+import Effects      // CanonicalSprite, SpriteColor, drawPixelSprite, drawPacMan, drawLinePets, drawChompCorridor
+import ThemeKit     // phosphorImage — the bonus-icon stand-in for the corridor
 
 /// Pac-Man face diameter in cells (an odd count centres the mouth wedge).
 private let pacDiameter = 13
@@ -276,6 +277,84 @@ struct PathPetView: NSViewRepresentable {
     }
 }
 
+// MARK: - The Neon Corridor — the composite arcade maze (#12 Ph4)
+
+/// An orthogonal (90°-snapped) serpentine corridor inset into `r` (y-up): a comb
+/// of horizontal lanes joined by short verticals, so the centreline turns ONLY at
+/// right angles — exactly what the 2-stroke walls + interior fillets are built for
+/// (a true Pac-Man maze, not the freeform PathPet zigzag). `lanes` = lane count.
+private func orthogonalMazePath(in r: CGRect, lanes: Int = 3) -> [CGPoint] {
+    guard lanes >= 2, r.width > 0, r.height > 0 else { return [] }
+    let gap = r.height / CGFloat(lanes - 1)
+    var pts: [CGPoint] = []
+    for i in 0..<lanes {
+        let y = r.minY + gap * CGFloat(i)
+        let ltr = (i % 2 == 0)                       // serpentine: alternate run direction
+        pts.append(CGPoint(x: ltr ? r.minX : r.maxX, y: y))
+        pts.append(CGPoint(x: ltr ? r.maxX : r.minX, y: y))
+    }
+    return pts
+}
+
+/// A bright bonus stand-in for the app-icon pellet band: an app passes its REAL
+/// icon, but prism tints a Phosphor star cyan so it shows on the black road.
+/// `@MainActor` (its initializer calls the `@MainActor` `phosphorImage` loader).
+@MainActor private let corridorBonusIcon: NSImage? = {
+    guard let base = phosphorImage("star", pt: 14, weight: .fill) else { return nil }
+    let img = NSImage(size: base.size)
+    img.lockFocus()
+    NSColor(calibratedRed: 0.30, green: 0.92, blue: 1.0, alpha: 1).set()
+    let rect = NSRect(origin: .zero, size: base.size)
+    base.draw(in: rect)
+    rect.fill(using: .sourceAtop)
+    img.unlockFocus()
+    img.isTemplate = false
+    return img
+}()
+
+/// Hosts the REAL `drawChompCorridor` walking an orthogonal maze at this view's
+/// scale — the #12 Ph4 composite card (2-stroke walls + fillets + pellet row + the
+/// Ph3 pac walking it). NON-flipped (y-up), per the `drawChompPath` contract.
+/// `valid == false` swaps the pac for the panicking Blinky on the same corridor.
+final class CorridorNSView: NSView {
+    var valid = true
+    var tier: ScaleTier = .s
+    var previewNow: Double?
+    private var timer: Timer?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { timer?.invalidate(); timer = nil; return }
+        guard timer == nil else { return }
+        timer = startRedrawTick(for: self, frozen: previewNow != nil)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard bounds.width > 1, bounds.height > 1 else { return }
+        NSColor(white: 0.04, alpha: 1).setFill(); bounds.fill()
+        let now = previewNow ?? CACurrentMediaTime()
+        // Inset so the widest stroke (road + both walls) clears the card edge.
+        let track = bounds.insetBy(dx: 34 * uiScale, dy: 30 * uiScale)
+        drawChompCorridor(orthogonalMazePath(in: track, lanes: 3),
+                          now: now, valid: valid, tier: tier, scale: uiScale,
+                          speed: 64 * uiScale, icon: corridorBonusIcon)
+    }
+}
+
+struct NeonCorridorView: NSViewRepresentable {
+    var valid = true
+    var tier: ScaleTier = .s
+    func makeNSView(context: Context) -> CorridorNSView {
+        let v = CorridorNSView()
+        v.valid = valid; v.tier = tier
+        v.previewNow = chompFreezeNow
+        return v
+    }
+    func updateNSView(_ v: CorridorNSView, context: Context) {
+        v.valid = valid; v.tier = tier; v.needsDisplay = true
+    }
+}
+
 // MARK: - The showcase mock (wired into Gallery's `.particles` family)
 
 /// The PixelArt specimen for one theme card: the canonical arcade sprites drawn
@@ -351,6 +430,32 @@ struct MockPixelArt: View {
 
             PathPetView(valid: false, scale: 1.9)
                 .frame(height: 84 * uiScale)
+                .frame(maxWidth: .infinity)
+                .background(RoundedRectangle(cornerRadius: 7)
+                    .fill(Color(nsColor: NSColor(white: 0.04, alpha: 1))))
+                .overlay(RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color(nsColor: p.border), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+
+            Text("Neon Corridor (#12 Ph4) — the maze: 2-stroke neon walls (one rounded centreline stroked WIDE-blue then NARROW-black) + interior fillets on the inner corners + a central pellet row (positionHash01 bands cherry / icon / dot) + the Ph3 pac walking it. Orthogonal 90° path = a real Pac-Man maze:")
+                .font(sysFont(7.5, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
+
+            NeonCorridorView(valid: true, tier: .s)
+                .frame(height: 178 * uiScale)
+                .frame(maxWidth: .infinity)
+                .background(RoundedRectangle(cornerRadius: 7)
+                    .fill(Color(nsColor: NSColor(white: 0.04, alpha: 1))))
+                .overlay(RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color(nsColor: p.border), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+
+            Text("mismatch corridor — the gesture matched no rule: the panicking Blinky walks the same maze (valid == false):")
+                .font(sysFont(7.5, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
+
+            NeonCorridorView(valid: false, tier: .s)
+                .frame(height: 120 * uiScale)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: 7)
                     .fill(Color(nsColor: NSColor(white: 0.04, alpha: 1))))
