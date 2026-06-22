@@ -64,4 +64,14 @@ final class CorridorTests: XCTestCase {
         XCTAssertTrue(chompScorePops(bonuses: [], total: 100, speed: 50,
                                      now: 1, faceLag: 0, dur: 0.5).isEmpty)
     }
+
+    @MainActor
+    func testDrawScorePopSmoke() {
+        // Render into an offscreen image — proves the text draw path doesn't trap.
+        let img = NSImage(size: NSSize(width: 64, height: 32))
+        img.lockFocus()
+        drawScorePop(ScorePop(point: (x: 30, y: 8), value: 700, t: 0.5), scale: 2)
+        img.unlockFocus()
+        XCTAssertEqual(img.size.width, 64, accuracy: 1e-9)
+    }
 }

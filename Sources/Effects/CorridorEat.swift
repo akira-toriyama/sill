@@ -88,3 +88,31 @@ public func chompScorePops(
     }
     return out
 }
+
+#if canImport(AppKit)
+import AppKit
+import Motion   // ThemedTransition.Easing — the rise curve
+import Palette  // HexColor
+
+/// Draw one "+N" score pop: arcade-yellow bold monospaced text RISING (eased) and
+/// FADING over its `t` (0…1). Host in a NON-flipped (y-up) view (the corridor
+/// contract) — `NSAttributedString.draw` orients itself there, so +y lifts the
+/// text up; no flip. Centred horizontally on `pop.point`. `scale` matches the
+/// corridor's render resolution.
+@MainActor
+public func drawScorePop(_ pop: ScorePop, scale: CGFloat) {
+    let rise = ThemedTransition.Easing.easeOutCubic(pop.t)   // 0…1, snappy then soft
+    let dy = CGFloat(rise) * 14 * scale                      // total lift in points
+    let alpha = max(0, 1 - pop.t)                            // linear fade to 0
+    let font = NSFont.monospacedSystemFont(ofSize: 9 * scale, weight: .bold)
+    let attrs: [NSAttributedString.Key: Any] = [
+        .font: font,
+        .foregroundColor: NSColor(HexColor(SpriteColor.pacYellow))
+            .withAlphaComponent(alpha),
+    ]
+    let str = NSAttributedString(string: "+\(pop.value)", attributes: attrs)
+    let size = str.size()
+    str.draw(at: CGPoint(x: CGFloat(pop.point.x) - size.width / 2,
+                         y: CGFloat(pop.point.y) + dy))
+}
+#endif
