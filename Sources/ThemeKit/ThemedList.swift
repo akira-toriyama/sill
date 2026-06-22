@@ -636,17 +636,16 @@ public final class ThemedList: NSView {
     // MARK: Theming
 
     public func applyTheme() {
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)           // snap — no implicit cross-fade (combo parity)
-        let surface = effectiveSurface
-        // Paint the surface only when it is fully opaque; a nil (vibrancy) or
-        // translucent surface lets the lifted/vibrant host show through.
-        scrollView.drawsBackground = (surface?.alphaComponent ?? 0) >= 1
-        scrollView.backgroundColor = surface ?? .clear
-        vScroller.knobColor = palette.muted              // themed scroll knob (vs macOS grey)
-        hScroller.knobColor = palette.muted
-        focusRingLayer?.strokeColor = palette.primary.cgColor
-        CATransaction.commit()
+        layerTxn(animated: false) {           // snap — no implicit cross-fade (combo parity)
+            let surface = effectiveSurface
+            // Paint the surface only when it is fully opaque; a nil (vibrancy) or
+            // translucent surface lets the lifted/vibrant host show through.
+            scrollView.drawsBackground = (surface?.alphaComponent ?? 0) >= 1
+            scrollView.backgroundColor = surface ?? .clear
+            vScroller.knobColor = palette.muted              // themed scroll knob (vs macOS grey)
+            hScroller.knobColor = palette.muted
+            focusRingLayer?.strokeColor = palette.primary.cgColor
+        }
         listView?.needsDisplay = true
     }
 
@@ -1334,9 +1333,9 @@ extension ThemedList {
     private func resolvedTint(_ tint: ListTint) -> NSColor {
         switch tint {
         case .none:      return .clear
-        case .primary:   return palette.primary
-        case .secondary: return palette.secondary
-        case .error:     return palette.error
+        case .primary:   return palette.color(for: .primary)
+        case .secondary: return palette.color(for: .secondary)
+        case .error:     return palette.color(for: .error)
         case .custom(let hex): return NSColor(hex)
         }
     }
@@ -1559,9 +1558,9 @@ extension ThemedList {
         if onAccent { return (palette.onPrimary(0.18), palette.onPrimary(1)) }
         switch role {
         case .neutral:   return (palette.ink(.subtle, of: .muted), palette.muted)
-        case .primary:   return (palette.ink(.subtle, of: .primary), palette.primary)
-        case .secondary: return (palette.secondary.withAlphaComponent(0.16), palette.secondary)
-        case .error:     return (palette.error.withAlphaComponent(0.16), palette.error)
+        case .primary:   return (palette.ink(.subtle, of: .primary), palette.color(for: .primary))
+        case .secondary: return (palette.secondary.withAlphaComponent(0.16), palette.color(for: .secondary))
+        case .error:     return (palette.error.withAlphaComponent(0.16), palette.color(for: .error))
         }
     }
 

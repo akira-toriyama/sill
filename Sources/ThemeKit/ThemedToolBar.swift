@@ -183,9 +183,7 @@ public final class ThemedToolBar: NSView {
     private var dividerHeight: CGFloat { max(16, minHeight * 0.5) }
     private var hairlineThickness: CGFloat { 1.0 / backingScale }
 
-    private var backingScale: CGFloat {
-        window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-    }
+    private var backingScale: CGFloat { themeBackingScale }
 
     // MARK: - Init
 
@@ -277,8 +275,8 @@ public final class ThemedToolBar: NSView {
     /// (the panel translucency knob); `transparent` paints nothing.
     private var surfaceFill: NSColor? {
         switch surface {
-        case .primary:   return palette.primary
-        case .secondary: return palette.secondary
+        case .primary:   return palette.color(for: .primary)
+        case .secondary: return palette.color(for: .secondary)
         case .surface:
             let base = palette.background ?? .windowBackgroundColor
             if let a = palette.backgroundAlpha { return base.withAlphaComponent(a) }
@@ -516,20 +514,6 @@ public final class ThemedToolBar: NSView {
         let s = backingScale
         for l in [shadowLayer, backdropLayer, hairlineLayer] { l.contentsScale = s }
         needsLayout = true
-    }
-
-    // MARK: - Snap-vs-animate (verbatim house idiom)
-
-    private func layerTxn(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
     }
 }
 

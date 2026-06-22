@@ -128,18 +128,18 @@ final class ThemedFABTests: XCTestCase {
     func testElevationLadder() {
         let p = theme()
         let rest = fab(p) { $0.variant = .circular }.fabProbe
-        XCTAssertEqual(rest.shadowOpacity, 0.30, accuracy: 0.001, "resting ≈ dp6")
+        XCTAssertEqual(rest.shadowOpacity, 0.28, accuracy: 0.001, "resting dp8 (snapped from 0.30 to the ladder in #14a)")
         XCTAssertEqual(rest.shadowRadius, 8, accuracy: 0.01)
         // offsetY is NEGATIVE: isFlipped=false (y-up) so a downward shadow is −y.
         XCTAssertEqual(rest.shadowOffsetY, -3, accuracy: 0.01, "resting shadow points down (y-up)")
 
         let hover = fab(p) { $0.variant = .circular; $0.previewHovered = true }.fabProbe
-        XCTAssertEqual(hover.shadowOpacity, 0.30, accuracy: 0.001, "hover does NOT bump a FAB's elevation")
+        XCTAssertEqual(hover.shadowOpacity, 0.28, accuracy: 0.001, "hover does NOT bump a FAB's elevation")
         XCTAssertEqual(hover.shadowRadius, 8, accuracy: 0.01)
         XCTAssertEqual(hover.shadowOffsetY, -3, accuracy: 0.01, "hover keeps the resting offset")
 
         let focus = fab(p) { $0.variant = .circular; $0.previewFocused = true }.fabProbe
-        XCTAssertEqual(focus.shadowOpacity, 0.30, accuracy: 0.001, "focus does NOT bump elevation")
+        XCTAssertEqual(focus.shadowOpacity, 0.28, accuracy: 0.001, "focus does NOT bump elevation")
 
         let press = fab(p) { $0.variant = .circular; $0.previewPressed = true }.fabProbe
         XCTAssertEqual(press.shadowOpacity, 0.34, accuracy: 0.001, "pressed ≈ dp12")

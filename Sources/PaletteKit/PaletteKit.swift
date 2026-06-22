@@ -134,19 +134,46 @@ public extension ResolvedPalette {
     /// The hairline-stroke axis of `onSecondary` (the contrast ink @ 0.4) —
     /// for outlines on a secondary fill. Mirrors `onPrimaryStroke`.
     var onSecondaryStroke: NSColor { onSecondary(0.4) }
+
+    /// Black or white, whichever best contrasts `c` used as a fill. Reuses
+    /// the pure `prefersBlackForeground` (WCAG contrast-ratio crossover) so
+    /// the resolved-`NSColor` path (incl. OS controlAccent, whose hex the
+    /// pure layer can't see) can't drift from a Palette-only consumer.
+    /// Public so widgets drawing ink on an arbitrary fill (a contained
+    /// Button, an error Chip, a Tooltip) share this single crossover
+    /// instead of each re-deriving it.
+    func bestContrast(on c: NSColor) -> NSColor {
+        let s = c.usingColorSpace(.sRGB) ?? c
+        let L = wcagRelativeLuminance(r: Double(s.redComponent),
+                                      g: Double(s.greenComponent),
+                                      b: Double(s.blueComponent))
+        return prefersBlackForeground(fillRelLuminance: L) ? .black : .white
+    }
 }
 
-/// Black or white, whichever best contrasts `c` used as a fill. Reuses
-/// the pure `prefersBlackForeground` (WCAG contrast-ratio crossover) so
-/// the resolved-`NSColor` path (incl. OS controlAccent, whose hex the
-/// pure layer can't see) can't drift from a Palette-only consumer.
+// MARK: - Control role
+
+/// The role a themed control is tinted by — the single vocabulary the widgets
+/// map their own public `Role` enums onto, so the role → colour selection lives
+/// in ONE place (`color(for:)`) instead of a byte-identical switch per widget.
+public enum ControlRole: Sendable, Hashable, CaseIterable {
+    case neutral, primary, secondary, error
+}
+
 @MainActor
-func bestContrast(on c: NSColor) -> NSColor {
-    let s = c.usingColorSpace(.sRGB) ?? c
-    let L = wcagRelativeLuminance(r: Double(s.redComponent),
-                                  g: Double(s.greenComponent),
-                                  b: Double(s.blueComponent))
-    return prefersBlackForeground(fillRelLuminance: L) ? .black : .white
+public extension ResolvedPalette {
+    /// The fill for a control role: `neutral` ⇒ `foreground`, else the matching
+    /// role field. A widget keeps its own (possibly narrower / wider) public
+    /// `Role` enum and translates to this; non-role arms (surface, transparent,
+    /// custom, washes) stay at the call site.
+    func color(for role: ControlRole) -> NSColor {
+        switch role {
+        case .neutral:   return foreground
+        case .primary:   return primary
+        case .secondary: return secondary
+        case .error:     return error
+        }
+    }
 }
 
 // MARK: - Derive recipe

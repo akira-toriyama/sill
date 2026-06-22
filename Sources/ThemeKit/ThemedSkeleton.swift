@@ -114,7 +114,7 @@ public final class ThemedSkeleton: NSView {
         wantsLayer = true
         layer?.masksToBounds = false
 
-        let s = NSScreen.main?.backingScaleFactor ?? 2
+        let s = themeBackingScale
         fillLayer.contentsScale = s
         fillLayer.masksToBounds = true            // clip the wave child to the rounded shape
         layer?.addSublayer(fillLayer)
@@ -313,24 +313,9 @@ public final class ThemedSkeleton: NSView {
 
     public override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
-        let s = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let s = themeBackingScale
         fillLayer.contentsScale = s
         waveLayer.contentsScale = s
-    }
-
-    // MARK: - Snap-vs-animate (verbatim ThemedTextField idiom)
-
-    private func layerTxn(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
-            CATransaction.setAnimationTimingFunction(
-                CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
     }
 }
 

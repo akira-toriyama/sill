@@ -1,6 +1,6 @@
 # #14a — DRY 集約（トークン非依存）実装プラン
 
-> 状態: **設計/監査済・実装未着手**（plan/execution 分割の handoff・2026-06-22）。
+> 状態: **✅ 完了（PR #67 + `v1.20.0`・2026-06-22）。** C1/C2/C3/C5/C6 を value-preserving に実装（正味 −111 行・`swift build` 緑・敵対的レビュー 6 クラスタで confirmed defect 0）。唯一の意図的値変化＝FAB-rest 0.30→dp8 0.28。**C4（CornerPath）は単一消費者のため見送り＝#14b の `ThemedControl` seam で実施。** 以下は実装時の監査記録（参照用に保持）。
 > #14 のうち**トークン非依存の安全な前半**だけを 1 PR に。本丸 `ThemedControl: NSView` 基底（hover/press/focus/focus-ring/`preview*`/`fx*` の状態機械を 1 基底へ）は **#14b 以降に別途設計**（grill/brainstorm 必須）。
 > 前提: #13 完了済（origin/main `b761c35` 以降・`v1.19.0`）＝`Space`/`Radius`/`Elevation` トークン + `ResolvedPalette.shadow(_:)` + 9 widget の layerTxn は既に `Duration.enter` 配線済。
 > ブランチ `feat-dry-14a`（origin/main から）。次セッションは `git fetch` → 本プラン → 実装 → `swift build` → prism before/after → 敵対的レビュー → PR → CI 緑 → squash-merge + `v1.20.0`。

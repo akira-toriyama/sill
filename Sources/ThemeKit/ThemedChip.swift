@@ -31,6 +31,19 @@ import Palette
 import PaletteKit
 import Motion
 
+extension ThemedChip.Role {
+    /// Bridge to the shared `ControlRole`. `neutral` ⇒ `color(for: .neutral)` =
+    /// `foreground`, matching the chip's prior direct `palette.foreground`.
+    var control: ControlRole {
+        switch self {
+        case .neutral:   return .neutral
+        case .primary:   return .primary
+        case .secondary: return .secondary
+        case .error:     return .error
+        }
+    }
+}
+
 @MainActor
 public final class ThemedChip: NSControl {
 
@@ -254,25 +267,7 @@ public final class ThemedChip: NSControl {
     // (honours .mono/.rounded/.menu). The `.keycap` variant forces a
     // monospaced face inline at the label call site.
 
-    private var roleColor: NSColor {
-        switch role {
-        case .neutral:   return palette.foreground
-        case .primary:   return palette.primary
-        case .secondary: return palette.secondary
-        case .error:     return palette.error
-        }
-    }
-
-    /// Black or white, whichever best contrasts an opaque fill — the same WCAG
-    /// crossover `PaletteKit.onPrimary` uses (so secondary / error fills get
-    /// correct ink too, not just primary).
-    private func ink(on c: NSColor) -> NSColor {
-        let s = c.usingColorSpace(.sRGB) ?? c
-        let l = wcagRelativeLuminance(r: Double(s.redComponent),
-                                      g: Double(s.greenComponent),
-                                      b: Double(s.blueComponent))
-        return prefersBlackForeground(fillRelLuminance: l) ? .black : .white
-    }
+    private var roleColor: NSColor { palette.color(for: role.control) }
 
     /// The selected wash: the canonical `selection` for neutral, a role wash
     /// (≈ MUI's selected tint) otherwise.
@@ -312,7 +307,7 @@ public final class ThemedChip: NSControl {
             switch role {
             case .primary:   return palette.onPrimary()
             case .secondary: return palette.onSecondary()
-            case .error:     return ink(on: palette.error)
+            case .error:     return palette.bestContrast(on: palette.error)
             case .neutral:   return palette.foreground   // unreachable (guarded out)
             }
         }
@@ -339,7 +334,7 @@ public final class ThemedChip: NSControl {
     private var overlayColor: NSColor {
         guard isClickable else { return .clear }
         if hasOpaqueRoleFill {
-            let on = ink(on: roleColor)
+            let on = palette.bestContrast(on: roleColor)
             if fxPressed { return on.withAlphaComponent(0.12) }
             if fxHovered { return on.withAlphaComponent(0.08) }
             return .clear
@@ -470,9 +465,7 @@ public final class ThemedChip: NSControl {
 
     // MARK: - Layout
 
-    private var backingScale: CGFloat {
-        window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-    }
+    private var backingScale: CGFloat { themeBackingScale }
 
     public override func layout() {
         super.layout()
@@ -532,20 +525,6 @@ public final class ThemedChip: NSControl {
         focusRingLayer.contentsScale = s
         rebuildIcons()
         needsLayout = true
-    }
-
-    // MARK: - Snap-vs-animate (verbatim ThemedButton idiom)
-
-    private func layerTxn(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
     }
 
     // MARK: - Hover (chip body + the × sub-region)

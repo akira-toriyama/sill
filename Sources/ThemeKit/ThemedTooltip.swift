@@ -304,23 +304,11 @@ public final class ThemedTooltip: NSObject {
     // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
     // (honours .mono/.rounded/.menu; the old local helper dropped two).
 
-    /// Black or white, whichever best contrasts a fill — the same WCAG crossover
-    /// `onPrimary` uses, via the pure `Palette` helpers (no drift). PaletteKit's
-    /// `bestContrast` is internal, so the contained / FAB widgets keep this local
-    /// copy; the tooltip does the same for its `onForeground` text.
-    private func ink(on c: NSColor) -> NSColor {
-        let s = c.usingColorSpace(.sRGB) ?? c
-        let l = wcagRelativeLuminance(r: Double(s.redComponent),
-                                      g: Double(s.greenComponent),
-                                      b: Double(s.blueComponent))
-        return prefersBlackForeground(fillRelLuminance: l) ? .black : .white
-    }
-
     /// The inverted surface — `foreground @ 0.92`. A dark bubble on a light
     /// theme, a light one on a dark / neon theme, theme-robustly.
     private var fillColor: NSColor { palette.foreground.withAlphaComponent(0.92) }
     /// Best-contrast ink on the (opaque) foreground.
-    private var textColor: NSColor { ink(on: palette.foreground) }
+    private var textColor: NSColor { palette.bestContrast(on: palette.foreground) }
 
     /// Re-measure the text, re-theme the layers, and reposition a shown bubble.
     /// Snapped (a theme / text swap should not smear).

@@ -104,9 +104,7 @@ public final class ThemedButtonGroup: NSView {
     @available(*, unavailable)
     public required init?(coder: NSCoder) { nil }
 
-    private var backingScale: CGFloat {
-        window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-    }
+    private var backingScale: CGFloat { themeBackingScale }
 
     /// The uniform per-member extent along the cross axis (the button height) —
     /// mirrors ThemedButton's per-size height.
@@ -205,27 +203,12 @@ public final class ThemedButtonGroup: NSView {
 
     // MARK: - Group-owned layer colours
 
-    private var roleColor: NSColor {
-        switch role {
-        case .primary:   return palette.primary
-        case .secondary: return palette.secondary
-        case .error:     return palette.error
-        }
-    }
-    /// Best-contrast ink on a fill — the same WCAG path ThemedButton uses, for a
-    /// visible contained-seam line over a saturated role fill.
-    private func contrastInk(on c: NSColor) -> NSColor {
-        let s = c.usingColorSpace(.sRGB) ?? c
-        let l = wcagRelativeLuminance(r: Double(s.redComponent),
-                                      g: Double(s.greenComponent),
-                                      b: Double(s.blueComponent))
-        return prefersBlackForeground(fillRelLuminance: l) ? .black : .white
-    }
+    private var roleColor: NSColor { palette.color(for: role.control) }
     private var dividerColor: NSColor {
         guard isEnabled else { return palette.muted }
         switch variant {
         case .text:      return roleColor.withAlphaComponent(0.5)
-        case .contained: return contrastInk(on: roleColor).withAlphaComponent(0.25)
+        case .contained: return palette.bestContrast(on: roleColor).withAlphaComponent(0.25)
         case .outlined:  return .clear   // the overlapped border IS the seam
         }
     }
@@ -242,9 +225,10 @@ public final class ThemedButtonGroup: NSView {
             }
             self.groupShadowLayer.isHidden = !self.groupShadowVisible
             if self.groupShadowVisible {
-                self.groupShadowLayer.shadowOpacity = 0.20   // MUI contained group = static dp2
-                self.groupShadowLayer.shadowRadius  = 3
-                self.groupShadowLayer.shadowOffset  = CGSize(width: 0, height: -1)
+                let e = self.palette.shadow(.dp2)   // MUI contained group = static dp2
+                self.groupShadowLayer.shadowOpacity = e.opacity
+                self.groupShadowLayer.shadowRadius  = e.radius
+                self.groupShadowLayer.shadowOffset  = CGSize(width: 0, height: e.offsetY)
             }
         }
     }
@@ -367,21 +351,6 @@ public final class ThemedButtonGroup: NSView {
             j += step
         }
         return nil
-    }
-
-    // MARK: - Snap-vs-animate (verbatim ThemedTextField idiom)
-
-    private func layerTxn(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
-            CATransaction.setAnimationTimingFunction(
-                CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
     }
 }
 

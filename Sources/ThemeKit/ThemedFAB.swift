@@ -30,6 +30,17 @@ import Palette
 import PaletteKit
 import Motion
 
+extension ThemedFAB.Role {
+    /// Bridge to the shared `ControlRole` (a FAB has no `.error` — that's an
+    /// intentional API narrowing, not a gap).
+    var control: ControlRole {
+        switch self {
+        case .primary:   return .primary
+        case .secondary: return .secondary
+        }
+    }
+}
+
 @MainActor
 public final class ThemedFAB: NSControl {
 
@@ -225,12 +236,7 @@ public final class ThemedFAB: NSControl {
     // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
     // (honours .mono/.rounded/.menu; the old local helper dropped two).
 
-    private var roleColor: NSColor {
-        switch role {
-        case .primary:   return palette.primary
-        case .secondary: return palette.secondary
-        }
-    }
+    private var roleColor: NSColor { palette.color(for: role.control) }
 
     /// Best-contrast ink on the role fill via PaletteKit's role accessors
     /// (`onPrimary` / `onSecondary`) — the same WCAG crossover, so a secondary
@@ -240,17 +246,6 @@ public final class ThemedFAB: NSControl {
         case .primary:   return palette.onPrimary()
         case .secondary: return palette.onSecondary()
         }
-    }
-
-    /// Black or white, whichever best contrasts a fill — a local copy of the
-    /// `onPrimary` crossover so the animated overlay is role-correct for ANY
-    /// fill (matches ThemedButton's contained overlay).
-    private func ink(on c: NSColor) -> NSColor {
-        let s = c.usingColorSpace(.sRGB) ?? c
-        let l = wcagRelativeLuminance(r: Double(s.redComponent),
-                                      g: Double(s.greenComponent),
-                                      b: Double(s.blueComponent))
-        return prefersBlackForeground(fillRelLuminance: l) ? .black : .white
     }
 
     /// Icon + extended-label ink for the current state (role contrast / muted).
@@ -273,20 +268,21 @@ public final class ThemedFAB: NSControl {
     /// contained button.
     private var overlayColor: NSColor {
         guard isEnabled else { return .clear }
-        let on = ink(on: roleColor)
+        let on = palette.bestContrast(on: roleColor)
         if fxPressed { return on.withAlphaComponent(0.12) }
         if fxHovered { return on.withAlphaComponent(0.08) }
         return .clear
     }
 
-    private struct Elevation { let opacity: Float; let radius: CGFloat; let offsetY: CGFloat }
-    /// FAB elevation: it floats HIGHER than a button (resting ≈ dp6) and only
-    /// deepens on press (≈ dp12). Hover / focus do NOT bump it (a FAB is already
-    /// raised) — with only two rungs there is no dip risk.
-    private var elevation: Elevation {
-        guard isEnabled else { return Elevation(opacity: 0, radius: 0, offsetY: 0) }
-        if fxPressed { return Elevation(opacity: 0.34, radius: 12, offsetY: -7) }
-        return Elevation(opacity: 0.30, radius: 8, offsetY: -3)
+    /// FAB elevation: it floats HIGHER than a button (resting dp8) and only
+    /// deepens on press (dp12). Hover / focus do NOT bump it (a FAB is already
+    /// raised) — with only two rungs there is no dip risk. (Rest snapped from a
+    /// bespoke 0.30 to the dp8 ladder value 0.28 in #14a — ~7% lighter, per the
+    /// #13 elevation-token plan.)
+    private var elevation: (opacity: Float, radius: CGFloat, offsetY: CGFloat) {
+        guard isEnabled else { return palette.shadow(.flat) }
+        if fxPressed { return palette.shadow(.dp12) }
+        return palette.shadow(.dp8)
     }
 
     private var showFocusRing: Bool { fxFocused }
@@ -367,9 +363,7 @@ public final class ThemedFAB: NSControl {
 
     // MARK: - Layout
 
-    private var backingScale: CGFloat {
-        window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-    }
+    private var backingScale: CGFloat { themeBackingScale }
 
     public override func layout() {
         super.layout()
@@ -433,21 +427,6 @@ public final class ThemedFAB: NSControl {
         focusRingLayer.contentsScale = s
         rebuildIcon()       // re-rasterize at the new device scale
         needsLayout = true
-    }
-
-    // MARK: - Snap-vs-animate (verbatim ThemedButton idiom)
-
-    private func layerTxn(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
-            CATransaction.setAnimationTimingFunction(
-                CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
     }
 
     // MARK: - Hover (tracking area)

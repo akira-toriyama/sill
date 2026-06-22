@@ -68,6 +68,27 @@ final class PaletteKitTests: XCTestCase {
         XCTAssertTrue(p.forceDarkAqua)
     }
 
+    // MARK: - Shared role / contrast resolvers (#14a DRY seam)
+
+    /// `color(for:)` is the single role → fill resolver the widgets share.
+    /// `neutral` ⇒ foreground (the chip's prior direct value); the rest map
+    /// 1:1 to their role field.
+    func testColorForRoleMapsToRoleFields() {
+        let p = resolve(.terminal)
+        XCTAssertEqual(p.color(for: .neutral), p.foreground)
+        XCTAssertEqual(p.color(for: .primary), p.primary)
+        XCTAssertEqual(p.color(for: .secondary), p.secondary)
+        XCTAssertEqual(p.color(for: .error), p.error)
+    }
+
+    /// `bestContrast(on:)` (now public) is the WCAG crossover the contained
+    /// widgets ink with: black on a light fill, white on a dark one.
+    func testBestContrastCrossover() {
+        let p = resolve(.terminal)
+        XCTAssertEqual(p.bestContrast(on: NSColor(hex: 0xFFFFFF)), .black)
+        XCTAssertEqual(p.bestContrast(on: NSColor(hex: 0x000000)), .white)
+    }
+
     /// bg override (shared primary/foreground, app-chosen background).
     func testBgOverride() {
         let p = resolve(.terminal, bgOverride: HexColor(0x111111))

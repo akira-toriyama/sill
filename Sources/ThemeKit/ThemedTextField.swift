@@ -217,7 +217,7 @@ public final class ThemedTextField: NSView {
         layer?.addSublayer(notchLayer)
 
         labelLayer.anchorPoint = CGPoint(x: 0, y: 0.5)   // scale toward the left
-        labelLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 2
+        labelLayer.contentsScale = themeBackingScale
         labelLayer.truncationMode = .end
         labelLayer.isWrapped = false
         layer?.addSublayer(labelLayer)
@@ -360,21 +360,6 @@ public final class ThemedTextField: NSView {
         syncPlaceholder()
         guard label != nil else { return }
         positionLabel(animated: animated)
-    }
-
-    /// Wrap layer mutations so they animate (0.16 s ease-out, like MUI) or
-    /// snap, sharing one timing for the label float + the border transition.
-    private func layerTxn(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
-            CATransaction.setAnimationTimingFunction(
-                CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
     }
 
     private func positionLabel(animated: Bool) {
@@ -520,7 +505,7 @@ public final class ThemedTextField: NSView {
     /// backing-scale change.
     public override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
-        let s = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let s = themeBackingScale
         labelLayer.contentsScale = s
         strokeLayer.contentsScale = s
     }

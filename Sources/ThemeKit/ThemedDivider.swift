@@ -110,7 +110,7 @@ public final class ThemedDivider: NSView {
         // auto-manages only the view's own backing layer. Solid-fill layers (rule /
         // gap) raster no contents, so it's cosmetic for them; we seed the rule too
         // for symmetry. Refreshed in viewDidChangeBackingProperties on a DPI change.
-        let s = NSScreen.main?.backingScaleFactor ?? 2
+        let s = themeBackingScale
 
         ruleLayer.contentsScale = s
         layer?.addSublayer(ruleLayer)         // bottom
@@ -184,9 +184,7 @@ public final class ThemedDivider: NSView {
 
     // MARK: - Device-pixel geometry
 
-    private var backingScale: CGFloat {
-        window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-    }
+    private var backingScale: CGFloat { themeBackingScale }
 
     /// Hairline thickness in points: one device pixel when `deviceHairline`, else
     /// the caller's `thickness` floored at a device pixel — so a degenerate 0 /
@@ -267,23 +265,6 @@ public final class ThemedDivider: NSView {
         ruleLayer.contentsScale = s
         labelLayer.contentsScale = s
         needsLayout = true
-    }
-
-    // MARK: - Snap-vs-animate (verbatim ThemedTextField idiom)
-
-    /// Wrap layer mutations so they SNAP (a divider never animates). Kept as a
-    /// local helper — there is no shared one; each widget re-declares it.
-    private func layerTxn(animated: Bool, _ body: () -> Void) {
-        CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(ThemedTransition.Duration.enter)
-            CATransaction.setAnimationTimingFunction(
-                CAMediaTimingFunction(name: .easeOut))
-        } else {
-            CATransaction.setDisableActions(true)
-        }
-        body()
-        CATransaction.commit()
     }
 
     // MARK: - Decorative: clicks pass through
