@@ -59,6 +59,9 @@ final class PixelArtNSView: NSView {
     /// When set (env `PRISM_CHOMP_T`), render ONE frozen frame at that absolute
     /// clock value instead of running live.
     var previewNow: Double?
+    // Live clock ORIGIN: `now` runs from this view's birth, so a fresh instance
+    // (the `↺ replay` button rebuilds the cards via `.id`) restarts at t=0.
+    private let clockStart = CACurrentMediaTime()
     private var timer: Timer?
 
     override var isFlipped: Bool { true }
@@ -86,7 +89,7 @@ final class PixelArtNSView: NSView {
         bounds.fill()
 
         // The injected clock → the discrete swaps (mouth phase + ghost pose).
-        let now = previewNow ?? CACurrentMediaTime()
+        let now = previewNow ?? (CACurrentMediaTime() - clockStart)
         let mouth = mouthHalfRad(phase: ThemedTransition.frameStep(
             now: now, hz: chompMouthHz, frames: chompMouthFrames))
         let ghostPose = ThemedTransition.frameStep(
@@ -123,6 +126,9 @@ final class PixelArtNSView: NSView {
 final class LinePetWalkNSView: NSView {
     var petScale: CGFloat = 1.6
     var previewNow: Double?
+    // Live clock ORIGIN: `now` runs from this view's birth, so a fresh instance
+    // (the `↺ replay` button rebuilds the cards via `.id`) restarts at t=0.
+    private let clockStart = CACurrentMediaTime()
     private var timer: Timer?
 
     override func viewDidMoveToWindow() {
@@ -136,7 +142,7 @@ final class LinePetWalkNSView: NSView {
         guard bounds.width > 1, bounds.height > 1 else { return }
         NSColor(white: 0.04, alpha: 1).setFill()
         bounds.fill()
-        let now = previewNow ?? CACurrentMediaTime()
+        let now = previewNow ?? (CACurrentMediaTime() - clockStart)
         let track = bounds.insetBy(dx: 18 * uiScale, dy: 18 * uiScale)
         drawLinePets([.chomp, .ghost], on: track, now: now,
                      scale: petScale * uiScale, speed: 70 * uiScale)
@@ -177,6 +183,9 @@ struct LinePetWalkView: NSViewRepresentable {
 /// enough to read the gaze; `isFlipped` so row 0 (the dome) sits at the TOP.
 final class DirectionalGhostNSView: NSView {
     var previewNow: Double?
+    // Live clock ORIGIN: `now` runs from this view's birth, so a fresh instance
+    // (the `↺ replay` button rebuilds the cards via `.id`) restarts at t=0.
+    private let clockStart = CACurrentMediaTime()
     private var timer: Timer?
 
     override var isFlipped: Bool { true }
@@ -196,7 +205,7 @@ final class DirectionalGhostNSView: NSView {
         guard bounds.width > 1, bounds.height > 1 else { return }
         NSColor(white: 0.04, alpha: 1).setFill()
         bounds.fill()
-        let now = previewNow ?? CACurrentMediaTime()
+        let now = previewNow ?? (CACurrentMediaTime() - clockStart)
         var x = pad
         for look in [GhostLook.up, .right, .down, .left] {
             let pose = ThemedTransition.frameStep(
@@ -239,6 +248,9 @@ final class PathPetNSView: NSView {
     var valid = true
     var petScale: CGFloat = 2.4
     var previewNow: Double?
+    // Live clock ORIGIN: `now` runs from this view's birth, so a fresh instance
+    // (the `↺ replay` button rebuilds the cards via `.id`) restarts at t=0.
+    private let clockStart = CACurrentMediaTime()
     private var timer: Timer?
 
     override func viewDidMoveToWindow() {
@@ -252,7 +264,7 @@ final class PathPetNSView: NSView {
         guard bounds.width > 1, bounds.height > 1 else { return }
         NSColor(white: 0.04, alpha: 1).setFill()
         bounds.fill()
-        let now = previewNow ?? CACurrentMediaTime()
+        let now = previewNow ?? (CACurrentMediaTime() - clockStart)
         let track = bounds.insetBy(dx: 26 * uiScale, dy: 22 * uiScale)
         // faceLag ≈ one pac diameter (footprint 14pt × petScale) so the head
         // clearly leads the face by a body length at any tier; 0 for the ghost.
@@ -319,7 +331,11 @@ private func orthogonalMazePath(in r: CGRect, lanes: Int = 3) -> [CGPoint] {
 final class CorridorNSView: NSView {
     var valid = true
     var tier: ScaleTier = .s
+    var showBonuses = true
     var previewNow: Double?
+    // Live clock ORIGIN: `now` runs from this view's birth, so a fresh instance
+    // (the `↺ replay` button rebuilds the cards via `.id`) restarts at t=0.
+    private let clockStart = CACurrentMediaTime()
     private var timer: Timer?
 
     override func viewDidMoveToWindow() {
@@ -332,26 +348,28 @@ final class CorridorNSView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard bounds.width > 1, bounds.height > 1 else { return }
         NSColor(white: 0.04, alpha: 1).setFill(); bounds.fill()
-        let now = previewNow ?? CACurrentMediaTime()
+        let now = previewNow ?? (CACurrentMediaTime() - clockStart)
         // Inset so the widest stroke (road + both walls) clears the card edge.
         let track = bounds.insetBy(dx: 34 * uiScale, dy: 30 * uiScale)
         drawChompCorridor(orthogonalMazePath(in: track, lanes: 3),
                           now: now, valid: valid, tier: tier, scale: uiScale,
-                          speed: 64 * uiScale, icon: corridorBonusIcon)
+                          speed: 64 * uiScale, icon: corridorBonusIcon,
+                          showBonuses: showBonuses)
     }
 }
 
 struct NeonCorridorView: NSViewRepresentable {
     var valid = true
     var tier: ScaleTier = .s
+    var showBonuses = true
     func makeNSView(context: Context) -> CorridorNSView {
         let v = CorridorNSView()
-        v.valid = valid; v.tier = tier
+        v.valid = valid; v.tier = tier; v.showBonuses = showBonuses
         v.previewNow = chompFreezeNow
         return v
     }
     func updateNSView(_ v: CorridorNSView, context: Context) {
-        v.valid = valid; v.tier = tier; v.needsDisplay = true
+        v.valid = valid; v.tier = tier; v.showBonuses = showBonuses; v.needsDisplay = true
     }
 }
 
@@ -363,6 +381,9 @@ struct NeonCorridorView: NSViewRepresentable {
 /// at a small scale (the verification-gate view). Theme-invariant by design.
 struct MockPixelArt: View {
     let p: ResolvedPalette
+    /// Bumped by the `↺ replay` button — re-identifies the live cards so they
+    /// rebuild and restart their animation clocks from t=0.
+    @State private var replay = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -371,8 +392,25 @@ struct MockPixelArt: View {
                     .font(sysFont(9, weight: .semibold, design: .monospaced))
                     .foregroundColor(Color(nsColor: p.muted))
                 liveDot
+                Spacer(minLength: 6)
+                replayButton
             }
 
+            cards.id(replay)   // ↺ replay rebuilds every live card → clocks reset to t=0
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10)
+            .fill(Color(nsColor: p.background ?? .underPageBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 10)
+            .stroke(Color(nsColor: p.border), lineWidth: 1))
+    }
+
+    /// All the live cards, grouped so `↺ replay` can reset them as a unit: bumping
+    /// `replay` gives this subtree a fresh identity, so SwiftUI rebuilds the NSViews
+    /// and each one's `clockStart` re-captures `now` — the animation plays from t=0.
+    @ViewBuilder private var cards: some View {
+        VStack(alignment: .leading, spacing: 9) {
             PixelArtFieldView()
                 // The NSView's interior metrics (unit/pad/gap/rowGap) are ALL × uiScale,
                 // so the host frame must scale with the gallery knob too. Interior bottom
@@ -450,11 +488,11 @@ struct MockPixelArt: View {
                     .stroke(Color(nsColor: p.border), lineWidth: 1))
                 .clipShape(RoundedRectangle(cornerRadius: 7))
 
-            Text("mismatch corridor — the gesture matched no rule: the panicking Blinky walks the same maze (valid == false):")
+            Text("mismatch corridor — the gesture matched no rule: the panicking Blinky walks the same maze (valid == false). Dots only (no cherry / icon bonuses — the ghost never eats):")
                 .font(sysFont(7.5, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
-            NeonCorridorView(valid: false, tier: .s)
+            NeonCorridorView(valid: false, tier: .s, showBonuses: false)
                 .frame(height: 120 * uiScale)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: 7)
@@ -467,12 +505,18 @@ struct MockPixelArt: View {
                 .font(sysFont(7.5, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10)
-            .fill(Color(nsColor: p.background ?? .underPageBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .stroke(Color(nsColor: p.border), lineWidth: 1))
+    }
+
+    /// The ↺ replay control — restarts every live card from the beginning (bumps
+    /// `replay`, which re-identifies `cards`). "最初から見たい" gate convenience.
+    private var replayButton: some View {
+        Button { replay += 1 } label: {
+            Text("↺ replay")
+                .font(sysFont(8, weight: .bold, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.primary))
+        }
+        .buttonStyle(.plain)
+        .help("最初から再生")
     }
 
     private var liveDot: some View {

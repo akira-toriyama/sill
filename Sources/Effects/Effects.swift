@@ -633,11 +633,14 @@ private func drawCorridorIcon(_ icon: NSImage, at c: CGPoint, box: CGFloat) {
 /// NON-flipped (y-up) view (the `drawChompPath` contract) so the sprites stand
 /// upright; `now` is injected (deterministic freeze / XCTest). `icon` (optional,
 /// pre-resolved) is the app-icon bonus; nil falls back to a plain pellet there.
+/// `showBonuses` false makes EVERY pellet a plain dot (no cherry / icon) — the
+/// mismatch (panicking-ghost) corridor wants a quiet dots-only row, since the
+/// ghost never eats and the bonus decals just clutter it.
 @MainActor
 public func drawChompCorridor(_ path: [CGPoint], now: CFTimeInterval,
                               valid: Bool = true, tier: ScaleTier = .m,
                               scale: CGFloat = 1, speed: CGFloat = 60,
-                              icon: NSImage? = nil) {
+                              icon: NSImage? = nil, showBonuses: Bool = true) {
     guard path.count >= 2 else { return }
     // `tier` is the discrete arcade step (2/3/4.5); `scale` is the render
     // resolution (a host's device / gallery knob) — both legitimately multiply.
@@ -675,7 +678,8 @@ public func drawChompCorridor(_ path: [CGPoint], now: CFTimeInterval,
         let arc = min(Double(i) * Double(pelletGap), total)
         let ix = Int(m.point.x.rounded()), iy = Int(m.point.y.rounded())
         let h = positionHash01(x: ix, y: iy)
-        let kind: Kind = h < 0.04 ? .cherry : (h < 0.08 && icon != nil ? .icon : .dot)
+        let kind: Kind = !showBonuses ? .dot
+                       : (h < 0.04 ? .cherry : (h < 0.08 && icon != nil ? .icon : .dot))
         pellets.append(Pellet(point: pt, arc: arc, kind: kind,
                               value: bonusValue(x: ix, y: iy)))
     }

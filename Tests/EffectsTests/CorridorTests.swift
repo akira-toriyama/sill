@@ -74,7 +74,9 @@ final class CorridorTests: XCTestCase {
         let img = NSImage(size: NSSize(width: 200, height: 100))
         img.lockFocus()
         drawChompCorridor(path, now: 1.3, valid: true, tier: .s, scale: 1, speed: 60)
-        drawChompCorridor(path, now: 2.7, valid: false, tier: .s, scale: 1, speed: 60)
+        // mismatch ghost corridor: dots only (no cherry / icon bonuses).
+        drawChompCorridor(path, now: 2.7, valid: false, tier: .s, scale: 1, speed: 60,
+                          showBonuses: false)
         img.unlockFocus()
         XCTAssertEqual(img.size.height, 100, accuracy: 1e-9)
     }
