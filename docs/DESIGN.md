@@ -516,6 +516,23 @@ unit-tested but **UI behaviour is proven live in `prism`** — every widget expo
 `preview…` overrides (`previewHovered` / `previewFocused` / `previewOpen` /
 `previewFrozen` / …) that force a deterministic state for a static screenshot.
 
+A new widget MUST also satisfy:
+
+- **Accessibility contract:** set `role`, `label`, `value` (if stateful), and an
+  `enabled` state that reflects `isEnabled`; and `postAXValueChanged()` (Shared.swift)
+  at each **committed** value/selection change — never on a transient highlight/hover
+  or per keystroke (that floods VoiceOver). Decorative parts (Border/Divider/Skeleton/
+  Scroller) are exempt.
+- **controlled/uncontrolled seam (two doors):** the plain property assignment is
+  SILENT; a parallel firing setter (`selectRow` / `setChecked(_:notifying:)` /
+  `commitSelection` / `setText(_:notifying:)`) notifies. The host drives a controlled
+  component by re-assigning the value from inside the callback. Do NOT introduce a
+  `@Binding`-style wrapper (it breaks plain-property callers).
+- **Pure core for complex state:** if the widget owns non-trivial selection/highlight/
+  filter logic, put that logic in `ListCore` (Foundation-only, Sendable, AppKit-free)
+  with XCTest, and keep the AppKit widget a thin wrapper — both today's AppKit widget
+  and tomorrow's SwiftUI view (#16/#17) share one tested core.
+
 ### Versioning at 1.0
 
 1.0 marks the widget kit **complete and its API stable**. Pre-1.0 a minor could
