@@ -50,10 +50,14 @@ final class ListDnDTests: XCTestCase {
         let secRows: [ListRow<String>] = [
             ListRow(id: "A", kind: .sectionHeader()), ListRow(id: "a1"),
             ListRow(id: "B", kind: .sectionHeader()), ListRow(id: "b1"),
+            ListRow(id: "C", kind: .sectionHeader()), ListRow(id: "c1"),
         ]
         let cands = dragCandidates(source: "A", rows: secRows, mode: .both,
                                    chunkIDs: ["A", "a1"], validate: yes).map(\.placement)
-        XCTAssertEqual(cands, [.between(beforeID: "B"), .between(beforeID: nil)],
-                       "a chunk lift aims at section gaps + the end gap only")
+        // Chunk A+a1 sits at the top: the gap before B is the chunk's OWN trailing
+        // no-move slot (rejected by isInsideChunk); valid targets are the gap before C
+        // and the end gap. A chunk lift aims at section gaps minus its own no-move slots.
+        XCTAssertEqual(cands, [.between(beforeID: "C"), .between(beforeID: nil)],
+                       "a chunk lift aims at section gaps + the end gap, excluding its own no-move slot")
     }
 }
