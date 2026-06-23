@@ -441,6 +441,20 @@ public final class ThemedComboBox: NSObject {
         onSelect?(Item(id: text, label: text))
     }
 
+    /// Programmatic commit that FIRES `onSelect` — the firing counterpart of
+    /// assigning `selectedIndex` (silent). An out-of-range / nil index clears the
+    /// selection and fires `onSelect(nil)`. (User picks still route through
+    /// `commitItem`, which also dismisses the popup and re-asserts field focus.)
+    public func commitSelection(_ index: Int?) {
+        if let index, options.indices.contains(index) {
+            setSelection(index)          // silent: sets _selectedIndex + committedValue + field text
+            onSelect?(selectedItem)
+        } else {
+            setSelection(nil)
+            onSelect?(nil)
+        }
+    }
+
     /// Commit the actionable empty row (via the list's `onEmptyAction`) — same
     /// synchronous discipline as commitItem (beat the field's async focus
     /// reconcile), then hand the query to the consumer, which may freely re-drive
