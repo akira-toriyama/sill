@@ -4,7 +4,7 @@ import XCTest
 private struct Opt { let id: String; let label: String }
 
 final class ComboLogicTests: XCTestCase {
-    let opts = [Opt(id: "1", label: "Apple"), Opt(id: "2", label: "Apricot"), Opt(id: "3", label: "Banana")]
+    private let opts = [Opt(id: "1", label: "Apple"), Opt(id: "2", label: "Apricot"), Opt(id: "3", label: "Banana")]
 
     func testEmptyQueryKeepsAll() {
         XCTAssertEqual(comboFilter(opts, query: "", label: { $0.label }).count, 3)
