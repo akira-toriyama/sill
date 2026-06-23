@@ -675,6 +675,7 @@ public final class ThemedList: NSView {
         // reconcile): keep it if still present + selectable, else drop (silently).
         if let id = _selectedID, !(items.contains { $0.id == id && isSelectable($0) }) {
             _selectedID = nil
+            setAccessibilityValue(_selectedID) // keep AX attr current; no post (reload drop ≠ user action)
         }
         if let h = highlightedIndex, !(items.indices.contains(h) && isSelectable(items[h])) {
             highlightedIndex = isActionRowActive ? 0 : nil
