@@ -1,22 +1,27 @@
-// ThemeKitUI — SwiftUI bridge for a single (optionally animated) pixel sprite,
-// blitted by the real `Effects.drawPixelSprite` (antialias OFF — crisp cells).
+// ThemeKitUI — SwiftUI-native pixel-sprite view (nearest-neighbour, crisp cells).
 //
-// This is the shared **antialias-off blitter** the deep-dive (#17a §0.6) calls
-// for: SwiftUI `Canvas` is vector-only and can't draw per-pixel crisp cells, so a
-// thin `NSViewRepresentable` over the AppKit blitter is the intended home for an
-// app's pixel pet (facet/pet). GENERAL: pass any `PixelSprite` frames — one frame
-// is static; several swap at `hz` via `Motion`'s discrete `frameStep` (the same
-// sampler the line-pets use). `color` overrides the sprite's intrinsic palette
-// (nil = the sprite's own colours). `frozen` (absolute seconds) freezes one frame
-// for a deterministic capture. Sizes to the sprite (`pixelSize(cell:)`).
+// Replaces the #17a AppKit-backed bridge with a pure SwiftUI `View`.
+// Rendering pipeline: `pixelImage(_:color:)` (Task 2) builds a
+// 1px/cell CGImage with `.interpolation(.none)`, which `.resizable().frame(…)`
+// scales up without any blurring. Same public API as before:
+//   • `frames`, `hz`, `cell`, `color`, `frozen` — identical stored properties.
+//   • Both inits preserved verbatim.
+//   • Intrinsic size: `pixelSize(cell:)` of the first frame, expressed via
+//     `.frame(width:height:)` on the Image — same footprint that prism relies on.
+//
+// Three render branches (NO @State write during render — that's forbidden):
+//   1. Single frame (`frames.count == 1`): static Image — no TimelineView.
+//   2. Frozen (`frozen != nil`): static Image at `now = frozen!`.
+//   3. Live animation: `TimelineView(.animation)`; clock is birth-relative
+//      (`now = context.date.timeIntervalSince(start)` where `start` is a `@State`
+//      default set exactly once at init — reading it during render is fine).
 
 import SwiftUI
-import AppKit
 import PixelArt
 import Effects
 import Motion
 
-public struct PixelSpriteView: NSViewRepresentable {
+public struct PixelSpriteView: View {
     /// The animation frames; a single-element array is a static sprite.
     public var frames: [PixelSprite]
     /// Frame-swap rate (ignored when `frames.count == 1`).
@@ -42,71 +47,39 @@ public struct PixelSpriteView: NSViewRepresentable {
         self.init(frames: [sprite], cell: cell, color: color, frozen: nil)
     }
 
-    public func makeNSView(context: Context) -> PixelSpriteNSView {
-        let v = PixelSpriteNSView()
-        apply(v)
-        return v
-    }
+    // Birth timestamp — set once at view identity creation; NEVER written during
+    // render. `@State` default `Date()` is captured at the first render and stays
+    // stable for the lifetime of this view identity.
+    @State private var start = Date()
 
-    public func updateNSView(_ v: PixelSpriteNSView, context: Context) {
-        apply(v)
-        v.needsDisplay = true
-    }
-
-    public func sizeThatFits(_ proposal: ProposedViewSize, nsView: PixelSpriteNSView,
-                             context: Context) -> CGSize? {
-        frames.first?.pixelSize(cell: cell)
-    }
-
-    private func apply(_ v: PixelSpriteNSView) {
-        v.frames = frames
-        v.hz = hz
-        v.cell = cell
-        v.color = color
-        v.frozen = frozen
-        v.refreshTick()
-    }
-}
-
-/// The live host: blits `frameStep(now)`'s frame with the real `drawPixelSprite`.
-/// `isFlipped` so row 0 draws at the TOP (the grid convention). Transparent
-/// background. The timer runs only while animating (more than one frame).
-public final class PixelSpriteNSView: NSView {
-    public var frames: [PixelSprite] = []
-    public var hz: Double = CanonicalSprite.waddleHz
-    public var cell: CGFloat = 1
-    public var color: UInt32?
-    public var frozen: Double?
-
-    // Live clock ORIGIN: `now` runs from this view's birth (a rebuilt view
-    // restarts at t=0), matching the prism benches' clock contract.
-    private let clockStart = CACurrentMediaTime()
-    private var timer: Timer?
-
-    public override var isFlipped: Bool { true }
-
-    public override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if window == nil { timer?.invalidate(); timer = nil; return }
-        refreshTick()
-    }
-
-    /// (Re)start or stop the tick to match the current animate/frozen state.
-    func refreshTick() {
-        let animating = frames.count > 1 && frozen == nil && window != nil
-        if animating, timer == nil {
-            timer = startEffectTick(for: self, frozen: false)
-        } else if !animating, timer != nil {
-            timer?.invalidate(); timer = nil
+    public var body: some View {
+        if frames.isEmpty {
+            // Defensive: no frames → zero-size transparent placeholder.
+            Color.clear.frame(width: 0, height: 0)
+        } else if frames.count == 1 {
+            // ── Branch 1: single frame — pure static Image, no clock needed. ──
+            spriteImage(frames[0])
+        } else if let f = frozen {
+            // ── Branch 2: frozen — static Image at the given absolute `now`. ──
+            spriteImage(ThemedTransition.frameStep(now: f, hz: hz, frames: frames))
+        } else {
+            // ── Branch 3: live animation — birth-relative clock via TimelineView. ──
+            // `context.date.timeIntervalSince(start)` gives seconds elapsed since
+            // this view was born; `start` is read (never written) here.
+            TimelineView(.animation) { context in
+                let now = context.date.timeIntervalSince(start)
+                spriteImage(ThemedTransition.frameStep(now: now, hz: hz, frames: frames))
+            }
         }
     }
 
-    public override func draw(_ dirtyRect: NSRect) {
-        guard !frames.isEmpty, bounds.width > 0, bounds.height > 0 else { return }
-        let now = frozen ?? (CACurrentMediaTime() - clockStart)
-        let sprite = frames.count > 1
-            ? ThemedTransition.frameStep(now: now, hz: hz, frames: frames)
-            : frames[0]
-        drawPixelSprite(sprite, cell: cell, at: .zero, color: color)
+    // MARK: - Render helper
+
+    /// Render `sprite` as a nearest-neighbour Image sized to `pixelSize(cell:)`.
+    @ViewBuilder private func spriteImage(_ sprite: PixelSprite) -> some View {
+        let size = sprite.pixelSize(cell: cell)
+        pixelImage(sprite, color: color)
+            .resizable()
+            .frame(width: size.width, height: size.height)
     }
 }
