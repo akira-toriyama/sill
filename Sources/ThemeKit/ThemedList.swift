@@ -35,6 +35,12 @@ import ListCore
 import Palette
 import PaletteKit
 
+// DnD vocabulary now lives in ListCore (generic); the AppKit widget is String-keyed.
+public typealias DragMode = ListCore.DragMode
+public typealias DropPlacement = ListCore.DropPlacement<String>
+public typealias DragContext = ListCore.DragContext<String>
+public typealias DropTarget = ListCore.DropTarget<String>
+
 // MARK: - Row-model vocabulary (shared with the coming ThemedMenu)
 
 /// The role a `Badge` paints in — resolved to a palette colour at draw time.
@@ -139,61 +145,6 @@ public struct ListItem {
     /// not disabled (mirrors `isSelectable` / `isDragSource` — a disabled item is inert).
     var isCollapsibleHeader: Bool { isHeader && !isDisabled && headerCollapsed != nil }
     var isSeparator: Bool { if case .separator = kind { return true }; return false }
-}
-
-// MARK: - Drag-and-drop vocabulary (the additive, default-off drag layer)
-
-/// What kinds of drop a draggable list resolves from the pointer / keyboard aim.
-/// The DEFAULT is `.both`; a list opts into dragging at all via `draggable`.
-///   * `.dropOnto` — only `.onto(id:)` targets (facet's tree: a window row dropped
-///     ONTO a Workspace header re-homes it; headers swap onto each other). The whole
-///     target row lights.
-///   * `.reorderBetween` — only `.between(beforeID:)` targets (a future plain-list
-///     reorder): an insertion line in the gap the row would land in.
-///   * `.both` — the kit picks onto vs between by where in the row the pointer sits
-///     (top/bottom quarter ⇒ between; middle ⇒ onto), the MUI tree-DnD zone model.
-public enum DragMode: Equatable, Sendable { case dropOnto, reorderBetween, both }
-
-/// WHERE a drag would land, as resolved by the kit from the pointer zone or the
-/// keyboard aim. The host maps the row `id` onto its own domain (a window → a
-/// workspace) — the kit knows no domain (the React-component contract).
-public enum DropPlacement: Equatable, Sendable {
-    /// Dropped ONTO a row (facet: onto a Workspace header → re-home; header-to-header
-    /// swap). `id` is the target row's id.
-    case onto(id: String)
-    /// Dropped into the GAP before `beforeID` (a reorder insertion point). `nil` ⇒
-    /// after the last row (the end gap).
-    case between(beforeID: String?)
-}
-
-/// The thing being dragged. Carries the lifted row's `id` AND the full set of row
-/// ids that move together (`memberIDs`, always filled): a single-row drag is its own
-/// member (`[sourceID]`); a section-header CHUNK drag is the header followed by its
-/// child rows (`[header, …children]`). The host's `onDrop` / validator reads
-/// `memberIDs` to move the whole unit — the kit knows no domain, so whether a chunk
-/// drop becomes a positional reorder or a swap is the host's call (the React-component
-/// contract). A struct (not a bare `String`) so the layer can grow without breaking
-/// the closure signatures.
-public struct DragContext: Equatable, Sendable {
-    /// The lifted row's `id` — a chunk's header, or a single row.
-    public let sourceID: String
-    /// Every row id that moves as one unit, header-first: `[sourceID]` for a single
-    /// row, or `[header, …children]` for a chunk. NEVER empty.
-    public let memberIDs: [String]
-    public init(sourceID: String, memberIDs: [String]) {
-        self.sourceID = sourceID; self.memberIDs = memberIDs
-    }
-}
-
-/// A resolved drop target handed to `dropTargetValidator` / `onDrop`. Wraps the
-/// `placement`; a struct (rather than passing the bare `DropPlacement`) for the
-/// same forward-compatibility reason as `DragContext` — a later field (a pointer
-/// fraction, an `isExternal` flag) is additive on the struct, not a breaking change
-/// to the closure type.
-public struct DropTarget: Equatable, Sendable {
-    /// Where the drop lands.
-    public let placement: DropPlacement
-    public init(placement: DropPlacement) { self.placement = placement }
 }
 
 // MARK: - ThemedList
@@ -706,6 +657,15 @@ public final class ThemedList: NSView {
         listView?.needsDisplay = true
     }
 
+    /// The pure-core shadow of the current `items` (drops the NSImage etc.).
+    private var coreRows: [ListRow<String>] {
+        items.map { ListRow(id: $0.id, kind: $0.kind.coreKind, isDisabled: $0.isDisabled, indentLevel: $0.indentLevel) }
+    }
+    /// The per-row vertical geometry the drop resolver needs, from the cached row layout.
+    private var coreGeom: [RowGeom] {
+        rowLayout.yOffsets.indices.map { RowGeom(yOffset: rowLayout.yOffsets[$0], height: rowLayout.heights[$0]) }
+    }
+
     private func recomputeLayout() {
         var ys: [CGFloat] = [], hs: [CGFloat] = [], headers: [Int] = [], zebra: [Bool] = []
         var y: CGFloat = 0
@@ -1081,14 +1041,8 @@ public final class ThemedList: NSView {
     /// no header is at/above the top. Pure (takes the scroll y) so tests need no
     /// live window.
     func stickyHeader(atVisibleTop bandTop: CGFloat) -> (index: Int, drawY: CGFloat)? {
-        guard let active = rowLayout.headerIndices.last(where: { rowLayout.yOffsets[$0] <= bandTop }) else { return nil }
-        let hH = rowLayout.heights[active]
-        var drawY = bandTop
-        if let next = rowLayout.headerIndices.first(where: { rowLayout.yOffsets[$0] > rowLayout.yOffsets[active] }) {
-            let nextTop = rowLayout.yOffsets[next]
-            if nextTop - bandTop < hH { drawY = nextTop - hH }      // push up (may go < bandTop)
-        }
-        return (active, drawY)
+        ListCore.stickyHeader(atVisibleTop: bandTop, headerIndices: rowLayout.headerIndices,
+                              yOffsets: rowLayout.yOffsets, heights: rowLayout.heights)
     }
 
     private func scrollRowVisible(_ i: Int, position: ScrollPosition) {
@@ -1781,144 +1735,20 @@ extension ThemedList {
     /// Resolve the `DropTarget` for a pointer at `docY` (the zone model), validated.
     /// nil ⇒ no valid drop here (paint no affordance, a release is a no-op).
     fileprivate func resolveDropTarget(atDocY docY: CGFloat, source: String) -> DropTarget? {
-        guard !items.isEmpty else { return nil }
-        // A lifted CHUNK always reorders to a GAP, never ONTO a row (positional reorder
-        // only — decision ①), regardless of the list's `dragMode`; a single-row drag uses
-        // the configured mode. The pointer still lands at the precise row gap (the keyboard
-        // is the one that snaps to section boundaries).
         let mode: DragMode = dragChunkIDs.isEmpty ? dragMode : .reorderBetween
-        if docY < 0 {                                       // above the top
-            return mode == .dropOnto ? nil : validatedTarget(.between(beforeID: items[0].id), source)
-        }
-        guard let i = rowIndex(atDocY: docY) else {         // below the last row
-            return mode == .dropOnto ? nil : validatedTarget(.between(beforeID: nil), source)
-        }
-        if items[i].isSeparator { return nil }
-        let r = rowRect(i)
-        let frac = r.height > 0 ? (docY - r.minY) / r.height : 0.5    // 0 = top edge … 1 = bottom edge
-        switch mode {
-        case .dropOnto:
-            return validatedTarget(.onto(id: items[i].id), source)
-        case .reorderBetween:
-            return validatedTarget(.between(beforeID: frac < 0.5 ? items[i].id : nextRowID(after: i)), source)
-        case .both:
-            if frac < 0.25 { return validatedTarget(.between(beforeID: items[i].id), source) }
-            if frac > 0.75 { return validatedTarget(.between(beforeID: nextRowID(after: i)), source) }
-            // The middle zone is an onto; fall back to a between when onto is vetoed,
-            // so the mid-zone of a non-droppable row still offers the natural reorder.
-            return validatedTarget(.onto(id: items[i].id), source)
-                ?? validatedTarget(.between(beforeID: items[i].id), source)
-        }
+        return ListCore.resolveDropTarget(atDocY: docY, source: source, rows: coreRows, geom: coreGeom,
+                                          mode: mode, chunkIDs: dragChunkIDs,
+                                          validate: { [weak self] ctx, t in self?.dropTargetValidator?(ctx, t) ?? true })
     }
 
-    /// Wrap a placement into a validated `DropTarget`: reject the structurally-trivial
-    /// (onto self, a no-move reorder, a separator target), THEN consult the host's
-    /// domain veto. nil ⇒ not a legal drop.
-    private func validatedTarget(_ placement: DropPlacement, _ source: String) -> DropTarget? {
-        guard !isTrivialSelfDrop(placement, source) else { return nil }
-        guard !isInsideChunk(placement, source: source) else { return nil }   // a chunk can't land in itself
-        if case let .onto(id) = placement, let i = indexOf(id), items[i].isSeparator { return nil }
-        let target = DropTarget(placement: placement)
-        let ctx = DragContext(sourceID: source, memberIDs: dragChunkIDs.isEmpty ? [source] : dragChunkIDs)
-        guard dropTargetValidator?(ctx, target) ?? true else { return nil }
-        return target
-    }
-
-    /// A drop that wouldn't move the source: onto itself, or into the gap immediately
-    /// above or below itself (incl. the end gap when the source is already last).
-    private func isTrivialSelfDrop(_ placement: DropPlacement, _ source: String) -> Bool {
-        switch placement {
-        case .onto(let id):
-            return id == source
-        case .between(let beforeID):
-            guard let si = indexOf(source) else { return false }
-            return beforeID == source || beforeID == nextRowID(after: si)
-        }
-    }
-
-    /// A drop that would land a lifted CHUNK inside (or in the no-move gap of) itself —
-    /// rejected so a section can't be dropped into its own body. A no-op (false) for a
-    /// single-row drag (`dragChunkIDs` empty), which `isTrivialSelfDrop` already guards.
-    ///   * `.onto(id)` — `id` is a chunk member.
-    ///   * `.between(beforeID)` — `beforeID` is a chunk member (a gap WITHIN the chunk),
-    ///     OR the gap immediately AFTER the chunk's last member (the chunk's own slot, a
-    ///     no-op; the end gap `nil` matches when the chunk already ends the list).
-    private func isInsideChunk(_ placement: DropPlacement, source: String) -> Bool {
-        guard !dragChunkIDs.isEmpty else { return false }
-        let members = Set(dragChunkIDs)
-        switch placement {
-        case .onto(let id):
-            return members.contains(id)
-        case .between(let beforeID):
-            if let beforeID, members.contains(beforeID) { return true }   // a gap WITHIN the chunk
-            guard let lastID = dragChunkIDs.last, let li = indexOf(lastID) else { return false }
-            // The chunk's own trailing slot is a no-move: the gap immediately below the last
-            // member AND the gap before the next section header — a separator between the chunk
-            // and that header doesn't shift it, so BOTH the literal next row (the mouse form)
-            // and the next-header boundary (the keyboard candidate form) must reject. nil/end-gap
-            // matches when the chunk already ends the list.
-            var j = li + 1
-            while j < items.count, items[j].isSeparator { j += 1 }   // skip trailing separators
-            let boundaryID = j < items.count ? items[j].id : nil      // the next header, or nil = end
-            return beforeID == nextRowID(after: li) || beforeID == boundaryID
-        }
-    }
-
-    /// The ordered, validated keyboard candidates for the current source + `dragMode`:
-    /// `.dropOnto` ⇒ onto each row; `.reorderBetween` ⇒ each gap; `.both` ⇒ both,
-    /// interleaved in row order, then the end gap.
     private func dragCandidates() -> [DropTarget] {
         guard let source = drag?.sourceID else { return [] }
-        // A chunk lift aims at SECTION boundaries only (decision ②): the gap before each
-        // section header + the end gap, with the chunk's own gaps rejected by
-        // `isInsideChunk`. Reorder semantics regardless of `dragMode` — a whole section
-        // can't be dropped ONTO a row. Arrows therefore step section-by-section, not row.
-        if !dragChunkIDs.isEmpty {
-            var out: [DropTarget] = []
-            for h in rowLayout.headerIndices {
-                if let t = validatedTarget(.between(beforeID: items[h].id), source) { out.append(t) }
-            }
-            if let t = validatedTarget(.between(beforeID: nil), source) { out.append(t) }
-            return out
-        }
-        var out: [DropTarget] = []
-        for item in items where !item.isSeparator {
-            switch dragMode {
-            case .dropOnto:
-                if let t = validatedTarget(.onto(id: item.id), source) { out.append(t) }
-            case .reorderBetween:
-                if let t = validatedTarget(.between(beforeID: item.id), source) { out.append(t) }
-            case .both:
-                if let t = validatedTarget(.between(beforeID: item.id), source) { out.append(t) }
-                if let t = validatedTarget(.onto(id: item.id), source) { out.append(t) }
-            }
-        }
-        if dragMode != .dropOnto, let t = validatedTarget(.between(beforeID: nil), source) { out.append(t) }
-        return out
+        return ListCore.dragCandidates(source: source, rows: coreRows, mode: dragMode, chunkIDs: dragChunkIDs,
+                                       validate: { [weak self] ctx, t in self?.dropTargetValidator?(ctx, t) ?? true })
     }
 
-    private func nextRowID(after i: Int) -> String? {
-        let n = i + 1
-        return items.indices.contains(n) ? items[n].id : nil
-    }
-
-    /// The ids that move as a unit when the section HEADER `id` is lifted: the header
-    /// followed by every row beneath it up to (not including) the next section header —
-    /// the flat-model section body. A non-header id yields `[]` (no chunk). Separator
-    /// ids are skipped (no identity to move). A NESTED header (a header directly below
-    /// another) stops the walk at that first subsequent header (the flat section model,
-    /// intentional). A COLLAPSED section's child rows are absent from `items`, so its
-    /// chunk is the header alone — the kit moves only visible rows; the host reconciles
-    /// the hidden children in its own model (risk #1).
     private func chunkMemberIDs(forHeader id: String) -> [String] {
-        guard let start = indexOf(id), items[start].isHeader else { return [] }
-        var out = [items[start].id]
-        var i = start + 1
-        while i < items.count, !items[i].isHeader {
-            if !items[i].isSeparator { out.append(items[i].id) }
-            i += 1
-        }
-        return out
+        ListCore.chunkMemberIDs(forHeader: id, rows: coreRows)
     }
 
     /// The row a target visually references (for scroll-into-view); nil for the end gap.
@@ -2232,6 +2062,18 @@ private final class DragGhost {
     func hide() { panel.orderOut(nil) }
 }
 
+// MARK: - ListItem.Kind → RowKind bridge (pure-core projection, used by coreRows)
+
+private extension ListItem.Kind {
+    var coreKind: RowKind {
+        switch self {
+        case .row: return .row
+        case let .sectionHeader(s, c): return .sectionHeader(subtitle: s, collapsed: c)
+        case .separator: return .separator
+        }
+    }
+}
+
 // MARK: - RowLayout (cached per reload — rows have mixed heights)
 
 private struct RowLayout {
@@ -2472,7 +2314,7 @@ extension ThemedList {
     /// Whether a placement lands inside the LIVE chunk (lift a header first via
     /// `_beginMouseDrag` / `beginDrag` to seed it) — the real chunk-internal rejection.
     func _isInsideChunk(_ placement: DropPlacement, source: String) -> Bool {
-        isInsideChunk(placement, source: source)
+        ListCore.isInsideChunk(placement, source: source, rows: coreRows, chunkIDs: dragChunkIDs)
     }
     /// Route a keyDown through the real drag-key logic (consume-vs-fall-through).
     @discardableResult func _handleDragKey(_ ev: NSEvent) -> Bool { handleDragKey(ev) }
