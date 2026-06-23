@@ -1006,15 +1006,9 @@ public final class ThemedList: NSView {
         if isDragging { return }               // a lift replaces highlight nav with drop-target aim (decision e)
         if isActionRowActive { setHighlight(0); return }
         let sel = items.indices.filter { isSelectable(items[$0]) }
-        guard !sel.isEmpty else { setHighlight(nil); return }
-        let target: Int
-        if let cur = highlightedIndex, let pos = sel.firstIndex(of: cur) {
-            let n = sel.count
-            let np = wrapsHighlight ? ((pos + delta) % n + n) % n
-                                    : min(max(pos + delta, 0), n - 1)
-            target = sel[np]
-        } else {
-            target = delta > 0 ? sel.first! : sel.last!
+        guard let target = ListCore.nextHighlight(current: highlightedIndex, delta: delta,
+                                                  selectableIndices: sel, wraps: wrapsHighlight) else {
+            setHighlight(nil); return
         }
         setHighlight(target)
         scrollRowVisible(target, position: .nearest)
