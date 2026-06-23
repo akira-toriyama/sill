@@ -291,6 +291,7 @@ public final class ThemedCheckbox: ThemedControl {
         if fromUser {
             onChange?(next)
             sendActionToTarget()
+            postAXValueChanged()
         }
     }
 
@@ -302,7 +303,7 @@ public final class ThemedCheckbox: ThemedControl {
         guard isEnabled else { return }
         isIndeterminate = false
         isChecked = checked            // silent didSet (syncAccessibility + applyState)
-        if notifying { onChange?(checked); sendActionToTarget() }
+        if notifying { onChange?(checked); sendActionToTarget(); postAXValueChanged() }
     }
 }
 

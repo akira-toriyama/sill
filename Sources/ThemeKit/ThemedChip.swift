@@ -343,6 +343,7 @@ public final class ThemedChip: ThemedControl {
         setAccessibilityRole(isClickable ? .button : .staticText)
         setAccessibilityLabel(title.isEmpty ? nil : title)
         setAccessibilityEnabled(isEnabled)
+        setAccessibilityValue(isSelected ? 1 : 0)
     }
 
     override func applyInteractionState() {
@@ -569,6 +570,7 @@ public final class ThemedChip: ThemedControl {
         guard isClickable else { return }
         onTap?()
         sendActionToTarget()
+        postAXValueChanged()
     }
 }
 

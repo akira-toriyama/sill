@@ -45,4 +45,9 @@ extension NSView {
     var themeBackingScale: CGFloat {
         window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
     }
+
+    /// Announce a COMMITTED value/selection change to assistive tech (VoiceOver).
+    /// Call ONLY at firing-door sites (user-intent / `notifying:` setters) — NEVER
+    /// on every transient highlight, hover, or keystroke (that floods VoiceOver).
+    func postAXValueChanged() { NSAccessibility.post(element: self, notification: .valueChanged) }
 }

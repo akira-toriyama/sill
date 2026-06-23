@@ -792,11 +792,12 @@ public final class ThemedList: NSView {
             isSelectable: { rid in self.items.contains { $0.id == rid && self.isSelectable($0) } })
         guard didChange else { if fire { onSelectionChange?(resolved) }; return }
         _selectedID = resolved
+        setAccessibilityValue(_selectedID)
         invalidateRows([indexOf(old), indexOf(resolved)])
         // Reveal the committed row (honours the documented "scrolls into view"; a
         // no-op before layout or for an already-visible row — e.g. the click path).
         if let i = indexOf(resolved) { scrollRowVisible(i, position: .nearest) }
-        if fire { onSelectionChange?(resolved) }
+        if fire { onSelectionChange?(resolved); postAXValueChanged() }
     }
 
     // MARK: Public methods

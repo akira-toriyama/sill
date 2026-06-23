@@ -195,7 +195,9 @@ public final class ThemedButtonGroup: NSView {
     private func handleTap(_ i: Int) {
         if mode == .segmented {
             selectedIndex = i        // didSet → reconfigure() paints the sticky active treatment
+            setAccessibilityValue(selectedIndex)
             onSelect?(i)
+            postAXValueChanged()
         } else {
             onTap?(i)
         }
