@@ -3,17 +3,17 @@
 - 現行 **v1.23.0**（**#16 SwiftUI 提供層（A）完了 = `ThemeKitUI`（prism の14ウィジェット橋を公開 SwiftUI モジュールに昇格 + prism を最初の consumer に・Menu/ToolBar reshape・Field→TextField 改名）・PR #70 + `v1.23.0`・2026-06-23／**#15 ヘッドレス純粋核 + seam + a11y 完了 = `ListCore` 純粋核抽出（byte-identical 委譲）+ controlled/uncontrolled seam（firing setters）+ a11y P0/P1・PR #69 + `v1.22.0`・2026-06-23／**#14b ThemedControl 基底完了 = `ThemedControl: NSControl` に Button/FAB/Checkbox/Chip の相互作用機構を集約 + focus-ring outset トークン化・PR #68 + `v1.21.0`・2026-06-23／#14a DRY 集約完了 = PR #67 + `v1.20.0`・2026-06-22／**#13 トークン基盤完了 = pure `Space`/`Radius`/`Elevation` スケール + `PaletteKit.shadow(_:)` 解決表 + ThemeKit→`Motion` 配線・PR #65 + `v1.19.0`・2026-06-22／**#8 文字 MUI 照合完了 = MUI-grounded 内部 TypeScale + font-fidelity 修正・PR #63 + `v1.18.0`・2026-06-22／**#12 chomp「ChompCorridor」完了 = PR #62 + `v1.17.0`（Ph1–Ph5 一括 squash・ユーザー本採用 2026-06-22）**／#9d 完了 = `Gesture`（wand 由来の純粋 4-way 認識アトム）・PR #60 + `v1.16.0` tagged 2026-06-21／#9c = `TrailGeometry`・PR #59 + `v1.15.0`／#9b = `SplatterShape`・PR #58 + `v1.14.0`／#9a = `ParticleBurst.radiusSpeed`・PR #57 + `v1.13.0`／#7 = `ParticleBurst`・PR #56 + `v1.12.0`／#6 = `Motion`・PR #55／#5 = perch PR #133／#4 = perch PR #132／#3 = PR #54）。**番号が小さいほど先**にやる（ただし **#8〜11 は順番入れ替え可**＝ユーザー裁定 2026-06-20）。**#9 完了（wand effect 一式を sill へ・スコープ=full／連作 9a→9b→9c→9d ✅。9e=wand 本体移植は不要＝ユーザー裁定 2026-06-21＝sill 側 #9 は 9d で完結）。#11+#10 = ✅ 完了（PR #61・prism のみ＝タグ無し・2026-06-21）→ **#12 完了（PR #62 + `v1.17.0`・2026-06-22）→ #8 完了（PR #63 + `v1.18.0`・2026-06-22）= 全 #1–#12 完了。**
 - すべて sill 本体の作業（追加は additive・default-off）。
 - このファイルが残作業・進捗の**唯一の記録**（git 管理）。
-- **🆕 次の大型テーマ #13〜（sill 汎用化 + SwiftUI 化 + 各アプリ適用）= 着手（#13 ✅ 完了 = PR #65 + `v1.19.0`／#14a ✅ 完了 = PR #67 + `v1.20.0`・2026-06-22／#14b ✅ 完了 = PR #68 + `v1.21.0`・2026-06-23／#15 ✅ 完了 = PR #69 + `v1.22.0`・2026-06-23／#16 ✅ 完了 = PR #70 + `v1.23.0`・2026-06-23／#17〜 未着手）**。設計と根拠は [`docs/superpowers/specs/2026-06-22-sill-generalization-and-swiftui-design.md`](superpowers/specs/2026-06-22-sill-generalization-and-swiftui-design.md)（14-agent 調査 + 4観点敵対レビューで固めた版）。下の「## 次の大型テーマ」節を参照。
+- **🆕 次の大型テーマ #13〜（sill 汎用化 + SwiftUI 化 + 各アプリ適用）= 着手（#13 ✅ 完了 = PR #65 + `v1.19.0`／#14a ✅ 完了 = PR #67 + `v1.20.0`・2026-06-22／#14b ✅ 完了 = PR #68 + `v1.21.0`・2026-06-23／#15 ✅ 完了 = PR #69 + `v1.22.0`・2026-06-23／#16 ✅ 完了 = PR #70 + `v1.23.0`・2026-06-23／#16.5 で 0ベース再接地済＝旧 Phase 2/3 を破棄し新 Phase A/B に再作成）**。0ベース全17パーツ調査の根拠と設計は [`docs/superpowers/specs/2026-06-23-app-by-app-swiftui-deep-dive.md`](superpowers/specs/2026-06-23-app-by-app-swiftui-deep-dive.md)。下の「## 次の大型テーマ」節を参照。
 
 ## 次の大型テーマ — #13〜（sill 汎用化 + SwiftUI 化 + 各アプリ適用）
 
-> **設計合意済（ユーザー方向確定 2026-06-22）・着手（#13・#14a・#14b 完了／#15 ✅ 完了 = PR #69 + `v1.22.0`・2026-06-23／#16 ✅ 完了 = PR #70 + `v1.23.0`・2026-06-23／#17〜 未着手）。** 詳細設計＝上記 spec。番号小さいほど先。各フェーズはセッション分割可。**未達成は各行で明示（暗黙にしない）。**
+> **方向 確定（2026-06-23 0ベース再接地）。** Phase 1（#13–#15）+ #16（`ThemeKitUI`）完了。番号小さいほど先・各フェーズはセッション分割可。**未達成は各行で明示（暗黙にしない）。**
 >
-> **要望の再解釈（調査で確定）**: ①「ブラッシュアップ」= Radix/Tailwind/MUI の良所取り＋トークン/DRY 化。②「各アプリ適用＝脱AppKit→SwiftUI」は文字通りには不成立（5アプリ全部 100% AppKit overlay daemon・ThemeKit 利用ゼロ・SwiftUI は窓を作ると必ずアクティブ化＝非アクティブ overlay を壊す）。→ **ハイブリッド**で進める: sill に SwiftUI 層を足し、アプリは **AppKit の殻 + 中身 SwiftUI-on-sill**（`NSHostingView`）に。「脱AppKit」自体は達成しない（中身のみ SwiftUI＝ユーザー合意済）。
+> **🔁 #16.5 で旧 Phase 2/3 を破棄・再作成（2026-06-23）。** 旧計画の前提「各アプリは SwiftUI 化 不可／ThemeKit 利用ゼロ＝pure 収束のみ」は **0ベース再調査（34-agent・全17パーツ code-level）で覆った**。結論＝**全アプリの UI 層は SwiftUI/sill で組める・真の UI hard wall は実質ゼロ**（ネイティブは UI でなく裏方＝画像/入力/窓位置/データに限局）。focus/IME も VM で実証（`.nonactivatingPanel` + ThemeKitUI `TextField` は前面アプリ/メニューバーを奪わず key+IME 可）。**全17パーツの設計・裏方・要追加部品 ＝ [`docs/superpowers/specs/2026-06-23-app-by-app-swiftui-deep-dive.md`](superpowers/specs/2026-06-23-app-by-app-swiftui-deep-dive.md)。**（旧再接地メモ [`2026-06-23-roadmap-regrounding-phase2-3.md`](superpowers/specs/2026-06-23-roadmap-regrounding-phase2-3.md) の「不可」結論は本書で上書き。）
 >
-> **前提（ユーザー 2026-06-22）**: 個人開発・破壊的変更/長時間リファクタ全てOK・品質重視・プラン再作成OK。
+> **新計画 ＝ Phase A（sill の SwiftUI 部品を建てる）→ Phase B（各アプリ UI を 0ベースで SwiftUI/sill 再構築）。** apps が sill 初の本格 consumer になり sill の SwiftUI 層（`ThemeKitUI`）を牽引する＝「sill が主役・統一感」の実体化。
 >
-> **🆕 #16.5 ロードマップ再接地（2026-06-23・整理は次セッションで実行）**: #17 着手前の実コード調査（7-agent）で **5アプリ全て（facet/wand/perch/glance/halo）が `ThemeKit`/`ThemeKitUI`（ウィジェット/SwiftUI 層）を未使用**＝消費しているのは純粋/AppKit-resolver エンジン（Palette/PaletteKit/Effects/ConfigSchema/CLIKit）のみ、`ThemeKit`/`ThemeKitUI` の消費者は prism だけ、と判明。全アプリ 100% 非アクティブ overlay/daemon で SwiftUI 化の "content 窓" が無い。→ **#17（native SwiftUI B）と Phase 3（各アプリ SwiftUI 化）は実アプリ前提が無い**ため Phase 2/3 を再枠組みする（#17 をクリティカルパスから外す／Phase 3 を「各アプリの自前重複→pure モジュール収束」に・残対象は小〔主に wand `NSColorParse`→`PaletteKit`〕）。**根拠・実行プラン・open questions = [`docs/superpowers/specs/2026-06-23-roadmap-regrounding-phase2-3.md`](superpowers/specs/2026-06-23-roadmap-regrounding-phase2-3.md)。下の Phase 2/3 記述は #16.5 で書き換え予定（現状は旧計画のまま）。**
+> **前提（ユーザー 2026-06-22/23）**: 個人開発・**0ベース／破壊的変更／長時間リファクタ 全て OK**・最高品質・プラン再作成 OK・可能な限り SwiftUI（`ThemeKitUI`）へ寄せる。
 
 ### Phase 1 — sill ブラッシュアップ（全部 sill 内・additive/リファクタ・B の前工事）
 - **#13 トークン基盤 — ✅ 完了（PR #65 + `v1.19.0`・2026-06-22／スコープ=ユーザー裁定「A 推奨バランス」）。** pure `Palette` に `Space`(2/4/6/8/12/16)・`Radius`(2/4/6/8/12) を static-let ramp（`ThemedTransition.Duration` 流儀・Tailwind/MUI grounding）＋ `ElevationToken`/`Elevation`(flat/dp2…dp12＝Button/FAB/Group の実 shadow 値) を TypeToken/TypeRole 流儀＋ `ScaleStep`（全 Sendable・Double・config 非依存）。`PaletteKit` に `ResolvedPalette.shadow(_:)→(opacity,radius,offsetY)` 解決表（`uiFont(_:)` 同型・dy を y-up 用に符号反転）。**配線**: ThemeKit に `Motion` 依存追加（acyclic）・9 widget の `setAnimationDuration(0.16)`→`Duration.enter`・combo/tooltip `PopupFade` を `exit`/`enter` へ（**値不変=feel 不変**）。menu 0.14 はトークン無しで据置・easing は system `.easeOut` 据置（`Easing.standard` 化と shared `layerTransaction` は #14a）。14 ファイルの散乱 radius/gap をトークン化（**値完全保持**・例外は承認済2スナップ keycap5→4／drop-onto5→6 のみ・coupled radii は同値維持）。prism `.palette` に `TokenSpecimen`（3スケール live＋Elevation 行が `shadow(_:)` を駆動）。pure `TokenScaleTests`＋`ElevationResolveTests`（CI のみ）。**繰延（spec 通り #14a）**: Elevation widget 適用（inline struct 統合）・shared `layerTransaction`・`bestContrast` public 化。control-size/密度 Metrics・1〜3px hairline・off-grid(3/5/10/72) は温存（対象外）。検証=`swift build` 緑＋敵対的レビュー（4観点×独立検証・12 agent＝8件→確定 nit 4件修正→0）＋CI 緑。**ライブ目視（2スナップ＋TokenSpecimen）はユーザー委譲**（agent 画面収録不可・[[prism-bench]]＝`.palette` タブ）。**halo タッチアップは随時＝未着手**（#13 トークン消費先）。
@@ -24,17 +24,31 @@
 
 ### Phase 2 — sill を SwiftUI 化（A→B）
 - **#16 SwiftUI 提供層（A）= ✅ 完了（PR #70 + `v1.23.0`・2026-06-23）。** prism の**ウィジェット橋 14個**を新規公開モジュール **`ThemeKitUI`**（sill で初の `import SwiftUI` 層・deps=ThemeKit/PaletteKit/Effects）に昇格＝Border/Button/ButtonGroup/Checkbox/Chip/Divider/TextField/FAB/Skeleton/ComboBox/Tooltip/List/Menu/ToolBar。各橋は `public struct` + 明示 `public init`（SwiftUI の memberwise init は internal）+ public protocol witness + 必要箇所は public Coordinator・CLT 安全（`#Preview` 不使用）。**prism を最初の consumer に**＝in-tree 橋を削除し `import ThemeKitUI`（ドリフトゼロ）。Effects/PixelArt の**デモ橋**（ParticleFieldView/SplatterFieldView/PixelArt*/HeavyRule/IconBarView…）は prism 据え置き（Effects/PixelArt/Motion を引き込むため除外）。**2橋を一般公開コンポーネントに reshape**（1:1 移動でなく＝[[kit-component-philosophy]]）: `ThemedMenuTriggerView` は caller の `[ThemedMenu.MenuItem]`（+title/trailingSymbol）を受け、`ThemedToolBarView` は public nested `Item` value descriptor を公開（`ThemedToolBar.Item` は `.custom(NSView)` 持ち＝SwiftUI 更新を跨げない）。**改名**（public 面の統一・[[build-best-then-migrate]]）: `ListView`→`ThemedListView`・`MenuTriggerView`→`ThemedMenuTriggerView`・`ThemedFieldView`→`ThemedTextFieldView`。palette は `Color(nsColor:)`/`ResolvedPalette` のまま（動的 appearance・@MainActor resolver）。**palette→Color 便利機能は #17 に先送り**（消費者1つ＝rule-of-three 未達）。**テストターゲット無し**（純 `@MainActor` コード移動・headless ロジックは ListCore/ThemeKitTests が網羅・XCTest は CI のみ）。検証＝`swift build` 緑 + **7観点敵対的レビュー（26 agent・finding 毎に独立スケプティック検証）= 確定 minor/nit 4件修正**（menu items reactivity・死んだ Palette 直接依存除去・Field→TextField 改名・seed-once doc）**・誤検出15件棄却**（clean-move 12橋は挙動バイト等価を確認）+ **CI 緑（full Xcode `swift test` + lint）**。**prism ライブ目視 maintainer ゲートは waive**（ユーザー判断 2026-06-23＝バイト等価移動で描画不変・PR #70 本文にチェックリスト）。**将来（暗黙にしない）**: #17 ネイティブ SwiftUI 部品（B）+ Phase 3 アプリ適用（#16 依存・#17 非依存）。`ThemedMenuTriggerView` の固定トリガ frame・`ThemedToolBarView.Item` の image case 欠如は #17/将来の汎用化で対応可。
-- **#17 ネイティブ SwiftUI 部品（B・部品ごと）** — #13+#15 後。簡単（Divider/Chip/Skeleton）→ 複雑（TextField/ComboBox/ToolBar）は当面 A ラップ。**決定論プレビュー seam を実装**。**アニメ/見た目は maintainer 実機確認ゲート**（[[chomp-push-gate]] 同型・agent は画面収録不可）。Effects/装飾の Canvas 化はスコープ外（当面 AppKit ラップ）。
+### Phase A — sill の SwiftUI 部品を建てる（#17 を再定義・拡張）
+> 0ベース audit が出した「各アプリ再構築に必要だが sill にまだ無い SwiftUI 部品」を建てる工程。`ThemeKitUI` を本物の SwiftUI 部品ライブラリへ育てる。番号は仮。各部品は prism で live 検証→アプリが consumer に。**ネイティブ純正で足りない表現は ThemeKitUI 橋（`NSViewRepresentable` で実 AppKit/CG を内包）で実現してよい＝「SwiftUI UI 層＋薄い裏方」。** 各部品の要求元は deep-dive memo の §0.6。
+- **#17a Canvas 粒子/スプライト/line-pets システム**（`Effects`→SwiftUI `Canvas` 橋）— ★最優先・最頻出（wand trail/arcade・perch particle・halo ring・facet pet/line-pets が共有）。閉形式 `f(now)` の既存 `Effects`/`ParticleBurst`/`TrailGeometry`/`PixelArt` を SwiftUI Canvas で描く橋＋決定論プレビュー seam。
+- **#17b `ThemedList` 強化** — キーボード nav（`onKeyPress`: ↑↓/Space/Return/Esc）・折りたたみ section header（アニメ）・multi-select（複数行ドラッグ）・drag-ghost overlay ヘルパ・sticky header 強化。facet tree/grid・wand launcher が要求（ListCore は元々 facet tree をモデルに設計＝最有力消費者）。
+- **#17c `BlurBackdropView`** — `NSVisualEffectView`(.menu/.hud)＋mask の SwiftUI 橋。wand/perch/glance が要求。
+- **#17d `AnimatedBorderView`** — 虹/グラデの animated border（`ThemedBorder`/`Effects` 駆動）。wand 枠・facet chrome が要求。
+- **#17e サムネ Grid 部品** — ScreenCaptureKit 画像を並べる themed grid（facet grid/rail）。
+- **#17f `MarkdownKit`** — glance 用: `AttributedString` 橋・**GFM 表（`LazyVGrid`・sticky/CJK 対応）**・角丸 code block/blockquote Shape・Highlightr 橋。glance の唯一の表組み課題を sill 側で解く道（薄 `NSTextView` backend を採るなら本項目は任意）。
+- **#17g 小物** — `ThemedPill`・cascade/radial menu placement・search-pill badge・`DisplayLink`→Combine ユーティリティ。
+- **決定論プレビュー seam**（各部品）＋**アニメ/見た目は maintainer 実機確認ゲート**（[[chomp-push-gate]] 同型・agent は画面収録不可・[[prism-bench]]）。
 
-### Phase 3 — 各アプリへ適用（各 app repo の follow-up・殻は AppKit のまま・**#16 依存/#17 非依存**）
-> 順 = **glance → perch → wand → facet（facet 最後・ユーザー指示）**。halo は描画のみで SwiftUI 検証にならず先頭から除外（#13 トークン消費のタッチアップ）。**facet/wand 着手前に「非 key パネル内 SwiftUI 入力（TextField/focus-ring/@FocusState）」の spike 必須。**
-- **#18 glance** — 先頭・最小（~2k LOC）・既に PaletteKit 消費・実 NSPanel chrome＝`NSHostingView` 検証台。
-- **#19 perch** — overlay/eventtap/AX 殻維持・ヒント pill 描画の sill 化。
-- **#20 wand** — overlay/launcher 殻維持・中身 sill 化 + `NSColorParse`→`PaletteKit` 収束。
-- **#21 facet** — 最大（~9k LOC）・最後。KeyablePanel/overlay/AX 殻維持・sidebar/grid/rail を SwiftUI-on-sill 再構築・自前 `ThemedScroller` 等を sill へ収束。
+### Phase B — 各アプリ UI を 0ベースで SwiftUI/sill 再構築（各 app repo follow-up）
+> 旧 Phase 3 を破棄して再作成。各アプリの UI を**ゼロから** SwiftUI/sill で組み直す。ネイティブは UI でなく**裏方**（ScreenCaptureKit=画像・CGEventTap=入力・SkyLight=窓位置・AX=データ）に限局し、`NSHostingView` で SwiftUI を載せる。各パーツの設計/裏方/要追加部品＝deep-dive memo §1–§5。**順 = 確実な pilot から**（旧「facet 最後」は破棄）。
+- **#18 facet pilot — search-bar → tree**（pilot・effort S→M）: search-bar は ThemeKitUI `TextField` 即適用（IME 実証済）。tree は `ThemedList`＝#17b の実地検証。SF Symbols→sill phosphor 収束も同時。**ここで SwiftUI-on-sill の seam を実証**してから横展開。
+- **#19 halo**（単純・早期検証向き）: リング+glow+line-pets を SwiftUI Canvas(#17a)。裏方=SkyLight(位置)。pure `Effects` 消費の理想形。
+- **#20 wand**: launcher を SwiftUI メニュー/グリッド・trail/arcade を Canvas(#17a)・枠を `AnimatedBorder`(#17d)・blur(#17c)。裏方=CGEventTap。**+ `NSColorParse`→`PaletteKit` 収束（pure）**。
+- **#21 perch**: hint pill/grid を `ThemedPill`(#17g)+Canvas(#17a)・search を本物の検索 UI に。裏方=CGEventTap/AX/OverlayCoords・**never-key は窓属性（裏方）で両立**。
+- **#22 glance**（最後・#17f 依存）: markdown を `MarkdownKit`(#17f)（or 薄 `NSTextView` backend）・chrome を SwiftUI（key≠active は実証済）。
+- **2つの注意（hard wall ではない）**: facet pet のアンチエイリアス OFF ドット絵＝小さな `NSViewRepresentable` blitter を残す／glance GFM 表＝#17f or 薄 `NSTextView`。
 
 ### 順序・依存（要点）
-- クリティカルパス **#13 → #15 → #17**。#14a と #16(A) は並行可。#14b は #13 後、#17(B) は #13+#15 後。Phase 3 は **#16 依存・#17 非依存**（早期アプリは A で着手・B は裏で並行）。
+- **Phase A（sill 部品）→ Phase B（アプリ再構築）。** Phase A 最優先 = **#17a Canvas 粒子系**（5アプリ横断）＋**#17b `ThemedList` 強化**（facet pilot の前提）。
+- Phase B は **facet pilot（#18 search→tree）で seam を実証**してから横展開。halo(#19) は単純で早期検証向き。glance(#22) は #17f 完成後。
+- pure 収束（wand `NSColorParse`→`PaletteKit` 等）は Phase 横断で随時。
+- **破棄**: 旧クリティカルパス「#13→#15→#17」・「ハイブリッド（AppKit 殻＋中身だけ SwiftUI）」・「Phase 3＝pure 収束のみ」。0ベースでは UI 全体が SwiftUI/sill。
 
 ## 🧭 現在地（引き継ぎ — 最新セッション 2026-06-21）
 
