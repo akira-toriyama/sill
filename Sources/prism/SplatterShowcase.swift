@@ -1,10 +1,11 @@
 // prism — the LIVE ink-splatter bench (now a CONSUMER of ThemeKitUI).
 //
-// `Effects`' `SplatterShape` (rollSplatter → alpha(now:) → drawInkSplatter) is
-// pure geometry + a draw helper. #17a promoted the live host into the public
-// `ThemeKitUI.InkSplatterView` (a thin `NSViewRepresentable` owning the redraw
-// clock + painting the REAL `drawInkSplatter`); prism just drives it (drift-zero,
-// the #16 pattern). It re-stamps a fresh splat on a fixed period and fades it
+// `Effects`' `SplatterShape` (rollSplatter → alpha(now:) → vertices) is pure
+// geometry. #17a promoted the live host into the public
+// `ThemeKitUI.InkSplatterView`; #17h made it SwiftUI-native (a `View` rendering
+// the splat with a `Canvas` + Catmull-Rom `Path`, the clock from
+// `TimelineView(.animation)`); prism just drives it (drift-zero, the #16
+// pattern). It re-stamps a fresh splat on a fixed period and fades it
 // (hold ⅔ → fade ⅓). Theme-tinted: the splat units pick from the card's accent +
 // festive hues, so a single stamp can land 2–3 differently-coloured splats.
 //

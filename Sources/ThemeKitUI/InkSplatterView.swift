@@ -1,9 +1,5 @@
-// ThemeKitUI — SwiftUI bridge for `Effects`' ink-splatter decal
-// (`rollSplatter` → `alpha(now:)` → the real AppKit `drawInkSplatter`). Pure
-// geometry + a draw helper, so the bridge OWNS the redraw clock and re-stamps a
-// fresh splat on a fixed cadence (hold ⅔ → fade ⅓), painting it each frame. The
-// renderer is `NSBezierPath`/`NSColor` (Catmull-Rom wet rim), so this is a
-// `NSViewRepresentable` — byte-identical to the AppKit draw.
+// ThemeKitUI — SwiftUI-native ink-splatter decal bridge
+// (`rollSplatter` → `alpha(now:)` → SwiftUI Canvas + Catmull-Rom Path).
 //
 // GENERAL by design: colours, the stamp `center`/`size` (bounds-relative
 // closures), `seed`, `duration` and loop cadence are inputs — an app stamps a
@@ -11,12 +7,18 @@
 // gets the same pixels. `frozen` (0…1 of `duration`) freezes one held frame;
 // when frozen without an explicit `seed` a stable default keeps it deterministic
 // (prism's old fixed-seed capture).
+//
+// Live mode: `TimelineView(.animation)` drives the Canvas; the splat is a PURE
+// derivation of `now` — the cadence index (`floor(now/loopPeriod)`) picks a
+// deterministic per-cadence seed (golden-ratio mix), so a new splat rolls each
+// cadence and is stable within it, with NO state mutation during render (the
+// f(now)/replayable contract). Frozen mode: no TimelineView — one static Canvas
+// frame with the stable seed and the frozen fraction.
 
 import SwiftUI
-import AppKit
 import Effects
 
-public struct InkSplatterView: NSViewRepresentable {
+public struct InkSplatterView: View {
     public var colors: [UInt32]
     /// Where the splat stamps, from the view's bounds. Default = centre.
     public var center: (CGRect) -> CGPoint
@@ -50,79 +52,99 @@ public struct InkSplatterView: NSViewRepresentable {
         self.size = size
     }
 
-    public func makeNSView(context: Context) -> InkSplatterNSView {
-        let v = InkSplatterNSView()
-        apply(v)
-        return v
-    }
-
-    public func updateNSView(_ v: InkSplatterNSView, context: Context) {
-        apply(v)
-        v.needsDisplay = true
-    }
-
-    private func apply(_ v: InkSplatterNSView) {
-        v.colors = colors
-        v.center = center
-        v.size = size
-        v.seed = seed
-        v.duration = duration
-        v.loopPeriod = loopPeriod
-        v.frozen = frozen
-    }
-}
-
-/// The live host: re-stamps a fresh `SplatterShape` at its configured centre and
-/// paints it with `drawInkSplatter`. Owns a 60 Hz redraw timer; honours `frozen`
-/// for a deterministic capture. Transparent background.
-public final class InkSplatterNSView: NSView {
-    public var colors: [UInt32] = [] { didSet { needsDisplay = true } }
-    public var center: (CGRect) -> CGPoint = { CGPoint(x: $0.midX, y: $0.midY) }
-    public var size: (CGRect) -> Double = { Double(min($0.width, $0.height)) * 0.78 }
-    public var seed: UInt64?
-    public var duration: TimeInterval = 1.4
-    public var loopPeriod: Double?
-    public var frozen: Double?
-
-    private var shape: SplatterShape?
-    private var timer: Timer?
-
-    public override var isFlipped: Bool { true }
-
-    public override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if window == nil { timer?.invalidate(); timer = nil; return }
-        guard timer == nil else { return }
-        timer = startEffectTick(for: self, frozen: frozen != nil)
-    }
-
-    public override func draw(_ dirtyRect: NSRect) {
-        guard bounds.width > 1, bounds.height > 1 else { return }
-        let c = center(bounds)
-        let sz = size(bounds)
-
-        // Freeze mode — one deterministic frame (stable seed + held opacity).
+    public var body: some View {
         if let f = frozen {
-            let s = shape ?? rollSplatter(at: c, size: sz, colors: colors,
-                                          seed: seed ?? InkSplatterView.frozenSeedDefault,
-                                          now: 0, duration: duration)
-            shape = s
-            drawInkSplatter(s, now: max(0, min(1, f)) * duration)
-            return
-        }
-
-        // Live — re-stamp once, or every `loopPeriod` (pop, hold, fade, beat).
-        let now = CACurrentMediaTime()
-        let reroll: Bool
-        if let period = loopPeriod {
-            reroll = shape == nil || now - (shape?.startedAt ?? 0) >= period
+            // Static frozen frame — no animation clock needed.
+            Canvas { ctx, size in
+                let bounds = CGRect(origin: .zero, size: size)
+                let c = center(bounds)
+                let sz = self.size(bounds)
+                let shape = rollSplatter(at: c, size: sz, colors: colors,
+                                         seed: seed ?? InkSplatterView.frozenSeedDefault,
+                                         now: 0, duration: duration)
+                let frozenNow = max(0, min(1, f)) * duration
+                drawSplat(shape, now: frozenNow, into: &ctx)
+            }
         } else {
-            reroll = shape == nil
+            // Live mode — TimelineView drives the animation clock. The stamp is a
+            // PURE derivation of `now` (no @State write during render — that's
+            // forbidden in SwiftUI). Each cadence rolls a deterministic, replayable
+            // splat from a per-cadence seed; the index changes per cadence so the
+            // shape varies, but it never re-rolls (and never flickers) within a frame.
+            TimelineView(.animation) { timeline in
+                Canvas { ctx, size in
+                    let now = timeline.date.timeIntervalSinceReferenceDate
+                    let bounds = CGRect(origin: .zero, size: size)
+                    let c = center(bounds)
+                    let sz = self.size(bounds)
+
+                    // Which cadence are we in, and when did it stamp?
+                    let cadenceIndex: UInt64
+                    let stampNow: Double
+                    if let period = loopPeriod, period > 0 {
+                        cadenceIndex = UInt64(max(0, floor(now / period)))
+                        stampNow = Double(cadenceIndex) * period
+                    } else {
+                        cadenceIndex = 0
+                        stampNow = 0
+                    }
+
+                    // Deterministic per-cadence seed (no randomness during render).
+                    let stampSeed: UInt64
+                    if let s = seed {
+                        stampSeed = s &+ cadenceIndex &* 0x9E3779B97F4A7C15
+                    } else {
+                        stampSeed = (cadenceIndex &+ 1) &* 0x9E3779B97F4A7C15
+                    }
+
+                    let shape = rollSplatter(at: c, size: sz, colors: colors,
+                                             seed: stampSeed, now: stampNow,
+                                             duration: duration)
+                    // alpha(now:) measures `now - stampNow`, so the fade is correct.
+                    drawSplat(shape, now: now, into: &ctx)
+                }
+            }
         }
-        if reroll {
-            shape = rollSplatter(at: c, size: sz, colors: colors,
-                                 seed: seed, now: now, duration: duration)
+    }
+
+    // MARK: - Render helpers
+
+    /// Paint one `SplatterShape` at wall-clock `now` into `ctx`.
+    private func drawSplat(_ shape: SplatterShape, now: Double,
+                           into ctx: inout GraphicsContext) {
+        let a = max(0, min(1, shape.alpha(now: now)))
+        guard a > 0 else { return }
+        for unit in shape.units {
+            // Rim: ink blended 45 % toward black (manual lerp — no AppKit).
+            let inkR = Double((unit.color >> 16) & 0xFF) / 255
+            let inkG = Double((unit.color >> 8)  & 0xFF) / 255
+            let inkB = Double( unit.color        & 0xFF) / 255
+            let rimColor = Color(red: inkR * 0.55, green: inkG * 0.55, blue: inkB * 0.55,
+                                 opacity: 0.78 * a)
+            ctx.fill(catmullRom(unit.rim), with: .color(rimColor))
+            // Body.
+            let inkColor = Color(red: inkR, green: inkG, blue: inkB, opacity: 0.96 * a)
+            ctx.fill(catmullRom(unit.body), with: .color(inkColor))
+            // Droplet specks.
+            let dropColor = Color(red: inkR, green: inkG, blue: inkB, opacity: 0.88 * a)
+            for speck in unit.droplets {
+                ctx.fill(catmullRom(speck), with: .color(dropColor))
+            }
         }
-        if let s = shape { drawInkSplatter(s, now: now) }
+    }
+
+    /// Build a closed, smooth `SwiftUI.Path` through `v` using Catmull-Rom →
+    /// cubic-bézier (1/6 tension) — the same smoothing as the AppKit reference.
+    private func catmullRom(_ v: [(x: Double, y: Double)]) -> Path {
+        var p = Path(); let n = v.count; guard n > 1 else { return p }
+        func cg(_ q: (x: Double, y: Double)) -> CGPoint { CGPoint(x: q.x, y: q.y) }
+        p.move(to: cg(v[0]))
+        for i in 0..<n {
+            let p0 = v[(i-1+n)%n], p1 = v[i], p2 = v[(i+1)%n], p3 = v[(i+2)%n]
+            let c1 = CGPoint(x: p1.x + (p2.x - p0.x)/6, y: p1.y + (p2.y - p0.y)/6)
+            let c2 = CGPoint(x: p2.x - (p3.x - p1.x)/6, y: p2.y - (p3.y - p1.y)/6)
+            p.addCurve(to: cg(p2), control1: c1, control2: c2)
+        }
+        p.closeSubpath(); return p
     }
 }
