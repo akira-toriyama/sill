@@ -5,78 +5,15 @@
 // the rows below force each variant / surface / section / state — the icon-strip
 // row uses `previewHoveredItem` (the non-activating-panel hover path) so it
 // captures deterministically.
+//
+// The bridge (`ThemedToolBarView`) + its `Item` value descriptor now live in
+// ThemeKitUI; this bench just feeds it `[ThemedToolBarView.Item]`.
 
 import SwiftUI
 import AppKit
 import PaletteKit
 import ThemeKit
-
-// MARK: - A lightweight value descriptor (SwiftUI can't carry the NSView-bearing
-//         ThemedToolBar.Item across an update, so the bridge rebuilds from these).
-
-enum ToolBarDemoItem {
-    case button(title: String?, symbol: String?,
-                role: ThemedButton.Role = .primary, variant: ThemedButton.Variant = .text,
-                enabled: Bool = true)
-    case label(String)
-    case flex
-    case fixed(CGFloat)
-    case divider
-
-    func toItem() -> ThemedToolBar.Item {
-        switch self {
-        case let .button(t, s, role, variant, enabled):
-            return .button(.init(title: t, symbol: s, role: role, variant: variant,
-                                 isEnabled: enabled, tooltip: t ?? s))
-        case .label(let s):     return .label(s)
-        case .flex:             return .flexibleSpace
-        case .fixed(let w):     return .fixedSpace(w)
-        case .divider:          return .divider
-        }
-    }
-}
-
-// MARK: - SwiftUI bridge for ThemeKit's ThemedToolBar
-
-struct ThemedToolBarView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    var items: [ToolBarDemoItem]
-    var surface: ThemedToolBar.Surface = .surface
-    var variant: ThemedToolBar.Variant = .regular
-    var corners: ThemedToolBar.Corners = .square
-    var elevation: Int = 0
-    var trackingMode: ThemedToolBar.TrackingMode = .standard
-    var previewHoveredItem: Int? = nil
-    var onItemClick: ((Int) -> Void)? = nil
-
-    func makeNSView(context: Context) -> ThemedToolBar {
-        let bar = ThemedToolBar(palette: palette)
-        apply(to: bar)
-        return bar
-    }
-    func updateNSView(_ bar: ThemedToolBar, context: Context) { apply(to: bar) }
-
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedToolBar,
-                      context: Context) -> CGSize? {
-        let s = nsView.intrinsicContentSize
-        if s.width == NSView.noIntrinsicMetric {
-            return CGSize(width: proposal.width ?? 360, height: s.height)
-        }
-        return s
-    }
-
-    private func apply(to bar: ThemedToolBar) {
-        bar.palette = palette
-        bar.surface = surface
-        bar.variant = variant
-        bar.corners = corners
-        bar.elevation = elevation
-        bar.trackingMode = trackingMode
-        bar.onItemClick = onItemClick
-        bar.previewHoveredItem = previewHoveredItem
-        bar.items = items.map { $0.toItem() }   // set LAST (rebuilds from current props)
-    }
-}
+import ThemeKitUI
 
 // MARK: - Showcase
 
@@ -84,7 +21,7 @@ struct MockToolBar: View {
     let p: ResolvedPalette
     @State private var taps = 0
 
-    private let liveItems: [ToolBarDemoItem] = [
+    private let liveItems: [ThemedToolBarView.Item] = [
         .button(title: nil, symbol: "list"),
         .label("Inbox"),
         .flex,
@@ -93,7 +30,7 @@ struct MockToolBar: View {
         .divider,
         .button(title: "Compose", symbol: "note-pencil", variant: .contained),
     ]
-    private let stripItems: [ToolBarDemoItem] = [
+    private let stripItems: [ThemedToolBarView.Item] = [
         .button(title: nil, symbol: "text-b"),
         .button(title: nil, symbol: "text-italic"),
         .button(title: nil, symbol: "text-underline"),

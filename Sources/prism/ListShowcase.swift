@@ -19,33 +19,7 @@ import AppKit
 import Palette
 import PaletteKit
 import ThemeKit
-
-// MARK: - LIVE bridge: the REAL ThemedList
-
-struct ListView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    let configure: (ThemedList) -> Void
-
-    // The specimen data + preview seams are theme-INDEPENDENT (role-typed tints,
-    // resolved at draw), so they're applied ONCE — on the first update, after
-    // SwiftUI has sized the view (the previewScrollY/Highlight seams need bounds).
-    // Subsequent frames only re-theme, so an animatable theme cycling its palette
-    // at 30 Hz no longer triggers a full item reload + NSImage re-raster each tick.
-    final class Coordinator { var configured = false }
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeNSView(context: Context) -> ThemedList {
-        ThemedList(palette: palette)
-    }
-
-    func updateNSView(_ list: ThemedList, context: Context) {
-        list.palette = palette                  // re-tint every frame (cheap snap-recolour)
-        if !context.coordinator.configured {
-            configure(list)                     // items + preview seams: once, post-sizing
-            context.coordinator.configured = true
-        }
-    }
-}
+import ThemeKitUI
 
 // MARK: - Mock image helpers (pre-resolved NSImages — the kit parses no SF name)
 
@@ -192,7 +166,7 @@ struct MockList: View {
 
             HStack(alignment: .top, spacing: 20) {
                 cell("facet tree · sticky headers · single-select") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = facetItems()
                         list.selectionMode = .single
                         list.showsDividers = true
@@ -206,7 +180,7 @@ struct MockList: View {
                 }
 
                 cell("wand tome · solidAccent · no-select") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = wandItems(p)
                         list.selectionMode = .none
                         list.hoverStyle = .solidAccent
@@ -225,7 +199,7 @@ struct MockList: View {
                 }
 
                 cell("dense · compact · menu-style") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = denseItems()
                         list.density = .compact
                         list.managesFirstResponder = true
@@ -241,7 +215,7 @@ struct MockList: View {
 
             HStack(alignment: .top, spacing: 20) {
                 cell("drag · drop-onto (facet tree) · w3 → Workspace B") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = facetItems()
                         list.selectionMode = .single
                         list.showsDividers = true
@@ -261,7 +235,7 @@ struct MockList: View {
                 }
 
                 cell("drag · reorder (insertion line) · before 'Third task'") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = reorderItems()
                         list.draggable = true
                         list.dragMode = .reorderBetween
@@ -285,7 +259,7 @@ struct MockList: View {
             // non-header row still lifts SOLO (the reorder cell above) — chunk is headers-only.
             HStack(alignment: .top, spacing: 20) {
                 cell("drag · chunk reorder (facet) · header + its windows lift as one") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = facetItems()
                         list.selectionMode = .single
                         list.showsDividers = true
@@ -302,7 +276,7 @@ struct MockList: View {
                 }
 
                 cell("drag · chunk reorder (generic sections) · section insertion bar") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = chunkItems()
                         list.selectionMode = .single
                         list.showsDividers = true
@@ -323,7 +297,7 @@ struct MockList: View {
 
             HStack(alignment: .top, spacing: 20) {
                 cell("tree · indentLevel + collapsible sections (▾ / ▸)") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = treeItems()
                         list.selectionMode = .single
                         list.showsDividers = true
@@ -343,7 +317,7 @@ struct MockList: View {
             // filled selection · zebra rows · horizontal content scroll (no truncation).
             HStack(alignment: .top, spacing: 20) {
                 cell("highlight .outline (cursor) ≠ selection (fill)") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = facetItems()
                         list.selectionMode = .single
                         list.highlightStyle = .outline
@@ -359,7 +333,7 @@ struct MockList: View {
                 }
 
                 cell("zebra · alternatingRowBackground (resets per section)") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = facetItems()
                         list.alternatingRowBackground = true
                         list.selectionMode = .none
@@ -371,7 +345,7 @@ struct MockList: View {
                 }
 
                 cell("horizontalContentScroll · long titles, no truncation") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = longItems()
                         list.selectionMode = .single
                         list.horizontalContentScroll = true

@@ -41,6 +41,7 @@ let package = Package(
         .library(name: "ListCore", targets: ["ListCore"]),
         .library(name: "PixelArt", targets: ["PixelArt"]),
         .library(name: "ThemeKit", targets: ["ThemeKit"]),
+        .library(name: "ThemeKitUI", targets: ["ThemeKitUI"]),
     ],
     dependencies: [
         // The family's ONE TOML implementation now lives in its own repo
@@ -140,6 +141,23 @@ let package = Package(
                 resources: [.copy("Resources/Phosphor"),
                             .copy("Resources/SimpleIcons")]),
 
+        // SwiftUI bridge layer atop ThemeKit — the family's `NSViewRepresentable`
+        // wrappers (`ThemedButtonView`, `ThemedFieldView`, …) that host the REAL
+        // AppKit widgets inside SwiftUI, so an app's *View* layer can drive sill
+        // parts from an `NSHostingView` shell. The FIRST module in sill to import
+        // SwiftUI — SwiftUI compiles on CommandLineTools; the Xcode-only hazard is
+        // the `#Preview` macro/plugin, which these bridges DELIBERATELY avoid (a
+        // static `previewFrozen`/`preview…` field on the widget gives deterministic
+        // capture instead, same reason SwiftDraw is pinned < 0.25). prism is its
+        // FIRST consumer (drops its in-tree bridges and `import ThemeKitUI` — no
+        // drift). @MainActor / AppKit + SwiftUI; sits ABOVE ThemeKit and MUST
+        // NEVER be a dependency of a pure `*Core` (a consumer linking only
+        // `Palette` still links zero AppKit AND zero SwiftUI). Effects is declared
+        // directly: `ThemedBorderView` names `EffectSpec` in its own surface, and
+        // ThemeKit only reaches Effects transitively (never re-exports it).
+        .target(name: "ThemeKitUI",
+                dependencies: ["ThemeKit", "PaletteKit", "Effects"]),
+
         // Pure, Sendable, AppKit-free. One declarative `Spec<Root>` that
         // BOTH decodes a `config.toml` (over `Toml`) and emits its JSON
         // Schema for taplo — so the two can never drift. A pure atom
@@ -152,7 +170,7 @@ let package = Package(
         // config.toml. Renders every catalog theme (all roles + font +
         // its OWN mock chrome specimens — never imports an app's View, so
         // no drift debt). The visual verification bench for the catalog.
-        .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "Motion", "ThemeKit", "PixelArt"]),
+        .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "Motion", "ThemeKit", "ThemeKitUI", "PixelArt"]),
 
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit", "Effects"]),

@@ -12,6 +12,7 @@ import AppKit
 import Palette
 import PaletteKit
 import ThemeKit
+import ThemeKitUI
 
 // MARK: - Best-contrast ink on the inverted surface (mirrors the widget)
 
@@ -26,40 +27,6 @@ import ThemeKit
 @MainActor private func tooltipFont(_ p: ResolvedPalette) -> Font {
     p.font == .mono ? .system(size: 11, weight: .medium, design: .monospaced)
                     : .system(size: 11, weight: .medium)
-}
-
-// MARK: - LIVE: a real ThemedTooltip attached to a real control
-
-/// A real anchor (a ThemedButton) with a live ThemedTooltip attached. Hover it
-/// in the running bench to see the actual inverted bubble fade in on its own
-/// child window (a separate window — not part of a prism screenshot).
-struct ThemedTooltipAnchorView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    let text: String
-    let placement: ThemedTooltip.Placement
-
-    final class Coordinator { var tooltip: ThemedTooltip? }
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeNSView(context: Context) -> ThemedButton {
-        let b = ThemedButton(palette: palette)
-        b.variant = .outlined
-        b.title = "Hover me"
-        context.coordinator.tooltip =
-            ThemedTooltip.attach(to: b, text: text, palette: palette, placement: placement)
-        return b
-    }
-    func updateNSView(_ b: ThemedButton, context: Context) {
-        b.palette = palette
-        b.title = "Hover me"
-        if let t = context.coordinator.tooltip {
-            t.palette = palette
-            t.text = text
-            t.placement = placement
-        }
-    }
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedButton,
-                      context: Context) -> CGSize? { nsView.intrinsicContentSize }
 }
 
 // MARK: - Inline mock of the rendered bubble (for the static grid)

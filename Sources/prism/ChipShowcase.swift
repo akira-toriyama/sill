@@ -8,56 +8,7 @@
 import SwiftUI
 import PaletteKit
 import ThemeKit
-
-// MARK: - SwiftUI bridge for ThemeKit's ThemedChip
-
-struct ThemedChipView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    var variant: ThemedChip.Variant = .filled
-    var size: ThemedChip.Size = .medium
-    var role: ThemedChip.Role = .neutral
-    var title: String = "Tag"
-    var leading: String? = nil
-    var selected = false
-    var enabled = true
-    var previewHovered = false
-    var previewPressed = false
-    var previewFocused = false
-    var clickable = false
-    var deletable = false
-    var onTap: (() -> Void)? = nil
-    var onDelete: (() -> Void)? = nil
-
-    func makeNSView(context: Context) -> ThemedChip {
-        let c = ThemedChip(palette: palette)
-        apply(to: c)
-        return c
-    }
-
-    func updateNSView(_ c: ThemedChip, context: Context) { apply(to: c) }
-
-    /// Size to the chip's own intrinsic content (so it hugs its label, not the cell).
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedChip,
-                      context: Context) -> CGSize? {
-        nsView.intrinsicContentSize
-    }
-
-    private func apply(to c: ThemedChip) {
-        c.palette = palette
-        c.variant = variant
-        c.size = size
-        c.role = role
-        c.title = title
-        c.leadingSymbol = leading
-        c.isSelected = selected
-        c.isEnabled = enabled
-        c.previewHovered = previewHovered
-        c.previewPressed = previewPressed
-        c.previewFocused = previewFocused
-        c.onTap = clickable ? (onTap ?? {}) : nil
-        c.onDelete = deletable ? (onDelete ?? {}) : nil
-    }
-}
+import ThemeKitUI
 
 // MARK: - Showcase: variants (live) + every state / role / size in the theme
 

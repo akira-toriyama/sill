@@ -17,6 +17,7 @@ import AppKit
 import Palette
 import PaletteKit
 import ThemeKit
+import ThemeKitUI
 
 // MARK: - Mock images (pre-resolved template glyphs — the kit parses no SF name)
 
@@ -42,61 +43,29 @@ import ThemeKit
 // 7 rows @ 26 (compact) + 2 separators @ 7 = 196pt of content.
 private let mockMenuContentHeight: CGFloat = 196
 
-// MARK: - Live trigger: a button that opens the REAL ThemedMenu
+// MARK: - Live-trigger menu items (the demo action menu the live trigger opens)
 
-struct MenuTriggerView: NSViewRepresentable {
-    let palette: ResolvedPalette
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeNSView(context: Context) -> NSView {
-        let host = NSView(frame: NSRect(x: 0, y: 0, width: 150, height: 34))
-        let button = ThemedButton(palette: palette)
-        button.variant = .outlined
-        button.title = "Actions"
-        button.trailingSymbol = "caret-down"
-        button.frame = NSRect(x: 0, y: 0, width: 130, height: 34)
-        host.addSubview(button)
-
-        let menu = ThemedMenu.make(palette: palette, items: liveItems(context.coordinator))
-        context.coordinator.menu = menu
-        context.coordinator.button = button
-        button.onTap = { [weak menu, weak button] in
-            guard let menu, let button else { return }
-            menu.present(from: button)
-        }
-        return host
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.button?.palette = palette
-        context.coordinator.menu?.palette = palette
-    }
-
-    private func liveItems(_ coord: Coordinator) -> [ThemedMenu.MenuItem] {
-        [
-            ThemedMenu.MenuItem("New Window", icon: menuGlyph("file-plus"), shortcut: "⌘N") {},
-            ThemedMenu.MenuItem("Open…",      icon: menuGlyph("folder"),         shortcut: "⌘O") {},
-            ThemedMenu.MenuItem(id: "recent", title: "Open Recent", icon: menuGlyph("clock"), submenu: [
-                ThemedMenu.MenuItem("Project Alpha", icon: menuGlyph("file")) {},
-                ThemedMenu.MenuItem("Project Beta",  icon: menuGlyph("file")) {},
-                .separator(),
-                ThemedMenu.MenuItem("Clear Menu", icon: menuGlyph("trash"), isDestructive: true) {},
-            ]),
+/// The `ThemedMenu.MenuItem` tree the live `ThemedMenuTriggerView` (ThemeKitUI)
+/// opens. Now that the trigger bridge is a GENERAL sill component (it takes its
+/// items from the caller), prism owns the demo content here.
+@MainActor private func menuTriggerItems() -> [ThemedMenu.MenuItem] {
+    [
+        ThemedMenu.MenuItem("New Window", icon: menuGlyph("file-plus"), shortcut: "⌘N") {},
+        ThemedMenu.MenuItem("Open…",      icon: menuGlyph("folder"),         shortcut: "⌘O") {},
+        ThemedMenu.MenuItem(id: "recent", title: "Open Recent", icon: menuGlyph("clock"), submenu: [
+            ThemedMenu.MenuItem("Project Alpha", icon: menuGlyph("file")) {},
+            ThemedMenu.MenuItem("Project Beta",  icon: menuGlyph("file")) {},
             .separator(),
-            ThemedMenu.MenuItem(id: "side", title: "Show Sidebar", icon: menuGlyph("check"),
-                                shortcut: "⌘\\", isChecked: true),
-            .separator(),
-            ThemedMenu.MenuItem("Rename", icon: menuGlyph("pencil")) {},
-            ThemedMenu.MenuItem("Delete", icon: menuGlyph("trash"), isDestructive: true) {},
-            ThemedMenu.MenuItem("Unavailable", icon: menuGlyph("prohibit"), isEnabled: false),
-        ]
-    }
-
-    @MainActor final class Coordinator {
-        var menu: ThemedMenu?
-        weak var button: ThemedButton?
-    }
+            ThemedMenu.MenuItem("Clear Menu", icon: menuGlyph("trash"), isDestructive: true) {},
+        ]),
+        .separator(),
+        ThemedMenu.MenuItem(id: "side", title: "Show Sidebar", icon: menuGlyph("check"),
+                            shortcut: "⌘\\", isChecked: true),
+        .separator(),
+        ThemedMenu.MenuItem("Rename", icon: menuGlyph("pencil")) {},
+        ThemedMenu.MenuItem("Delete", icon: menuGlyph("trash"), isDestructive: true) {},
+        ThemedMenu.MenuItem("Unavailable", icon: menuGlyph("prohibit"), isEnabled: false),
+    ]
 }
 
 // MARK: - Showcase
@@ -115,7 +84,7 @@ struct MockMenu: View {
 
             HStack(alignment: .top, spacing: 24) {
                 cell("inline mock · the open menu") {
-                    ListView(palette: p) { list in
+                    ThemedListView(palette: p) { list in
                         list.items = menuRows()
                         list.selectionMode = .none
                         list.hoverStyle = .solidAccent
@@ -133,7 +102,7 @@ struct MockMenu: View {
                 }
 
                 cell("live trigger · opens the real menu") {
-                    MenuTriggerView(palette: p)
+                    ThemedMenuTriggerView(palette: p, items: menuTriggerItems())
                         .frame(width: 150, height: 38)
                 }
                 Spacer(minLength: 0)
