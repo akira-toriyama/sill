@@ -31,6 +31,7 @@
 // `hover` (the pointer veil over a selected row) · `error` (the error badge/tint).
 
 import AppKit
+import ListCore
 import Palette
 import PaletteKit
 
@@ -785,11 +786,11 @@ public final class ThemedList: NSView {
 
     /// The ONLY selection mutator — repaints old+new, optionally scrolls + fires.
     private func setSelection(_ id: String?, fire: Bool) {
-        let resolved: String? = id.flatMap { id in
-            items.contains { $0.id == id && isSelectable($0) } ? id : nil
-        }
         let old = _selectedID
-        guard resolved != old else { if fire { onSelectionChange?(resolved) }; return }
+        let (resolved, didChange) = ListCore.resolveSelection(
+            proposed: id, current: old,
+            isSelectable: { rid in self.items.contains { $0.id == rid && self.isSelectable($0) } })
+        guard didChange else { if fire { onSelectionChange?(resolved) }; return }
         _selectedID = resolved
         invalidateRows([indexOf(old), indexOf(resolved)])
         // Reveal the committed row (honours the documented "scrolls into view"; a
