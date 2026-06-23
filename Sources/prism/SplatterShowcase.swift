@@ -1,24 +1,22 @@
-// prism — the LIVE ink-splatter bench.
+// prism — the LIVE ink-splatter bench (now a CONSUMER of ThemeKitUI).
 //
 // `Effects`' `SplatterShape` (rollSplatter → alpha(now:) → drawInkSplatter) is
-// pure geometry + a draw helper, so — like the particle bench — the way to
-// PROVE it works is to DRIVE it. This hosts the REAL `drawInkSplatter` in a
-// tiny `SplatterNSView` that re-stamps a fresh splat on a fixed period and
-// fades it (hold ⅔ → fade ⅓), painting it each frame. Theme-tinted: the splat
-// units pick from the card's accent + festive hues, so a single stamp can land
-// 2–3 differently-coloured splats (the Splatoon multi-shot feel).
+// pure geometry + a draw helper. #17a promoted the live host into the public
+// `ThemeKitUI.InkSplatterView` (a thin `NSViewRepresentable` owning the redraw
+// clock + painting the REAL `drawInkSplatter`); prism just drives it (drift-zero,
+// the #16 pattern). It re-stamps a fresh splat on a fixed period and fades it
+// (hold ⅔ → fade ⅓). Theme-tinted: the splat units pick from the card's accent +
+// festive hues, so a single stamp can land 2–3 differently-coloured splats.
 //
-// A `PRISM_PARTICLE_T` env override freezes a deterministic frame (and a fixed
-// seed) for a static screenshot; absent it, the bench runs live.
+// `PRISM_PARTICLE_T` freezes a deterministic frame (a stable seed kicks in for a
+// frozen view with no explicit seed); absent it, the bench runs live.
 
 import SwiftUI
 import AppKit
 import Palette
 import PaletteKit
 import Effects
-
-/// Re-stamp cadence — the splat's lifetime plus a short beat.
-private let splatPeriod: Double = 1.4 + 0.4
+import ThemeKitUI
 
 /// Festive base hues a splat mixes with the theme accent.
 private let splatHues: [UInt32] = [0xFFD700, 0xFF6EC7, 0x00E5FF, 0x9EFF00, 0xBC6BFF]
@@ -32,82 +30,15 @@ private func splatHex(_ c: NSColor) -> UInt32 {
     return (r << 16) | (g << 8) | b
 }
 
-// MARK: - The live NSView (hosts the REAL drawInkSplatter renderer)
-
-/// Re-stamps a fresh `SplatterShape` at its centre every `splatPeriod` and
-/// paints it with `drawInkSplatter`. Owns a 60 Hz redraw timer; honors a
-/// `previewT` freeze (with a fixed seed) for deterministic capture.
-final class SplatterNSView: NSView {
-    var colors: [UInt32] = splatHues { didSet { needsDisplay = true } }
-    var previewT: Double?
-
-    private var shape: SplatterShape?
-    private var timer: Timer?
-
-    override var isFlipped: Bool { true }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if window == nil { timer?.invalidate(); timer = nil; return }
-        guard previewT == nil, timer == nil else { return }
-        let t = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.needsDisplay = true }
-        }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
-    }
-
-    private var size: Double { Double(min(bounds.width, bounds.height)) * 0.78 }
-    private var center: (x: Double, y: Double) { (x: Double(bounds.midX), y: Double(bounds.midY)) }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard bounds.width > 1, bounds.height > 1 else { return }
-
-        // Freeze mode — one deterministic frame (fixed seed + held opacity).
-        if let pt = previewT {
-            let s = shape ?? rollSplatter(at: center, size: size, colors: colors,
-                                          seed: 0xC0FFEE, now: 0, duration: 1.4)
-            shape = s
-            drawInkSplatter(s, now: max(0, min(1, pt)) * 1.4)
-            return
-        }
-
-        // Live — re-stamp once the period elapses (pop, hold, fade, beat).
-        let now = CACurrentMediaTime()
-        if shape == nil || now - (shape?.startedAt ?? 0) >= splatPeriod {
-            shape = rollSplatter(at: center, size: size, colors: colors,
-                                 seed: nil, now: now, duration: 1.4)
-        }
-        if let s = shape { drawInkSplatter(s, now: now) }
-    }
-}
-
-// MARK: - SwiftUI bridge
-
-struct SplatterFieldView: NSViewRepresentable {
-    let colors: [UInt32]
-
-    private static let previewT: Double? =
-        ProcessInfo.processInfo.environment["PRISM_PARTICLE_T"].flatMap(Double.init)
-
-    func makeNSView(context: Context) -> SplatterNSView {
-        let v = SplatterNSView()
-        v.colors = colors
-        v.previewT = Self.previewT
-        return v
-    }
-
-    func updateNSView(_ v: SplatterNSView, context: Context) {
-        v.colors = colors
-        v.needsDisplay = true
-    }
-}
+/// `PRISM_PARTICLE_T` (0…1) freezes a deterministic splatter frame.
+private let splatterFreezeT: Double? =
+    ProcessInfo.processInfo.environment["PRISM_PARTICLE_T"].flatMap(Double.init)
 
 // MARK: - The showcase mock (wired into Gallery's `.particles` family)
 
 /// The ink-splatter specimen for one theme card: a single live stage that
-/// re-stamps a fresh splat (theme accent + festive hues) painting the REAL
-/// `drawInkSplatter`, plus a fact note.
+/// re-stamps a fresh splat (theme accent + festive hues) driving the REAL
+/// `InkSplatterView`, plus a fact note.
 struct MockSplatter: View {
     let p: ResolvedPalette
 
@@ -117,7 +48,7 @@ struct MockSplatter: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("Effects · ink splatter — rollSplatter → alpha(now:) → the real drawInkSplatter (Splatoon decal)")
+            Text("Effects · ink splatter — rollSplatter → alpha(now:) → the real InkSplatterView (Splatoon decal)")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
@@ -127,7 +58,8 @@ struct MockSplatter: View {
                     .foregroundColor(Color(nsColor: p.foreground))
                 liveDot
             }
-            SplatterFieldView(colors: inkColors)
+            InkSplatterView(colors: inkColors, duration: 1.4, loopPeriod: 1.4 + 0.4,
+                            frozen: splatterFreezeT)
                 .frame(height: 150 * uiScale)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: 7)

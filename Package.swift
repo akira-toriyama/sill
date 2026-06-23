@@ -155,8 +155,13 @@ let package = Package(
         // `Palette` still links zero AppKit AND zero SwiftUI). Effects is declared
         // directly: `ThemedBorderView` names `EffectSpec` in its own surface, and
         // ThemeKit only reaches Effects transitively (never re-exports it).
+        // `Motion` + `PixelArt` are declared for the #17a effect bridges
+        // (Particle/InkSplatter/PixelSprite/LinePets/PathPet/ChompCorridor): they
+        // name `ThemedTransition.frameStep` (Motion) and `PixelSprite`/`ScaleTier`/
+        // `pixelSize(cell:)` (PixelArt) directly (Trail geometry + the canonical
+        // sprites/blitters already arrive via Effects).
         .target(name: "ThemeKitUI",
-                dependencies: ["ThemeKit", "PaletteKit", "Effects"]),
+                dependencies: ["ThemeKit", "PaletteKit", "Effects", "Motion", "PixelArt"]),
 
         // Pure, Sendable, AppKit-free. One declarative `Spec<Root>` that
         // BOTH decodes a `config.toml` (over `Toml`) and emits its JSON

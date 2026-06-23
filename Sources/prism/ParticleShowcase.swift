@@ -1,25 +1,24 @@
-// prism — the LIVE particle-burst bench.
+// prism — the LIVE particle-burst bench (now a CONSUMER of ThemeKitUI).
 //
 // `Effects`' particle atom (`rollBurst` / `resolveParticles` / `drawParticles`)
-// is pure MATH + a draw helper, not a widget — so, like the Motion bench, the
-// way to PROVE it works is to DRIVE it. This hosts the REAL AppKit
-// `drawParticles` renderer in a tiny `ParticleBurstNSView` that owns a redraw
-// clock (prism owns the clock here — there is no widget to own it), re-rolls a
-// burst on a fixed period, and paints it. Two stages per card — 花火 fireworks
-// (radial glow) and 紙吹雪 confetti (a party-popper of tumbling paper) — so
-// every theme shows both emissions cycling live.
+// is pure MATH + a draw helper, not a widget. #17a promoted the live host into
+// the public `ThemeKitUI.ParticleBurstView` (a thin `NSViewRepresentable` that
+// owns the redraw clock and paints the REAL `drawParticles`); prism drops its
+// in-tree bridge and just drives that public view — drift-zero, the #16 pattern.
 //
-// Theme-tinted: each burst's palette is the card's `primary` + `secondary`
-// plus a festive constant set, so the pop reads in every theme (perch's
-// "accent + gold/pink/cyan" generalized). A `previewT` env override
-// (`PRISM_PARTICLE_T=0.35`) freezes a deterministic mid-burst frame for a
-// static screenshot; absent it, the bench runs live.
+// Two stages per card — 花火 fireworks (radial glow) and 紙吹雪 confetti (a
+// party-popper of tumbling paper) — feed the SAME public view different inputs
+// (emitter, duration, cooling, loop), so every theme shows both emissions cycling
+// live. Theme-tinted: each burst's palette is the card's `primary` + `secondary`
+// plus a festive constant set. `PRISM_PARTICLE_T=0.35` freezes a deterministic
+// mid-burst frame (passed straight to the view's public `frozen` seam).
 
 import SwiftUI
 import AppKit
 import Palette
 import PaletteKit
 import Effects
+import ThemeKitUI
 
 /// The festive base hues every burst mixes with the theme accent (gold / pink
 /// / cyan / lime / violet) — guarantees variety even on a monochrome theme.
@@ -34,114 +33,15 @@ private func hexU32(_ c: NSColor) -> UInt32 {
     return (r << 16) | (g << 8) | b
 }
 
-// MARK: - The live NSView (hosts the REAL drawParticles renderer)
-
-/// A flipped (top-left-origin, so the sim's `+y`-down gravity falls on-screen)
-/// NSView that re-rolls one emission's burst every `burstPeriod` and paints it
-/// with the shared `drawParticles`. Owns a 60 Hz redraw timer; honors a
-/// `previewT` freeze for deterministic capture.
-final class ParticleBurstNSView: NSView {
-    var emission: ParticleEmission = .fireworks
-    var colors: [UInt32] = festiveHues { didSet { needsDisplay = true } }
-    /// When set (env `PRISM_PARTICLE_T`, 0…1), render ONE frozen frame at that
-    /// fraction of the burst instead of running live.
-    var previewT: Double?
-
-    private var burst: ParticleBurst?
-    private var timer: Timer?
-
-    override var isFlipped: Bool { true }   // +y down → gravity falls on-screen
-    override var wantsDefaultClipping: Bool { true }
-
-    // Start the redraw tick when added to a window; stop it when removed.
-    // viewDidMoveToWindow is MainActor-isolated, so it (not a nonisolated
-    // deinit) owns the timer's lifetime.
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if window == nil {
-            timer?.invalidate(); timer = nil
-            return
-        }
-        guard previewT == nil, timer == nil else { return }
-        let t = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.needsDisplay = true }
-        }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
-    }
-
-    /// The burst origin: fireworks from upper-center; confetti shoots up from
-    /// near the bottom edge (a party popper).
-    private var emitter: (x: Double, y: Double) {
-        switch emission {
-        case .fireworks: return (Double(bounds.midX), Double(bounds.height * 0.46))
-        case .confetti:  return (Double(bounds.midX), Double(bounds.height * 0.94))
-        }
-    }
-
-    private var duration: TimeInterval { emission == .fireworks ? 1.05 : 1.6 }
-
-    /// Re-roll cadence — the burst's own length plus a short beat, so the pop
-    /// reads then re-fires before a long dead frame (fireworks ≠ confetti, so
-    /// the two stages drift out of phase and the card is never fully still).
-    private var period: Double { duration + 0.4 }
-
-    /// Fireworks cool + shrink as they fade (the new `radiusSpeed`); confetti
-    /// paper keeps its size while it flutters down.
-    private var radiusSpeed: Double { emission == .fireworks ? -2.0 : 0 }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard bounds.width > 1, bounds.height > 1 else { return }
-
-        // Freeze mode — one deterministic mid-burst frame.
-        if let pt = previewT {
-            let b = burst ?? rollBurst(emission: emission, from: [emitter],
-                                       colors: colors, intensity: .bold,
-                                       now: 0, duration: duration, radiusSpeed: radiusSpeed)
-            burst = b
-            drawParticles(b, now: max(0, min(1, pt)) * duration, scale: uiScale)
-            return
-        }
-
-        // Live — re-roll once the period has elapsed (a popped-then-rests beat).
-        let now = CACurrentMediaTime()
-        if burst == nil || now - (burst?.startedAt ?? 0) >= period {
-            burst = rollBurst(emission: emission, from: [emitter],
-                              colors: colors, intensity: .bold,
-                              now: now, duration: duration, radiusSpeed: radiusSpeed)
-        }
-        if let b = burst { drawParticles(b, now: now, scale: uiScale) }
-    }
-}
-
-// MARK: - SwiftUI bridge
-
-struct ParticleFieldView: NSViewRepresentable {
-    let emission: ParticleEmission
-    let colors: [UInt32]
-
-    private static let previewT: Double? =
-        ProcessInfo.processInfo.environment["PRISM_PARTICLE_T"].flatMap(Double.init)
-
-    func makeNSView(context: Context) -> ParticleBurstNSView {
-        let v = ParticleBurstNSView()
-        v.emission = emission
-        v.colors = colors
-        v.previewT = Self.previewT
-        return v
-    }
-
-    func updateNSView(_ v: ParticleBurstNSView, context: Context) {
-        v.emission = emission
-        v.colors = colors
-        v.needsDisplay = true
-    }
-}
+/// `PRISM_PARTICLE_T` (0…1) freezes a deterministic mid-burst frame for a static
+/// screenshot; absent it, the bench runs live.
+private let particleFreezeT: Double? =
+    ProcessInfo.processInfo.environment["PRISM_PARTICLE_T"].flatMap(Double.init)
 
 // MARK: - The showcase mock (wired into Gallery's `.particles` family)
 
 /// The whole particle specimen for one theme card: two live stages — 花火 and
-/// 紙吹雪 — each painting the REAL `drawParticles`, plus a fact legend.
+/// 紙吹雪 — each driving the REAL `ParticleBurstView`, plus a fact legend.
 struct MockParticles: View {
     let p: ResolvedPalette
 
@@ -153,7 +53,7 @@ struct MockParticles: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("Effects · particles — rollBurst → resolveParticles (closed-form) → the real drawParticles")
+            Text("Effects · particles — rollBurst → resolveParticles (closed-form) → the real ParticleBurstView (ThemeKitUI)")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
@@ -172,16 +72,32 @@ struct MockParticles: View {
     }
 
     /// One labelled live stage — a contained dark-or-theme panel the burst
-    /// plays inside, with a "● live" tag so a screenshot reads as moving.
+    /// plays inside, with a "● live" tag so a screenshot reads as moving. The
+    /// per-emission inputs (emitter, duration, cooling) that the in-tree NSView
+    /// used to compute internally are now passed to the public view.
     private func stage(_ title: String, emission: ParticleEmission) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        // The burst origin: fireworks from upper-centre; confetti shoots up from
+        // near the bottom edge (a party popper). The view is flipped (+y down).
+        let emitters: (CGRect) -> [CGPoint] = { r in
+            switch emission {
+            case .fireworks: return [CGPoint(x: r.midX, y: r.height * 0.46)]
+            case .confetti:  return [CGPoint(x: r.midX, y: r.height * 0.94)]
+            }
+        }
+        let duration: TimeInterval = emission == .fireworks ? 1.05 : 1.6
+        // Fireworks cool + shrink as they fade; confetti paper keeps its size.
+        let radiusSpeed: Double = emission == .fireworks ? -2.0 : 0
+        return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
                 Text(title)
                     .font(sysFont(8.5, weight: .medium, design: .monospaced))
                     .foregroundColor(Color(nsColor: p.foreground))
                 liveDot
             }
-            ParticleFieldView(emission: emission, colors: burstColors)
+            ParticleBurstView(emission: emission, colors: burstColors, intensity: .bold,
+                              duration: duration, radiusSpeed: radiusSpeed,
+                              loopPeriod: duration + 0.4, scale: uiScale,
+                              frozen: particleFreezeT, emitters: emitters)
                 .frame(height: 132 * uiScale)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: 7)
