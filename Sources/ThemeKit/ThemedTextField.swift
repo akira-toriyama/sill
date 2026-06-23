@@ -116,10 +116,17 @@ public final class ThemedTextField: NSView {
         set { field.stringValue = newValue; syncFloat(animated: false) }
     }
 
-    /// Clear the field AS IF the user deleted all text: unlike `stringValue =
-    /// ""` (a silent setter) this fires `onChange("")`, so a bound search list
-    /// actually refreshes. The trailing clear button routes through here.
-    public func clearText() { field.stringValue = ""; textChanged() }
+    /// Programmatic set with an EXPLICIT notify choice — the firing counterpart of
+    /// assigning `stringValue` (silent). `notifying: true` fires `onChange` (so a
+    /// bound search list refreshes), matching the old `clearText` discipline; the
+    /// silent branch mirrors the `stringValue` setter (`syncFloat`).
+    public func setText(_ text: String, notifying: Bool) {
+        field.stringValue = text
+        if notifying { textChanged() } else { syncFloat(animated: false) }
+    }
+
+    /// Clear the field AS IF the user deleted all text — fires `onChange("")`.
+    public func clearText() { setText("", notifying: true) }
 
     /// Begin editing programmatically (make the field first responder).
     /// `selectingAll` selects the whole value — what a host like facet's rename
@@ -143,6 +150,16 @@ public final class ThemedTextField: NSView {
     /// field (which stays a text field). The visible floating label / value are
     /// already exposed via `syncAccessibility`.
     public func markAccessibilityComboBox() { field.setAccessibilityRole(.comboBox) }
+
+    /// Announce a committed value change on the INNER NSTextField — the element
+    /// VoiceOver actually reads (the ThemedTextField wrapper is AX-transparent:
+    /// it sets no role/element/value on itself; the inner field is what VO sees).
+    /// Sets the AX value attr on the inner field AND posts `.valueChanged` on it.
+    /// Matches the visibility + pattern of `markAccessibilityComboBox()`.
+    public func announceAccessibilityValue(_ value: Any?) {
+        field.setAccessibilityValue(value)
+        NSAccessibility.post(element: field, notification: .valueChanged)
+    }
 
     // MARK: - Internals
 

@@ -38,6 +38,7 @@ let package = Package(
         .library(name: "ConfigSchema", targets: ["ConfigSchema"]),
         .library(name: "CLIKit", targets: ["CLIKit"]),
         .library(name: "Gesture", targets: ["Gesture"]),
+        .library(name: "ListCore", targets: ["ListCore"]),
         .library(name: "PixelArt", targets: ["PixelArt"]),
         .library(name: "ThemeKit", targets: ["ThemeKit"]),
     ],
@@ -86,6 +87,13 @@ let package = Package(
         // Mechanism only — `Gesture` owns no vocabulary and no timing.
         .target(name: "Gesture"),
 
+        // Pure, Sendable, AppKit-free HEADLESS CORE for the stateful widgets —
+        // selection resolution, roving-highlight math, ComboBox filter/reconcile,
+        // Menu keycode→intent. ThemedList/ComboBox/Menu delegate to it as
+        // byte-identical thin wrappers; #16/#17 SwiftUI will share the same core.
+        // A pure leaf alongside Palette/Gesture/Motion: zero AppKit, zero Palette.
+        .target(name: "ListCore"),
+
         // Pure, Sendable, AppKit-free PIXEL-SPRITE atom — wand's chomp
         // (Pac-Man-style) arcade decals reinterpreted as resolution-independent
         // integer pixel grids: a `PixelSprite` (rows + palette), the
@@ -126,7 +134,7 @@ let package = Package(
         // adornments, focus-accent transition, helper/error, IME-aware. Themed
         // by assigning `palette`. @MainActor / AppKit.
         .target(name: "ThemeKit",
-                dependencies: ["PaletteKit", "Palette", "Motion",
+                dependencies: ["PaletteKit", "Palette", "Motion", "ListCore",
                                .product(name: "SwiftDraw", package: "SwiftDraw")],
                 exclude: ["Resources/README.md"],   // doc, not a bundled resource
                 resources: [.copy("Resources/Phosphor"),
@@ -156,6 +164,7 @@ let package = Package(
                                    .product(name: "Toml", package: "swift-toml-edit")]),
         .testTarget(name: "CLIKitTests", dependencies: ["CLIKit"]),
         .testTarget(name: "GestureTests", dependencies: ["Gesture"]),
+        .testTarget(name: "ListCoreTests", dependencies: ["ListCore"]),
         .testTarget(name: "PixelArtTests", dependencies: ["PixelArt"]),
     ]
 )

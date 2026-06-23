@@ -291,7 +291,19 @@ public final class ThemedCheckbox: ThemedControl {
         if fromUser {
             onChange?(next)
             sendActionToTarget()
+            postAXValueChanged()
         }
+    }
+
+    /// Programmatic set with an EXPLICIT notify choice — the firing counterpart of
+    /// assigning `isChecked` (silent). `notifying: true` fires `onChange` +
+    /// target/action exactly like a user toggle; the host may re-drive the value
+    /// from inside `onChange` (controlled component). Clears any indeterminate state.
+    public func setChecked(_ checked: Bool, notifying: Bool) {
+        guard isEnabled else { return }
+        isIndeterminate = false
+        isChecked = checked            // silent didSet (syncAccessibility + applyState)
+        if notifying { onChange?(checked); sendActionToTarget(); postAXValueChanged() }
     }
 }
 

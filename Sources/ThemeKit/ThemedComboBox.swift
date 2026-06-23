@@ -33,6 +33,7 @@ import QuartzCore
 import Palette
 import PaletteKit
 import Motion
+import ListCore
 
 @MainActor
 public final class ThemedComboBox: NSObject {
@@ -245,8 +246,7 @@ public final class ThemedComboBox: NSObject {
     /// substring, honouring the current locale (so "AP" finds "Grape", "café"
     /// finds "cafe"). Empty query ⇒ the full list.
     nonisolated static func defaultFilter(_ options: [Item], _ query: String) -> [Item] {
-        guard !query.isEmpty else { return options }
-        return options.filter { $0.label.localizedStandardContains(query) }
+        comboFilter(options, query: query, label: { $0.label })
     }
 
     // MARK: - Theming
@@ -277,18 +277,11 @@ public final class ThemedComboBox: NSObject {
     // MARK: - Options / filter / selection
 
     private func optionsChanged() {
-        // Re-resolve the committed selection: an index into the old list is
-        // meaningless now. Keep it if the SAME item is still present, else clear.
-        if let idx = _selectedIndex, options.indices.contains(idx) {
-            committedValue = options[idx].label
-        } else if !committedValue.isEmpty,
-                  let again = options.firstIndex(where: { $0.label == committedValue }) {
-            _selectedIndex = again
-        } else {
-            _selectedIndex = nil
-            // committedValue stays as the literal typed/committed string so a
-            // freeSolo revert target survives an options reload.
-        }
+        let r = reconcileSelection(selectedIndex: _selectedIndex,
+                                   committedValue: committedValue,
+                                   labels: options.map { $0.label })
+        _selectedIndex = r.selectedIndex
+        committedValue = r.committedValue
         refilter()
         if isOpen { syncList(); reframe() }
     }
@@ -324,6 +317,7 @@ public final class ThemedComboBox: NSObject {
         committedValue = ""
         field.clearText()                            // sets "" + fires field.onChange("") → fieldDidChange
         onSelect?(nil)
+        field.announceAccessibilityValue(nil)
     }
 
     private func syncTrailingIcons() {
@@ -440,12 +434,30 @@ public final class ThemedComboBox: NSObject {
         dismissPopup(animated: false)
         field.focus(selectingAll: false)             // re-assert (harmless no-op if already FR)
         isCommitting = false
+        field.announceAccessibilityValue(selectedItem?.label)
     }
 
     private func commitFreeText(_ text: String) {
         committedValue = text
         _selectedIndex = options.firstIndex(of: Item(id: text, label: text))
         onSelect?(Item(id: text, label: text))
+        field.announceAccessibilityValue(text.isEmpty ? nil : text)
+    }
+
+    /// Programmatic commit that FIRES `onSelect` — the firing counterpart of
+    /// assigning `selectedIndex` (silent). An out-of-range / nil index clears the
+    /// selection and fires `onSelect(nil)`. (User picks still route through
+    /// `commitItem`, which also dismisses the popup and re-asserts field focus.)
+    public func commitSelection(_ index: Int?) {
+        if let index, options.indices.contains(index) {
+            setSelection(index)          // silent: sets _selectedIndex + committedValue + field text
+            onSelect?(selectedItem)
+            field.announceAccessibilityValue(selectedItem?.label)
+        } else {
+            setSelection(nil)
+            onSelect?(nil)
+            field.announceAccessibilityValue(nil)
+        }
     }
 
     /// Commit the actionable empty row (via the list's `onEmptyAction`) — same

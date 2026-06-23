@@ -31,6 +31,7 @@
 // `hover` (the pointer veil over a selected row) · `error` (the error badge/tint).
 
 import AppKit
+import ListCore
 import Palette
 import PaletteKit
 
@@ -674,6 +675,7 @@ public final class ThemedList: NSView {
         // reconcile): keep it if still present + selectable, else drop (silently).
         if let id = _selectedID, !(items.contains { $0.id == id && isSelectable($0) }) {
             _selectedID = nil
+            setAccessibilityValue(_selectedID) // keep AX attr current; no post (reload drop ≠ user action)
         }
         if let h = highlightedIndex, !(items.indices.contains(h) && isSelectable(items[h])) {
             highlightedIndex = isActionRowActive ? 0 : nil
@@ -785,17 +787,18 @@ public final class ThemedList: NSView {
 
     /// The ONLY selection mutator — repaints old+new, optionally scrolls + fires.
     private func setSelection(_ id: String?, fire: Bool) {
-        let resolved: String? = id.flatMap { id in
-            items.contains { $0.id == id && isSelectable($0) } ? id : nil
-        }
         let old = _selectedID
-        guard resolved != old else { if fire { onSelectionChange?(resolved) }; return }
+        let (resolved, didChange) = ListCore.resolveSelection(
+            proposed: id, current: old,
+            isSelectable: { rid in self.items.contains { $0.id == rid && self.isSelectable($0) } })
+        guard didChange else { if fire { onSelectionChange?(resolved) }; return }
         _selectedID = resolved
+        setAccessibilityValue(_selectedID)
         invalidateRows([indexOf(old), indexOf(resolved)])
         // Reveal the committed row (honours the documented "scrolls into view"; a
         // no-op before layout or for an already-visible row — e.g. the click path).
         if let i = indexOf(resolved) { scrollRowVisible(i, position: .nearest) }
-        if fire { onSelectionChange?(resolved) }
+        if fire { onSelectionChange?(resolved); postAXValueChanged() }
     }
 
     // MARK: Public methods
@@ -1005,15 +1008,9 @@ public final class ThemedList: NSView {
         if isDragging { return }               // a lift replaces highlight nav with drop-target aim (decision e)
         if isActionRowActive { setHighlight(0); return }
         let sel = items.indices.filter { isSelectable(items[$0]) }
-        guard !sel.isEmpty else { setHighlight(nil); return }
-        let target: Int
-        if let cur = highlightedIndex, let pos = sel.firstIndex(of: cur) {
-            let n = sel.count
-            let np = wrapsHighlight ? ((pos + delta) % n + n) % n
-                                    : min(max(pos + delta, 0), n - 1)
-            target = sel[np]
-        } else {
-            target = delta > 0 ? sel.first! : sel.last!
+        guard let target = ListCore.nextHighlight(current: highlightedIndex, delta: delta,
+                                                  selectableIndices: sel, wraps: wrapsHighlight) else {
+            setHighlight(nil); return
         }
         setHighlight(target)
         scrollRowVisible(target, position: .nearest)
