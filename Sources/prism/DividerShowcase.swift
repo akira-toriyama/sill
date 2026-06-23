@@ -6,32 +6,7 @@
 import SwiftUI
 import PaletteKit
 import ThemeKit
-
-// MARK: - SwiftUI bridge for ThemeKit's ThemedDivider
-
-struct ThemedDividerView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    var orientation: ThemedDivider.Orientation = .horizontal
-    var variant: ThemedDivider.Variant = .fullWidth
-    var label: String? = nil
-    var surface: NSColor? = nil
-
-    func makeNSView(context: Context) -> ThemedDivider {
-        let d = ThemedDivider(palette: palette)
-        apply(to: d)
-        return d
-    }
-
-    func updateNSView(_ d: ThemedDivider, context: Context) { apply(to: d) }
-
-    private func apply(to d: ThemedDivider) {
-        d.palette = palette
-        d.orientation = orientation
-        d.variant = variant
-        d.label = label
-        d.surfaceColor = surface
-    }
-}
+import ThemeKitUI
 
 // MARK: - Showcase: every orientation + variant in the current theme
 

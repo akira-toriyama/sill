@@ -6,50 +6,7 @@
 import SwiftUI
 import PaletteKit
 import ThemeKit
-
-// MARK: - SwiftUI bridge for ThemeKit's ThemedTextField
-
-struct ThemedFieldView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    var variant: ThemedTextField.Variant = .outlined
-    var label: String? = nil
-    var placeholder: String = ""
-    var text: String = ""
-    var leading: String? = nil
-    var trailing: String? = nil
-    var helper: String? = nil
-    var error: String? = nil
-    var surface: NSColor? = nil
-    var previewFocused: Bool = false
-
-    func makeNSView(context: Context) -> ThemedTextField {
-        let f = ThemedTextField(palette: palette)
-        // Seed-once / uncontrolled ON PURPOSE: `text` here is a static specimen
-        // value, so `updateNSView` deliberately does NOT re-push it (that would
-        // clobber live typing on every theme-switch re-render). A real host
-        // wanting two-way binding wires `onChange` to a @Binding and pushes
-        // model→field only while the field is not first responder / composing.
-        f.stringValue = text
-        f.onTrailingTap = { [weak f] in f?.clearText() }   // fire onChange("") on clear
-        apply(to: f)
-        return f
-    }
-
-    func updateNSView(_ f: ThemedTextField, context: Context) { apply(to: f) }
-
-    private func apply(to f: ThemedTextField) {
-        f.palette = palette
-        f.variant = variant
-        f.label = label
-        f.placeholder = placeholder
-        f.leadingSymbol = leading
-        f.trailingSymbol = trailing
-        f.helperText = helper
-        f.errorText = error
-        f.surfaceColor = surface
-        f.previewFocused = previewFocused
-    }
-}
+import ThemeKitUI
 
 // MARK: - Showcase: every variant + state in the current theme
 
@@ -64,33 +21,33 @@ struct MockField: View {
 
             HStack(alignment: .top, spacing: 16) {
                 ex("outlined · resting", h: 50) {
-                    ThemedFieldView(palette: p, label: "Filter",
+                    ThemedTextFieldView(palette: p, label: "Filter",
                                     placeholder: "type to filter…",
                                     leading: "magnifying-glass", surface: p.background)
                 }
                 ex("outlined · focused", h: 50) {
-                    ThemedFieldView(palette: p, label: "Filter",
+                    ThemedTextFieldView(palette: p, label: "Filter",
                                     placeholder: "type to filter…",
                                     leading: "magnifying-glass", surface: p.background,
                                     previewFocused: true)
                 }
                 ex("outlined · filled + clear", h: 50) {
-                    ThemedFieldView(palette: p, label: "Filter", text: "kernel",
+                    ThemedTextFieldView(palette: p, label: "Filter", text: "kernel",
                                     leading: "magnifying-glass",
                                     trailing: "x-circle", surface: p.background)
                 }
             }
             HStack(alignment: .top, spacing: 16) {
                 ex("filled variant", h: 50) {
-                    ThemedFieldView(palette: p, variant: .filled, label: "Name",
+                    ThemedTextFieldView(palette: p, variant: .filled, label: "Name",
                                     text: "facet", surface: p.background)
                 }
                 ex("standard variant", h: 50) {
-                    ThemedFieldView(palette: p, variant: .standard, label: "Tag",
+                    ThemedTextFieldView(palette: p, variant: .standard, label: "Tag",
                                     text: "web", surface: p.background)
                 }
                 ex("error + helper", h: 68) {
-                    ThemedFieldView(palette: p, label: "Filter", text: "zzz",
+                    ThemedTextFieldView(palette: p, label: "Filter", text: "zzz",
                                     leading: "magnifying-glass",
                                     error: "no matches", surface: p.background)
                 }

@@ -199,7 +199,7 @@ let kitCatalog: [KitComponent] = [
         name: "ThemedCheckbox", module: "ThemeKit",
         kind: "MUI <Checkbox> (basic, tri-state) — outline-box ↔ primary-filled box with a draw-in checkmark/dash",
         summary: "Themed tri-state AppKit checkbox; styled by assigning a ResolvedPalette.",
-        consumes: "Embed directly as an NSView (a self-contained NSControl, no child window/controller): `let c = ThemedCheckbox(palette:)`, set isChecked/label/size + onChange, add to your view; in SwiftUI host via the prism `ThemedCheckboxView: NSViewRepresentable` pattern.",
+        consumes: "Embed directly as an NSView (a self-contained NSControl, no child window/controller): `let c = ThemedCheckbox(palette:)`, set isChecked/label/size + onChange, add to your view; in SwiftUI host via ThemeKitUI's `ThemedCheckboxView: NSViewRepresentable`.",
         keyAPI: [
                  "palette: ResolvedPalette — assign to (re)theme; repaints via didSet",
                  "isChecked: Bool — bound on/off; assigning animates glyph but does NOT fire onChange",
@@ -288,7 +288,7 @@ let kitCatalog: [KitComponent] = [
         name: "ThemedSkeleton", module: "ThemeKit",
         kind: "MUI <Skeleton> (low-alpha loading placeholder with pulse/wave ambient animation)",
         summary: "Themed grey-wash loading placeholder; themed by assigning a ResolvedPalette.",
-        consumes: "Embed directly: a host instantiates ThemedSkeleton(palette:) — a plain NSView — sets variant/animation/optional width/height, and adds it as a subview (or bridges it via NSViewRepresentable as prism's ThemedSkeletonView does). No controller or child window.",
+        consumes: "Embed directly: a host instantiates ThemedSkeleton(palette:) — a plain NSView — sets variant/animation/optional width/height, and adds it as a subview (or bridges it via NSViewRepresentable as ThemeKitUI's ThemedSkeletonView does). No controller or child window.",
         keyAPI: [
                  "palette: ResolvedPalette — theme; init-required and didSet re-tints the wash (muted .subtle ink) live without disturbing a running animation",
                  "variant: Variant — .text/.circular/.rectangular/.rounded shape (default .text)",
@@ -332,7 +332,7 @@ let kitCatalog: [KitComponent] = [
         name: "ThemedList", module: "ThemeKit",
         kind: "MUI <List> (basic) — an embeddable themed list/menu row-painter",
         summary: "Embeddable NSView list of mixed-height rows; themed by assigning a PaletteKit ResolvedPalette.",
-        consumes: "A host EMBEDS it as a plain NSView (init(palette:), addSubview) — not a child-window controller like ThemedComboBox/ThemedTooltip; it is itself screencapturable. In prism it bridges via ListView: NSViewRepresentable (makeNSView builds ThemedList(palette:), configure closure sets items + props).",
+        consumes: "A host EMBEDS it as a plain NSView (init(palette:), addSubview) — not a child-window controller like ThemedComboBox/ThemedTooltip; it is itself screencapturable. ThemeKitUI bridges it via ThemedListView: NSViewRepresentable (makeNSView builds ThemedList(palette:), configure closure sets items + props).",
         keyAPI: [
                  "items: [ListItem] — rows (id, image: pre-resolved NSImage?, primary/secondary text, badges: [Badge], trailing: TrailingAccessory, tint: ListTint, kind: .row/.sectionHeader/.separator, isDisabled, axChecked, indentLevel: Int); assign relayouts+repaints",
                  "HIERARCHY (additive, default off): ListItem.indentLevel:Int (0=top; shifts the leading cluster — the image/text, plus a collapsible header's disclosure triangle — right by indentLevel×indentStep; selection/hover fill + leading tint bar stay FULL-BLEED, the MUI tree model) + Kind.sectionHeader(subtitle:collapsed:Bool?) — collapsed nil=plain header (unchanged), false=collapsible+expanded (▾), true=collapsed (▸); a leading disclosure triangle + a clickable header. onToggleSection: ((String)->Void)? fires on a collapsible header click (incl. the pinned sticky header). The kit hides NOTHING — the host owns the collapsed set + rebuilds items (React-component contract). Keyboard toggle + collapsible non-header rows are documented non-goals (v1).",

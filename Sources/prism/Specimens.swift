@@ -11,6 +11,7 @@ import AppKit
 import SwiftUI
 import PaletteKit
 import ThemeKit
+import ThemeKitUI
 
 /// A Phosphor glyph as a tintable SwiftUI `Image` (template ⇒ adopts the
 /// ancestor `.foregroundColor`). The mock specimens draw their accents this way
@@ -147,7 +148,7 @@ struct MockTree: View {
     private var searchBar: some View {
         // The REAL ThemeKit field (outlined, leading magnifier), themed to
         // this panel — replacing the hand-drawn approximation.
-        ThemedFieldView(palette: p, placeholder: "type to filter…",
+        ThemedTextFieldView(palette: p, placeholder: "type to filter…",
                         leading: "magnifying-glass", surface: p.background)
             .frame(height: 40)   // ≥ the label-less field's 40pt box, else the top rule clips
     }
@@ -350,7 +351,7 @@ struct MockTome: View {
             VStack(alignment: .leading, spacing: 6) {
                 // Launcher query field — the REAL ThemeKit field (replacing the
                 // hand-drawn one) so the tome mirrors the shared component.
-                ThemedFieldView(palette: p, placeholder: "open…",
+                ThemedTextFieldView(palette: p, placeholder: "open…",
                                 leading: "magnifying-glass", surface: p.background)
                     .frame(height: 40)   // ≥ the label-less field's 40pt box, else the top rule clips
 

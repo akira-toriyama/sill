@@ -9,47 +9,7 @@
 import SwiftUI
 import PaletteKit
 import ThemeKit
-
-// MARK: - SwiftUI bridge for ThemeKit's ThemedFAB
-
-struct ThemedFABView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    var variant: ThemedFAB.Variant = .circular
-    var size: ThemedFAB.Size = .large
-    var role: ThemedFAB.Role = .primary
-    var symbol: String? = "plus"
-    var image: NSImage? = nil          // pre-resolved icon (SVG / logo / …); wins over symbol
-    var label: String = ""
-    var enabled = true
-    var previewHovered = false
-    var previewPressed = false
-    var previewFocused = false
-    var onTap: (() -> Void)? = nil
-
-    func makeNSView(context: Context) -> ThemedFAB {
-        let f = ThemedFAB(palette: palette)
-        apply(to: f)
-        return f
-    }
-    func updateNSView(_ f: ThemedFAB, context: Context) { apply(to: f) }
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedFAB,
-                      context: Context) -> CGSize? { nsView.intrinsicContentSize }
-
-    private func apply(to f: ThemedFAB) {
-        f.palette = palette
-        f.variant = variant
-        f.size = size
-        f.role = role
-        f.leadingSymbol = symbol
-        f.leadingImage = image
-        f.label = label
-        f.isEnabled = enabled
-        f.previewHovered = previewHovered
-        f.previewPressed = previewPressed
-        f.previewFocused = previewFocused
-        f.onTap = onTap
-    }
-}
+import ThemeKitUI
 
 // MARK: - Showcase
 

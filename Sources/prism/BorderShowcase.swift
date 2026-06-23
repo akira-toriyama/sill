@@ -13,36 +13,7 @@ import Palette
 import PaletteKit
 import Effects
 import ThemeKit
-
-// MARK: - SwiftUI bridge for ThemeKit's ThemedBorder
-
-struct ThemedBorderView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    var effect: EffectSpec? = nil
-    var effectsEnabled: Bool = true
-    var cornerRadius: CGFloat = 10
-    var lineWidth: CGFloat = 1.5
-    /// Freeze the live cycle at a fixed phase for deterministic capture (off in
-    /// the bench — the rim animates live, like the Skeleton shimmer).
-    var previewFrozen: Bool = false
-
-    func makeNSView(context: Context) -> ThemedBorder {
-        let b = ThemedBorder(palette: palette, effect: effect)
-        apply(b)
-        return b
-    }
-
-    func updateNSView(_ b: ThemedBorder, context: Context) { apply(b) }
-
-    private func apply(_ b: ThemedBorder) {
-        b.palette = palette
-        b.effect = effect
-        b.effectsEnabled = effectsEnabled
-        b.cornerRadius = cornerRadius
-        b.lineWidth = lineWidth
-        b.previewFrozen = previewFrozen
-    }
-}
+import ThemeKitUI
 
 // MARK: - Showcase: static / live-effect / effect-off, in the current theme
 

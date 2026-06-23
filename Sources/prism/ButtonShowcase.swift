@@ -8,60 +8,7 @@
 import SwiftUI
 import PaletteKit
 import ThemeKit
-
-// MARK: - SwiftUI bridge for ThemeKit's ThemedButton
-
-struct ThemedButtonView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    var variant: ThemedButton.Variant = .text
-    var size: ThemedButton.Size = .medium
-    var role: ThemedButton.Role = .primary
-    var title: String = "Button"
-    var leading: String? = nil
-    var trailing: String? = nil
-    var leadingImage: NSImage? = nil      // pre-resolved icon (SVG / logo / …)
-    var trailingImage: NSImage? = nil
-    var fullWidth = false
-    var enabled = true
-    var previewHovered = false
-    var previewPressed = false
-    var previewFocused = false
-    var onTap: (() -> Void)? = nil
-
-    func makeNSView(context: Context) -> ThemedButton {
-        let b = ThemedButton(palette: palette)
-        apply(to: b)
-        return b
-    }
-
-    func updateNSView(_ b: ThemedButton, context: Context) { apply(to: b) }
-
-    /// Size to the button's own intrinsic content (so it doesn't stretch to fill
-    /// the cell) — except `fullWidth`, which intentionally takes the proposal.
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedButton,
-                      context: Context) -> CGSize? {
-        if fullWidth { return nil }
-        return nsView.intrinsicContentSize
-    }
-
-    private func apply(to b: ThemedButton) {
-        b.palette = palette
-        b.variant = variant
-        b.size = size
-        b.role = role
-        b.title = title
-        b.leadingSymbol = leading
-        b.trailingSymbol = trailing
-        b.leadingImage = leadingImage
-        b.trailingImage = trailingImage
-        b.fullWidth = fullWidth
-        b.isEnabled = enabled
-        b.previewHovered = previewHovered
-        b.previewPressed = previewPressed
-        b.previewFocused = previewFocused
-        b.onTap = onTap
-    }
-}
+import ThemeKitUI
 
 // MARK: - Showcase: variants (live) + every state / role / size in the theme
 

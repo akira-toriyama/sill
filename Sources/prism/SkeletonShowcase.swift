@@ -8,36 +8,7 @@
 import SwiftUI
 import PaletteKit
 import ThemeKit
-
-// MARK: - SwiftUI bridge for ThemeKit's ThemedSkeleton
-
-struct ThemedSkeletonView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    var variant: ThemedSkeleton.Variant = .text
-    var animation: ThemedSkeleton.Animation = .pulse
-    var width: CGFloat? = nil
-    var height: CGFloat? = nil
-    /// Live shimmer in the bench (the 演出 to feel); the screenshot-only freeze
-    /// override defaults off here and is covered by the tests instead.
-    var previewFrozen: Bool = false
-
-    func makeNSView(context: Context) -> ThemedSkeleton {
-        let s = ThemedSkeleton(palette: palette)
-        apply(to: s)
-        return s
-    }
-
-    func updateNSView(_ s: ThemedSkeleton, context: Context) { apply(to: s) }
-
-    private func apply(to s: ThemedSkeleton) {
-        s.palette = palette
-        s.variant = variant
-        s.animation = animation
-        s.width = width
-        s.height = height
-        s.previewFrozen = previewFrozen
-    }
-}
+import ThemeKitUI
 
 // MARK: - Showcase: every variant + animation in the current theme
 

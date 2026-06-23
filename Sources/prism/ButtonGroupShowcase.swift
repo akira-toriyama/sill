@@ -8,61 +8,7 @@
 import SwiftUI
 import PaletteKit
 import ThemeKit
-
-// MARK: - SwiftUI bridge for ThemeKit's ThemedButtonGroup
-
-struct ThemedButtonGroupView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    var titles: [String]
-    var orientation: ThemedButtonGroup.Orientation = .horizontal
-    var variant: ThemedButton.Variant = .outlined
-    var size: ThemedButton.Size = .medium
-    var role: ThemedButton.Role = .primary
-    var mode: ThemedButtonGroup.Mode = .actions
-    var fullWidth = false
-    var enabled = true
-    var disabledMember: Int? = nil
-    var selectedIndex: Int? = nil
-    var previewSelectedIndex: Int? = nil
-    var previewHoveredIndex: Int? = nil
-    var previewFocusedIndex: Int? = nil
-    var onTap: ((Int) -> Void)? = nil
-    var onSelect: ((Int) -> Void)? = nil
-
-    func makeNSView(context: Context) -> ThemedButtonGroup {
-        let g = ThemedButtonGroup(palette: palette)
-        apply(to: g)
-        return g
-    }
-
-    func updateNSView(_ g: ThemedButtonGroup, context: Context) { apply(to: g) }
-
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedButtonGroup,
-                      context: Context) -> CGSize? {
-        if fullWidth { return nil }
-        return nsView.intrinsicContentSize
-    }
-
-    private func apply(to g: ThemedButtonGroup) {
-        g.palette = palette
-        g.orientation = orientation
-        g.variant = variant
-        g.size = size
-        g.role = role
-        g.mode = mode
-        g.fullWidth = fullWidth
-        g.isEnabled = enabled
-        g.segments = titles.enumerated().map { i, t in
-            ThemedButtonGroup.Segment(t, isEnabled: i != disabledMember)
-        }
-        g.selectedIndex = selectedIndex
-        g.previewSelectedIndex = previewSelectedIndex
-        g.previewHoveredIndex = previewHoveredIndex
-        g.previewFocusedIndex = previewFocusedIndex
-        g.onTap = onTap
-        g.onSelect = onSelect
-    }
-}
+import ThemeKitUI
 
 // MARK: - Showcase
 

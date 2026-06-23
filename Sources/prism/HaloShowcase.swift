@@ -8,10 +8,10 @@ import SwiftUI
 import AppKit
 import PaletteKit   // ResolvedPalette
 import Effects      // borderEffectFor, isAnimatableTheme
-// NOTE: SpecimenBox, elevate, uiScale, sysFont, and ThemedBorderView are all
-// prism-LOCAL (Specimens.swift / Gallery.swift / BorderShowcase.swift) — same
-// target, no import needed. ThemedBorderView is prism's NSViewRepresentable
-// bridge that wraps ThemeKit's ThemedBorder, so ThemeKit need not be imported here.
+import ThemeKitUI   // ThemedBorderView (the SwiftUI bridge over ThemeKit's ThemedBorder)
+// NOTE: SpecimenBox, elevate, uiScale, sysFont are prism-LOCAL (Specimens.swift /
+// Gallery.swift). ThemedBorderView now lives in the public ThemeKitUI module
+// (the SwiftUI bridge that wraps ThemeKit's ThemedBorder).
 
 /// A miniature of halo's signature surface: a fake focused window (traffic-light
 /// dots + a title + two content bars) hugged by the live effect ring. The ring

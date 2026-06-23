@@ -8,6 +8,7 @@ import PaletteKit
 import Effects
 import Motion
 import ThemeKit
+import ThemeKitUI
 
 // MARK: - UI scale
 

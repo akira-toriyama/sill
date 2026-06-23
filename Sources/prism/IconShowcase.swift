@@ -13,6 +13,7 @@ import SwiftUI
 import AppKit
 import PaletteKit
 import ThemeKit
+import ThemeKitUI
 
 // MARK: - Memoized loaders
 //

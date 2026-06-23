@@ -7,47 +7,7 @@
 import SwiftUI
 import PaletteKit
 import ThemeKit
-
-// MARK: - SwiftUI bridge for ThemeKit's ThemedCheckbox
-
-struct ThemedCheckboxView: NSViewRepresentable {
-    let palette: ResolvedPalette
-    var size: ThemedCheckbox.Size = .medium
-    var label: String? = nil
-    var isChecked = false
-    var isIndeterminate = false
-    var enabled = true
-    var previewHovered = false
-    var previewPressed = false
-    var previewFocused = false
-    var previewChecked: Bool? = nil
-    var previewIndeterminate: Bool? = nil
-    var onChange: ((Bool) -> Void)? = nil
-
-    func makeNSView(context: Context) -> ThemedCheckbox {
-        let c = ThemedCheckbox(palette: palette)
-        apply(to: c)
-        return c
-    }
-    func updateNSView(_ c: ThemedCheckbox, context: Context) { apply(to: c) }
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedCheckbox,
-                      context: Context) -> CGSize? { nsView.intrinsicContentSize }
-
-    private func apply(to c: ThemedCheckbox) {
-        c.palette = palette
-        c.size = size
-        c.label = label
-        c.isChecked = isChecked
-        c.isIndeterminate = isIndeterminate
-        c.isEnabled = enabled
-        c.previewHovered = previewHovered
-        c.previewPressed = previewPressed
-        c.previewFocused = previewFocused
-        c.previewChecked = previewChecked
-        c.previewIndeterminate = previewIndeterminate
-        c.onChange = onChange
-    }
-}
+import ThemeKitUI
 
 // MARK: - Showcase
 
