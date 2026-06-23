@@ -151,6 +151,16 @@ public final class ThemedTextField: NSView {
     /// already exposed via `syncAccessibility`.
     public func markAccessibilityComboBox() { field.setAccessibilityRole(.comboBox) }
 
+    /// Announce a committed value change on the INNER NSTextField — the element
+    /// VoiceOver actually reads (the ThemedTextField wrapper is AX-transparent:
+    /// it sets no role/element/value on itself; the inner field is what VO sees).
+    /// Sets the AX value attr on the inner field AND posts `.valueChanged` on it.
+    /// Matches the visibility + pattern of `markAccessibilityComboBox()`.
+    public func announceAccessibilityValue(_ value: Any?) {
+        field.setAccessibilityValue(value)
+        NSAccessibility.post(element: field, notification: .valueChanged)
+    }
+
     // MARK: - Internals
 
     private let field = FocusReportingTextField()

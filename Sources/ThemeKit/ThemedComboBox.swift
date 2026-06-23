@@ -316,9 +316,8 @@ public final class ThemedComboBox: NSObject {
         _selectedIndex = nil
         committedValue = ""
         field.clearText()                            // sets "" + fires field.onChange("") → fieldDidChange
-        field.setAccessibilityValue(nil)
         onSelect?(nil)
-        field.postAXValueChanged()
+        field.announceAccessibilityValue(nil)
     }
 
     private func syncTrailingIcons() {
@@ -431,20 +430,18 @@ public final class ThemedComboBox: NSObject {
         guard let idx = options.firstIndex(where: { $0.id == id }) else { return }
         isCommitting = true
         setSelection(idx)
-        field.setAccessibilityValue(selectedItem?.label)
         onSelect?(selectedItem)
         dismissPopup(animated: false)
         field.focus(selectingAll: false)             // re-assert (harmless no-op if already FR)
         isCommitting = false
-        field.postAXValueChanged()
+        field.announceAccessibilityValue(selectedItem?.label)
     }
 
     private func commitFreeText(_ text: String) {
         committedValue = text
         _selectedIndex = options.firstIndex(of: Item(id: text, label: text))
-        field.setAccessibilityValue(text.isEmpty ? nil : text)
         onSelect?(Item(id: text, label: text))
-        field.postAXValueChanged()
+        field.announceAccessibilityValue(text.isEmpty ? nil : text)
     }
 
     /// Programmatic commit that FIRES `onSelect` — the firing counterpart of
@@ -454,14 +451,13 @@ public final class ThemedComboBox: NSObject {
     public func commitSelection(_ index: Int?) {
         if let index, options.indices.contains(index) {
             setSelection(index)          // silent: sets _selectedIndex + committedValue + field text
-            field.setAccessibilityValue(selectedItem?.label)
             onSelect?(selectedItem)
+            field.announceAccessibilityValue(selectedItem?.label)
         } else {
             setSelection(nil)
-            field.setAccessibilityValue(nil)
             onSelect?(nil)
+            field.announceAccessibilityValue(nil)
         }
-        field.postAXValueChanged()
     }
 
     /// Commit the actionable empty row (via the list's `onEmptyAction`) — same
