@@ -36,6 +36,7 @@ import AppKit
 import QuartzCore
 import Palette
 import PaletteKit
+import ListCore
 
 @MainActor
 public final class ThemedMenu: NSObject {
@@ -555,26 +556,26 @@ public final class ThemedMenu: NSObject {
         // The ROOT owns the only monitor; route the keys to the DEEPEST open menu
         // (the active leaf) so a cascade navigates its open child, not the root.
         let leaf = activeLeaf()
-        switch ev.keyCode {
-        case 125: leaf.list.moveHighlight(1);  return nil    // ↓
-        case 126: leaf.list.moveHighlight(-1); return nil    // ↑
-        case 124:                                            // → open the highlighted submenu (else pass through)
+        switch menuKeyIntent(keyCode: ev.keyCode) {
+        case .moveDown: leaf.list.moveHighlight(1);  return nil
+        case .moveUp:   leaf.list.moveHighlight(-1); return nil
+        case .openSubmenu:
             if let id = leaf.list.highlightedID,
                leaf.items.first(where: { $0.id == id })?.submenu.isEmpty == false {
                 leaf.openSubmenu(rowID: id, highlightFirst: true)
                 return nil
             }
             return ev                                        // no submenu on this row → host keeps → (IME safe)
-        case 123:                                            // ← close the current submenu level
-            guard let parent = leaf.parentMenu else { return ev }   // at the root there's no level to close
+        case .closeLevel:
+            guard let parent = leaf.parentMenu else { return ev }
             parent.closeChild()
             return nil
-        case 36, 76, 49: leaf.list.activateHighlight(); return nil   // ⏎ / keypad ⏎ / Space
-        case 53:                                             // Esc — close one level (root ⇒ dismiss all)
+        case .activate: leaf.list.activateHighlight(); return nil
+        case .escapeLevel:
             if let parent = leaf.parentMenu { parent.closeChild() } else { dismiss() }
             return nil
-        case 48:  dismiss(); return ev                       // Tab — dismiss all, don't trap focus
-        default:  return ev                                  // pass everything else through (host IME, etc.)
+        case .dismissTab: dismiss(); return ev
+        case .passThrough: return ev
         }
     }
 
