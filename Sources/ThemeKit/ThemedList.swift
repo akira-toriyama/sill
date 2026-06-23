@@ -1041,14 +1041,8 @@ public final class ThemedList: NSView {
     /// no header is at/above the top. Pure (takes the scroll y) so tests need no
     /// live window.
     func stickyHeader(atVisibleTop bandTop: CGFloat) -> (index: Int, drawY: CGFloat)? {
-        guard let active = rowLayout.headerIndices.last(where: { rowLayout.yOffsets[$0] <= bandTop }) else { return nil }
-        let hH = rowLayout.heights[active]
-        var drawY = bandTop
-        if let next = rowLayout.headerIndices.first(where: { rowLayout.yOffsets[$0] > rowLayout.yOffsets[active] }) {
-            let nextTop = rowLayout.yOffsets[next]
-            if nextTop - bandTop < hH { drawY = nextTop - hH }      // push up (may go < bandTop)
-        }
-        return (active, drawY)
+        ListCore.stickyHeader(atVisibleTop: bandTop, headerIndices: rowLayout.headerIndices,
+                              yOffsets: rowLayout.yOffsets, heights: rowLayout.heights)
     }
 
     private func scrollRowVisible(_ i: Int, position: ScrollPosition) {
