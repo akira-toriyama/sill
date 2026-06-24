@@ -16,13 +16,14 @@
 //   • the app's own unknown-key check — `ObjectShape.keySet` is the section's
 //     accepted key inventory.
 //
-// Why a SECOND family alongside `Spec<Root>`: `Spec` models only flat
-// scalar/array fields and decodes the family's flat-section dialect. This
-// family models the RICHER surface a hand-written imperative-DSL config needs —
-// per-enum-value hover, open string/int maps, nested array-of-tables,
-// parser-recognised-to-reject keys, and cross-field rules — and does not
-// decode. The two coexist; a later step routes `Spec.jsonSchema()` through this
-// emitter so there is ONE lowering.
+// Why a SECOND family alongside `Spec<Root>`: `Spec` decodes the family's
+// flat-section dialect AND emits; this family models the RICHER surface a
+// hand-written imperative-DSL config needs — per-enum-value hover, open
+// string/int maps, nested array-of-tables, parser-recognised-to-reject keys,
+// and cross-field rules — and does not decode. Since #138 S3 the two share ONE
+// lowering: `Spec.jsonSchema()` folds its dotted-header section tree into the
+// `ObjectShape` vocabulary here (`objects` = nested single objects, `permissive`
+// = dynamic-name tables) and emits through the same `SchemaEmit` primitives.
 //
 // Generalised from chord's in-repo descriptor (chord #138 B): chord proved the
 // type shapes against a real, complex config; this is the app-agnostic move
@@ -40,6 +41,7 @@ public struct SchemaField: Sendable, Equatable {
     public enum Shape: Sendable, Equatable {
         case string                 // plain or free-form DSL string
         case integer
+        case number                 // a floating-point scalar (JSON `number`)
         case boolean
         case stringOrStringArray    // a string OR an array of strings
         case stringArray            // an array of strings
@@ -56,10 +58,22 @@ public struct SchemaField: Sendable, Equatable {
     /// skips that value). Emitted as `x-taplo.docs.enumValues` — taplo's
     /// per-value hover, which a single `description` cannot give.
     public let enumDocs: [String?]?
+    /// For a `.stringArray`, a finite value set applied to each ELEMENT →
+    /// `items.enum`. nil = free-form string elements.
+    public let arrayItemEnum: [String]?
     public let defaultBool: Bool?
     public let defaultInt: Int?
+    public let defaultString: String?
+    public let defaultNumber: Double?
+    public let defaultStringArray: [String]?
     /// A `> n` lower bound → `exclusiveMinimum`.
     public let exclusiveMinimum: Int?
+    /// Inclusive bounds → `minimum` / `maximum`. Carried as `Double` (the
+    /// JSON-number domain): a whole bound on an `.integer` still serialises as
+    /// `30`, a fractional one on a `.number` as `0.5` — JSONSerialization picks
+    /// the shortest round-trippable form.
+    public let minimum: Double?
+    public let maximum: Double?
     public let doc: String
     /// A key the app's PARSER recognises but that is NOT schema-valid — it is
     /// listed only so the unknown-key check (via [ObjectShape.keySet]) does not
@@ -69,12 +83,22 @@ public struct SchemaField: Sendable, Equatable {
 
     public init(_ key: String, _ shape: Shape, doc: String,
                 enumDomain: [String]? = nil, enumDocs: [String?]? = nil,
+                arrayItemEnum: [String]? = nil,
                 defaultBool: Bool? = nil, defaultInt: Int? = nil,
-                exclusiveMinimum: Int? = nil, rejected: Bool = false) {
+                defaultString: String? = nil, defaultNumber: Double? = nil,
+                defaultStringArray: [String]? = nil,
+                exclusiveMinimum: Int? = nil,
+                minimum: Double? = nil, maximum: Double? = nil,
+                rejected: Bool = false) {
         self.key = key; self.shape = shape; self.doc = doc
         self.enumDomain = enumDomain; self.enumDocs = enumDocs
+        self.arrayItemEnum = arrayItemEnum
         self.defaultBool = defaultBool; self.defaultInt = defaultInt
-        self.exclusiveMinimum = exclusiveMinimum; self.rejected = rejected
+        self.defaultString = defaultString; self.defaultNumber = defaultNumber
+        self.defaultStringArray = defaultStringArray
+        self.exclusiveMinimum = exclusiveMinimum
+        self.minimum = minimum; self.maximum = maximum
+        self.rejected = rejected
     }
 }
 
@@ -102,7 +126,19 @@ public struct ObjectShape: Sendable {
     public let required: [String]
     public let exclusions: [ExclusionRule]
     public let nested: [NestedTable]
+    /// Nested SINGLE-object children (one `[parent.child]` sub-table, not an
+    /// array-of-tables) → an object property. The representation a dotted-header
+    /// section tree folds into (`[cast.overlay]` → a `cast` shape with an
+    /// `overlay` object); empty for the flat array-of-tables surface.
+    public let objects: [NestedObject]
     public let doc: String
+    /// `additionalProperties` policy. `false` (default) = a strict table that
+    /// rejects typo'd keys; `true` = a permissive object for dynamic key names
+    /// that can't be enumerated (custom palettes, per-app overrides, the
+    /// `[desktop.N]` dialect). NOTE: the typed open-map sections
+    /// (`openStringMap` / `openIntMap`) carry their own value schema and do not
+    /// use this flag.
+    public let permissive: Bool
     /// Keys taplo pre-inserts when autocompleting a new table of this shape
     /// (`x-taplo.initKeys`) — a curated starter set for array-of-tables items.
     public let initKeys: [String]
@@ -115,17 +151,33 @@ public struct ObjectShape: Sendable {
 
     public init(fields: [SchemaField], required: [String] = [],
                 exclusions: [ExclusionRule] = [], nested: [NestedTable] = [],
-                doc: String = "", initKeys: [String] = [],
+                objects: [NestedObject] = [], doc: String = "",
+                permissive: Bool = false, initKeys: [String] = [],
                 constraints: [String] = []) {
         self.fields = fields; self.required = required
-        self.exclusions = exclusions; self.nested = nested; self.doc = doc
+        self.exclusions = exclusions; self.nested = nested
+        self.objects = objects; self.doc = doc; self.permissive = permissive
         self.initKeys = initKeys; self.constraints = constraints
     }
 
-    /// Every key this object accepts (own fields + nested-table keys) — the
-    /// app's unknown-key validation surface and the shape tests' inventory.
+    /// Every key this object accepts (own fields + nested-table + nested-object
+    /// keys) — the app's unknown-key validation surface and the shape tests'
+    /// inventory.
     public var keySet: Set<String> {
-        Set(fields.map(\.key)).union(nested.map(\.key))
+        Set(fields.map(\.key))
+            .union(nested.map(\.key))
+            .union(objects.map(\.key))
+    }
+}
+
+/// A single-object child nested inside an [ObjectShape] — the schema for one
+/// `[parent.child]` sub-table (vs [NestedTable]'s `[[parent.child]]` array).
+/// The child's `description` comes from its own [ObjectShape.doc].
+public struct NestedObject: Sendable {
+    public let key: String          // e.g. "overlay", "cursor"
+    public let shape: ObjectShape
+    public init(key: String, shape: ObjectShape) {
+        self.key = key; self.shape = shape
     }
 }
 

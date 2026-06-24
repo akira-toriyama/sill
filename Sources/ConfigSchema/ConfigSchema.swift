@@ -31,8 +31,9 @@
 // `ObjectShape` / `SchemaField` / `ExclusionRule`. It models the RICHER input
 // surface a hand-written imperative-DSL config needs (per-enum-value hover,
 // open maps, nested arrays-of-tables, cross-field rules) and only EMITS (and,
-// later, validates) — it does not decode. The two coexist; a later step routes
-// `Spec.jsonSchema()` through that emitter so there is ONE lowering.
+// later, validates) — it does not decode. Since #138 S3 there is ONE lowering:
+// `Spec.jsonSchema()` folds its dotted-header section tree into that family's
+// `ObjectShape` vocabulary and emits through the shared `SchemaEmit` emitter.
 
 import Foundation
 import Toml
@@ -77,6 +78,10 @@ public enum ConfigSchema {
         public let kind: Kind
         public let apply: (inout Root, Toml.Value) -> Void
         public var domain: [String]?        // enum values for a string scalar
+        /// Per-enum-value hover docs, index-aligned to `domain` (a nil entry
+        /// skips that value) → taplo's `x-taplo.docs.enumValues`, the per-value
+        /// hover a single `description` can't give. Only meaningful with `domain`.
+        public var enumDocs: [String?]?
         public var def: DefaultValue?
         public var min: Double?
         public var max: Double?
@@ -87,6 +92,7 @@ public enum ConfigSchema {
             kind: Kind,
             apply: @escaping (inout Root, Toml.Value) -> Void,
             domain: [String]? = nil,
+            enumDocs: [String?]? = nil,
             def: DefaultValue? = nil,
             min: Double? = nil,
             max: Double? = nil,
@@ -96,6 +102,7 @@ public enum ConfigSchema {
             self.kind = kind
             self.apply = apply
             self.domain = domain
+            self.enumDocs = enumDocs
             self.def = def
             self.min = min
             self.max = max
@@ -165,16 +172,33 @@ public extension ConfigSchema.Spec {
 
 // MARK: - JSON Schema emission (drives `--emit-schema`)
 
-/// A mutable object-schema node while folding the spec's (possibly
-/// dotted) section headers into a tree. `permissive` flips
-/// `additionalProperties` to `true` for dynamic-name tables (custom
-/// palettes / per-app overrides / synonym maps) whose keys can't be
+/// A mutable node while folding the spec's (possibly dotted) section
+/// headers into a tree. The fold builds typed leaves (`fields` / `arrays` /
+/// child `children`) which are then converted to an `ObjectShape` tree and
+/// lowered through the SHARED `SchemaEmit` emitter — so `Spec` and
+/// `SchemaDescriptor` share ONE field/object lowering (ConfigSchema #138 S3).
+/// `permissive` flips `additionalProperties` to `true` for dynamic-name tables
+/// (custom palettes / per-app overrides / synonym maps) whose keys can't be
 /// enumerated; otherwise it stays `false` so taplo flags typo'd keys.
 private final class SchemaNode {
-    var properties: [String: Any] = [:]   // scalar/array field schemas
-    var children: [String: SchemaNode] = [:]
+    var fields: [SchemaField] = []                          // scalar / array leaves
+    var arrays: [(key: String, item: ObjectShape)] = []     // `[[header]]` children
+    var children: [String: SchemaNode] = [:]                // nested object sub-tables
     var description: String?
     var permissive = false
+
+    /// Fold this node into the shared `ObjectShape` vocabulary. Child sub-tables
+    /// become nested objects and array-of-tables become nested tables; both
+    /// land in `properties` alongside this node's own scalar fields when
+    /// `SchemaEmit.emitObject` lowers the result.
+    func toObjectShape() -> ObjectShape {
+        ObjectShape(
+            fields: fields,
+            nested: arrays.map { NestedTable(key: $0.key, item: $0.item) },
+            objects: children.map { NestedObject(key: $0.key, shape: $0.value.toObjectShape()) },
+            doc: description ?? "",
+            permissive: permissive)
+    }
 }
 
 public extension ConfigSchema.Spec {
@@ -191,27 +215,36 @@ public extension ConfigSchema.Spec {
     /// leaf keys merge with its nested children (e.g. `[cast]` scalars +
     /// `[cast.overlay]`). One source (`sections`) ⇒ schema can't drift
     /// from the decode.
+    ///
+    /// The fold builds an `ObjectShape` tree and lowers it through the shared
+    /// `SchemaEmit` emitter (the same one `SchemaDescriptor` uses), so the
+    /// JSON-shape rules live in ONE place. Output spelling matches the historic
+    /// `Spec` emission byte-for-byte (bare slashes + a trailing newline), with
+    /// ONE deliberate normalization: an EXPLICIT empty-string `doc` ("") is now
+    /// treated like an absent doc and OMITS `description` — where the old
+    /// lowering emitted `"description": ""`. No real spec passes `doc: ""` (the
+    /// field/section builders default it to nil), and an empty description is
+    /// noise; the shared `doc: String` ("" = none) is not widened to `Optional`
+    /// just to reproduce that wart. See SpecEmitLoweringTests.
     func jsonSchema() -> String {
+        let options = SchemaDescriptor.EmitOptions(escapeSlashes: false, trailingNewline: true)
         let root = SchemaNode()
         for section in sections {
             switch section.kind {
             case .table:
                 let node = Self.descend(root, Self.pathComponents(section.header))
                 node.description = node.description ?? section.doc
-                for field in section.fields {
-                    node.properties[field.key] = Self.fieldSchema(field)
-                }
+                node.fields.append(contentsOf: section.fields.map(Self.schemaField))
             case .arrayOfTables:
-                // `[[a.b.name]]` → an array of objects at `a → b → name`.
+                // `[[a.b.name]]` → an array of objects at `a → b → name`. The
+                // section doc rides the ITEM (not the array node) — the shared
+                // NestedTable convention, matching the historic Spec emission.
                 let path = Self.pathComponents(section.header)
                 guard let last = path.last else { break }
                 let parent = Self.descend(root, Array(path.dropLast()))
-                var props: [String: Any] = [:]
-                for field in section.fields { props[field.key] = Self.fieldSchema(field) }
-                var items: [String: Any] = ["type": "object", "additionalProperties": false]
-                if !props.isEmpty { items["properties"] = props }
-                if let doc = section.doc { items["description"] = doc }
-                parent.properties[last] = ["type": "array", "items": items] as [String: Any]
+                let item = ObjectShape(fields: section.fields.map(Self.schemaField),
+                                       doc: section.doc ?? "")
+                parent.arrays.append((key: last, item: item))
             case .dynamicTable:
                 if section.header.contains("\"") {
                     // A literal-quote header (`behavior."<bundle-id>"`) marks
@@ -230,10 +263,15 @@ public extension ConfigSchema.Spec {
                 }
             }
         }
-        var schema = Self.objectSchema(root)
+        // The root carries the top-level `Section("")` doc (if any) on its own
+        // shape — pass it as the root's sectionDoc so a documented top-level
+        // scope keeps its `description` (emitObject reads the parameter, not
+        // shape.doc, for the object's own description).
+        let rootShape = root.toObjectShape()
+        var schema = SchemaEmit.emitObject(rootShape, sectionDoc: rootShape.doc, options)
         schema["$schema"] = "http://json-schema.org/draft-07/schema#"
         schema["title"] = title
-        return Self.serialize(schema)
+        return SchemaEmit.serialize(schema, options)
     }
 
     /// Split a (possibly dotted) section header into path components.
@@ -259,66 +297,58 @@ public extension ConfigSchema.Spec {
         return cur
     }
 
-    /// Serialize a node to a JSON-Schema object. Child sub-objects merge
-    /// into `properties` alongside the node's own scalar fields; an empty
-    /// `properties` is omitted (a bare permissive/dynamic object).
-    private static func objectSchema(_ node: SchemaNode) -> [String: Any] {
-        var props = node.properties
-        for (name, child) in node.children { props[name] = objectSchema(child) }
-        var obj: [String: Any] = [
-            "type": "object",
-            "additionalProperties": node.permissive,
-        ]
-        if !props.isEmpty { obj["properties"] = props }
-        if let doc = node.description { obj["description"] = doc }
-        return obj
-    }
-
-    private static func fieldSchema(_ field: ConfigSchema.Field<Root>) -> [String: Any] {
-        var s: [String: Any] = [:]
+    /// Convert a decode-bearing `Spec.Field` into the decode-free `SchemaField`
+    /// the shared emitter consumes. `apply` is dropped (emission ignores it);
+    /// type / enum / range / default / doc carry over so the output is identical
+    /// to the historic per-field lowering.
+    private static func schemaField(_ field: ConfigSchema.Field<Root>) -> SchemaField {
+        let shape: SchemaField.Shape
+        var itemEnum: [String]?
+        // Scalar-only metadata. The historic `fieldSchema` emitted `enum` /
+        // `minimum` / `maximum` ONLY in the `.scalar` branch, so a `.stringArray`
+        // field's stray `domain` / `min` / `max` was dropped (the element enum
+        // rides `.stringArray(item:)` instead). Gate them on the kind to keep
+        // that exact contract; `enumDocs` pairs with the scalar enum, so it
+        // follows the same gate.
+        var domain: [String]?
+        var enumDocs: [String?]?
+        var minimum: Double?
+        var maximum: Double?
         switch field.kind {
         case .scalar(let scalar):
-            s["type"] = jsonType(scalar)
-            if let domain = field.domain { s["enum"] = domain }
-            if let lo = field.min { s["minimum"] = lo }
-            if let hi = field.max { s["maximum"] = hi }
+            switch scalar {
+            case .string:  shape = .string
+            case .integer: shape = .integer
+            case .number:  shape = .number
+            case .boolean: shape = .boolean
+            }
+            domain = field.domain
+            enumDocs = field.enumDocs
+            minimum = field.min
+            maximum = field.max
         case .stringArray(let item):
-            s["type"] = "array"
-            var items: [String: Any] = ["type": "string"]
-            if let item { items["enum"] = item }
-            s["items"] = items
+            shape = .stringArray
+            itemEnum = item
         }
-        if let def = field.def { s["default"] = defaultJSON(def) }
-        if let doc = field.doc { s["description"] = doc }
-        return s
-    }
-
-    private static func jsonType(_ scalar: ConfigSchema.Scalar) -> String {
-        switch scalar {
-        case .string:  return "string"
-        case .integer: return "integer"
-        case .number:  return "number"
-        case .boolean: return "boolean"
+        // `default` and `doc` carried for BOTH kinds (matching the historic
+        // lowering). Map the descriptive default onto its typed slot purely by
+        // the DefaultValue case, mirroring the old `defaultJSON` switch.
+        var defBool: Bool?; var defInt: Int?; var defString: String?
+        var defNumber: Double?; var defStringArray: [String]?
+        switch field.def {
+        case .bool(let b):        defBool = b
+        case .int(let i):         defInt = i
+        case .string(let s):      defString = s
+        case .number(let d):      defNumber = d
+        case .stringArray(let a): defStringArray = a
+        case nil:                 break
         }
-    }
-
-    private static func defaultJSON(_ def: ConfigSchema.DefaultValue) -> Any {
-        switch def {
-        case .string(let s):      return s
-        case .int(let i):         return i
-        case .number(let d):      return d
-        case .bool(let b):        return b
-        case .stringArray(let a): return a
-        }
-    }
-
-    private static func serialize(_ root: [String: Any]) -> String {
-        guard let data = try? JSONSerialization.data(
-            withJSONObject: root,
-            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        ), let text = String(data: data, encoding: .utf8) else {
-            return "{}"
-        }
-        return text + "\n"
+        return SchemaField(
+            field.key, shape, doc: field.doc ?? "",
+            enumDomain: domain, enumDocs: enumDocs,
+            arrayItemEnum: itemEnum,
+            defaultBool: defBool, defaultInt: defInt, defaultString: defString,
+            defaultNumber: defNumber, defaultStringArray: defStringArray,
+            minimum: minimum, maximum: maximum)
     }
 }

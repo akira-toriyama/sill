@@ -1,5 +1,15 @@
-// SchemaDescriptorEmit.swift — lower a `SchemaDescriptor` to a Draft-07 JSON
+// SchemaDescriptorEmit.swift — lower a config-surface model to a Draft-07 JSON
 // Schema string for editor completion (taplo).
+//
+// THE ONE LOWERING. Both config-surface front-ends in this module emit through
+// the `SchemaEmit` primitives here:
+//
+//   • `SchemaDescriptor` (the decode-free, cross-field-rule-bearing surface) —
+//     `SchemaDescriptor.jsonSchema(options:)` below.
+//   • `ConfigSchema.Spec<Root>` (the decode + emit surface) — its
+//     `jsonSchema()` folds dotted headers into an `ObjectShape` tree and emits
+//     it through these same `SchemaEmit.emitObject` / `.serialize` calls, so a
+//     field/object lowering change lands in ONE place (ConfigSchema #138 S3).
 //
 // Deterministic: built with `JSONSerialization [.sortedKeys, .prettyPrinted]`
 // so a freshly emitted string is byte-stable across runs/platforms — a CI
@@ -50,15 +60,23 @@ public extension SchemaDescriptor {
         if let comment { root["$comment"] = comment }
         var props: [String: Any] = [:]
         for section in sections {
-            props[section.name] = Self.emitSection(section, options)
+            props[section.name] = SchemaEmit.emitSection(section, options)
         }
         root["properties"] = props
-        return Self.serialize(root, options)
+        return SchemaEmit.serialize(root, options)
     }
+}
 
-    // MARK: - lowering
+// MARK: - The shared lowering (model → Draft-07 dict → string)
 
-    private static func emitSection(_ s: SchemaSection, _ options: EmitOptions) -> [String: Any] {
+/// The single field/object/serialize lowering shared by both `SchemaDescriptor`
+/// and `ConfigSchema.Spec`. Internal: the public entry points are the two
+/// `jsonSchema(…)` methods; these are their common machinery.
+enum SchemaEmit {
+
+    typealias EmitOptions = SchemaDescriptor.EmitOptions
+
+    static func emitSection(_ s: SchemaSection, _ options: EmitOptions) -> [String: Any] {
         switch s.kind {
         case .table(let shape):
             return emitObject(shape, sectionDoc: s.doc, options)
@@ -84,11 +102,13 @@ public extension SchemaDescriptor {
         }
     }
 
-    private static func emitObject(_ shape: ObjectShape, sectionDoc: String,
-                                   _ options: EmitOptions) -> [String: Any] {
+    static func emitObject(_ shape: ObjectShape, sectionDoc: String,
+                           _ options: EmitOptions) -> [String: Any] {
         var obj: [String: Any] = [
             "type": "object",
-            "additionalProperties": false,
+            // false = strict (reject typo'd keys); true = permissive (dynamic
+            // key names the schema can't enumerate).
+            "additionalProperties": shape.permissive,
         ]
         if !sectionDoc.isEmpty { obj["description"] = sectionDoc }
 
@@ -102,7 +122,14 @@ public extension SchemaDescriptor {
             if n.nonEmpty { arr["minItems"] = 1 }
             props[n.key] = arr
         }
-        obj["properties"] = props
+        // Nested SINGLE objects (dotted-header folding): each is its own
+        // strict/permissive object, described by its shape's own doc.
+        for o in shape.objects {
+            props[o.key] = emitObject(o.shape, sectionDoc: o.shape.doc, options)
+        }
+        // A bare permissive object (dynamic key names, no enumerable keys) has
+        // no `properties`; omit the empty map rather than emit `{}`.
+        if !props.isEmpty { obj["properties"] = props }
 
         if !shape.required.isEmpty { obj["required"] = shape.required }
 
@@ -139,20 +166,24 @@ public extension SchemaDescriptor {
         return obj
     }
 
-    private static func emitField(_ f: SchemaField) -> [String: Any] {
+    static func emitField(_ f: SchemaField) -> [String: Any] {
         var out: [String: Any] = [:]
         switch f.shape {
         case .string:
             out["type"] = "string"
         case .integer:
             out["type"] = "integer"
+        case .number:
+            out["type"] = "number"
         case .boolean:
             out["type"] = "boolean"
         case .stringOrStringArray:
             out["oneOf"] = [["type": "string"], ["type": "array", "items": ["type": "string"]]]
         case .stringArray:
             out["type"] = "array"
-            out["items"] = ["type": "string"]
+            var items: [String: Any] = ["type": "string"]
+            if let e = f.arrayItemEnum { items["enum"] = e }
+            out["items"] = items
         case .constTrue:
             out["const"] = true
         case .intMap:
@@ -166,7 +197,12 @@ public extension SchemaDescriptor {
         if let e = f.enumDomain { out["enum"] = e }
         if let d = f.defaultBool { out["default"] = d }
         if let d = f.defaultInt { out["default"] = d }
+        if let d = f.defaultString { out["default"] = d }
+        if let d = f.defaultNumber { out["default"] = d }
+        if let d = f.defaultStringArray { out["default"] = d }
         if let m = f.exclusiveMinimum { out["exclusiveMinimum"] = m }
+        if let m = f.minimum { out["minimum"] = m }
+        if let m = f.maximum { out["maximum"] = m }
         if !f.doc.isEmpty { out["description"] = f.doc }
         // Per-enum-value hover (taplo `x-taplo.docs.enumValues`, index-aligned
         // to `enum`; a nil entry → JSON null skips that value). taplo does NOT
@@ -179,7 +215,7 @@ public extension SchemaDescriptor {
         return out
     }
 
-    private static func serialize(_ obj: [String: Any], _ options: EmitOptions) -> String {
+    static func serialize(_ obj: [String: Any], _ options: EmitOptions) -> String {
         var writing: JSONSerialization.WritingOptions = [.sortedKeys, .prettyPrinted]
         if !options.escapeSlashes { writing.insert(.withoutEscapingSlashes) }
         guard let data = try? JSONSerialization.data(withJSONObject: obj, options: writing),

@@ -423,4 +423,97 @@ final class SchemaDescriptorTests: XCTestCase {
                                          NestedTable(key: "per-space", item: leaf)])
         XCTAssertEqual(shape.keySet, ["id", "per-app", "per-space"])
     }
+
+    // MARK: - #138 S3: shared vocabulary additions (number / bounds / typed
+    // defaults / array-item enum / permissive object / nested single object).
+    // These let `Spec.jsonSchema()` route through this emitter; they are also
+    // available to a descriptor written by hand (perch/wand).
+
+    /// One table exercising every S3 leaf addition.
+    private func s3Fields() throws -> [String: Any] {
+        let d = SchemaDescriptor(title: "t", sections: [
+            SchemaSection("opts", .table(ObjectShape(fields: [
+                SchemaField("scale", .number, doc: "A float.",
+                            defaultNumber: 0.9, minimum: 0.1, maximum: 30),
+                SchemaField("name", .string, doc: "", defaultString: "tree"),
+                SchemaField("pets", .stringArray, doc: "",
+                            arrayItemEnum: ["chomp", "ghost"],
+                            defaultStringArray: ["chomp"]),
+            ])), doc: "opts"),
+        ])
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(d.jsonSchema().utf8)) as? [String: Any])
+        return try XCTUnwrap((obj["properties"] as? [String: Any])?["opts"] as? [String: Any])
+    }
+
+    func testNumberShapeAndInclusiveBounds() throws {
+        let props = try XCTUnwrap(s3Fields()["properties"] as? [String: Any])
+        let scale = try XCTUnwrap(props["scale"] as? [String: Any])
+        XCTAssertEqual(scale["type"] as? String, "number")
+        XCTAssertEqual(scale["default"] as? Double, 0.9)
+        // Inclusive bounds carried as Double; a whole one still serialises clean.
+        XCTAssertEqual(scale["maximum"] as? Int, 30)
+        XCTAssertEqual(scale["minimum"] as? Double, 0.1)
+    }
+
+    func testTypedDefaultsStringAndNumberAndArray() throws {
+        let props = try XCTUnwrap(s3Fields()["properties"] as? [String: Any])
+        XCTAssertEqual((props["name"] as? [String: Any])?["default"] as? String, "tree")
+        let pets = try XCTUnwrap(props["pets"] as? [String: Any])
+        XCTAssertEqual(pets["default"] as? [String], ["chomp"])
+        XCTAssertEqual((pets["items"] as? [String: Any])?["enum"] as? [String], ["chomp", "ghost"])
+    }
+
+    /// A whole-valued `Double` bound must render as `30`, not `30.0`.
+    func testWholeDoubleBoundRendersClean() throws {
+        let d = SchemaDescriptor(title: "t", sections: [
+            SchemaSection("o", .table(ObjectShape(fields: [
+                SchemaField("n", .integer, doc: "", minimum: 1, maximum: 12),
+            ])), doc: "o"),
+        ])
+        let raw = d.jsonSchema()
+        XCTAssertTrue(raw.contains("\"maximum\" : 12"))
+        XCTAssertFalse(raw.contains("12.0"))
+        XCTAssertFalse(raw.contains("1.0"))
+    }
+
+    func testPermissiveObjectAndNestedSingleObject() throws {
+        // A strict parent table holding one permissive child object and one
+        // strict child object (the dotted-header fold target).
+        let permissiveChild = ObjectShape(fields: [], doc: "Dynamic names.", permissive: true)
+        let strictChild = ObjectShape(fields: [SchemaField("enabled", .boolean, doc: "")])
+        let parent = ObjectShape(
+            fields: [SchemaField("button", .string, doc: "")],
+            objects: [NestedObject(key: "themes", shape: permissiveChild),
+                      NestedObject(key: "overlay", shape: strictChild)],
+            doc: "Parent.")
+        let d = SchemaDescriptor(title: "t", sections: [
+            SchemaSection("cast", .table(parent), doc: "cast"),
+        ])
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(d.jsonSchema().utf8)) as? [String: Any])
+        let cast = try XCTUnwrap((obj["properties"] as? [String: Any])?["cast"] as? [String: Any])
+        XCTAssertEqual(cast["additionalProperties"] as? Bool, false)
+        let castProps = try XCTUnwrap(cast["properties"] as? [String: Any])
+        XCTAssertNotNil(castProps["button"], "own field sits beside nested objects")
+
+        // Permissive child: additionalProperties true, NO properties map.
+        let themes = try XCTUnwrap(castProps["themes"] as? [String: Any])
+        XCTAssertEqual(themes["additionalProperties"] as? Bool, true)
+        XCTAssertNil(themes["properties"], "an empty permissive object omits properties")
+        XCTAssertEqual(themes["description"] as? String, "Dynamic names.")
+
+        // Strict child: additionalProperties false, with its own properties.
+        let overlay = try XCTUnwrap(castProps["overlay"] as? [String: Any])
+        XCTAssertEqual(overlay["additionalProperties"] as? Bool, false)
+        XCTAssertNotNil((overlay["properties"] as? [String: Any])?["enabled"])
+
+        // Nested-object keys join the keySet.
+        XCTAssertEqual(parent.keySet, ["button", "themes", "overlay"])
+    }
+
+    func testNonPermissiveDefaultUnchanged() throws {
+        // The permissive flag defaults false: an ordinary table is still strict
+        // (guards the chord byte-identity — chord never sets `permissive`).
+        let item = try bindingItem(try emitted())
+        XCTAssertEqual(item["additionalProperties"] as? Bool, false)
+    }
 }
