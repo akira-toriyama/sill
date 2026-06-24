@@ -25,6 +25,14 @@
 // `decode` drives ONLY `.table` sections (the uniform bulk) — an app keeps
 // its own bespoke decode for arrays-of-tables / dynamic sections, which
 // the spec still DESCRIBES for the schema.
+//
+// A SECOND, decode-free type family lives alongside `Spec<Root>` in this
+// module (SchemaDescriptor.swift): `SchemaDescriptor` / `SchemaSection` /
+// `ObjectShape` / `SchemaField` / `ExclusionRule`. It models the RICHER input
+// surface a hand-written imperative-DSL config needs (per-enum-value hover,
+// open maps, nested arrays-of-tables, cross-field rules) and only EMITS (and,
+// later, validates) — it does not decode. The two coexist; a later step routes
+// `Spec.jsonSchema()` through that emitter so there is ONE lowering.
 
 import Foundation
 import Toml
