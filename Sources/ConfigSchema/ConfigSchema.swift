@@ -228,6 +228,24 @@ public extension ConfigSchema.Spec {
     /// just to reproduce that wart. See SpecEmitLoweringTests.
     func jsonSchema() -> String {
         let options = SchemaDescriptor.EmitOptions(escapeSlashes: false, trailingNewline: true)
+        // The root carries the top-level `Section("")` doc (if any) on its own
+        // shape — pass it as the root's sectionDoc so a documented top-level
+        // scope keeps its `description` (emitObject reads the parameter, not
+        // shape.doc, for the object's own description).
+        let rootShape = foldedRoot().toObjectShape()
+        var schema = SchemaEmit.emitObject(rootShape, sectionDoc: rootShape.doc, options)
+        schema["$schema"] = "http://json-schema.org/draft-07/schema#"
+        schema["title"] = title
+        return SchemaEmit.serialize(schema, options)
+    }
+
+    /// Fold the (possibly dotted) section headers into the shared `SchemaNode`
+    /// tree. The ONE fold consumed by BOTH `jsonSchema()` (→ `ObjectShape` →
+    /// Draft-07) and `makeDescriptor()` (→ `SchemaDescriptor` → runtime
+    /// validate), so emit and validate can't drift from the single `sections`
+    /// source (ConfigSchema #138 — the validation half of S3's single-source
+    /// promise).
+    private func foldedRoot() -> SchemaNode {
         let root = SchemaNode()
         for section in sections {
             switch section.kind {
@@ -263,15 +281,53 @@ public extension ConfigSchema.Spec {
                 }
             }
         }
-        // The root carries the top-level `Section("")` doc (if any) on its own
-        // shape — pass it as the root's sectionDoc so a documented top-level
-        // scope keeps its `description` (emitObject reads the parameter, not
-        // shape.doc, for the object's own description).
-        let rootShape = root.toObjectShape()
-        var schema = SchemaEmit.emitObject(rootShape, sectionDoc: rootShape.doc, options)
-        schema["$schema"] = "http://json-schema.org/draft-07/schema#"
-        schema["title"] = title
-        return SchemaEmit.serialize(schema, options)
+        return root
+    }
+}
+
+// MARK: - Runtime validate (drives the app's `config --validate`)
+
+public extension ConfigSchema.Spec {
+    /// Lower this spec to a decode-free [SchemaDescriptor] — the surface the
+    /// generic runtime validator (`SchemaDescriptor.validate`) and the JSON
+    /// emitter both consume. Built from the SAME `foldedRoot()` fold as
+    /// `jsonSchema()`, so the schema taplo checks and the rules the loader
+    /// enforces are one source: "editor green" and "loader accepts it" cannot
+    /// diverge.
+    ///
+    /// Each top-level folded node becomes a `[header]` table section; a
+    /// top-level `[[header]]` becomes an array-of-tables section. Nested dotted
+    /// children (`[cast.overlay]`, `[[cast.cursor.rule]]`) ride inside their
+    /// parent section's `ObjectShape` (objects / nested), matching the NESTED
+    /// `Toml.parse` document the validator walks. `.dynamicTable` sections fold
+    /// to `permissive` object shapes (arbitrary keys accepted) — the same
+    /// `additionalProperties: true` the emitter produces.
+    ///
+    /// Section order is by key (deterministic); the validator is
+    /// order-independent. Top-level bare scalar keys (a `Section("")` with
+    /// fields) are NOT represented — the validator walks named sections only.
+    /// No family spec currently uses a bare top-level field.
+    func makeDescriptor() -> SchemaDescriptor {
+        let root = foldedRoot()
+        var sections: [SchemaSection] = []
+        for (name, node) in root.children.sorted(by: { $0.key < $1.key }) {
+            sections.append(SchemaSection(name, .table(node.toObjectShape()),
+                                          doc: node.description ?? ""))
+        }
+        for (key, item) in root.arrays {
+            sections.append(SchemaSection(key, .arrayOfTables(item), doc: item.doc))
+        }
+        return SchemaDescriptor(title: title, sections: sections)
+    }
+
+    /// Validate a decoded NESTED config document (`Toml.parse(_).` root, NOT
+    /// the flat `parseFlat` map `decode` reads) against this spec's structural +
+    /// cross-field rules. Convenience for `makeDescriptor().validate(root)` so a
+    /// consumer's `config --validate` is one call on the same `configSpec` it
+    /// already uses for decode + emit. Returns every violation (does not stop at
+    /// the first); an empty array means structurally valid.
+    func validate(_ root: [String: Toml.Value]) -> [ValidationError] {
+        makeDescriptor().validate(root)
     }
 
     /// Split a (possibly dotted) section header into path components.
