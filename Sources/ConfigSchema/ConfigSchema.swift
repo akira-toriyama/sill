@@ -30,8 +30,8 @@
 // module (SchemaDescriptor.swift): `SchemaDescriptor` / `SchemaSection` /
 // `ObjectShape` / `SchemaField` / `ExclusionRule`. It models the RICHER input
 // surface a hand-written imperative-DSL config needs (per-enum-value hover,
-// open maps, nested arrays-of-tables, cross-field rules) and only EMITS (and,
-// later, validates) — it does not decode. Since #138 S3 there is ONE lowering:
+// open maps, nested arrays-of-tables, cross-field rules) and EMITS + VALIDATES
+// (Validator.swift) — it does not decode. Since #138 S3 there is ONE lowering:
 // `Spec.jsonSchema()` folds its dotted-header section tree into that family's
 // `ObjectShape` vocabulary and emits through the shared `SchemaEmit` emitter.
 

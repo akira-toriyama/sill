@@ -12,7 +12,8 @@
 //   • `jsonSchema(options:)` — a Draft-07 JSON Schema for editor completion
 //     (taplo), emitted here (this file's sibling, SchemaDescriptorEmit.swift).
 //   • a generic runtime validator — run the SAME structural/cross-field rules
-//     over a decoded document (future work; the rules are already pure data).
+//     over a decoded document (`SchemaDescriptor.validate`, Validator.swift) so
+//     "editor green" and "loader accepts it" cannot diverge.
 //   • the app's own unknown-key check — `ObjectShape.keySet` is the section's
 //     accepted key inventory.
 //
@@ -27,8 +28,8 @@
 //
 // Generalised from chord's in-repo descriptor (chord #138 B): chord proved the
 // type shapes against a real, complex config; this is the app-agnostic move
-// into sill so facet / wand / perch / halo can share the emit (and, later,
-// validate) machinery. App-specific spellings (the vendor-constraints key
+// into sill so facet / wand / perch / halo can share the emit + validate
+// machinery. App-specific spellings (the vendor-constraints key
 // name, slash-escaping, trailing newline) are `EmitOptions` knobs, not baked
 // in. Pure / Sendable / Foundation-only (zero AppKit, zero Palette, zero Toml).
 
@@ -220,8 +221,8 @@ public struct SchemaSection: Sendable {
 // MARK: - Root descriptor
 
 /// The whole config.toml input surface: a title, an optional `$comment`, and
-/// the ordered sections. The single source the emitter (and, later, a generic
-/// validator) consume.
+/// the ordered sections. The single source the emitter and the generic
+/// validator (Validator.swift) consume.
 public struct SchemaDescriptor: Sendable {
     public let title: String
     /// Emitted as `$comment` when non-nil (e.g. a "regenerate with …" note).
