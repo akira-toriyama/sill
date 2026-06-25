@@ -50,8 +50,12 @@ let package = Package(
         // package used to vendor as `Sources/Toml`. The module name stays `Toml`,
         // so every consumer's `import Toml` survives untouched; ConfigSchema
         // decodes over that projection. See atelier docs/swift-toml-edit.md.
+        // 2.0.0: `Toml.Value.arrayOfTables` now holds `[Toml.Row]` (row +
+        // `SourceSpan`) and the `__line__` key is gone — additive for sill
+        // (ConfigSchema decodes flat `parseFlat` tables, not `.arrayOfTables`),
+        // so the floor moves to 2.x and the family unifies on it (chord#148).
         .package(url: "https://github.com/akira-toriyama/swift-toml-edit.git",
-                 .upToNextMinor(from: "1.0.0")),
+                 .upToNextMajor(from: "2.0.0")),
 
         // SwiftDraw (Zlib · zero deps · pure-Swift CoreGraphics SVG renderer,
         // macOS 10.15+) — ThemeKit's SVG rasterizer. The ONLY path that
