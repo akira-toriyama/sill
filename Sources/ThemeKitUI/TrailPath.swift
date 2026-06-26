@@ -22,3 +22,14 @@ func swiftUIPath(from steps: [PathStep]) -> Path {
     }
     return p
 }
+
+/// Decode a 0xRRGGBB into a SwiftUI sRGB `Color` — the module-internal shared
+/// counterpart to PathPetView/ParticleBurstView's private copies (a free function
+/// so ChompCorridorView and future effect views reuse one decoder).
+func swiftUIColor(_ rgb: UInt32, opacity: Double = 1) -> Color {
+    Color(.sRGB,
+          red: Double((rgb >> 16) & 0xFF) / 255,
+          green: Double((rgb >> 8) & 0xFF) / 255,
+          blue: Double(rgb & 0xFF) / 255,
+          opacity: opacity)
+}
