@@ -352,6 +352,7 @@ struct ThemeCard: View {
             WidgetSection(kitComponent("ThemedBorder"), p: p) { MockBorder(p: p, themeName: name) }
             WidgetSection(kitComponent("ThemedSkeleton"), p: p) { MockSkeleton(p: p) }
             WidgetSection(kitComponent("ThemedTooltip"), p: p) { MockTooltip(p: p) }
+            WidgetSection(kitComponent("ThemedBackdrop"), p: p) { MockBackdrop(p: p) }
         case .collection:
             WidgetSection(kitComponent("ThemedList"), p: p) { MockList(p: p) }
             WidgetSection(kitComponent("ThemedMenu"), p: p) { MockMenu(p: p) }
