@@ -101,7 +101,7 @@ struct LiveEffectStrip: View {
     }
 }
 
-// The card rim's live border is now the REAL shared `ThemedBorder` widget
-// (ThemeKit), dogfooded via prism's `ThemedBorderView` in Gallery's overlay —
-// prism's old local `AnimatedCardBorder` was retired when the part shipped.
+// The card rim's live border is now the REAL shared `AnimatedBorderView` widget
+// (ThemeKitUI, SwiftUI-native #17d), dogfooded in Gallery's overlay — prism's old
+// local `AnimatedCardBorder` was retired when the part shipped.
 // `liveEffectFrame` above still backs the Palette-tab `LiveEffectStrip`.

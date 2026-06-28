@@ -157,7 +157,7 @@ let package = Package(
         // drift). @MainActor / AppKit + SwiftUI; sits ABOVE ThemeKit and MUST
         // NEVER be a dependency of a pure `*Core` (a consumer linking only
         // `Palette` still links zero AppKit AND zero SwiftUI). Effects is declared
-        // directly: `ThemedBorderView` names `EffectSpec` in its own surface, and
+        // directly: `AnimatedBorderView` names `EffectSpec` in its own surface, and
         // ThemeKit only reaches Effects transitively (never re-exports it).
         // `Motion` + `PixelArt` are declared for the #17a effect bridges
         // (Particle/InkSplatter/PixelSprite/LinePets/PathPet/ChompCorridor): they

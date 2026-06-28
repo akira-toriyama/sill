@@ -16,8 +16,6 @@ import Motion
 /// implicit actions so the change snaps (a theme switch must not smear). Nine
 /// widgets had this exact block inline; the `duration` knob also folds
 /// `PopupFade.transact`, which passes its own combo / tooltip fade length.
-/// (ThemedBorder keeps its own snap-only variant — its animated branch is a
-/// no-op, deliberately distinct from this one.)
 @MainActor
 func layerTxn(animated: Bool,
               duration: TimeInterval = ThemedTransition.Duration.enter,

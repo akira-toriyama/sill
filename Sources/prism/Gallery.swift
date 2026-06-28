@@ -295,16 +295,17 @@ struct ThemeCard: View {
         .padding(16)
         .background(cardBG)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        // The card rim is the REAL shared `ThemedBorder` (dogfood) — the ONE part
-        // every theme uses: a static `primary` stroke normally, the LIVE glowing /
-        // breathing / cycling effect rim when the theme has an effect AND the master
-        // `effectsEnabled` (here prism's `show-effects`) is on.
+        // The card rim is the REAL shared `AnimatedBorderView` (dogfood) — the ONE
+        // part every theme uses: a static `primary` stroke normally, the LIVE
+        // glowing / breathing / cycling effect rim when the theme has an effect AND
+        // the master `effectsEnabled` (here prism's `show-effects`) is on.
         .overlay {
-            ThemedBorderView(
+            AnimatedBorderView(
                 palette: base,
                 effect: isAnimatableTheme(name) ? borderEffectFor(name) : nil,
                 effectsEnabled: showEffects,
-                cornerRadius: 12, lineWidth: 1.5)
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous),
+                lineWidth: 1.5)
         }
     }
 
@@ -349,7 +350,7 @@ struct ThemeCard: View {
             WidgetSection(kitComponent("ThemedFAB"), p: p) { MockFAB(p: p) }
         case .feedback:
             WidgetSection(kitComponent("ThemedDivider"), p: p) { MockDivider(p: p) }
-            WidgetSection(kitComponent("ThemedBorder"), p: p) { MockBorder(p: p, themeName: name) }
+            WidgetSection(kitComponent("AnimatedBorderView"), p: p) { MockBorder(p: p, themeName: name) }
             WidgetSection(kitComponent("ThemedSkeleton"), p: p) { MockSkeleton(p: p) }
             WidgetSection(kitComponent("ThemedTooltip"), p: p) { MockTooltip(p: p) }
             WidgetSection(kitComponent("ThemedBackdrop"), p: p) { MockBackdrop(p: p) }
