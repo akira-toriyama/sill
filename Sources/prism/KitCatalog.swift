@@ -329,6 +329,24 @@ let kitCatalog: [KitComponent] = [
              ],
         family: .feedback),
     KitComponent(
+        name: "ThemedBackdrop", module: "ThemeKitUI",
+        kind: "SwiftUI-native themed backdrop surface — what panels/pills/cards sit on (solid or alpha scrim, any Shape; NO blur)",
+        summary: "Pure-SwiftUI surface: a Shape filled with the theme's background (opaque, or a translucent scrim via backgroundAlpha) + optional hairline; re-themes by reassigning ResolvedPalette. Replaces each app's behind-window NSVisualEffectView blur (床2個 kept — blur was cosmetic, #17c).",
+        consumes: "A SwiftUI View: `ThemedBackdropView(palette:in:fill:bordered:)`, or the `.themedBackdrop(_:in:fill:bordered:)` modifier to put it behind any view; host it (NSHostingView) at the back of a panel/pill/card.",
+        keyAPI: [
+                 "palette: ResolvedPalette — theme; reassigning re-themes the surface",
+                 "in shape: some Shape — the mask (default continuous rounded-rect r=10); Capsule() for pills, RoundedRectangle(cornerRadius:12) for panels",
+                 "fill: BackdropFill — .auto (from palette) / .solid (opaque) / .scrim(opacity:) (translucent, NOT blurred) / .clear (border-only)",
+                 "bordered: Bool — 1pt hairline in palette.border",
+                 "View.themedBackdrop(_:in:fill:bordered:) — DRY ergonomic for .background(ThemedBackdropView(...))",
+             ],
+        variants: [
+                 "fill: auto (concrete bg ⇒ opaque or backgroundAlpha scrim; vibrancy theme ⇒ system scrim @ backgroundAlpha ?? 0.85) / solid / scrim(opacity) / clear",
+                 "shape: any SwiftUI Shape — rounded-rect (cards), Capsule (pills), custom",
+                 "bordered on/off; live re-theme by reassigning palette",
+             ],
+        family: .feedback),
+    KitComponent(
         name: "ThemedList", module: "ThemeKit",
         kind: "MUI <List> (basic) — an embeddable themed list/menu row-painter",
         summary: "Embeddable NSView list of mixed-height rows; themed by assigning a PaletteKit ResolvedPalette.",
