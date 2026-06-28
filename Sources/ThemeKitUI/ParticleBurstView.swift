@@ -175,8 +175,7 @@ public struct ParticleBurstView: View {
         ctx.drawLayer { l in
             l.addFilter(.shadow(color: Color(.sRGB, red: red, green: green,
                                              blue: blue, opacity: a * 0.85),
-                                radius: r * 2.6,
-                                options: .shadowAbove))
+                                radius: r * 2.6))
             l.fill(
                 Path(ellipseIn: CGRect(x: cx - r, y: cy - r,
                                        width: 2 * r, height: 2 * r)),

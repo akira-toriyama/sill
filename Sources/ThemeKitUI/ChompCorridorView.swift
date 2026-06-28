@@ -256,7 +256,7 @@ public struct ChompCorridorView: View {
                 let txt = Text("+\(pop.value)")
                     .font(.system(size: 9 * s, weight: .bold, design: .monospaced))
                     .foregroundColor(swiftUIColor(SpriteColor.pacYellow, opacity: alpha))
-                ctx.draw(txt, at: at, anchor: .center)
+                ctx.draw(txt, at: at, anchor: .bottom)
             }
         }
     }

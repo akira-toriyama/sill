@@ -105,7 +105,7 @@ public struct PathPetView: View {
         // The faint rounded guide trail (round cap/join to match the old look).
         if showGuide {
             let guide = swiftUIPath(from: roundedCornerPath(pts, radius: Double(6 * scale)))
-            ctx.stroke(guide, with: .color(color(SpriteColor.pupilBlue, opacity: 0.22)),
+            ctx.stroke(guide, with: .color(swiftUIColor(SpriteColor.pupilBlue, opacity: 0.22)),
                        style: StrokeStyle(lineWidth: 1.5 * scale,
                                           lineCap: .round, lineJoin: .round))
         }
@@ -120,12 +120,12 @@ public struct PathPetView: View {
         if valid, faceLag > 0, let head = markAtArcLength(pts, distance: headDist) {
             let r: CGFloat = 2.5 * scale
             ctx.drawLayer { l in
-                l.addFilter(.shadow(color: color(SpriteColor.pacYellow, opacity: 1),
+                l.addFilter(.shadow(color: swiftUIColor(SpriteColor.pacYellow, opacity: 1),
                                     radius: 4 * scale))
                 let rect = CGRect(x: head.point.x - r, y: head.point.y - r,
                                   width: 2 * r, height: 2 * r)
                 l.fill(Path(ellipseIn: rect),
-                       with: .color(color(SpriteColor.pacYellow, opacity: 1)))
+                       with: .color(swiftUIColor(SpriteColor.pacYellow, opacity: 1)))
             }
         }
 
@@ -160,13 +160,4 @@ public struct PathPetView: View {
         }
     }
 
-    /// A SwiftUI `Color` from a `SpriteColor` `0xRRGGBB` (the intrinsic arcade
-    /// palette is theme-invariant, like the sprites).
-    private func color(_ rgb: UInt32, opacity: Double) -> Color {
-        Color(.sRGB,
-              red: Double((rgb >> 16) & 0xFF) / 255,
-              green: Double((rgb >> 8) & 0xFF) / 255,
-              blue: Double(rgb & 0xFF) / 255,
-              opacity: opacity)
-    }
 }

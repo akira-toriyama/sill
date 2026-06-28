@@ -19,6 +19,9 @@ import SwiftUI
 import Effects
 
 public struct InkSplatterView: View {
+    /// Birth time — READ only inside the live Canvas/TimelineView closure so the
+    /// one-shot and loop branches are birth-anchored (mirrors ParticleBurstView).
+    @State private var start = Date()
     public var colors: [UInt32]
     /// Where the splat stamps, from the view's bounds. Default = centre.
     public var center: (CGRect) -> CGPoint
@@ -74,19 +77,23 @@ public struct InkSplatterView: View {
             TimelineView(.animation) { timeline in
                 Canvas { ctx, size in
                     let now = timeline.date.timeIntervalSinceReferenceDate
+                    let startBaseline = start.timeIntervalSinceReferenceDate
                     let bounds = CGRect(origin: .zero, size: size)
                     let c = center(bounds)
                     let sz = self.size(bounds)
 
                     // Which cadence are we in, and when did it stamp?
+                    // Both branches are birth-anchored so one-shot (stampNow = startBaseline)
+                    // and loop both measure `now - stampNow` as a small in-range value.
                     let cadenceIndex: UInt64
                     let stampNow: Double
                     if let period = loopPeriod, period > 0 {
-                        cadenceIndex = UInt64(max(0, floor(now / period)))
-                        stampNow = Double(cadenceIndex) * period
+                        let elapsed = now - startBaseline
+                        cadenceIndex = UInt64(max(0, floor(elapsed / period)))
+                        stampNow = startBaseline + Double(cadenceIndex) * period
                     } else {
                         cadenceIndex = 0
-                        stampNow = 0
+                        stampNow = startBaseline
                     }
 
                     // Deterministic per-cadence seed (no randomness during render).
@@ -115,18 +122,19 @@ public struct InkSplatterView: View {
         let a = max(0, min(1, shape.alpha(now: now)))
         guard a > 0 else { return }
         for unit in shape.units {
-            // Rim: ink blended 45 % toward black (manual lerp — no AppKit).
+            // Rim: ink blended 45 % toward black (manual lerp matching AppKit ref
+            // `NSColor.black.blended(withFraction: 0.45, of: ink)` — no AppKit).
             let inkR = Double((unit.color >> 16) & 0xFF) / 255
             let inkG = Double((unit.color >> 8)  & 0xFF) / 255
             let inkB = Double( unit.color        & 0xFF) / 255
-            let rimColor = Color(red: inkR * 0.55, green: inkG * 0.55, blue: inkB * 0.55,
+            let rimColor = Color(.sRGB, red: inkR * 0.45, green: inkG * 0.45, blue: inkB * 0.45,
                                  opacity: 0.78 * a)
             ctx.fill(catmullRom(unit.rim), with: .color(rimColor))
             // Body.
-            let inkColor = Color(red: inkR, green: inkG, blue: inkB, opacity: 0.96 * a)
+            let inkColor = Color(.sRGB, red: inkR, green: inkG, blue: inkB, opacity: 0.96 * a)
             ctx.fill(catmullRom(unit.body), with: .color(inkColor))
             // Droplet specks.
-            let dropColor = Color(red: inkR, green: inkG, blue: inkB, opacity: 0.88 * a)
+            let dropColor = Color(.sRGB, red: inkR, green: inkG, blue: inkB, opacity: 0.88 * a)
             for speck in unit.droplets {
                 ctx.fill(catmullRom(speck), with: .color(dropColor))
             }

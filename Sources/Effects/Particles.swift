@@ -249,7 +249,7 @@ public func rollBurst(
     // Create a random seed so each call produces a distinct burst (the
     // original random-roll behaviour). The seeded core does all the actual
     // work, keeping the two paths in sync.
-    let seed = UInt64.random(in: 0 ..< UInt64.max)
+    let seed = UInt64.random(in: 0 ... UInt64.max)
     return rollBurst(seed: seed, emission: emission, from: emitters,
                      colors: colors, intensity: intensity, now: now,
                      duration: duration, count: count, radiusSpeed: radiusSpeed)
