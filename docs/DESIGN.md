@@ -197,12 +197,12 @@ each app owns the **motion drawing** for its surface.
 > mouth / splatoon splat were always app-side; sill now ships no motion
 > abstraction at all until a second consumer earns one.
 
-### 1.0 — the kit earns the shared motion (ThemedBorder)
+### 1.0 — the kit earns the shared motion (AnimatedBorderView)
 
 Phase A removed the motion abstraction because **no second consumer existed**.
 By 1.0 one does — sill's own **widget kit**. The border flash / breathe /
 colour-cycle that facet · halo · wand · glance each hand-drew is now ONE part,
-**`ThemedBorder`** (ThemeKit), and the live accent trio is
+**`AnimatedBorderView`** (ThemeKitUI, SwiftUI-native since #17d), and the live accent trio is
 **`ResolvedPalette.animated(forTheme:at:)`** (PaletteKit). The rule-of-three,
 finally met, promoted the shared *colour* motion INTO sill. This does **not**
 walk back the §3 / Q4-A mandate — it sharpens it:
@@ -213,13 +213,13 @@ walk back the §3 / Q4-A mandate — it sharpens it:
   There is still **no motion-*geometry* protocol** — Pac-Man's mouth, facet's
   tree flourish, the splatoon splat stay 100% app-side, each app drawing its own.
 - **What moved in is the *application* of that colour motion**, not a new
-  abstraction. `ThemedBorder` owns the 30 Hz redraw + the off-screen /
-  reduce-motion / window-visibility lifecycle; `ResolvedPalette.animated` grafts
+  abstraction. `AnimatedBorderView` owns its SwiftUI `TimelineView(.animation)`
+  clock (resting on the steady hue under reduce-motion); `ResolvedPalette.animated` grafts
   the accent frame onto an otherwise-steady palette so a widget's whole
   appearance cycles, not just its rim. PaletteKit owns this composition (the one
   acyclic **`PaletteKit → Effects`** edge) precisely because Effects must NOT
   know `ResolvedPalette` — halo still links Effects alone.
-- **One master switch.** `ThemedBorder.effectsEnabled` and
+- **One master switch.** `AnimatedBorderView.effectsEnabled` and
   `animated(forTheme:at:enabled:)` take the SAME `enabled` flag (派手好き ON /
   静か OFF), so a host reads ONE preference and the whole theme — border rim +
   widget accents — animates or rests together. `Effects.isAnimatableTheme(_:)`
@@ -452,7 +452,7 @@ same array. The families are the gallery's tabs:
 |---|---|
 | **Text** | `ThemedTextField` ⟨TextField⟩ · `ThemedComboBox` ⟨Autocomplete⟩ |
 | **Action** | `ThemedButton` ⟨Button⟩ · `ThemedButtonGroup` ⟨ButtonGroup⟩ · `ThemedCheckbox` ⟨Checkbox⟩ · `ThemedFAB` ⟨Fab⟩ |
-| **Feedback** | `ThemedDivider` ⟨Divider⟩ · `ThemedBorder` ⟨surface rim⟩ · `ThemedSkeleton` ⟨Skeleton⟩ · `ThemedTooltip` ⟨Tooltip⟩ |
+| **Feedback** | `ThemedDivider` ⟨Divider⟩ · `AnimatedBorderView` ⟨surface rim⟩ · `ThemedSkeleton` ⟨Skeleton⟩ · `ThemedTooltip` ⟨Tooltip⟩ |
 | **Collection** | `ThemedList` ⟨List⟩ · `ThemedMenu` ⟨Menu⟩ |
 
 `ThemedList` is the shared **row-painter** that both `ThemedComboBox`'s drop-down
@@ -470,11 +470,11 @@ checkmark / favicon lands upright (1.2).
 Two pieces make the dynamic theme (§3) visible *in the kit itself*, gated by ONE
 master switch:
 
-- **`ThemedBorder`** — the universal surface rim. No effect (or
+- **`AnimatedBorderView`** (ThemeKitUI) — the universal surface rim. No effect (or
   `effectsEnabled = false`) → a static `primary` stroke; an effect + effects ON →
   the live `Effects.resolveBorder` rim (glowing / breathing / colour-cycling),
-  driven by its own 30 Hz `Timer` with the off-screen / reduce-motion /
-  window-visibility lifecycle (mirroring `ThemedSkeleton`).
+  drawn SwiftUI-native (#17d) on a `TimelineView(.animation)` clock + a `Canvas`
+  two-stop bloom, resting on the steady hue under reduce-motion.
 - **`ResolvedPalette.animated(forTheme:at:enabled:)`** (PaletteKit) — grafts the
   live accent trio onto an otherwise-steady palette each frame, so a widget's
   *whole* appearance cycles, not just its border. `prism` drives every widget
@@ -482,7 +482,7 @@ master switch:
   still for deterministic capture.
 
 `effectsEnabled` is the host's **one preference** (派手好き ON / 静か OFF): the
-same flag feeds `ThemedBorder.effectsEnabled` AND `animated(…enabled:)`, so
+same flag feeds `AnimatedBorderView.effectsEnabled` AND `animated(…enabled:)`, so
 border + widget accents animate or rest *together* (see §3, "the kit earns the
 shared motion").
 

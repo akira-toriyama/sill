@@ -1,21 +1,20 @@
 // prism — halo mock chrome. halo draws a thin, glowing, click-through ring
 // around the FOCUSED macOS window (RingView, sampling Effects.resolveBorder at
 // 30 Hz). This mock is a tiny fake "window" wrapped in the REAL shared
-// ThemedBorderView, so the ring breathes / cycles live for an animatable theme
+// AnimatedBorderView, so the ring breathes / cycles live for an animatable theme
 // exactly as halo ships — prism imports no app View (mirrors by eye only).
 
 import SwiftUI
 import AppKit
 import PaletteKit   // ResolvedPalette
 import Effects      // borderEffectFor, isAnimatableTheme
-import ThemeKitUI   // ThemedBorderView (the SwiftUI bridge over ThemeKit's ThemedBorder)
+import ThemeKitUI   // AnimatedBorderView (the SwiftUI-native shared border, #17d)
 // NOTE: SpecimenBox, elevate, uiScale, sysFont are prism-LOCAL (Specimens.swift /
-// Gallery.swift). ThemedBorderView now lives in the public ThemeKitUI module
-// (the SwiftUI bridge that wraps ThemeKit's ThemedBorder).
+// Gallery.swift).
 
 /// A miniature of halo's signature surface: a fake focused window (traffic-light
 /// dots + a title + two content bars) hugged by the live effect ring. The ring
-/// IS the shared `ThemedBorderView` (dogfood) — static `primary` stroke when the
+/// IS the shared `AnimatedBorderView` (dogfood) — static `primary` stroke when the
 /// theme has no effect / effects are off, the glowing breathing cycle otherwise.
 struct MockHalo: View {
     let p: ResolvedPalette
@@ -51,13 +50,14 @@ struct MockHalo: View {
                 .padding(12)
             }
             .frame(height: 92 * uiScale)
-            // The live ring — the REAL shared ThemedBorder widget.
+            // The live ring — the REAL shared AnimatedBorderView widget.
             .overlay {
-                ThemedBorderView(
+                AnimatedBorderView(
                     palette: p,
                     effect: isAnimatableTheme(themeName) ? borderEffectFor(themeName) : nil,
                     effectsEnabled: showEffects,
-                    cornerRadius: 10, lineWidth: 2)
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous),
+                    lineWidth: 2)
             }
         }
     }

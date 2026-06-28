@@ -946,8 +946,8 @@ public enum Radius {
     /// 8pt — the large surface: text field, toolbar backdrop, combo-box
     /// dropdown (Tailwind `rounded-lg`).
     public static let lg: Double = 8
-    /// 12pt — the decorative ring: `ThemedBorder`'s default (Tailwind
-    /// `rounded-xl`).
+    /// 12pt — the decorative ring / surface rim (e.g. facet's tree panel; an
+    /// `AnimatedBorderView` mask) (Tailwind `rounded-xl`).
     public static let xl: Double = 12
 
     /// The ramp as ordered steps — for the prism showcase + drift tests.

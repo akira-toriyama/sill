@@ -57,9 +57,9 @@ public extension ResolvedPalette {
     ///
     /// `enabled` is the master effects switch (派手好き ON / 静か OFF): pass `false`
     /// and the palette rests STATIC regardless of theme — the same flag a host
-    /// passes to `ThemedBorder.effectsEnabled`, so the whole theme (widget accents
-    /// + border) animates or rests together. A host reads ONE preference and wires
-    /// it to both.
+    /// passes to `AnimatedBorderView.effectsEnabled`, so the whole theme (widget
+    /// accents + border) animates or rests together. A host reads ONE preference
+    /// and wires it to both.
     func animated(forTheme name: String, at phase: CGFloat, enabled: Bool = true) -> ResolvedPalette {
         guard enabled, let frame = Effects.animatedPalette(theme: name, at: phase) else { return self }
         return applying(frame)
