@@ -207,7 +207,7 @@ private func irregularBlob(at c: (x: Double, y: Double), baseRadius r: Double,
 /// A deterministic 64-bit RNG so a splatter's shape is reproducible from its
 /// seed (a fixed seed → the same splat every time; tests + screenshots rely on
 /// it). Ported verbatim from wand's `DecalManager.SplitMix64`.
-struct SplitMix64 {
+struct SplitMix64: RandomNumberGenerator {
     private var state: UInt64
     init(seed: UInt64) { self.state = seed }
 

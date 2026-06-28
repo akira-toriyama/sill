@@ -585,7 +585,7 @@ public func drawChompPath(_ path: [CGPoint], now: CFTimeInterval, valid: Bool = 
 /// Panic-buzz cycles/sec for the mismatch ghost in `drawChompPath` — the rate the
 /// 2-D `dampedSine` tremble repeats. Named so the prism card and any future
 /// corridor read the same shake speed.
-private let pathPetPanicHz: Double = 1.5
+public let pathPetPanicHz: Double = 1.5
 
 // MARK: - Neon corridor (#12 Ph4) — the composite arcade maze scene
 
@@ -765,7 +765,7 @@ public func drawChompCorridor(_ path: [CGPoint], now: CFTimeInterval,
 /// return the centre + travel-direction rotation at `distance`. Each
 /// pet's draw code stays in a canonical "facing-right" frame; the
 /// transform supplies the lap-aware orientation.
-private func linePetPosition(on r: CGRect, distance t: CGFloat)
+public func linePetPosition(on r: CGRect, distance t: CGFloat)
     -> (x: CGFloat, y: CGFloat, rot: CGFloat) {
     let topLen = r.width, rightLen = r.height, bottomLen = r.width
     if t < topLen {
@@ -782,9 +782,9 @@ private func linePetPosition(on r: CGRect, distance t: CGFloat)
 // Pixel line-pet metrics (#12 Ph2) — sized so the unified arcade sprites keep
 // the SAME on-screen footprint the smooth pets had (no layout shift for the
 // apps that already place line-pets). `scale` multiplies these per surface.
-private let chompFaceCells = 13                  // odd ⇒ the mouth wedge centres
-private let chompFaceFootprint: CGFloat = 14     // pt @ scale 1 (old smooth Ø)
-private let ghostFootprint: CGFloat = 14         // pt @ scale 1 (sprite is 14×14)
+public let chompFaceCells = 13                   // odd ⇒ the mouth wedge centres
+public let chompFaceFootprint: CGFloat = 14      // pt @ scale 1 (old smooth Ø)
+public let ghostFootprint: CGFloat = 14          // pt @ scale 1 (sprite is 14×14)
 
 /// Yellow PIXEL Pac-Man — the chomp line-pet, unified to the arcade sprite in
 /// #12 Ph2 (was a smooth cosine wedge; see `drawChompPetSmooth`, the gate

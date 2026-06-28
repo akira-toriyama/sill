@@ -246,6 +246,30 @@ public func rollBurst(
     count: Int? = nil,
     radiusSpeed: Double = 0
 ) -> ParticleBurst {
+    // Create a random seed so each call produces a distinct burst (the
+    // original random-roll behaviour). The seeded core does all the actual
+    // work, keeping the two paths in sync.
+    let seed = UInt64.random(in: 0 ... UInt64.max)
+    return rollBurst(seed: seed, emission: emission, from: emitters,
+                     colors: colors, intensity: intensity, now: now,
+                     duration: duration, count: count, radiusSpeed: radiusSpeed)
+}
+
+/// Deterministic variant: supply a `seed` and get the SAME burst every time
+/// for the same inputs. Used by `ParticleBurstView` to keep f(now) rendering
+/// flicker-free (no @State write during render) — a stable seed per cadence
+/// means the same particles are rolled on every rerender within that cadence.
+public func rollBurst(
+    seed: UInt64,
+    emission: ParticleEmission,
+    from emitters: [(x: Double, y: Double)],
+    colors: [UInt32],
+    intensity: EffectIntensity = .normal,
+    now: Double,
+    duration: TimeInterval = 1.1,
+    count: Int? = nil,
+    radiusSpeed: Double = 0
+) -> ParticleBurst {
     let palette = colors.isEmpty ? [0xFFFFFF] : colors
     let scale = intensity.multiplier
     // Per-emitter count: scale with intensity, hard-cap so a many-emitter
@@ -253,13 +277,14 @@ public func rollBurst(
     let base = emission == .fireworks ? 18 : 24
     let perEmitter = count ?? max(6, min(40, Int(Double(base) * scale)))
 
+    var rng = SplitMix64(seed: seed)
     var particles: [Particle] = []
     particles.reserveCapacity(emitters.count * perEmitter)
     for e in emitters {
         for _ in 0..<perEmitter {
             particles.append(emission == .fireworks
-                ? rollSpark(at: e, palette: palette, scale: scale, radiusSpeed: radiusSpeed)
-                : rollPaper(at: e, palette: palette, scale: scale, radiusSpeed: radiusSpeed))
+                ? rollSpark(at: e, palette: palette, scale: scale, radiusSpeed: radiusSpeed, using: &rng)
+                : rollPaper(at: e, palette: palette, scale: scale, radiusSpeed: radiusSpeed, using: &rng))
         }
     }
     let gravity = emission == .fireworks ? 360.0 : 900.0
@@ -268,16 +293,19 @@ public func rollBurst(
 }
 
 /// A radial firework spark: uniform random angle, 120–260 pt/s × intensity.
+/// Uses the supplied `rng` for every random draw — pass a `SplitMix64` for
+/// a reproducible result or the system RNG for a random one.
 private func rollSpark(at e: (x: Double, y: Double),
-                       palette: [UInt32], scale: Double, radiusSpeed: Double) -> Particle {
-    let angle = Double.random(in: 0 ..< (2 * .pi))
-    let speed = Double.random(in: 120...260) * scale
+                       palette: [UInt32], scale: Double, radiusSpeed: Double,
+                       using rng: inout SplitMix64) -> Particle {
+    let angle = Double.random(in: 0 ..< (2 * .pi), using: &rng)
+    let speed = Double.random(in: 120...260, using: &rng) * scale
     return Particle(
         x0: e.x, y0: e.y,
         vx: cos(angle) * speed, vy: sin(angle) * speed,
-        radius: Double.random(in: 1.6...3.2),
-        color: palette.randomElement() ?? 0xFFFFFF,
-        life: Double.random(in: 0.6...1.0),
+        radius: Double.random(in: 1.6...3.2, using: &rng),
+        color: palette.randomElement(using: &rng) ?? 0xFFFFFF,
+        life: Double.random(in: 0.6...1.0, using: &rng),
         shape: .spark,
         radiusSpeed: radiusSpeed)
 }
@@ -285,20 +313,23 @@ private func rollSpark(at e: (x: Double, y: Double),
 /// A confetti paper: a party-popper cone — shoots UP-and-out (negative `vy`)
 /// with a wide horizontal spread, then gravity arcs it down; given a tumble
 /// spin and a horizontal flutter so it reads as paper, not a falling dot.
+/// Uses the supplied `rng` for every random draw — pass a `SplitMix64` for
+/// a reproducible result or the system RNG for a random one.
 private func rollPaper(at e: (x: Double, y: Double),
-                       palette: [UInt32], scale: Double, radiusSpeed: Double) -> Particle {
-    let dx = Double.random(in: -150...150) * scale
-    let dy = Double.random(in: -240 ... -90) * scale   // up-and-out
+                       palette: [UInt32], scale: Double, radiusSpeed: Double,
+                       using rng: inout SplitMix64) -> Particle {
+    let dx = Double.random(in: -150...150, using: &rng) * scale
+    let dy = Double.random(in: -240 ... -90, using: &rng) * scale   // up-and-out
     return Particle(
         x0: e.x, y0: e.y,
         vx: dx, vy: dy,
-        radius: Double.random(in: 2.2...3.6),
-        color: palette.randomElement() ?? 0xFFFFFF,
-        spin: Double.random(in: -7 ... 7),
-        sway: Double.random(in: 8...22),
-        swayFreq: Double.random(in: 3...6),
-        phase: Double.random(in: 0 ..< (2 * .pi)),
-        life: Double.random(in: 0.7...1.0),
+        radius: Double.random(in: 2.2...3.6, using: &rng),
+        color: palette.randomElement(using: &rng) ?? 0xFFFFFF,
+        spin: Double.random(in: -7 ... 7, using: &rng),
+        sway: Double.random(in: 8...22, using: &rng),
+        swayFreq: Double.random(in: 3...6, using: &rng),
+        phase: Double.random(in: 0 ..< (2 * .pi), using: &rng),
+        life: Double.random(in: 0.7...1.0, using: &rng),
         shape: .paper,
         radiusSpeed: radiusSpeed)
 }
@@ -320,6 +351,25 @@ public func rollBurst(
     radiusSpeed: Double = 0
 ) -> ParticleBurst {
     rollBurst(emission: emission,
+              from: emitters.map { (x: Double($0.x), y: Double($0.y)) },
+              colors: colors, intensity: intensity, now: now,
+              duration: duration, count: count, radiusSpeed: radiusSpeed)
+}
+
+/// `CGPoint` + seeded convenience for `rollBurst` — deterministic burst from
+/// a fixed seed. Used by `ParticleBurstView` (SwiftUI-native, f(now) render).
+public func rollBurst(
+    seed: UInt64,
+    emission: ParticleEmission,
+    from emitters: [CGPoint],
+    colors: [UInt32],
+    intensity: EffectIntensity = .normal,
+    now: Double,
+    duration: TimeInterval = 1.1,
+    count: Int? = nil,
+    radiusSpeed: Double = 0
+) -> ParticleBurst {
+    rollBurst(seed: seed, emission: emission,
               from: emitters.map { (x: Double($0.x), y: Double($0.y)) },
               colors: colors, intensity: intensity, now: now,
               duration: duration, count: count, radiusSpeed: radiusSpeed)
