@@ -4,13 +4,16 @@
 // matched glow, ghosting exits, and a miss flash. This mock rebuilds that scene
 // out of the REAL ThemedPillView (#17g) over a faux desktop, so it re-themes
 // across every catalog theme exactly as perch will — prism imports no app View
-// (mirrors the layout by eye only). The neon/effect-border row is deferred to
-// #17k (ThemedBorder arbitrary-path stroke), per the t-yc68 design spec.
+// (mirrors the layout by eye only). The neon/effect-border row (deferred from the
+// t-yc68 mock) is now FILLED by #17k: the bottom row carries the animated effect
+// border on every pill shape via ThemedPillView's `borderEffect` knob (built on
+// #17d's AnimatedBorderView).
 
 import SwiftUI
 import AppKit
 import PaletteKit   // ResolvedPalette
 import ThemeKitUI   // ThemedPillView (the merged perch hint-pill widget)
+import Effects       // borderEffectFor, EffectSpec — the #17k effect-border row
 // NOTE: SpecimenBox, elevate, sysFont, uiScale are prism-LOCAL (Specimens.swift /
 // Gallery.swift).
 
@@ -23,41 +26,77 @@ import ThemeKitUI   // ThemedPillView (the merged perch hint-pill widget)
 /// the card's 30 Hz `TimelineView` drives `p`, so the matched glow breathes live.
 struct MockPerchOverlay: View {
     let p: ResolvedPalette
+    let themeName: String
+    let showEffects: Bool
 
     var body: some View {
         SpecimenBox(title: "perch · overlay", p: p) {
-            GeometryReader { geo in
-                let w = geo.size.width
-                let h = geo.size.height
-                ZStack(alignment: .topLeading) {
-                    desktop
-                    // idle hints — two-color typed prefix, frosted-floating
-                    hint("FJ").position(x: w * 0.16, y: h * 0.20)
-                    hint("DK").position(x: w * 0.80, y: h * 0.18)
-                    hint("SL").position(x: w * 0.82, y: h * 0.52)
-                    // the active candidate — matched glow
-                    hint("FK", state: .matched).position(x: w * 0.42, y: h * 0.50)
-                    // ghosting-out — idle look, faded + shrunk via the transform rail
-                    hint("GH", opacity: 0.32, scale: 0.9).position(x: w * 0.20, y: h * 0.78)
-                    hint("RU", opacity: 0.28, scale: 0.88).position(x: w * 0.56, y: h * 0.82)
-                    // miss flash
-                    hint("X", state: .miss).position(x: w * 0.50, y: h * 0.16)
-                    // modifier badge
-                    hint("EN", badge: "⌘").position(x: w * 0.82, y: h * 0.82)
-                    // the other shapes — underline / tag / single-glyph circle
-                    ThemedPillView(palette: p, label: "TY", shape: .underline,
-                                   typedCount: 1)
-                        .position(x: w * 0.34, y: h * 0.92)
-                    ThemedPillView(palette: p, label: "OP", shape: .tag,
-                                   typedCount: 1, surfaceAlpha: 0.3, frosted: true)
-                        .position(x: w * 0.14, y: h * 0.48)
-                    ThemedPillView(palette: p, label: "A", shape: .circle,
-                                   surfaceAlpha: 0.3, frosted: true)
-                        .position(x: w * 0.66, y: h * 0.36)
+            VStack(alignment: .leading, spacing: 12) {
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    let h = geo.size.height
+                    ZStack(alignment: .topLeading) {
+                        desktop
+                        // idle hints — two-color typed prefix, frosted-floating
+                        hint("FJ").position(x: w * 0.16, y: h * 0.20)
+                        hint("DK").position(x: w * 0.80, y: h * 0.18)
+                        hint("SL").position(x: w * 0.82, y: h * 0.52)
+                        // the active candidate — matched glow
+                        hint("FK", state: .matched).position(x: w * 0.42, y: h * 0.50)
+                        // ghosting-out — idle look, faded + shrunk via the transform rail
+                        hint("GH", opacity: 0.32, scale: 0.9).position(x: w * 0.20, y: h * 0.78)
+                        hint("RU", opacity: 0.28, scale: 0.88).position(x: w * 0.56, y: h * 0.82)
+                        // miss flash
+                        hint("X", state: .miss).position(x: w * 0.50, y: h * 0.16)
+                        // modifier badge
+                        hint("EN", badge: "⌘").position(x: w * 0.82, y: h * 0.82)
+                        // the other shapes — underline / tag / single-glyph circle
+                        ThemedPillView(palette: p, label: "TY", shape: .underline,
+                                       typedCount: 1)
+                            .position(x: w * 0.34, y: h * 0.92)
+                        ThemedPillView(palette: p, label: "OP", shape: .tag,
+                                       typedCount: 1, surfaceAlpha: 0.3, frosted: true)
+                            .position(x: w * 0.14, y: h * 0.48)
+                        ThemedPillView(palette: p, label: "A", shape: .circle,
+                                       surfaceAlpha: 0.3, frosted: true)
+                            .position(x: w * 0.66, y: h * 0.36)
+                    }
                 }
+                .frame(height: 150 * uiScale)
+                effectBorderRow
             }
-            .frame(height: 150 * uiScale)
         }
+    }
+
+    /// The #17k payoff — the row deferred from the t-yc68 mock. Every pill shape
+    /// (pill / square / circle / tag / neon-underline) carries the animated
+    /// `borderEffect`, so the rim cycles + blooms live on an animatable theme and
+    /// rests to the static border when the master effects toggle is off.
+    private var effectBorderRow: some View {
+        let fx = rowEffect
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("neon border · all shapes")
+                .font(sysFont(8, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.tertiary))
+            HStack(spacing: 16) {
+                ThemedPillView(palette: p, label: "FJ", shape: .pill, typedCount: 1,
+                               surfaceAlpha: 0.3, frosted: true, borderEffect: fx)
+                ThemedPillView(palette: p, label: "DK", shape: .square, typedCount: 1,
+                               surfaceAlpha: 0.3, frosted: true, borderEffect: fx)
+                ThemedPillView(palette: p, label: "A", shape: .circle,
+                               surfaceAlpha: 0.3, frosted: true, borderEffect: fx)
+                ThemedPillView(palette: p, label: "OP", shape: .tag, typedCount: 1,
+                               surfaceAlpha: 0.3, frosted: true, borderEffect: fx)
+                ThemedPillView(palette: p, label: "TY", shape: .underline,
+                               typedCount: 1, borderEffect: fx)
+            }
+        }
+    }
+
+    /// The row's effect: the theme's catalog border-effect (`.neon` fallback so
+    /// every theme lights up), rested to nil by the master effects toggle.
+    private var rowEffect: EffectSpec? {
+        showEffects ? (borderEffectFor(themeName) ?? .neon) : nil
     }
 
     /// A frosted idle/matched hint with a two-color typed prefix. `scale`/`opacity`

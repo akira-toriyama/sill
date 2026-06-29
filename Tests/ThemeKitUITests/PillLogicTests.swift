@@ -36,4 +36,16 @@ final class PillLogicTests: XCTestCase {
         XCTAssertFalse(PillLogic.prefixUsesError(.idle))
         XCTAssertFalse(PillLogic.prefixUsesError(.matched))
     }
+
+    func test_showsEffectRim_idleAndMatchedButNeverMiss() {
+        // No effect ⇒ never a rim, in any state (keeps the static tri-state border).
+        XCTAssertFalse(PillLogic.showsEffectRim(hasEffect: false, state: .idle))
+        XCTAssertFalse(PillLogic.showsEffectRim(hasEffect: false, state: .matched))
+        XCTAssertFalse(PillLogic.showsEffectRim(hasEffect: false, state: .miss))
+        // Effect set ⇒ rim on idle/matched; suppressed on miss so the red error
+        // stroke wins.
+        XCTAssertTrue(PillLogic.showsEffectRim(hasEffect: true, state: .idle))
+        XCTAssertTrue(PillLogic.showsEffectRim(hasEffect: true, state: .matched))
+        XCTAssertFalse(PillLogic.showsEffectRim(hasEffect: true, state: .miss))
+    }
 }

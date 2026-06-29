@@ -2,6 +2,7 @@ import SwiftUI
 import Palette
 import PaletteKit
 import ThemeKitUI
+import Effects   // borderEffectFor, EffectSpec — the #17k effect-border row
 
 /// prism showcase for `ThemedPill` (display / indicator). Named `MockThemedPill`
 /// to avoid colliding with the perch app-specimen `MockPerchOverlay`
@@ -9,6 +10,7 @@ import ThemeKitUI
 /// prism imports `ThemeKitUI` only — never an app's View, so there's no drift.
 struct MockThemedPill: View {
     let p: ResolvedPalette
+    let themeName: String
 
     private let shapes: [(ThemedPillView.Shape, String)] = [
         (.pill, "pill"), (.square, "square"), (.circle, "circle"),
@@ -53,6 +55,18 @@ struct MockThemedPill: View {
                 ThemedPillView(palette: p, label: "GH", shape: .pill,
                                state: .matched, badge: "⌘")
                 ThemedPillView(palette: p, label: "GH", shape: .tag, badge: "⌥")
+            }
+            // effect border (#17k) — the animated neon rim on every shape (incl.
+            // the neon underline bar); `.neon` fallback so non-animatable themes
+            // still show it. Lights live; rests to the static border on master-off.
+            HStack(spacing: 10) {
+                cap("effect")
+                ForEach(shapes, id: \.1) { shape, _ in
+                    ThemedPillView(palette: p,
+                                   label: shape == .circle ? "G" : "GH",
+                                   shape: shape, state: .idle, typedCount: 1,
+                                   borderEffect: borderEffectFor(themeName) ?? .neon)
+                }
             }
         }
         .padding(10)
