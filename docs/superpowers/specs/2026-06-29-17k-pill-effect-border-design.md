@@ -141,3 +141,19 @@ unacceptably, add a minimal **pure-SwiftUI** `bloomPad` to `AnimatedBorderView`
   <lane>` (open ⇒ in-progress; merge ⇒ lane).
 - Green + clean CI ⇒ squash-merge + tag (standing autonomy), after the LIVE prism
   proof.
+
+## Verification (LIVE in prism, host, 2026-06-30)
+
+Captured the perch tab (`family = perch`, `show-effects = true`) across the catalog
+(terminal / chomp themes inspected at 4× zoom). Confirmed:
+
+- All 5 shapes carry the animated themed rim: pill (Capsule), square (RoundedRect
+  r1), circle, tag (the `TagShape` left-triangle notch strokes correctly), and the
+  **underline as a glowing neon bar** (`HBarShape`).
+- The two-stop bloom glow IS visible around the tight pills — the feared
+  `Canvas` outward-bloom clipping did **not** materialise into a problem, so **no
+  `bloomPad` was added** (the risk in the plan is closed; `AnimatedBorderView`
+  unchanged).
+- The existing perch overlay scene (idle / matched / miss / ghost / badge) is
+  unchanged — those pills pass `borderEffect: nil` and keep the static tri-state
+  border.
