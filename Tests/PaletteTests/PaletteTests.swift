@@ -69,8 +69,10 @@ final class PaletteTests: XCTestCase {
     }
 
     /// A preset without an error override falls back to the canonical red.
+    /// (rainbow is the sole remaining no-error preset — gruvbox now ships an
+    /// explicit AA-clean red.)
     func testErrorDefaultsToCanonicalRed() {
-        XCTAssertEqual(ThemeSpec.gruvbox.error.rgb, defaultErrorHex)
+        XCTAssertEqual(ThemeSpec.rainbow.error.rgb, defaultErrorHex)
         XCTAssertEqual(defaultErrorHex, 0xEF4444)
     }
 
