@@ -369,6 +369,28 @@ let kitCatalog: [KitComponent] = [
              ],
         family: .feedback),
     KitComponent(
+        name: "WindowShell", module: "ThemeKit",
+        kind: "The family's ONE parameterized AppKit window-shell factory — a long-lived non-activating NSPanel whose key behavior / chrome / level / collectionBehavior / click-through are knobs; content is SwiftUI via NSHostingView (the permitted 「窓の殻」 AppKit floor). SEPARATE from the internal transient-popup machinery (themedPopupPanel / placePopup / PopupFade).",
+        summary: "Builds a configured ShellPanel from a value-type WindowShellSpec, plus the helpers a floating shell needs (window fade, auto-size, screen-union, Esc/outside-click dismiss). The shell that the 5 apps' overlays/popovers/launchers (perch/glance/wand + facet KeyablePanel) move onto.",
+        consumes: "Free functions + value types, no controller: `let panel = makeWindowShell(WindowShellSpec(keyMode:.onDemand, chrome:.borderless))`, set `panel.contentView = NSHostingView(rootView: yourSwiftUIView)`, position it, show with `ShellFade().fadeIn(panel)`. Retain the panel + any monitors/glue for the shell's lifetime; dismiss with `ShellFade().fadeOut(panel)`.",
+        keyAPI: [
+                 "WindowShellSpec — value type: keyMode (.never/.onDemand/.always) · chrome (.borderless/.titled(resizable:closable:)/.hud) · nonactivating:Bool · level:NSWindow.Level · collectionBehavior · clickThrough:Bool · hasShadow/isOpaque/backgroundColor. resolvedStyleMask computes the styleMask",
+                 "makeWindowShell(_:WindowShellSpec) -> ShellPanel — builds the panel (isFloatingPanel, hidesOnDeactivate=false; becomesKeyOnlyIfNeeded when .onDemand). Assign an NSHostingView to contentView",
+                 "ShellPanel: NSPanel — canBecomeKey driven by keyMode (never⇒false, onDemand/always⇒true); canBecomeMain stays NSPanel default (false)",
+                 "unionFrame(of:[CGRect]) -> CGRect (pure, unit-testable) + screenUnionFrame() -> CGRect (all attached displays) + ScreenReconfigGlue.start(onChange:) — re-evaluate on display attach/detach",
+                 "sizeShellToContent(_:max:) — fit the panel to its content's fittingSize, top-left pinned, invalidateShadow",
+                 "ShellFade(duration:) — fadeIn/fadeOut the WHOLE window (animator().alphaValue); fadeOut gated by a monotonic shouldOrderOut token (quick re-show safe)",
+                 "ShellDismissMonitor.start(panel:onEscape:onOutsideClick:dismiss:) — Esc (key 53) + same-app outside-click dismissal; cross-app (resign-key) is the caller's to wire",
+             ],
+        variants: [
+                 "keyMode: never (transient-popup discipline) / onDemand (key only when a subview needs it — facet KeyablePanel, IME edit) / always (editable launcher window)",
+                 "chrome: borderless (overlays/popovers/launchers) / titled(resizable:closable:) / hud (.hudWindow). nonactivating toggles .nonactivatingPanel",
+                 "click-through (ignoresMouseEvents) — pure pass-through overlay (shares the helper with halo's raw NSWindow overlay)",
+                 "screen-union contentRect spanning every display; live hotplug reflow needs real multi-display hardware (union MATH is unit-tested)",
+                 "prism: inline mock of a shell surface + live triggers spawning the REAL shell (key-on-demand typing, click-through, titled-resizable, HUD, screen-union) for single-display verification",
+             ],
+        family: .feedback),
+    KitComponent(
         name: "ThemedList", module: "ThemeKit",
         kind: "MUI <List> (basic) — an embeddable themed list/menu row-painter",
         summary: "Embeddable NSView list of mixed-height rows; themed by assigning a PaletteKit ResolvedPalette.",
