@@ -196,6 +196,25 @@ let kitCatalog: [KitComponent] = [
              ],
         family: .action),
     KitComponent(
+        name: "ThemedPill", module: "ThemeKitUI",
+        kind: "Display/indicator pill — perch's universal hint pill in ONE SwiftUI surface (tag/badge/status/search-indicator)",
+        summary: "Pure-SwiftUI display pill: 5 shapes, two-color typed-prefix label, idle/matched/miss, frost, drop shadow, corner badge. Non-interactive (use ThemedChip for clickable tokens).",
+        consumes: "A SwiftUI View: ThemedPillView(palette:label:…). Composes ThemedBackdropView for the surface; hit-test passes through (host in any SwiftUI hierarchy, e.g. a perch overlay via NSHostingView).",
+        keyAPI: [
+                 "palette: ResolvedPalette — theme (canonical roles only)",
+                 "label: String + typedCount: Int — two-color typed-prefix (first N chars in accent/miss colour, rest in foreground)",
+                 "shape: .pill / .square / .circle / .underline / .tag",
+                 "state: .idle / .matched / .miss — border/glow per result (fill unchanged on matched, error wash on miss)",
+                 "accent: Color? — override palette.primary (perch [overlay].accent); surfaceAlpha: Double? + frosted: Bool — translucency + .ultraThinMaterial",
+                 "badge: String? — optional top-right corner badge; elevated: Bool — themed drop shadow; transform/opacity — app-driven motion passthrough",
+             ],
+        variants: [
+                 "shape: pill (capsule) / square (r1) / circle (single-glyph, else pill) / underline (body-less + accent bar) / tag (rounded + left triangle)",
+                 "state: idle (accent hairline) / matched (accent stroke + glow, fill unchanged) / miss (error fill + error border + error prefix)",
+                 "fill: solid / scrim(surfaceAlpha) / frosted (Material)",
+             ],
+        family: .action),
+    KitComponent(
         name: "ThemedCheckbox", module: "ThemeKit",
         kind: "MUI <Checkbox> (basic, tri-state) — outline-box ↔ primary-filled box with a draw-in checkmark/dash",
         summary: "Themed tri-state AppKit checkbox; styled by assigning a ResolvedPalette.",
