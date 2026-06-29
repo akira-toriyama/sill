@@ -4,7 +4,8 @@ import PaletteKit
 import ThemeKitUI
 
 /// prism showcase for `ThemedPill` (display / indicator). Named `MockThemedPill`
-/// to avoid colliding with the perch app-specimen `MockPill` (Specimens.swift).
+/// to avoid colliding with the perch app-specimen `MockPerchOverlay`
+/// (PerchShowcase.swift), which rebuilds the whole overlay scene from this widget.
 /// prism imports `ThemeKitUI` only — never an app's View, so there's no drift.
 struct MockThemedPill: View {
     let p: ResolvedPalette

@@ -379,7 +379,7 @@ struct ThemeCard: View {
             MockTome(p: p)
         case .perch:
             appCaption(.perch, p: p)
-            MockPill(p: p)
+            MockPerchOverlay(p: p)
         case .halo:
             appCaption(.halo, p: p)
             MockHalo(p: p, themeName: name, showEffects: showEffects)
