@@ -10,6 +10,12 @@ import ThemeKitUI
 struct MockThumbnailGrid: View {
     let p: ResolvedPalette
 
+    // Live interaction state so the maintainer can verify the #17e interaction fixes
+    // right here in prism: ⌘-click multi-select (the set grows) and double-click /
+    // Return activation (the status line below updates).
+    @State private var selection: Set<String> = ["c0"]
+    @State private var lastActivated: String = "—"
+
     private func swatch(_ nsColor: NSColor, _ size: CGFloat = 120) -> NSImage {
         let img = NSImage(size: NSSize(width: size, height: size))
         img.lockFocus()
@@ -40,17 +46,28 @@ struct MockThumbnailGrid: View {
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
-            // Vertical adaptive grid (default).
+            // Interaction hint + live state — exercises the gesture/activation fixes.
+            Text("click=replace · ⌘click=multi-select · double-click/Return=activate · arrows=move")
+                .font(.system(size: 8, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.tertiary))
+            Text("selected: \(selection.sorted().joined(separator: ", "))   ·   activated: \(lastActivated)")
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.primary))
+
+            // Vertical adaptive grid (default) — CONTROLLED selection + activation wired
+            // live so ⌘-click multi-select and Return/double-click activation are visible.
             ThemedThumbnailGridView(loadedItems + loadingItems,
-                                    selection: .constant(["c0"]),   // show a selected cell
+                                    selection: $selection,
                                     layout: .adaptive(minCellWidth: 96),
-                                    aspectRatio: 1, palette: p)
+                                    aspectRatio: 1, palette: p,
+                                    onActivate: { lastActivated = $0 })
                 .frame(height: 240)
 
             Text("horizontal rail strip · fixed 1-row").font(.system(size: 9, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
-            // Horizontal rail strip.
+            // Horizontal rail strip — uncontrolled; click a cell then arrow Left/Right
+            // to drive the roving cursor (verifies the horizontal-axis nav fix).
             ThemedThumbnailGridView(loadedItems,
                                     layout: .fixed(columns: 1),
                                     axis: .horizontal, aspectRatio: 1, palette: p)
