@@ -317,6 +317,43 @@ extension ThemeSpec {
         error: HexColor(0xFF3355),
         secondary: HexColor(0xFF6A1A))
 
+    // --- Contrast-verified neon (WCAG-clean by construction) ----------
+    // A trio designed AFTER the catalog contrast sweep (ContrastSweepTests),
+    // applying what it taught: every legibility pair clears its WCAG floor
+    // with margin and needs NO exception — neon that's loud AND legible.
+    // Dark presets: bg/fg/muted/primary/secondary/error only; the
+    // border/hover/selection trio derives from the near-black base.
+
+    /// biolume — deep-sea bioluminescence (nature): a glowing aqua-jade
+    /// primary + jelly-violet secondary on abyss black. The catalog's
+    /// "quiet but neon" aqua slot — distinct from terminal's phosphor green
+    /// and aurora-flux's emerald+violet by the blue-green jade lead.
+    public static let biolume = ThemeSpec(
+        background: HexColor(0x02070A), foreground: HexColor(0xD6FFF4),
+        muted: HexColor(0x5E9A90), primary: HexColor(0x00F5D4), font: .rounded,
+        error: HexColor(0xFF5E6C),
+        secondary: HexColor(0xB06BFF))
+
+    /// midas — neon gold (magic / luxe): a true rich-gold primary, a hue no
+    /// other theme LEADS with (cyberpunk acid-yellow, chomp pellet-yellow,
+    /// ember orange, arcane gold-as-secondary), against a cool electric teal
+    /// on warm pure black.
+    public static let midas = ThemeSpec(
+        background: HexColor(0x050402), foreground: HexColor(0xFFF4DA),
+        muted: HexColor(0x96804E), primary: HexColor(0xFFD23F), font: .mono,
+        error: HexColor(0xFF4D5E),
+        secondary: HexColor(0x2DE2C8))
+
+    /// spectre — haunted phantom glow (spooky / game): an eerie phantom-green
+    /// primary + bruise-violet secondary on ink black. A spooky MOOD the
+    /// catalog lacks — distinct from terminal's hacker green and toxic's rave
+    /// lime by the pale, cold, ghostly cast.
+    public static let spectre = ThemeSpec(
+        background: HexColor(0x04060A), foreground: HexColor(0xEAF7EE),
+        muted: HexColor(0x61856E), primary: HexColor(0x7CFFB0), font: .mono,
+        error: HexColor(0xFF4D6D),
+        secondary: HexColor(0x9B5CFF))
+
     // --- Animated neon family (theme + EffectSpec pairs) --------------
     // The second wave of `chomp`'s "playful animated themes" family (DESIGN
     // §3): each is a pure-#000000 neon theme that ALSO ships a matching
@@ -539,6 +576,7 @@ private let themeCatalog: [(name: String, spec: ThemeSpec)] = [
     ("neon-noir", .neonNoir), ("outrun", .outrun), ("blacklight", .blacklight),
     ("synthwave", .synthwave), ("ghostwire", .ghostwire),
     ("cyberpunk", .cyberpunk), ("tron", .tron),
+    ("biolume", .biolume), ("midas", .midas), ("spectre", .spectre),
     ("voltage", .voltage), ("toxic", .toxic), ("ember", .ember),
     ("solar-veil", .solarVeil), ("molten-vein", .moltenVein),
     ("coin-op", .coinOp), ("arcane", .arcane),
@@ -583,6 +621,8 @@ public let canonicalEffectNames: [String] = [
     // The animated neon family — each is a theme+EffectSpec pair (like
     // chomp), so its name is ALSO a valid standalone `[border] effect`.
     "voltage", "toxic", "ember", "solar-veil", "molten-vein", "coin-op", "arcane",
+    // The contrast-verified neon trio — each is also a theme+EffectSpec pair.
+    "biolume", "midas", "spectre",
     "random", "off",
 ]
 

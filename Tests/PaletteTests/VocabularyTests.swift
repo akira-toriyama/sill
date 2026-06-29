@@ -32,6 +32,7 @@ final class VocabularyTests: XCTestCase {
             "terminal", "chomp", "rainbow",
             "aurora-flux", "acidwave", "neon-noir", "outrun", "blacklight",
             "synthwave", "ghostwire", "cyberpunk", "tron",
+            "biolume", "midas", "spectre",
             "voltage", "toxic", "ember",
             "solar-veil", "molten-vein", "coin-op", "arcane",
             "dusk", "clay", "gemstone", "graphite",
@@ -69,6 +70,7 @@ final class VocabularyTests: XCTestCase {
             ["neon", "cyber", "vapor", "kawaii", "rainbow", "chomp",
              "voltage", "toxic", "ember", "solar-veil", "molten-vein",
              "coin-op", "arcane",
+             "biolume", "midas", "spectre",
              "random", "off"])
     }
 
