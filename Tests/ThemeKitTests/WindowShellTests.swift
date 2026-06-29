@@ -34,9 +34,9 @@ final class WindowShellTests: XCTestCase {
         XCTAssertEqual(u.minX, 0)
         XCTAssertEqual(u.minY, -100)
         XCTAssertEqual(u.maxX, 1440 + 1920)
-        XCTAssertEqual(u.maxY, 900)            // main's top wins (right is 100 lower, 1080 tall ⇒ 980)
+        XCTAssertEqual(u.maxY, 980)            // right's top wins: y=-100 + height 1080 = 980 > main's 900
         XCTAssertEqual(u.width, 3360)
-        XCTAssertEqual(u.height, 1000)
+        XCTAssertEqual(u.height, 1080)         // 980 − (−100)
     }
 
     func testUnionFrameHandlesNegativeOrigins() {
