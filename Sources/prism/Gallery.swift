@@ -306,6 +306,10 @@ struct ThemeCard: View {
                 effectsEnabled: showEffects,
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous),
                 lineWidth: 1.5)
+                // The rim is a full-frame `Canvas`, which hit-tests its whole bounds
+                // and would otherwise swallow every hover/click meant for the widget
+                // content beneath — a decorative border must never capture events.
+                .allowsHitTesting(false)
         }
     }
 
@@ -357,6 +361,7 @@ struct ThemeCard: View {
         case .collection:
             WidgetSection(kitComponent("ThemedList"), p: p) { MockList(p: p) }
             WidgetSection(kitComponent("ThemedMenu"), p: p) { MockMenu(p: p) }
+            WidgetSection(kitComponent("ThemedGrid"), p: p) { MockThumbnailGrid(p: p) }
         case .motion:
             WidgetSection(kitComponent("ThemedTransition"), p: p) { MockMotion(p: p) }
         case .particles:
