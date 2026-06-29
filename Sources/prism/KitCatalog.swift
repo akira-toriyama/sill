@@ -207,11 +207,13 @@ let kitCatalog: [KitComponent] = [
                  "state: .idle / .matched / .miss — border/glow per result (fill unchanged on matched, error wash on miss)",
                  "accent: Color? — override palette.primary (perch [overlay].accent); surfaceAlpha: Double? + frosted: Bool — translucency + .ultraThinMaterial",
                  "badge: String? — optional top-right corner badge; elevated: Bool — themed drop shadow; transform/opacity — app-driven motion passthrough",
+                 "borderEffect: EffectSpec? — animated neon/effect rim across ALL shapes (#17k, built on AnimatedBorderView; nil = static tri-state border). borderGlow / borderCycleSeconds / flashToken tune it",
              ],
         variants: [
                  "shape: pill (capsule) / square (r1) / circle (single-glyph, else pill) / underline (body-less + accent bar) / tag (rounded + left triangle)",
                  "state: idle (accent hairline) / matched (accent stroke + glow, fill unchanged) / miss (error fill + error border + error prefix)",
                  "fill: solid / scrim(surfaceAlpha) / frosted (Material)",
+                 "borderEffect: nil (static tri-state) / set (animated neon rim — cycles + blooms on idle/matched, suppressed on miss; underline becomes a neon bar)",
              ],
         family: .action),
     KitComponent(

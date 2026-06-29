@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import Palette
 import PaletteKit
+import Effects   // EffectSpec — the animated border-effect knob (#17k)
 
 // MARK: - Pure logic (deterministic XCTest surface; no SwiftUI/AppKit)
 
@@ -28,6 +29,14 @@ enum PillLogic {
 
     /// The typed prefix is drawn in the error colour on a miss, else the accent.
     static func prefixUsesError(_ state: ThemedPillView.State) -> Bool { state == .miss }
+
+    /// The animated effect rim shows on idle/matched but NEVER on a miss — the red
+    /// error stroke is a semantic signal the rim must not eat. No effect ⇒ no rim
+    /// (the pill keeps its static tri-state border). Applies to every shape,
+    /// including the underline bar.
+    static func showsEffectRim(hasEffect: Bool, state: ThemedPillView.State) -> Bool {
+        hasEffect && state != .miss
+    }
 }
 
 // MARK: - ThemedPillView (display / indicator pill; pure SwiftUI)
@@ -53,6 +62,22 @@ public struct ThemedPillView: View {
     public var elevated: Bool
     public var transform: CGAffineTransform
     public var opacity: Double
+    /// Non-nil ⇒ the pill carries an animated neon/effect rim (stroked along its
+    /// own shape via `AnimatedBorderView`), replacing the static idle/matched
+    /// border; nil ⇒ the current tri-state border, byte-identical. A miss always
+    /// keeps the error stroke. 派手/静か is the app's call (pass nil to rest).
+    public var borderEffect: EffectSpec?
+    /// Glow style for the effect rim (`.none` flat / `.bloom` neon-tube halo).
+    public var borderGlow: AnimatedBorderGlow
+    /// Seconds for one full colour cycle of the effect rim.
+    public var borderCycleSeconds: Double
+    /// Bump to roll a focus/match blink burst on the effect rim (perch drives it
+    /// on a state change). No-op when `borderEffect == nil`.
+    public var flashToken: Int
+    /// Hold the rim's live cycle at a fixed phase (prism deterministic capture).
+    public var previewFrozen: Bool
+    /// The phase held when `previewFrozen`.
+    public var previewPhase: CGFloat
 
     public init(palette: ResolvedPalette,
                 label: String,
@@ -65,7 +90,13 @@ public struct ThemedPillView: View {
                 frosted: Bool = false,
                 elevated: Bool = true,
                 transform: CGAffineTransform = .identity,
-                opacity: Double = 1) {
+                opacity: Double = 1,
+                borderEffect: EffectSpec? = nil,
+                borderGlow: AnimatedBorderGlow = .bloom,
+                borderCycleSeconds: Double = 5,
+                flashToken: Int = 0,
+                previewFrozen: Bool = false,
+                previewPhase: CGFloat = 0.35) {
         self.palette = palette
         self.label = label
         self.shape = shape
@@ -78,6 +109,12 @@ public struct ThemedPillView: View {
         self.elevated = elevated
         self.transform = transform
         self.opacity = opacity
+        self.borderEffect = borderEffect
+        self.borderGlow = borderGlow
+        self.borderCycleSeconds = borderCycleSeconds
+        self.flashToken = flashToken
+        self.previewFrozen = previewFrozen
+        self.previewPhase = previewPhase
     }
 
     // Colours (canonical roles only — never invent role names).
@@ -145,33 +182,73 @@ public struct ThemedPillView: View {
             .overlay(alignment: .topTrailing) { badgeView }
     }
 
-    /// Underline: no surface/border — a 2pt accent bar under the label.
+    /// Underline: no surface/border — a 2pt accent bar under the label, or (with
+    /// an effect set) a neon bar.
     private var underlineContent: some View {
         labelView
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(state == .miss ? errorColor : accentColor)
-                    .frame(height: 2)
-                    .padding(.horizontal, 4)
-            }
+            .overlay(alignment: .bottom) { underlineBar }
             .overlay(alignment: .topTrailing) { badgeView }
     }
 
-    /// Tri-state border. matched = accent stroke + a native glow on the stroke
-    /// (fill UNCHANGED); miss = error stroke; idle = accent hairline.
+    /// The underline bar. With an effect set (and not a miss) the SAME
+    /// `AnimatedBorderView` engine strokes a flat horizontal line (`HBarShape`),
+    /// so the bar itself cycles colour and blooms — the underline has no closed
+    /// surface to stroke, so it borrows the rim engine as a glowing bar. The
+    /// frame is taller than the 2pt line to give the bloom vertical room. A miss
+    /// (or no effect) keeps the static accent/error bar.
+    @ViewBuilder
+    private var underlineBar: some View {
+        if PillLogic.showsEffectRim(hasEffect: borderEffect != nil, state: state) {
+            effectRim(in: HBarShape())
+                .frame(height: 8)
+                .padding(.horizontal, 4)
+        } else {
+            Rectangle()
+                .fill(state == .miss ? errorColor : accentColor)
+                .frame(height: 2)
+                .padding(.horizontal, 4)
+        }
+    }
+
+    /// Border. With an effect set (and not a miss) the animated neon/effect rim
+    /// REPLACES the static stroke — the rim already glows, so the idle hairline
+    /// and the matched native shadow would only double it. Else the tri-state
+    /// static border: matched = accent stroke + a native glow (fill UNCHANGED);
+    /// miss = error stroke; idle = accent hairline.
     @ViewBuilder
     private var borderOverlay: some View {
-        switch state {
-        case .idle:
-            pillShape.stroke(accentColor.opacity(0.55), lineWidth: 1)
-        case .matched:
-            pillShape.stroke(accentColor, lineWidth: 2)
-                .shadow(color: accentColor.opacity(0.5), radius: 7)
-        case .miss:
-            pillShape.stroke(errorColor, lineWidth: 2)
+        if PillLogic.showsEffectRim(hasEffect: borderEffect != nil, state: state) {
+            effectRim(in: pillShape)
+        } else {
+            switch state {
+            case .idle:
+                pillShape.stroke(accentColor.opacity(0.55), lineWidth: 1)
+            case .matched:
+                pillShape.stroke(accentColor, lineWidth: 2)
+                    .shadow(color: accentColor.opacity(0.5), radius: 7)
+            case .miss:
+                pillShape.stroke(errorColor, lineWidth: 2)
+            }
         }
+    }
+
+    /// The animated neon/effect rim stroked along `shape` — the perch-deferred
+    /// #17k capability, built entirely on the SwiftUI-native `AnimatedBorderView`
+    /// (#17d). Fixed-width (no breathing) on a tight pill: the liveliness is the
+    /// colour cycle + bloom, not a fattening stroke.
+    private func effectRim<SH: SwiftUI.Shape>(in shape: SH) -> some View {
+        AnimatedBorderView(palette: palette,
+                           effect: borderEffect,
+                           in: shape,
+                           lineWidth: 1.5,
+                           breathTo: 1.5,
+                           cycleSeconds: borderCycleSeconds,
+                           glow: borderGlow,
+                           flashToken: flashToken,
+                           previewFrozen: previewFrozen,
+                           previewPhase: previewPhase)
     }
 
     @ViewBuilder
@@ -201,6 +278,20 @@ private struct PillShadow: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+// MARK: - Underline bar shape: a flat horizontal line (stroked = a glowing bar)
+
+/// A single horizontal line across the vertical centre. Stroked by
+/// `AnimatedBorderView` it reads as a bar — the underline shape's effect rim,
+/// reusing the neon engine instead of a bespoke fill path.
+struct HBarShape: SwiftUI.Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.midY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        return p
     }
 }
 
