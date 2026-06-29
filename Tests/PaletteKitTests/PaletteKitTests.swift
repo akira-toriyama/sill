@@ -81,6 +81,18 @@ final class PaletteKitTests: XCTestCase {
         XCTAssertEqual(p.color(for: .error), p.error)
     }
 
+    /// `surface(.raised/.inset)` formalize the "paper on background" fill as
+    /// the foreground ink tiers: raised = faint (gentle lift), inset = subtle
+    /// (deeper recess), so raised sits lighter than inset.
+    func testSurfaceTiersMapToInkTiers() {
+        let p = resolve(.terminal)
+        XCTAssertEqual(p.surface(.raised), p.ink(.faint))
+        XCTAssertEqual(p.surface(.inset),  p.ink(.subtle))
+        XCTAssertEqual(comps(p.surface(.raised)).a, 0.06, accuracy: 0.001)
+        XCTAssertEqual(comps(p.surface(.inset)).a,  0.16, accuracy: 0.001)
+        XCTAssertLessThan(comps(p.surface(.raised)).a, comps(p.surface(.inset)).a)
+    }
+
     /// `bestContrast(on:)` (now public) is the WCAG crossover the contained
     /// widgets ink with: black on a light fill, white on a dark one.
     func testBestContrastCrossover() {

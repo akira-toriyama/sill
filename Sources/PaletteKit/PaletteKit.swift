@@ -111,6 +111,25 @@ public extension ResolvedPalette {
         return base.withAlphaComponent(tier.alpha)
     }
 
+    /// A raised vs. inset surface fill layered OVER `background` — the
+    /// family's "paper on default" pattern.
+    enum SurfaceTier { case raised, inset }
+
+    /// A surface fill ABOVE `background` (a card/cell lift, or a recessed
+    /// well / code block). Built on the `ink` tiers of `foreground`, NOT a
+    /// new themable role: `.raised` is a gentle lift (`faint` 0.06), `.inset`
+    /// a deeper recess (`subtle` 0.16). Centralizes facet's grid-cell/ghost
+    /// fills, glance's code-block/table-header `ink(.subtle)`, and wand's
+    /// frosted card body — each previously hand-tinted. A FILL ONLY: text
+    /// drawn on it is governed by its own text role's contrast, so it is not
+    /// part of the WCAG sweep.
+    func surface(_ tier: SurfaceTier) -> NSColor {
+        switch tier {
+        case .raised: return ink(.faint)    // foreground @ 0.06 — gentle card/cell lift
+        case .inset:  return ink(.subtle)   // foreground @ 0.16 — recessed well / code block
+        }
+    }
+
     /// Foreground (black/white) that best contrasts the OPAQUE primary —
     /// for text / icons drawn ON a primary fill. Rooted on the opaque
     /// primary, NOT the selection wash. Opt-in.
