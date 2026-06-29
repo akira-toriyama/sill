@@ -138,7 +138,7 @@ The Phase V catalog (§4c) is **lean**:
   (terminal/cobalt2/shades-of-purple/tokyo-hack/github-dark/dracula/
   catppuccin-mocha/gruvbox).
 - **chomp** stores `border` + `selection` (arcade hues), `hover` derives.
-- **rainbow / github-light / catppuccin-latte** store the full trio
+- **rainbow / github-light** store the full trio
   (light/special — the dark-ink recipe would derive wrong).
 - **system** resolves dynamic OS colors (special-cased in `resolve`).
 
@@ -352,7 +352,6 @@ keeps its name** (facet invariant); only its fields rename.
 | catppuccin-mocha | distinctive | `1E1E2E` | `CDD6F4` | `CBA6F7` | `89B4FA` |
 | gruvbox | distinctive | `282828` | `EBDBB2` | `FE8019` | `8EC07C` |
 | github-light | light | `FFFFFF` | `1F2328` | `0969DA` | `8250DF` |
-| catppuccin-latte | light | `EFF1F5` | `4C4F69` | `8839EF` | `209FB5` |
 | **system** | structural | vibrancy | OS | OS accent | systemPurple |
 
 Retired in the 0-base cut: the old Tokyo-Night `terminal`, `hacker` (merged

@@ -55,7 +55,6 @@ final class ContrastSweepTests: XCTestCase {
         "cobalt2/error":          "Wes Bos red #FF5C57 on #193549 ≈ 4.20:1 — third-party theme fidelity",
         // --- muted × background below the 3:1 floor (WARN) ---------------
         "gemstone/muted":         "velvet low-value muted #5E5870 ≈ 2.97:1 — supplementary text, by design",
-        "catppuccin-latte/muted": "canonical Latte overlay grey #8C8FA1 ≈ 2.83:1 — upstream value, supplementary text",
     ]
 
     /// Every `.fixed` preset's legibility-critical pairs clear their WCAG

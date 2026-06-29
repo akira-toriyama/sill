@@ -540,17 +540,6 @@ extension ThemeSpec {
         hover: HexColor(0x1F2328, 0.05),
         selection: HexColor(0x0969DA, 0.18))
 
-    /// Catppuccin Latte — warm-grey lavender light. Purple primary, teal
-    /// secondary; explicit trio (light theme).
-    public static let catppuccinLatte = ThemeSpec(
-        background: HexColor(0xEFF1F5), foreground: HexColor(0x4C4F69),
-        muted: HexColor(0x8C8FA1), primary: HexColor(0x8839EF), font: .mono,
-        error: HexColor(0xD20F39),
-        secondary: HexColor(0x209FB5),
-        border: HexColor(0x4C4F69, 0.10),
-        hover: HexColor(0x4C4F69, 0.05),
-        selection: HexColor(0x8839EF, 0.18))
-
     // --- Structural ---------------------------------------------------
 
     /// Native vibrancy + dynamic system colors. background nil (vibrancy),
@@ -585,7 +574,7 @@ private let themeCatalog: [(name: String, spec: ThemeSpec)] = [
     ("tokyo-hack", .tokyoHack),
     ("github-dark", .githubDark), ("dracula", .dracula),
     ("catppuccin-mocha", .catppuccinMocha), ("gruvbox", .gruvbox),
-    ("github-light", .githubLight), ("catppuccin-latte", .catppuccinLatte),
+    ("github-light", .githubLight),
     ("system", .system),
 ]
 

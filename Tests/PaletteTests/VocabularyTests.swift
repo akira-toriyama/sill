@@ -38,7 +38,7 @@ final class VocabularyTests: XCTestCase {
             "dusk", "clay", "gemstone", "graphite",
             "cobalt2", "shades-of-purple", "tokyo-hack",
             "github-dark", "dracula", "catppuccin-mocha", "gruvbox",
-            "github-light", "catppuccin-latte",
+            "github-light",
             "system", "random",
         ]
         XCTAssertEqual(Set(canonicalThemeNames), expected)
