@@ -4,8 +4,9 @@
 // eye, so the preview can't couple the library to any app.
 //
 // One per family app, each its own per-app tab (KitFamily.appCases):
-// MockTree (facet) · MockTome (wand) · MockPill (perch) · MockMarkdown
-// (glance) here; MockHalo (halo) lives in HaloShowcase.swift.
+// MockTree (facet) · MockTome (wand) · MockMarkdown (glance) here;
+// MockHalo (halo) lives in HaloShowcase.swift, MockPerchOverlay (perch)
+// in PerchShowcase.swift.
 
 import AppKit
 import SwiftUI
@@ -295,41 +296,6 @@ private struct GripDots: View {
             }
         }
         .foregroundColor(Color(nsColor: color).opacity(0.5))
-    }
-}
-
-// MARK: - perch hint pills
-
-struct MockPill: View {
-    let p: ResolvedPalette
-
-    var body: some View {
-        SpecimenBox(title: "perch · hints", p: p) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    pill("J", fill: nil)
-                    pill("K", fill: p.primary)        // matched
-                    pill("L", fill: nil)
-                }
-                HStack(spacing: 6) {
-                    pill("⌫", fill: p.error)          // no-match / cancel
-                    Text("type to filter")
-                        .font(sysFont(10))
-                        .foregroundColor(Color(nsColor: p.muted))
-                }
-            }
-        }
-    }
-
-    @ViewBuilder private func pill(_ key: String, fill: NSColor?) -> some View {
-        let matched = fill != nil
-        Text(key)
-            .font(sysFont(12, weight: .bold, design: .monospaced))
-            .foregroundColor(Color(nsColor: matched ? p.onPrimary() : p.foreground))
-            .frame(width: 26, height: 22)
-            .background(Color(nsColor: fill ?? p.background ?? .clear).opacity(matched ? 1 : 0.9))
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(Color(nsColor: matched ? .clear : p.border), lineWidth: 1))
     }
 }
 
