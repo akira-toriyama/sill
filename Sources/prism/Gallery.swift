@@ -357,6 +357,7 @@ struct ThemeCard: View {
         case .collection:
             WidgetSection(kitComponent("ThemedList"), p: p) { MockList(p: p) }
             WidgetSection(kitComponent("ThemedMenu"), p: p) { MockMenu(p: p) }
+            WidgetSection(kitComponent("ThemedGrid"), p: p) { MockThumbnailGrid(p: p) }
         case .motion:
             WidgetSection(kitComponent("ThemedTransition"), p: p) { MockMotion(p: p) }
         case .particles:
