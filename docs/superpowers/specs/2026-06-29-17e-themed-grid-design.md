@@ -138,7 +138,7 @@ public struct GridCellState: Sendable {        // セルが任意で参照（自
 
 `ThemedThumbnailCell`（既定セル中身）:
 
-- 画像 = `Image(nsImage:).resizable().interpolation(.high)` を `scaledToFill` + クリップ。`image == nil` で [`ThemedSkeletonView`](../../../Sources/ThemeKitUI/ThemedSkeletonView.swift)。
+- 画像 = `Image(nsImage:).resizable().interpolation(.high)` を `scaledToFill` + クリップ。`image == nil` で **SwiftUI ネイティブの shimmer placeholder**（`ShimmerPlaceholder`＝muted 地に foreground のハイライト帯を sweep）。⚠ 既存 [`ThemedSkeletonView`](../../../Sources/ThemeKitUI/ThemedSkeletonView.swift) は **AppKit を包む `NSViewRepresentable`** なので使わない（本部品の「AppKit ゼロ」AC §9.4 を守るため SwiftUI 自前実装にする・計画段階の確定）。
 - ラベル（任意）= 下帯に `foreground` テキスト＋薄 scrim。型は TypeScale トークン。
 - コーナー badge 等の盛り付けは**既定セルに入れない**。必要なら generic な `ThemedGridView` の `cell` ビルダで consumer が compose（[[kit-component-philosophy]]）。
 
