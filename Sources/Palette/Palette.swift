@@ -662,6 +662,24 @@ public func wcagRelativeLuminance(r: Double, g: Double, b: Double) -> Double {
     return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
 }
 
+/// WCAG 2.x contrast ratio between two colors, `1...21`:
+/// `(maxL + 0.05) / (minL + 0.05)` over their gamma-decoded relative
+/// luminance. The pure value half of legibility checking — pairs with
+/// `wcagRelativeLuminance` and feeds the catalog contrast sweep
+/// (`ContrastSweepTests`) so every preset's text/fill pairs are held to a
+/// WCAG floor. ALPHA IS IGNORED: contrast is only meaningful between two
+/// OPAQUE surfaces, the catalog's legibility inks are authored opaque, and
+/// `backgroundAlpha` is panel-over-desktop translucency (a compositing
+/// concern), not part of this static ink-vs-fill relationship — the
+/// `.r/.g/.b` accessors already drop alpha, so this holds automatically.
+/// Pure / Sendable / no AppKit ⇒ compiles under the CommandLineTools
+/// `swift build` gate alongside its siblings.
+public func contrastRatio(_ a: HexColor, _ b: HexColor) -> Double {
+    let la = wcagRelativeLuminance(r: a.r, g: a.g, b: a.b)
+    let lb = wcagRelativeLuminance(r: b.r, g: b.g, b: b.b)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+}
+
 /// True when BLACK text contrasts a fill of WCAG relative luminance `L`
 /// at least as well as white — the actual contrast-ratio crossover
 /// (≈ L 0.18), NOT a perceptual-midpoint guess. A binary luminance
