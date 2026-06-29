@@ -39,6 +39,7 @@ let package = Package(
         .library(name: "CLIKit", targets: ["CLIKit"]),
         .library(name: "Gesture", targets: ["Gesture"]),
         .library(name: "ListCore", targets: ["ListCore"]),
+        .library(name: "GridCore", targets: ["GridCore"]),
         .library(name: "PixelArt", targets: ["PixelArt"]),
         .library(name: "ThemeKit", targets: ["ThemeKit"]),
         .library(name: "ThemeKitUI", targets: ["ThemeKitUI"]),
@@ -98,6 +99,14 @@ let package = Package(
         // byte-identical thin wrappers; #16/#17 SwiftUI will share the same core.
         // A pure leaf alongside Palette/Gesture/Motion: zero AppKit, zero Palette.
         .target(name: "ListCore"),
+
+        // Pure, Sendable, AppKit-free GRID math — adaptive column count,
+        // aspect-fit cell sizing, 2D roving-cursor navigation (ragged last row),
+        // and selection reconciliation. The headless core behind ThemeKitUI's
+        // native `ThemedGridView` (#17e); a pure leaf alongside Palette/ListCore:
+        // zero AppKit, zero Palette (only CGSize/CGFloat behind a CoreGraphics
+        // gate). The future `GridDnD.swift` (macOS-26 milestone) lands here.
+        .target(name: "GridCore"),
 
         // Pure, Sendable, AppKit-free PIXEL-SPRITE atom — wand's chomp
         // (Pac-Man-style) arcade decals reinterpreted as resolution-independent
@@ -165,7 +174,7 @@ let package = Package(
         // `pixelSize(cell:)` (PixelArt) directly (Trail geometry + the canonical
         // sprites/blitters already arrive via Effects).
         .target(name: "ThemeKitUI",
-                dependencies: ["ThemeKit", "PaletteKit", "Effects", "Motion", "PixelArt"]),
+                dependencies: ["ThemeKit", "PaletteKit", "Palette", "Effects", "Motion", "PixelArt", "GridCore"]),
 
         // Pure, Sendable, AppKit-free. One declarative `Spec<Root>` that
         // BOTH decodes a `config.toml` (over `Toml`) and emits its JSON
@@ -192,6 +201,7 @@ let package = Package(
         .testTarget(name: "CLIKitTests", dependencies: ["CLIKit"]),
         .testTarget(name: "GestureTests", dependencies: ["Gesture"]),
         .testTarget(name: "ListCoreTests", dependencies: ["ListCore"]),
+        .testTarget(name: "GridCoreTests", dependencies: ["GridCore"]),
         .testTarget(name: "PixelArtTests", dependencies: ["PixelArt"]),
     ]
 )
