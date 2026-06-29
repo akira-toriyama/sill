@@ -24,6 +24,7 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     private let onActivate: ((ID) -> Void)?
     private let cellBuilder: (Data.Element, GridCellState) -> Cell
     private let selectionBinding: Binding<Set<ID>>?
+    private let allowsMultiSelect: Bool
 
     @State private var internalSelection: Set<ID> = []
     @State private var cursor: ID?
@@ -45,6 +46,7 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
                 aspectRatio: CGFloat? = nil,
                 palette: ResolvedPalette,
                 onActivate: ((ID) -> Void)? = nil,
+                allowsMultiSelect: Bool = true,
                 @ViewBuilder cell: @escaping (Data.Element, GridCellState) -> Cell) {
         self.data = data
         self.idKey = id
@@ -54,6 +56,7 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
         self.aspectRatio = aspectRatio
         self.palette = palette
         self.onActivate = onActivate
+        self.allowsMultiSelect = allowsMultiSelect
         self.cellBuilder = cell
     }
 
@@ -79,9 +82,18 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
             }
             .focusable()
             .focused($isFocused)
+            .modifier(ReturnKeyActivation { if let c = cursor { onActivate?(c) } })
             .onMoveCommand { move($0) }
             .onAppear { recomputeColumns(width: crossWidth(geo)) }
             .onChange(of: geo.size) { _ in recomputeColumns(width: crossWidth(geo)) }
+            .onChange(of: ids) { newIds in
+                let present = Set(newIds)
+                if selectionBinding == nil {
+                    internalSelection = reconcileGridSelection(internalSelection, existing: present)
+                }
+                if let c = cursor, !present.contains(c) { cursor = nil }
+                if let h = hovered, !present.contains(h) { hovered = nil }
+            }
         }
     }
 
@@ -127,8 +139,7 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
             .contentShape(Rectangle())
             .onHover { inside in hovered = inside ? id : (hovered == id ? nil : hovered) }
             .gesture(TapGesture(count: 2).onEnded { onActivate?(id) })
-            .onTapGesture { selectOnly(id); cursor = id; isFocused = true }
-            .gesture(TapGesture().modifiers(.command).onEnded { toggle(id); cursor = id })
+            .gesture(selectionGesture(id))
     }
 
     @ViewBuilder
@@ -164,10 +175,23 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
         else { selection.wrappedValue.insert(id) }
     }
 
+    /// Single tap replaces the selection; Cmd-tap toggles (multi-select only).
+    /// ExclusiveGesture gives the Cmd variant precedence when the modifier is
+    /// held, so a plain and a Cmd click never both fire.
+    private func selectionGesture(_ id: ID) -> some Gesture {
+        let plain = TapGesture().onEnded { selectOnly(id); cursor = id; isFocused = true }
+        let cmd = TapGesture().modifiers(.command).onEnded {
+            if allowsMultiSelect { toggle(id) } else { selectOnly(id) }
+            cursor = id; isFocused = true
+        }
+        return ExclusiveGesture(cmd, plain)
+    }
+
     // MARK: keyboard
     private func crossWidth(_ geo: GeometryProxy) -> CGFloat {
         (axis == .vertical ? geo.size.width : geo.size.height) - pad * 2
     }
+    // resolvedColumns is a best-effort headless mirror of SwiftUI's own adaptive layout, used for nav only; it can differ by one at boundary widths — self-corrects on the next move.
     private func recomputeColumns(width: CGFloat) {
         switch layout {
         case .fixed(let n): resolvedColumns = Swift.max(n, 1)
@@ -176,6 +200,7 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
                                           gap: gap, max: Swift.max(ids.count, 1))
         }
     }
+    // Arrow keys drive a single roving cursor that REPLACES the selection (macOS list/grid convention); shift-extend isn't expressible via onMoveCommand without AppKit.
     private func move(_ direction: MoveCommandDirection) {
         guard !ids.isEmpty else { return }
         let current = cursor.flatMap { ids.firstIndex(of: $0) } ?? 0
@@ -187,7 +212,10 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
         case .down:  (dx, dy) = (0, 1)
         @unknown default: (dx, dy) = (0, 0)
         }
-        let next = nextGridIndex(from: current, dx: dx, dy: dy,
+        // LazyHGrid fills column-major over `resolvedColumns` rows; nextGridIndex
+        // is row-major, so swap the axes for a horizontal grid.
+        let (mdx, mdy) = axis == .vertical ? (dx, dy) : (dy, dx)
+        let next = nextGridIndex(from: current, dx: mdx, dy: mdy,
                                  count: ids.count, columns: resolvedColumns, wrap: false)
         cursor = ids[next]
         selectOnly(ids[next])
@@ -200,5 +228,17 @@ private struct AspectModifier: ViewModifier {
     func body(content: Content) -> some View {
         if let ratio { content.aspectRatio(ratio, contentMode: .fit) }
         else { content }
+    }
+}
+
+/// Return-key activation, available only on macOS 14+ (onKeyPress). A no-op on 13.
+private struct ReturnKeyActivation: ViewModifier {
+    let action: () -> Void
+    func body(content: Content) -> some View {
+        if #available(macOS 14.0, *) {
+            content.onKeyPress(.return) { action(); return .handled }
+        } else {
+            content
+        }
     }
 }

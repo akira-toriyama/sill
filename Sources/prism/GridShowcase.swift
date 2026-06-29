@@ -47,7 +47,7 @@ struct MockThumbnailGrid: View {
                                     aspectRatio: 1, palette: p)
                 .frame(height: 240)
 
-            Text("horizontal rail strip · fixed-3 grid").font(.system(size: 9, design: .monospaced))
+            Text("horizontal rail strip · fixed 1-row").font(.system(size: 9, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
             // Horizontal rail strip.

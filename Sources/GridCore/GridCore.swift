@@ -19,6 +19,7 @@ public func gridColumns(availableWidth: CGFloat, minCellWidth: CGFloat,
 }
 
 /// One cell's size given `columns`. `aspectRatio` = width/height (nil ⇒ square).
+/// Exposed for consumers that size cells themselves; ThemedGridView defers to SwiftUI's grid sizing.
 public func gridCellSize(availableWidth: CGFloat, columns: Int,
                          gap: CGFloat, aspectRatio: CGFloat?) -> CGSize {
     let cols = Swift.max(columns, 1)
