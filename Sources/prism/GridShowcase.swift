@@ -40,6 +40,16 @@ struct MockThumbnailGrid: View {
         (0..<3).map { ThumbnailItem(id: "l\($0)", image: nil, label: "loading") }
     }
 
+    // Opt-in interaction trace (off by default; run `PRISM_LOG=1 prism`), matching
+    // prism's other PRISM_* env seams. Now that prism has a genuinely interactive
+    // widget, this surfaces selection/activation to stdout for debugging.
+    private func prismLog(_ msg: String) {
+        if ProcessInfo.processInfo.environment["PRISM_LOG"] != nil {
+            print("[ThemedGrid] \(msg)")
+            fflush(stdout)   // stdout is block-buffered when redirected to a file
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("ThemeKitUI · ThemedGridView — native themed thumbnail grid (#17e)")
@@ -60,8 +70,9 @@ struct MockThumbnailGrid: View {
                                     selection: $selection,
                                     layout: .adaptive(minCellWidth: 96),
                                     aspectRatio: 1, palette: p,
-                                    onActivate: { lastActivated = $0 })
+                                    onActivate: { lastActivated = $0; prismLog("activated \($0)") })
                 .frame(height: 240)
+                .onChange(of: selection) { prismLog("selected [\($0.sorted().joined(separator: ", "))]") }
 
             Text("horizontal rail strip · fixed 1-row").font(.system(size: 9, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))

@@ -306,6 +306,10 @@ struct ThemeCard: View {
                 effectsEnabled: showEffects,
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous),
                 lineWidth: 1.5)
+                // The rim is a full-frame `Canvas`, which hit-tests its whole bounds
+                // and would otherwise swallow every hover/click meant for the widget
+                // content beneath — a decorative border must never capture events.
+                .allowsHitTesting(false)
         }
     }
 
