@@ -136,6 +136,9 @@ public struct ThemedPillView: View {
                     if frosted { pillShape.fill(.ultraThinMaterial) }
                     ThemedBackdropView(palette: palette, in: pillShape,
                                        fill: .scrim(opacity: surfaceAlpha ?? 1))
+                    // miss tints the surface with an error wash (perch parity:
+                    // a miss swaps the fill, not just the border/prefix).
+                    if state == .miss { pillShape.fill(errorColor.opacity(0.20)) }
                 }
             }
             .overlay { borderOverlay }
