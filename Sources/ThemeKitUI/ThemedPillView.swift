@@ -98,9 +98,125 @@ public struct ThemedPillView: View {
             .fixedSize()
     }
 
-    // NOTE: Task-1 scaffold body = just the label. Task 2 composes the surface,
-    // shapes, tri-state border, frost, drop shadow, badge, and motion passthrough.
+    /// The shape actually drawn (`.circle` degrades to `.pill` for multi-glyph).
+    private var kind: Shape { PillLogic.resolvedShape(shape, label: label) }
+
+    /// Type-erased SwiftUI shape for the surface + border (macOS 13+ `AnyShape`).
+    private var pillShape: AnyShape {
+        switch kind {
+        case .pill:      return AnyShape(Capsule())
+        case .square:    return AnyShape(RoundedRectangle(cornerRadius: 1, style: .continuous))
+        case .circle:    return AnyShape(Circle())
+        case .tag:       return AnyShape(TagShape())
+        case .underline: return AnyShape(Rectangle())   // never drawn as a surface
+        }
+    }
+
     public var body: some View {
-        labelView.padding(.horizontal, 10).padding(.vertical, 4)
+        content
+            .compositingGroup()
+            .modifier(PillShadow(palette: palette, enabled: elevated && kind != .underline))
+            .transformEffect(transform)
+            .opacity(opacity)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if kind == .underline { underlineContent } else { filledContent }
+    }
+
+    /// Filled/bordered shapes: a scrim surface (+ optional Material frost) under
+    /// the two-color label, a state-driven border, and an optional corner badge.
+    private var filledContent: some View {
+        labelView
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background {
+                ZStack {
+                    if frosted { pillShape.fill(.ultraThinMaterial) }
+                    ThemedBackdropView(palette: palette, in: pillShape,
+                                       fill: .scrim(opacity: surfaceAlpha ?? 1))
+                }
+            }
+            .overlay { borderOverlay }
+            .overlay(alignment: .topTrailing) { badgeView }
+    }
+
+    /// Underline: no surface/border — a 2pt accent bar under the label.
+    private var underlineContent: some View {
+        labelView
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(state == .miss ? errorColor : accentColor)
+                    .frame(height: 2)
+                    .padding(.horizontal, 4)
+            }
+            .overlay(alignment: .topTrailing) { badgeView }
+    }
+
+    /// Tri-state border. matched = accent stroke + a native glow on the stroke
+    /// (fill UNCHANGED); miss = error stroke; idle = accent hairline.
+    @ViewBuilder
+    private var borderOverlay: some View {
+        switch state {
+        case .idle:
+            pillShape.stroke(accentColor.opacity(0.55), lineWidth: 1)
+        case .matched:
+            pillShape.stroke(accentColor, lineWidth: 2)
+                .shadow(color: accentColor.opacity(0.5), radius: 7)
+        case .miss:
+            pillShape.stroke(errorColor, lineWidth: 2)
+        }
+    }
+
+    @ViewBuilder
+    private var badgeView: some View {
+        if let badge {
+            Text(badge)
+                .font(Font(palette.uiFont(.caption) as CTFont).weight(.semibold))
+                .foregroundColor(accentColor)
+                .padding(.horizontal, 3)
+                .padding(.vertical, 1)
+                .offset(x: 4, y: -4)
+        }
+    }
+}
+
+// MARK: - Themed drop shadow (Elevation.dp2 token)
+
+private struct PillShadow: ViewModifier {
+    let palette: ResolvedPalette
+    let enabled: Bool
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            let s = palette.shadow(.dp2)   // (opacity: Float, radius: CGFloat, offsetY: CGFloat)
+            content.shadow(color: .black.opacity(Double(s.opacity)),
+                           radius: s.radius, x: 0, y: s.offsetY)
+        } else {
+            content
+        }
+    }
+}
+
+// MARK: - Tag shape: rounded rect + left-pointing triangle (one path)
+
+struct TagShape: SwiftUI.Shape {
+    var radius: CGFloat = 10
+    var notch: CGFloat = 6        // how far the point pokes left of the body
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let body = CGRect(x: rect.minX + notch, y: rect.minY,
+                          width: max(0, rect.width - notch), height: rect.height)
+        p.addRoundedRect(in: body, cornerSize: CGSize(width: radius, height: radius))
+        var tri = Path()
+        tri.move(to: CGPoint(x: body.minX, y: rect.midY - 4))
+        tri.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
+        tri.addLine(to: CGPoint(x: body.minX, y: rect.midY + 4))
+        tri.closeSubpath()
+        p.addPath(tri)
+        return p
     }
 }
