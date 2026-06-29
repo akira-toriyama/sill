@@ -32,12 +32,13 @@ final class VocabularyTests: XCTestCase {
             "terminal", "chomp", "rainbow",
             "aurora-flux", "acidwave", "neon-noir", "outrun", "blacklight",
             "synthwave", "ghostwire", "cyberpunk", "tron",
+            "biolume", "midas", "spectre",
             "voltage", "toxic", "ember",
             "solar-veil", "molten-vein", "coin-op", "arcane",
             "dusk", "clay", "gemstone", "graphite",
             "cobalt2", "shades-of-purple", "tokyo-hack",
             "github-dark", "dracula", "catppuccin-mocha", "gruvbox",
-            "github-light", "catppuccin-latte",
+            "github-light",
             "system", "random",
         ]
         XCTAssertEqual(Set(canonicalThemeNames), expected)
@@ -69,6 +70,7 @@ final class VocabularyTests: XCTestCase {
             ["neon", "cyber", "vapor", "kawaii", "rainbow", "chomp",
              "voltage", "toxic", "ember", "solar-veil", "molten-vein",
              "coin-op", "arcane",
+             "biolume", "midas", "spectre",
              "random", "off"])
     }
 

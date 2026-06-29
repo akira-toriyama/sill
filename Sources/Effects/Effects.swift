@@ -144,6 +144,28 @@ extension EffectSpec {
     public static let arcane = EffectSpec(
         steady: 0x7B3FF2,
         flash: [0x7B3FF2, 0xB58BFF, 0xFFC83D, 0x9D6BFF, 0xFFE27A])
+
+    // --- Contrast-verified neon (paired with the same-named ThemeSpec) ---
+    // Animate the WCAG-clean trio. Same FIXED-palette blink as the family
+    // above (none `cycles`); only the accent/border cycles — the static
+    // palette and its verified contrast hold.
+
+    /// biolume — bioluminescent pulse: an aqua-jade shimmer through cyan and
+    /// a jelly-violet glow (deep-sea light that breathes).
+    public static let biolume = EffectSpec(
+        steady: 0x00F5D4,
+        flash: [0x00F5D4, 0x18FFC2, 0x3DF0FF, 0x00E5FF, 0xB06BFF, 0x5AE0C0])
+
+    /// midas — molten-gold gleam through amber, a white glint, and a teal spark.
+    public static let midas = EffectSpec(
+        steady: 0xFFD23F,
+        flash: [0xFFD23F, 0xFFC400, 0xFFE98A, 0xFFFFFF, 0x2DE2C8, 0xFFB800])
+
+    /// spectre — haunted flicker: phantom-green wavering through a ghost-white
+    /// flash and a bruise-violet.
+    public static let spectre = EffectSpec(
+        steady: 0x7CFFB0,
+        flash: [0x7CFFB0, 0xB8FFD6, 0xEAF7EE, 0x9B5CFF, 0x5CFF9E, 0x3DD98A])
 }
 
 // (`canonicalEffectNames` lives in `Palette` since 0.6.0 — pure
@@ -167,10 +189,13 @@ public func borderEffectFor(_ name: String) -> EffectSpec? {
     case "molten-vein": return .moltenVein
     case "coin-op":     return .coinOp
     case "arcane":      return .arcane
+    case "biolume":     return .biolume
+    case "midas":       return .midas
+    case "spectre":     return .spectre
     case "random":
         let pool: [EffectSpec] = [.neon, .cyber, .vapor, .kawaii, .rainbow, .chomp,
                                   .voltage, .toxic, .ember, .solarVeil, .moltenVein,
-                                  .coinOp, .arcane]
+                                  .coinOp, .arcane, .biolume, .midas, .spectre]
         return pool.randomElement()
     default:        return nil   // "off" or unknown
     }

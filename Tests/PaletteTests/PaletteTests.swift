@@ -34,7 +34,6 @@ final class PaletteTests: XCTestCase {
     func testIsLight() {
         XCTAssertFalse(ThemeSpec.terminal.isLight)
         XCTAssertTrue(ThemeSpec.githubLight.isLight)
-        XCTAssertTrue(ThemeSpec.catppuccinLatte.isLight)
         XCTAssertFalse(ThemeSpec.system.isLight)   // nil bg → treated dark
     }
 
@@ -56,7 +55,7 @@ final class PaletteTests: XCTestCase {
     /// Light / special presets DO store the trio (they deviate from the
     /// dark-ink recipe).
     func testSpecialPresetsStoreTrio() {
-        for s in [ThemeSpec.githubLight, .catppuccinLatte, .rainbow] {
+        for s in [ThemeSpec.githubLight, .rainbow] {
             XCTAssertNotNil(s.border)
             XCTAssertNotNil(s.hover)
             XCTAssertNotNil(s.selection)
@@ -70,8 +69,10 @@ final class PaletteTests: XCTestCase {
     }
 
     /// A preset without an error override falls back to the canonical red.
+    /// (rainbow is the sole remaining no-error preset — gruvbox now ships an
+    /// explicit AA-clean red.)
     func testErrorDefaultsToCanonicalRed() {
-        XCTAssertEqual(ThemeSpec.gruvbox.error.rgb, defaultErrorHex)
+        XCTAssertEqual(ThemeSpec.rainbow.error.rgb, defaultErrorHex)
         XCTAssertEqual(defaultErrorHex, 0xEF4444)
     }
 
@@ -97,7 +98,7 @@ final class PaletteTests: XCTestCase {
         XCTAssertEqual(paletteFor("shades-of-purple").primary.rgb, 0xFAD000)
         XCTAssertEqual(paletteFor("tokyo-hack").primary.rgb,       0xE84B3C)
         XCTAssertEqual(paletteFor("github-dark").primary.rgb,      0x2F81F7)
-        XCTAssertEqual(paletteFor("catppuccin-latte").primary.rgb, 0x8839EF)
+        XCTAssertEqual(paletteFor("catppuccin-mocha").primary.rgb, 0xCBA6F7)
     }
 
     func testEveryCanonicalNameResolves() {

@@ -317,6 +317,43 @@ extension ThemeSpec {
         error: HexColor(0xFF3355),
         secondary: HexColor(0xFF6A1A))
 
+    // --- Contrast-verified neon (WCAG-clean by construction) ----------
+    // A trio designed AFTER the catalog contrast sweep (ContrastSweepTests),
+    // applying what it taught: every legibility pair clears its WCAG floor
+    // with margin and needs NO exception — neon that's loud AND legible.
+    // Dark presets: bg/fg/muted/primary/secondary/error only; the
+    // border/hover/selection trio derives from the near-black base.
+
+    /// biolume — deep-sea bioluminescence (nature): a glowing aqua-jade
+    /// primary + jelly-violet secondary on abyss black. The catalog's
+    /// "quiet but neon" aqua slot — distinct from terminal's phosphor green
+    /// and aurora-flux's emerald+violet by the blue-green jade lead.
+    public static let biolume = ThemeSpec(
+        background: HexColor(0x02070A), foreground: HexColor(0xD6FFF4),
+        muted: HexColor(0x5E9A90), primary: HexColor(0x00F5D4), font: .rounded,
+        error: HexColor(0xFF5E6C),
+        secondary: HexColor(0xB06BFF))
+
+    /// midas — neon gold (magic / luxe): a true rich-gold primary, a hue no
+    /// other theme LEADS with (cyberpunk acid-yellow, chomp pellet-yellow,
+    /// ember orange, arcane gold-as-secondary), against a cool electric teal
+    /// on warm pure black.
+    public static let midas = ThemeSpec(
+        background: HexColor(0x050402), foreground: HexColor(0xFFF4DA),
+        muted: HexColor(0x96804E), primary: HexColor(0xFFD23F), font: .mono,
+        error: HexColor(0xFF4D5E),
+        secondary: HexColor(0x2DE2C8))
+
+    /// spectre — haunted phantom glow (spooky / game): an eerie phantom-green
+    /// primary + bruise-violet secondary on ink black. A spooky MOOD the
+    /// catalog lacks — distinct from terminal's hacker green and toxic's rave
+    /// lime by the pale, cold, ghostly cast.
+    public static let spectre = ThemeSpec(
+        background: HexColor(0x04060A), foreground: HexColor(0xEAF7EE),
+        muted: HexColor(0x61856E), primary: HexColor(0x7CFFB0), font: .mono,
+        error: HexColor(0xFF4D6D),
+        secondary: HexColor(0x9B5CFF))
+
     // --- Animated neon family (theme + EffectSpec pairs) --------------
     // The second wave of `chomp`'s "playful animated themes" family (DESIGN
     // §3): each is a pure-#000000 neon theme that ALSO ships a matching
@@ -414,12 +451,13 @@ extension ThemeSpec {
         error: HexColor(0xC85A4A),
         secondary: HexColor(0xA8A05E))
 
-    /// gemstone — deep emerald + amethyst on velvet black, garnet error.
+    /// gemstone — deep emerald + amethyst on velvet black, garnet error
+    /// (lifted in value to clear WCAG AA on the velvet-black base).
     /// Jewel-rich but NOT neon: lower-value, velvet saturation.
     public static let gemstone = ThemeSpec(
         background: HexColor(0x08070C), foreground: HexColor(0xE6E0EC),
         muted: HexColor(0x5E5870), primary: HexColor(0x2FA37C), font: .system,
-        error: HexColor(0xC0445E),
+        error: HexColor(0xD9536E),
         secondary: HexColor(0x9E6BC4))
 
     /// graphite — monochrome ink: a cool-silver primary + warm-taupe
@@ -479,10 +517,14 @@ extension ThemeSpec {
         error: HexColor(0xF38BA8),
         secondary: HexColor(0x89B4FA))
 
-    /// Gruvbox — retro warm dark. Orange primary, aqua secondary.
+    /// Gruvbox — retro warm dark. Orange primary, aqua secondary; gruvbox
+    /// bright-red error, lightened to clear WCAG AA on the #282828 base
+    /// (gruvbox ships no error hue, so this replaces sill's default red and
+    /// stays clearly red against the orange primary).
     public static let gruvbox = ThemeSpec(
         background: HexColor(0x282828), foreground: HexColor(0xEBDBB2),
         muted: HexColor(0x928374), primary: HexColor(0xFE8019), font: .mono,
+        error: HexColor(0xFC6452),
         secondary: HexColor(0x8EC07C))
 
     // --- Light --------------------------------------------------------
@@ -497,17 +539,6 @@ extension ThemeSpec {
         border: HexColor(0x1F2328, 0.10),
         hover: HexColor(0x1F2328, 0.05),
         selection: HexColor(0x0969DA, 0.18))
-
-    /// Catppuccin Latte — warm-grey lavender light. Purple primary, teal
-    /// secondary; explicit trio (light theme).
-    public static let catppuccinLatte = ThemeSpec(
-        background: HexColor(0xEFF1F5), foreground: HexColor(0x4C4F69),
-        muted: HexColor(0x8C8FA1), primary: HexColor(0x8839EF), font: .mono,
-        error: HexColor(0xD20F39),
-        secondary: HexColor(0x209FB5),
-        border: HexColor(0x4C4F69, 0.10),
-        hover: HexColor(0x4C4F69, 0.05),
-        selection: HexColor(0x8839EF, 0.18))
 
     // --- Structural ---------------------------------------------------
 
@@ -534,6 +565,7 @@ private let themeCatalog: [(name: String, spec: ThemeSpec)] = [
     ("neon-noir", .neonNoir), ("outrun", .outrun), ("blacklight", .blacklight),
     ("synthwave", .synthwave), ("ghostwire", .ghostwire),
     ("cyberpunk", .cyberpunk), ("tron", .tron),
+    ("biolume", .biolume), ("midas", .midas), ("spectre", .spectre),
     ("voltage", .voltage), ("toxic", .toxic), ("ember", .ember),
     ("solar-veil", .solarVeil), ("molten-vein", .moltenVein),
     ("coin-op", .coinOp), ("arcane", .arcane),
@@ -542,7 +574,7 @@ private let themeCatalog: [(name: String, spec: ThemeSpec)] = [
     ("tokyo-hack", .tokyoHack),
     ("github-dark", .githubDark), ("dracula", .dracula),
     ("catppuccin-mocha", .catppuccinMocha), ("gruvbox", .gruvbox),
-    ("github-light", .githubLight), ("catppuccin-latte", .catppuccinLatte),
+    ("github-light", .githubLight),
     ("system", .system),
 ]
 
@@ -578,6 +610,8 @@ public let canonicalEffectNames: [String] = [
     // The animated neon family — each is a theme+EffectSpec pair (like
     // chomp), so its name is ALSO a valid standalone `[border] effect`.
     "voltage", "toxic", "ember", "solar-veil", "molten-vein", "coin-op", "arcane",
+    // The contrast-verified neon trio — each is also a theme+EffectSpec pair.
+    "biolume", "midas", "spectre",
     "random", "off",
 ]
 
@@ -660,6 +694,24 @@ public func wcagRelativeLuminance(r: Double, g: Double, b: Double) -> Double {
         c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
     }
     return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+}
+
+/// WCAG 2.x contrast ratio between two colors, `1...21`:
+/// `(maxL + 0.05) / (minL + 0.05)` over their gamma-decoded relative
+/// luminance. The pure value half of legibility checking — pairs with
+/// `wcagRelativeLuminance` and feeds the catalog contrast sweep
+/// (`ContrastSweepTests`) so every preset's text/fill pairs are held to a
+/// WCAG floor. ALPHA IS IGNORED: contrast is only meaningful between two
+/// OPAQUE surfaces, the catalog's legibility inks are authored opaque, and
+/// `backgroundAlpha` is panel-over-desktop translucency (a compositing
+/// concern), not part of this static ink-vs-fill relationship — the
+/// `.r/.g/.b` accessors already drop alpha, so this holds automatically.
+/// Pure / Sendable / no AppKit ⇒ compiles under the CommandLineTools
+/// `swift build` gate alongside its siblings.
+public func contrastRatio(_ a: HexColor, _ b: HexColor) -> Double {
+    let la = wcagRelativeLuminance(r: a.r, g: a.g, b: a.b)
+    let lb = wcagRelativeLuminance(r: b.r, g: b.g, b: b.b)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 }
 
 /// True when BLACK text contrasts a fill of WCAG relative luminance `L`
