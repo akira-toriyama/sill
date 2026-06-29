@@ -52,4 +52,20 @@ final class GridMathTests: XCTestCase {
         XCTAssertEqual(reconcileGridSelection(Set(["a", "b", "z"]), existing: Set(["a", "b", "c"])),
                        Set(["a", "b"]))
     }
+
+    // nextGridIndex(horizontal:) — a horizontal rail (LazyHGrid, column-major)
+    // swaps the screen-space axes. Regression guard for the #17e horizontal-nav bug
+    // (Left/Right were inert in the shipped rail before the axis transpose).
+    func testHorizontalNavSwapsAxes() {
+        // 7 items in a single-row rail (columns == cross-axis row count == 1).
+        // Right advances one item; Left steps back; Down clamps (only one row).
+        XCTAssertEqual(nextGridIndex(from: 0, dx: 1, dy: 0, count: 7, columns: 1, horizontal: true, wrap: false), 1)
+        XCTAssertEqual(nextGridIndex(from: 3, dx: -1, dy: 0, count: 7, columns: 1, horizontal: true, wrap: false), 2)
+        XCTAssertEqual(nextGridIndex(from: 2, dx: 0, dy: 1, count: 7, columns: 1, horizontal: true, wrap: false), 2)
+    }
+    func testHorizontalFalseMatchesPlainOverload() {
+        // horizontal:false must be identical to the base row-major nextGridIndex.
+        XCTAssertEqual(nextGridIndex(from: 1, dx: 0, dy: 1, count: 7, columns: 3, horizontal: false, wrap: false),
+                       nextGridIndex(from: 1, dx: 0, dy: 1, count: 7, columns: 3, wrap: false))
+    }
 }

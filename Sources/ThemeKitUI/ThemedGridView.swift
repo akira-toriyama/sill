@@ -212,11 +212,11 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
         case .down:  (dx, dy) = (0, 1)
         @unknown default: (dx, dy) = (0, 0)
         }
-        // LazyHGrid fills column-major over `resolvedColumns` rows; nextGridIndex
-        // is row-major, so swap the axes for a horizontal grid.
-        let (mdx, mdy) = axis == .vertical ? (dx, dy) : (dy, dx)
-        let next = nextGridIndex(from: current, dx: mdx, dy: mdy,
-                                 count: ids.count, columns: resolvedColumns, wrap: false)
+        // GridCore handles the row-major↔column-major axis swap (a horizontal
+        // LazyHGrid fills column-major); `resolvedColumns` is the cross-axis count.
+        let next = nextGridIndex(from: current, dx: dx, dy: dy,
+                                 count: ids.count, columns: resolvedColumns,
+                                 horizontal: axis == .horizontal, wrap: false)
         cursor = ids[next]
         selectOnly(ids[next])
     }

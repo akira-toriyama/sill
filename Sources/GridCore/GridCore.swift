@@ -54,6 +54,18 @@ public func nextGridIndex(from index: Int, dx: Int, dy: Int,
     return target >= count ? count - 1 : target   // ragged last-row snap
 }
 
+/// Next focused index for a (dx,dy) intent, honoring the grid's main axis. A
+/// horizontal grid (LazyHGrid) fills column-major, so the screen-space dx/dy are
+/// swapped before the row-major `nextGridIndex`; a vertical grid is unchanged.
+/// `columns` is the cross-axis track count (columns for vertical, rows for
+/// horizontal).
+public func nextGridIndex(from index: Int, dx: Int, dy: Int, count: Int,
+                          columns: Int, horizontal: Bool, wrap: Bool) -> Int {
+    let (mdx, mdy) = horizontal ? (dy, dx) : (dx, dy)
+    return nextGridIndex(from: index, dx: mdx, dy: mdy,
+                         count: count, columns: columns, wrap: wrap)
+}
+
 /// Drop selected ids no longer present (reconcile a persisted selection).
 public func reconcileGridSelection<ID: Hashable>(_ selection: Set<ID>,
                                                   existing ids: Set<ID>) -> Set<ID> {
