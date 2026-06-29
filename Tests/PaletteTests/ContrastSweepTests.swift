@@ -48,11 +48,11 @@ final class ContrastSweepTests: XCTestCase {
     /// pass"), and removing the underlying issue should remove the entry.
     /// Key: "<preset>/<pair>".
     let contrastExceptions: [String: String] = [
-        // --- error × background below AA 4.5 (HARD) ----------------------
+        // --- error × background below AA 4.5 (HARD): third-party brand reds
+        //     kept faithful to the source theme (sill-owned gemstone &
+        //     default-using gruvbox were instead lifted over AA) -----------
         "shades-of-purple/error": "brand red #EC3A37 on #2D2B55 ≈ 3.29:1 — third-party theme fidelity (ahmadawais)",
-        "gruvbox/error":          "sill default red #EF4444 on #282828 ≈ 3.92:1 — gruvbox ships no error hue",
         "cobalt2/error":          "Wes Bos red #FF5C57 on #193549 ≈ 4.20:1 — third-party theme fidelity",
-        "gemstone/error":         "garnet #C0445E on velvet #08070C ≈ 4.04:1 — sill-original, just under AA",
         // --- muted × background below the 3:1 floor (WARN) ---------------
         "gemstone/muted":         "velvet low-value muted #5E5870 ≈ 2.97:1 — supplementary text, by design",
         "catppuccin-latte/muted": "canonical Latte overlay grey #8C8FA1 ≈ 2.83:1 — upstream value, supplementary text",

@@ -414,12 +414,13 @@ extension ThemeSpec {
         error: HexColor(0xC85A4A),
         secondary: HexColor(0xA8A05E))
 
-    /// gemstone — deep emerald + amethyst on velvet black, garnet error.
+    /// gemstone — deep emerald + amethyst on velvet black, garnet error
+    /// (lifted in value to clear WCAG AA on the velvet-black base).
     /// Jewel-rich but NOT neon: lower-value, velvet saturation.
     public static let gemstone = ThemeSpec(
         background: HexColor(0x08070C), foreground: HexColor(0xE6E0EC),
         muted: HexColor(0x5E5870), primary: HexColor(0x2FA37C), font: .system,
-        error: HexColor(0xC0445E),
+        error: HexColor(0xD9536E),
         secondary: HexColor(0x9E6BC4))
 
     /// graphite — monochrome ink: a cool-silver primary + warm-taupe
@@ -479,10 +480,14 @@ extension ThemeSpec {
         error: HexColor(0xF38BA8),
         secondary: HexColor(0x89B4FA))
 
-    /// Gruvbox — retro warm dark. Orange primary, aqua secondary.
+    /// Gruvbox — retro warm dark. Orange primary, aqua secondary; gruvbox
+    /// bright-red error, lightened to clear WCAG AA on the #282828 base
+    /// (gruvbox ships no error hue, so this replaces sill's default red and
+    /// stays clearly red against the orange primary).
     public static let gruvbox = ThemeSpec(
         background: HexColor(0x282828), foreground: HexColor(0xEBDBB2),
         muted: HexColor(0x928374), primary: HexColor(0xFE8019), font: .mono,
+        error: HexColor(0xFC6452),
         secondary: HexColor(0x8EC07C))
 
     // --- Light --------------------------------------------------------
