@@ -43,6 +43,8 @@ let package = Package(
         .library(name: "PixelArt", targets: ["PixelArt"]),
         .library(name: "ThemeKit", targets: ["ThemeKit"]),
         .library(name: "ThemeKitUI", targets: ["ThemeKitUI"]),
+        .library(name: "MarkdownKit", targets: ["MarkdownKit"]),
+        .library(name: "MarkdownKitUI", targets: ["MarkdownKitUI"]),
     ],
     dependencies: [
         // The family's ONE TOML implementation now lives in its own repo
@@ -72,6 +74,7 @@ let package = Package(
         // / `NSImage(_:)` API. Bump only if a CLT-buildable newer release lands.
         .package(url: "https://github.com/swhitty/SwiftDraw.git",
                  .upToNextMinor(from: "0.24.0")),
+        .package(url: "https://github.com/apple/swift-markdown.git", from: "0.4.0"),
     ],
     targets: [
         // Pure, Sendable, AppKit-free. The shared base.
@@ -184,11 +187,21 @@ let package = Package(
         .target(name: "ConfigSchema",
                 dependencies: [.product(name: "Toml", package: "swift-toml-edit")]),
 
+        .target(
+            name: "MarkdownKit",
+            dependencies: [.product(name: "Markdown", package: "swift-markdown")]),
+        .target(
+            name: "MarkdownKitUI",
+            dependencies: ["MarkdownKit", "PaletteKit", "Palette", "ThemeKit"]),
+        .testTarget(
+            name: "MarkdownKitTests",
+            dependencies: ["MarkdownKit"]),
+
         // `prism` — the theme PREVIEW app. The one place in sill with a
         // config.toml. Renders every catalog theme (all roles + font +
         // its OWN mock chrome specimens — never imports an app's View, so
         // no drift debt). The visual verification bench for the catalog.
-        .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "Motion", "ThemeKit", "ThemeKitUI", "PixelArt"]),
+        .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "Motion", "ThemeKit", "ThemeKitUI", "PixelArt", "MarkdownKit", "MarkdownKitUI"]),
 
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit", "Effects"]),

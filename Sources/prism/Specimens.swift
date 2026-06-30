@@ -4,8 +4,9 @@
 // eye, so the preview can't couple the library to any app.
 //
 // One per family app, each its own per-app tab (KitFamily.appCases):
-// MockTree (facet) · MockTome (wand) · MockMarkdown (glance) here;
-// MockHalo (halo) lives in HaloShowcase.swift, MockPerchOverlay (perch)
+// MockTree (facet) · MockTome (wand) here;
+// MockMarkdown (glance) lives in MarkdownShowcase.swift,
+// MockHalo (halo) in HaloShowcase.swift, MockPerchOverlay (perch)
 // in PerchShowcase.swift.
 
 import AppKit
@@ -367,36 +368,3 @@ struct MockTome: View {
     }
 }
 
-// MARK: - glance markdown
-
-struct MockMarkdown: View {
-    let p: ResolvedPalette
-
-    var body: some View {
-        SpecimenBox(title: "glance · markdown", p: p) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("# Heading")
-                    .font(sysFont(13, weight: .bold))
-                    .foregroundColor(Color(nsColor: p.primary))
-                Text("Body text with a")
-                    .font(sysFont(11))
-                    .foregroundColor(Color(nsColor: p.foreground))
-                + Text(" link")
-                    .font(sysFont(11, weight: .medium))
-                    .foregroundColor(Color(nsColor: p.primary))
-                Text("inline_code()")
-                    .font(sysFont(10, design: .monospaced))
-                    .foregroundColor(Color(nsColor: p.foreground))
-                    .padding(.horizontal, 4).padding(.vertical, 1)
-                    .background(Color(nsColor: p.selection))
-                    .clipShape(RoundedRectangle(cornerRadius: 3))
-                Text("error: not found")
-                    .font(sysFont(10, design: .monospaced))
-                    .foregroundColor(Color(nsColor: p.error))
-                Text("caption · least emphasis")
-                    .font(sysFont(9))
-                    .foregroundColor(Color(nsColor: p.tertiary))
-            }
-        }
-    }
-}

@@ -548,6 +548,26 @@ let kitCatalog: [KitComponent] = [
                  "Ph roadmap (#12): Ph1 sprites+blitter ✓ → Ph2 unify line-pets + Motion.frameStep ✓ → Ph3 upright directional-eye ghost ✓ (this) + PathPet next → Ph4 neon corridor + pellets → Ph5 eat + rainbow flash + score",
              ],
         family: .particles),
+    KitComponent(
+        name: "MarkdownView", module: "MarkdownKitUI",
+        kind: "Themed Markdown renderer — full GFM block/inline tree, SwiftUI-native",
+        summary: "Pure-SwiftUI view that parses and renders a GFM Markdown string using the theme's ResolvedPalette; re-themes by reassigning palette.",
+        consumes: "A SwiftUI View: `MarkdownView(palette:source:)` (or the blocks: init for pre-parsed AST). Embed directly in any SwiftUI hierarchy; it sizes to its content via VStack(alignment:.leading).",
+        keyAPI: [
+                 "palette: ResolvedPalette — theme; drives all colour roles (foreground, primary, muted, selection, error, border)",
+                 "source: String — raw GFM Markdown; parsed to [MarkdownBlock] by parseMarkdown(_:) (MarkdownKit)",
+                 "blocks: [MarkdownBlock] — pre-parsed AST init for callers that already hold the parsed tree",
+                 "style: MarkdownStyle — font size, block spacing (default: .default)",
+                 "highlighter: MarkdownHighlighter? — optional syntax-highlight hook for fenced code blocks",
+                 "textColor: Color? — override body text colour (nil ⇒ palette.foreground; set to tertiary inside blockquotes)",
+             ],
+        variants: [
+                 "Block elements: heading (h1–h6, bold+primary tint) / paragraph / blockquote (recursive, tertiary ink) / fenced code block / bullet list / ordered list / task list (✓/☐) / table (GFM) / thematic break (hr) / blank",
+                 "Inline elements: bold / italic / strikethrough / inline code (selection wash) / link (primary, underline) / plain text",
+                 "MarkdownStyle: baseFontSize, headingSize(level), blockSpacing — all in pt, scalable",
+                 ".textSelection(.enabled) on the whole VStack (text is selectable)",
+             ],
+        family: .glance),
 ]
 
 /// Look up a component by its public type name (the names are fixed in the gallery).
