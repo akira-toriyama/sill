@@ -1,3 +1,9 @@
+> ⚠ **SUPERSEDED (2026-06-30) by [`2026-06-30-17f-markdown-nstextview-design.md`](2026-06-30-17f-markdown-nstextview-design.md).**
+> This SwiftUI `TextRenderer` approach was rejected: `.textSelection(.enabled)` disables
+> a custom `TextRenderer`, so the pill never paints when the markdown is selectable
+> (proven live in prism). The popover must stay selectable, so sill adopts glance's
+> `NSTextView` renderer instead (床2個 → 床3個). Kept here for the detailed ① investigation.
+
 # sill #17f — MarkdownKitUI rounded inline-code pill (SwiftUI `TextRenderer`)
 
 Date: 2026-06-30 · Task: [t-xt11] (spun from the glance prism-mock arm of [t-yc68], PR sill#95)
