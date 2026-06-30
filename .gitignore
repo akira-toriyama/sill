@@ -5,3 +5,6 @@
 # A library resolves its own dependency graph from each consumer's pins
 # (.upToNextMinor), so the lockfile is per-checkout, not source of truth.
 Package.resolved
+
+# Claude Code local config + git worktrees (machine-specific; never commit worktrees)
+.claude/
