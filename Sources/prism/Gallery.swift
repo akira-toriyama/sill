@@ -385,7 +385,7 @@ struct ThemeCard: View {
             MockHalo(p: p, themeName: name, showEffects: showEffects)
         case .glance:
             appCaption(.glance, p: p)
-            MockMarkdown(p: p)
+            MockGlancePopover(p: p)
         }
     }
 

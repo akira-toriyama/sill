@@ -5,7 +5,7 @@
 //
 // One per family app, each its own per-app tab (KitFamily.appCases):
 // MockTree (facet) · MockTome (wand) here;
-// MockMarkdown (glance) lives in MarkdownShowcase.swift,
+// MockGlancePopover (glance) lives in GlanceShowcase.swift,
 // MockHalo (halo) in HaloShowcase.swift, MockPerchOverlay (perch)
 // in PerchShowcase.swift.
 
