@@ -35,7 +35,7 @@ Xcode). Therefore:
 | `ConfigSchema` | one `Spec<Root>` decodes config.toml + emits its JSON Schema | pure |
 | `CLIKit` | arity-driven argv tokenizer | pure |
 | `ThemeKit` | shared themed **AppKit widgets** (`ThemedTextField`, …) — the AppKit *draw* layer the SwiftUI bridges wrap | AppKit / `@MainActor` |
-| `ThemeKitUI` | public **SwiftUI** widgets (`ThemedTextFieldView`, …) — the DEFAULT UI layer; AppKit only for the 2 floors (IME edit-core + window shell, see **AppKit 使用可ポリシー**) | SwiftUI / `@MainActor` |
+| `ThemeKitUI` | public **SwiftUI** widgets (`ThemedTextFieldView`, …) — the DEFAULT UI layer; AppKit only for the 3 floors (IME edit-core + window shell + selectable rich-text/markdown, see **AppKit 使用可ポリシー**) | SwiftUI / `@MainActor` |
 | `prism` (exe) | the visual bench — renders every catalog theme + the real widgets | AppKit + SwiftUI |
 
 **The pure / AppKit split is enforced by the DEPENDENCY GRAPH, not a flag.**
@@ -46,9 +46,10 @@ must NEVER be a dependency of a pure `*Core`; apps consume them from their
 type `ThemedTextField` — avoids a Module.Module collision). The public SwiftUI
 front is **`ThemeKitUI`** (each widget an `NSViewRepresentable` wrapping its
 `ThemeKit` AppKit widget); apps consume *that* from their View layer. Standing
-direction: confine AppKit to the 2 essential floors (IME field-editor core + the
-nonactivating-panel window shell) and make everything else SwiftUI-native — a
-migration in progress, not a finished state (see **AppKit 使用可ポリシー**).
+direction: confine AppKit to the 3 essential floors (IME field-editor core + the
+nonactivating-panel window shell + the selectable rich-text/markdown render core) and
+make everything else SwiftUI-native — a migration in progress, not a finished state
+(see **AppKit 使用可ポリシー**).
 
 ## Theming contract
 
@@ -66,8 +67,9 @@ convention: focus/active affordances go `primary`.
 
 `ThemeKit` is the AppKit widget kit (PaletteKit resolves the theme; ThemeKit
 draws in it) — and **`ThemeKitUI`** wraps it as the public **SwiftUI** front (the
-default front for widgets; AppKit is kept only for the 2 unavoidable floors — the
-IME field editor and the non-activating panel/popup shell — see **AppKit 使用可ポリシー**).
+default front for widgets; AppKit is kept only for the 3 unavoidable floors — the
+IME field editor, the non-activating panel/popup shell, and the selectable
+rich-text/markdown render core — see **AppKit 使用可ポリシー**).
 A widget belongs in sill once ≥2 apps would otherwise hand-draw it
 (rule-of-three). Every widget MUST add a `prism` showcase — a `Themed<Widget>View`
 SwiftUI bridge in `ThemeKitUI` (today an `NSViewRepresentable` hosting the REAL
@@ -75,21 +77,22 @@ AppKit widget) that prism imports + a `Mock<Widget>(p:)` grid wired into
 `ThemeCard`, so it appears live across all themes (prism never imports an app's
 View → no drift).
 
-## AppKit 使用可ポリシー（確定 2026-06-23 — sill widget kit）
+## AppKit 使用可ポリシー（確定 2026-06-23・更新 2026-06-30〔床2個→床3個〕 — sill widget kit）
 
-ウィジェット層は **SwiftUI が既定**（`ThemeKitUI` が本物の SwiftUI 部品ライブラリ）。**AppKit は原則禁止** — 許可されるのは SwiftUI で本質的に不可能な次の **2点だけ**で、それ以外で AppKit が要ると感じたら「SwiftUI では不可能」として必ず**相談**する（勝手に AppKit を広げない）。許可される2点:
+ウィジェット層は **SwiftUI が既定**（`ThemeKitUI` が本物の SwiftUI 部品ライブラリ）。**AppKit は原則禁止** — 許可されるのは SwiftUI で本質的に不可能な次の **3点だけ**で、それ以外で AppKit が要ると感じたら「SwiftUI では不可能」として必ず**相談**する（勝手に AppKit を広げない）。許可される3点:
 
 1. **IME（日本語入力）の根幹** — `NSTextField` の field editor（変換中=marked text の検知＋変換確定前の Enter/Esc/↑↓ の出し分け）。AppKit は**編集コアだけ**・枠/ラベル/アイコン/配色/エラーは SwiftUI。
 2. **「前面/フォーカスを奪わず浮く窓」＋「親窓からはみ出す popup」** — `.nonactivatingPanel`。AppKit は**窓の殻だけ**・中身は `NSHostingView` 経由で全て SwiftUI。
+3. **選択可能なリッチテキスト描画（markdown 等）** — 連続選択/コピー ＋ inline-code の角丸ピル（`NSLayoutManager.fillBackgroundRectArray`）＋ `NSTextTable` の本物の表/コードブロック/blockquote 罫線。SwiftUI の `Text`/`textRenderer` は `.textSelection` と**排他**で両立不可（2026-06-30 prism で実証）。AppKit は **NSTextView 描画コアだけ**・配色/フォント/位置/データは sill role、窓殻は #17i WindowShell。
 
 それ以外はすべて SwiftUI:
 
 - ドット絵 = `Image(…).interpolation(.none)`（`NSViewRepresentable` blitter にしない）
 - 粒子グロー = SwiftUI `Canvas` の `.addFilter(.shadow)`（`NSShadow`/`NSViewRepresentable` にしない・fidelity 問題なら**要相談**）
 - blur/vibrancy = SwiftUI `Material`（`.ultraThinMaterial` 等。`NSVisualEffectView` は特定 material が出せない時のみ・**要相談**）
-- GFM 表 = SwiftUI `LazyVGrid`（薄 `NSTextView` backend は不可＝IME/窓 以外の AppKit）
+- GFM 表 = 単体表示なら SwiftUI `LazyVGrid`。ただし**選択可能な markdown 本文内の表**は floor #3 の `NSTextTable`（連続選択のため本文ごと NSTextView・2026-06-30 更新。旧「薄 NSTextView backend は不可」を上書き）
 
-この2点を超えて AppKit を足したくなったら必ず**要相談**。帰結: `ThemeKitUI` に残る AppKit は**床2個**（IME 編集コア＋窓の殻）だけ。設計の全文＝[`docs/ROADMAP.md`](docs/ROADMAP.md) #16.5/#17。
+この3点を超えて AppKit を足したくなったら必ず**要相談**。帰結: `ThemeKitUI` に残る AppKit は**床3個**（IME 編集コア＋窓の殻＋選択可能リッチテキスト描画）だけ。設計の全文＝[`docs/ROADMAP.md`](docs/ROADMAP.md) #16.5/#17。
 
 ## Icons (SVG, since v1.8.0)
 

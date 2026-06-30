@@ -8,12 +8,13 @@
 // View; the scene is mirrored by eye). glance pins ONE dark theme in production;
 // the bench proves the same chrome composes generically on EVERY theme.
 //
-// An audit (glance MarkdownRenderer/ViewerPanel ↔ sill MarkdownKitUI/WindowShell)
-// found MarkdownKitUI already renders glance's ENTIRE GFM surface; the residual
-// deltas are rendering-TECHNIQUE fidelity (inline-code flat fill vs glance's
-// rounded NSLayoutManager pill; LazyVGrid equal columns vs glance's content-sized
-// NSTextTable) and app-essential behaviour (cursor anchoring, cross-app dismiss,
-// the Highlightr adapter). See docs/superpowers/specs/2026-06-30-glance-prism-mock-design.md.
+// MarkdownKitUI now renders glance's ENTIRE GFM surface with glance's own technique:
+// #17f re-architected the renderer onto a selectable NSTextView (AppKit floor-3) — the
+// rounded inline-code pill (fillBackgroundRectArray), content-sized NSTextTable tables/
+// code-blocks/blockquotes, and native drag-select + ⌘C all match glance. The residual
+// glance-side bits are app-essential behaviour (cursor anchoring, cross-app dismiss, the
+// Highlightr adapter — prism injects StubSwiftHighlighter to exercise the hook). See
+// docs/superpowers/specs/2026-06-30-17f-markdown-nstextview-design.md.
 
 import SwiftUI
 import PaletteKit      // ResolvedPalette
