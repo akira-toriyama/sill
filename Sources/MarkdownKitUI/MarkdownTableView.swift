@@ -12,15 +12,32 @@ struct MarkdownTableView: View {
         Array(repeating: GridItem(.flexible(), spacing: 0), count: max(columnCount, 1))
     }
 
+    // LazyVGrid lays out a FLAT stream of cells; a nested ForEach (rows × cols)
+    // fails to emit the body cells, so flatten header + body into one sequence.
+    private struct CellRef: Identifiable {
+        let id: Int
+        let text: AttributedString
+        let column: Int
+        let isHeader: Bool
+    }
+    private var flatCells: [CellRef] {
+        var out: [CellRef] = []
+        var i = 0
+        for (c, h) in table.header.enumerated() {
+            out.append(CellRef(id: i, text: h, column: c, isHeader: true)); i += 1
+        }
+        for row in table.rows {
+            for (c, t) in row.enumerated() {
+                out.append(CellRef(id: i, text: t, column: c, isHeader: false)); i += 1
+            }
+        }
+        return out
+    }
+
     var body: some View {
         LazyVGrid(columns: columns, spacing: 0) {
-            ForEach(0..<table.header.count, id: \.self) { c in
-                cell(table.header[c], column: c, header: true)
-            }
-            ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
-                ForEach(0..<row.count, id: \.self) { c in
-                    cell(row[c], column: c, header: false)
-                }
+            ForEach(flatCells) { gc in
+                cell(gc.text, column: gc.column, header: gc.isHeader)
             }
         }
         .overlay(RoundedRectangle(cornerRadius: style.tableCornerRadius)
