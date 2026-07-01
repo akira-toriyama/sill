@@ -150,6 +150,15 @@ public final class ThemedToolBar: NSView {
     /// Force an item's hovered appearance without events — deterministic capture.
     public var previewHoveredItem: Int? { didSet { applyHover() } }
 
+    /// A PERSISTENT keyboard-navigation cursor (distinct from the transient
+    /// `previewHoveredItem` capture override): when a toolbar is driven as a
+    /// keyboard-navigable menu bar (ThemedMenu's `.toolbar` presentation), the host
+    /// sets this to light the "current" item as the ←→ cursor moves. Precedence in
+    /// `applyHover`: `previewHoveredItem` (capture) > `highlightedItem` (keyboard
+    /// cursor) > live mouse hover. `nil` (default) ⇒ no cursor, exactly the prior
+    /// behavior for a plain toolbar.
+    public var highlightedItem: Int? { didSet { if highlightedItem != oldValue { applyHover() } } }
+
     // MARK: - Internals
 
     private let shadowLayer   = CALayer()   // elevation — UNCLIPPED, explicit shadowPath
@@ -358,8 +367,9 @@ public final class ThemedToolBar: NSView {
 
     private func applyHover() {
         let forced: Int?
-        if let previewHoveredItem { forced = previewHoveredItem }
-        else if drivesHoverAppearance { forced = hoveredItem }
+        if let previewHoveredItem { forced = previewHoveredItem }   // capture override wins
+        else if let highlightedItem { forced = highlightedItem }    // then the keyboard cursor
+        else if drivesHoverAppearance { forced = hoveredItem }      // then live mouse hover
         else { forced = nil }
         for (idx, b) in buttons { b.previewHovered = (idx == forced) }
     }
@@ -536,6 +546,8 @@ extension ThemedToolBar {
         public let itemFrames: [CGRect]          // per item (space ⇒ .zero)
         public let buttonOverlay: [Int: CGColor?]  // composed button state layer per item
         public let hoveredItem: Int?
+        public let highlightedItem: Int?         // the keyboard-nav cursor (menu-bar mode)
+        public let forcedItem: Int?              // the item currently drawn hovered (precedence-resolved)
     }
     var toolBarProbe: ToolBarProbe {
         var frames: [CGRect] = []
@@ -554,7 +566,9 @@ extension ThemedToolBar {
             itemCount: items.count,
             itemFrames: frames,
             buttonOverlay: overlay,
-            hoveredItem: hoveredItem)
+            hoveredItem: hoveredItem,
+            highlightedItem: highlightedItem,
+            forcedItem: previewHoveredItem ?? highlightedItem ?? (drivesHoverAppearance ? hoveredItem : nil))
     }
 
     /// Drive a button item's activation dispatch without synthetic events — the

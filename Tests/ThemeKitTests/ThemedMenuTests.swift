@@ -499,4 +499,113 @@ final class ThemedMenuTests: XCTestCase {
         XCTAssertTrue(m._handleKey(left) === left, "← at the root with no open child passes through UNCHANGED (host IME safe)")
         m.dismiss(animated: false)
     }
+
+    // MARK: - Horizontal presentation (.toolbar / .labeledToolbar — the menu bar)
+
+    /// A/Folder(→S1,S2)/B, laid out as a horizontal bar. Folder is the one submenu item.
+    private func horizontalItems() -> [ThemedMenu.MenuItem] {
+        [.init("A"),
+         .init(id: "folder", title: "Folder", submenu: [.init(id: "s1", title: "S1"),
+                                                         .init(id: "s2", title: "S2")]),
+         .init("B")]
+    }
+
+    func testToolbarPresentationMapsItemsToBar() {
+        let m = ThemedMenu(palette: theme())
+        m.presentation = .toolbar
+        m.items = horizontalItems()
+        XCTAssertEqual(m.menuProbe.presentation, .toolbar, "the root reports its horizontal presentation")
+        XCTAssertEqual(m._toolbar?.toolBarProbe.itemCount, 3, "3 menu items → 3 toolbar items (composed ThemedToolBar)")
+        XCTAssertEqual(m.menuProbe.rowCount, 3, "the probe row count reads the bar's item count when horizontal")
+    }
+
+    func testHorizontalArrowsMoveAlongTheBar() {
+        let (m, anchor) = anchoredMenu(horizontalItems()) { $0.presentation = .toolbar }
+        m.present(from: anchor)
+        XCTAssertNil(m._handleKey(keyDown(124)), "→ swallowed")
+        XCTAssertEqual(m.menuProbe.highlightedID, "A", "→ lights the first bar item")
+        XCTAssertNil(m._handleKey(keyDown(124)))
+        XCTAssertEqual(m.menuProbe.highlightedID, "folder", "→ moves to the NEXT item along the bar")
+        XCTAssertNil(m._handleKey(keyDown(123)), "← swallowed")
+        XCTAssertEqual(m.menuProbe.highlightedID, "A", "← moves to the PREVIOUS item")
+        XCTAssertNil(m._handleKey(keyDown(123)))
+        XCTAssertEqual(m.menuProbe.highlightedID, "B", "← wraps to the last (MUI wrap, horizontal)")
+        m.dismiss(animated: false)
+    }
+
+    func testHorizontalUpArrowIsInert() {
+        let (m, anchor) = anchoredMenu(horizontalItems()) { $0.presentation = .toolbar }
+        m.present(from: anchor)
+        let up = keyDown(126)
+        XCTAssertTrue(m._handleKey(up) === up, "↑ on a top bar has no meaning → passes through (host/IME safe)")
+        m.dismiss(animated: false)
+    }
+
+    func testHorizontalDownOpensChildBelowAndChildIsVertical() {
+        let (m, anchor) = anchoredMenu(horizontalItems()) { $0.presentation = .toolbar }
+        m.present(from: anchor)
+        _ = m._handleKey(keyDown(124))                  // A
+        _ = m._handleKey(keyDown(124))                  // Folder
+        XCTAssertEqual(m.menuProbe.highlightedID, "folder")
+        XCTAssertNil(m._handleKey(keyDown(125)), "↓ swallowed")
+        XCTAssertTrue(m.menuProbe.childOpen, "↓ on a folder bar-item opens its child (below)")
+        XCTAssertEqual(m.menuProbe.childRowID, "folder")
+        XCTAssertEqual(m._child?.menuProbe.presentation, .vertical, "a horizontal root's child is a VERTICAL dropdown")
+        XCTAssertEqual(m._child?.menuProbe.rowCount, 2, "the child hosts the submenu's rows")
+        XCTAssertTrue(m.menuProbe.leafIsChild, "keys now route to the open child")
+        m.dismiss(animated: false)
+    }
+
+    func testHorizontalDownOnLeafOpensNothing() {
+        let (m, anchor) = anchoredMenu(horizontalItems()) { $0.presentation = .toolbar }
+        m.present(from: anchor)
+        _ = m._handleKey(keyDown(124))                  // A (a leaf)
+        let down = keyDown(125)
+        XCTAssertTrue(m._handleKey(down) === down, "↓ on a non-folder bar item passes through (nothing to open)")
+        XCTAssertFalse(m.menuProbe.childOpen)
+        m.dismiss(animated: false)
+    }
+
+    func testHorizontalEnterActivatesLeafAndDismisses() {
+        var fired = false
+        let items: [ThemedMenu.MenuItem] = [
+            .init(id: "a", title: "A", action: { fired = true }),
+            .init(id: "folder", title: "Folder", submenu: [.init(id: "s1", title: "S1")]),
+        ]
+        let (m, anchor) = anchoredMenu(items) { $0.presentation = .toolbar }
+        m.present(from: anchor)
+        _ = m._handleKey(keyDown(124))                  // highlight A
+        XCTAssertEqual(m.menuProbe.highlightedID, "a")
+        XCTAssertNil(m._handleKey(keyDown(36)), "⏎ swallowed")
+        XCTAssertTrue(fired, "⏎ on a highlighted leaf runs its action")
+        XCTAssertFalse(m.menuProbe.isOpen, "and dismisses the bar")
+    }
+
+    func testHorizontalClickOpensFolderChild() {
+        let (m, anchor) = anchoredMenu(horizontalItems()) { $0.presentation = .toolbar }
+        m.present(from: anchor)
+        m._toolbar?.simulateItemTapForTesting(1)        // item 1 == "folder" (bar items are 1:1 with menu items)
+        XCTAssertTrue(m.menuProbe.childOpen, "clicking a folder bar-item opens its child")
+        XCTAssertEqual(m.menuProbe.childRowID, "folder")
+        m.dismiss(animated: false)
+    }
+
+    func testHorizontalPreviewHighlightLightsMatchingBarItem() throws {
+        let m = ThemedMenu(palette: theme())
+        m.presentation = .toolbar
+        m.items = horizontalItems()
+        let tb = try XCTUnwrap(m._toolbar, "a .toolbar root builds its composed ThemedToolBar")
+        m.previewHighlight = "folder"
+        XCTAssertEqual(tb.toolBarProbe.forcedItem, 1, "previewHighlight forces the matching bar item (index 1) lit")
+        XCTAssertEqual(m.previewHighlight, "folder", "the getter round-trips the horizontal preview id")
+        m.previewHighlight = nil
+        XCTAssertNil(tb.toolBarProbe.forcedItem, "clearing it unlights the bar")
+    }
+
+    func testEscDismissesHorizontalRoot() {
+        let (m, anchor) = anchoredMenu(horizontalItems()) { $0.presentation = .toolbar }
+        m.present(from: anchor)
+        XCTAssertNil(m._handleKey(keyDown(53)), "Esc swallowed")
+        XCTAssertFalse(m.menuProbe.isOpen, "Esc on a horizontal root with no open child dismisses it")
+    }
 }

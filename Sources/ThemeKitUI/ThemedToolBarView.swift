@@ -18,7 +18,7 @@ public struct ThemedToolBarView: NSViewRepresentable {
     /// A SwiftUI-carryable value descriptor for a toolbar item (the subset that
     /// is not NSView-bearing). Mapped to the real `ThemedToolBar.Item` per update.
     public enum Item {
-        case button(title: String?, symbol: String?,
+        case button(title: String?, symbol: String?, trailingSymbol: String? = nil,
                     role: ThemedButton.Role = .primary, variant: ThemedButton.Variant = .text,
                     enabled: Bool = true)
         case label(String)
@@ -28,8 +28,8 @@ public struct ThemedToolBarView: NSViewRepresentable {
 
         func toItem() -> ThemedToolBar.Item {
             switch self {
-            case let .button(t, s, role, variant, enabled):
-                return .button(.init(title: t, symbol: s, role: role, variant: variant,
+            case let .button(t, s, trailing, role, variant, enabled):
+                return .button(.init(title: t, symbol: s, trailingSymbol: trailing, role: role, variant: variant,
                                      isEnabled: enabled, tooltip: t ?? s))
             case .label(let s):     return .label(s)
             case .flex:             return .flexibleSpace

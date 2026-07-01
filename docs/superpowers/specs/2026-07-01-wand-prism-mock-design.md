@@ -93,12 +93,16 @@ are very different sizes:
   `parentMenu == nil` guards (`ThemedMenu.swift:446`, `:467`) + one
   `validateOpenChild()` recursion + doc updates are needed. It covers wand's
   DEFAULT `.list` launcher — enough for a faithful wand mock.
-- **PR2 — horizontal presentation** (`.toolbar` / `.labeledToolbar`) — chunkier:
-  `ThemedMenu` hosts a *vertical* `ThemedList` (`ThemedMenu.swift:153`), so a
-  horizontal toolbar is a new layout (hover / highlight / ←→ nav / AX rebuilt
-  horizontally) **plus** its own inline-renderable form for the static card, and
-  wand is its only consumer. Deferred to a follow-up. The ② design below stands as
-  the PR2 design.
+- **PR2 — horizontal presentation** (`.toolbar` / `.labeledToolbar`) — **✅ DONE
+  (2026-07-01)**. Originally scoped as "a new horizontal layout inside `ThemedMenu`",
+  but a build-time investigation found sill ALREADY ships the right widget: the
+  **`ThemedToolBar`** (icon-only / icon+label bar) was built with the exact
+  launcher affordances this needs — `trackingMode = .nonActivatingPanel` hover +
+  `frameOnScreen(ofItem:)` / `onItemHover`, whose header comment literally cites
+  "anchor a child panel below a folder button" *for wand's tome*. So PR2
+  **COMPOSES** it (see "PR2 as-built" below) instead of re-drawing a horizontal
+  layout — far more reuse, `ThemedList` untouched, and no new AppKit. The ② design
+  below is the intent; the as-built section records the (better) realization.
 
 ## Design
 
@@ -208,6 +212,51 @@ screenshot path (so no seam change is needed just for the card).
 - **`ThemeKit/PopupPanel.swift`** — below-anchor placement for a horizontal parent.
 - **`ThemeKitUI/ThemedMenuTriggerView.swift`** — expose the presentation mode.
 - **`WandShowcase.swift`** — add the `.toolbar` / `.labeledToolbar` specimen.
+
+## PR2 as-built (2026-07-01) — COMPOSE `ThemedToolBar`, don't re-draw a layout
+
+The build-time investigation (user-approved deviation, "推奨でOK") replaced "a new
+horizontal row layout inside `ThemedMenu`" with **composition of the existing
+`ThemedToolBar`** — sill's horizontal app bar, whose `.nonActivatingPanel` hover +
+`frameOnScreen(ofItem:)` / `onItemHover` were purpose-built for wand's launcher.
+Payoffs: maximal reuse (icon-only / icon+label + hover + AX come free), **`ThemedList`
+untouched** (it is vertical to the bone — a horizontal axis would be a large, risky
+retrofit), and the spec's "new AppKit machinery → 要相談" halt condition is **avoided**
+(pure composition of shipped widgets — no new floor, `床3個` unchanged).
+
+- **`Sources/ListCore/MenuLogic.swift`** — `menuKeyIntent(keyCode:, orientation:)`
+  (default `.vertical`): a horizontal leaf flips the axes — ←→ move along the bar,
+  ↓ opens the child below, ↑ inert; `.vertical` mapping byte-identical to before.
+- **`Sources/ThemeKit/ThemedMenu.swift`** — a `Presentation` (`.vertical` /
+  `.toolbar` / `.labeledToolbar`); a horizontal ROOT hosts a `ThemedToolBar`
+  (transparent surface, `.nonActivatingPanel`, `.compact`/`.dense` per mode) instead
+  of the `ThemedList`; `MenuItem → ThemedToolBar.Item` mapping (icon-only vs
+  icon+label + a `caret-down` on labeled folders); orientation-aware content helpers
+  (`rowRectOnScreen` / `moveContentHighlight` / `highlightedContentID` /
+  `activateContentHighlight` / `clearContentHighlight`); `handleKeyDown` routes by
+  the active leaf's `orientation`. **CHILDREN stay vertical** (a menu bar's dropdowns
+  are vertical), and a horizontal parent's child drops **BELOW** the bar item —
+  reusing the existing `.anchorCorner` drop-down placement, so **`PopupPanel.swift`
+  is UNTOUCHED** (the planned "below-anchor case" was unnecessary — a drop-down below
+  an anchor already IS `.anchorCorner`).
+- **`Sources/ThemeKit/ThemedToolBar.swift`** — one small additive prop:
+  `highlightedItem: Int?`, a PERSISTENT keyboard cursor for menu-bar nav (precedence
+  in `applyHover`: `previewHoveredItem` capture > `highlightedItem` keyboard > live
+  mouse hover) + probe fields. `nil` default ⇒ a plain toolbar is byte-identical.
+- **`Sources/ThemeKitUI/ThemedMenuTriggerView.swift`** — exposes `presentation`.
+  **`ThemedToolBarView.swift`** — additive `trailingSymbol` on the `.button`
+  descriptor (folder caret in the static card).
+- **`Sources/prism/WandShowcase.swift`** — Tier 3: a static `.toolbar` icon strip +
+  a `.labeledToolbar` bar with a leading folder OPEN (an inline `ThemedListView`
+  dropdown beneath it) + two LIVE triggers (`.toolbar` / `.labeledToolbar`) that open
+  the REAL horizontal `ThemedMenu`. **`KitCatalog.swift`** — `ThemedMenu` entry +
+  wand `AppChrome` note the horizontal modes.
+- **Tests** — `ThemedMenuTests` +11 (item→bar mapping, ←→ nav + wrap, ↓ opens the
+  vertical child, ⏎ activates + dismisses, click opens a folder, preview-highlight,
+  Esc dismiss, child-is-vertical) · `MenuLogicTests` +4 (the orientation flip).
+- **Verified**: `swift build` green (CLT); the FULL suite run locally under the
+  Xcode 26 toolchain (`DEVELOPER_DIR=…Xcode-26…`) — **787 tests, 0 failures**; prism
+  live (the UI gate) — see the Verification section.
 
 ### Scene composition (`MockWandLauncher`) — PR1
 
