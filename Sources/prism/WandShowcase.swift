@@ -39,7 +39,7 @@ import ThemeKitUI
     [
         ListItem(id: "main", image: wandGlyph("git-branch"), primary: "main"),
         ListItem(id: "dev",  image: wandGlyph("git-branch"), primary: "develop"),
-        ListItem(id: "feat", image: wandGlyph("git-branch"), primary: "feature/cascade"),
+        ListItem(id: "hot",  image: wandGlyph("git-branch"), primary: "hotfix"),
     ]
 }
 
@@ -58,9 +58,9 @@ import ThemeKitUI
             ThemedMenu.MenuItem("Finder", icon: wandGlyph("folder")) {},
         ]),
         ThemedMenu.MenuItem(id: "branch", title: "Switch Branch", icon: wandGlyph("git-branch"), submenu: [
-            ThemedMenu.MenuItem("main",             icon: wandGlyph("git-branch")) {},
-            ThemedMenu.MenuItem("develop",          icon: wandGlyph("git-branch")) {},
-            ThemedMenu.MenuItem("feature/cascade",  icon: wandGlyph("git-branch")) {},
+            ThemedMenu.MenuItem("main",    icon: wandGlyph("git-branch")) {},
+            ThemedMenu.MenuItem("develop", icon: wandGlyph("git-branch")) {},
+            ThemedMenu.MenuItem("hotfix",  icon: wandGlyph("git-branch")) {},
         ]),
     ]
 }
@@ -70,12 +70,14 @@ struct MockWandLauncher: View {
 
     private var surface: Color { Color(nsColor: p.background ?? .windowBackgroundColor) }
 
-    // Compact rows are 26pt; separators ~7pt. 5 rows + 1 sep + vpad ≈ 145; 3 rows ≈ 86.
-    private let tomeListHeight: CGFloat = 145
+    // Compact rows are 26pt; separators ~7pt. Sized so the tome list shows all rows
+    // WITHOUT a scrollbar (5 rows + 1 sep + vpad), and the child holds 3 rows.
+    private let tomeListHeight: CGFloat = 162
     private let childListHeight: CGFloat = 86
-    // Push the child list down so its first row sits beside the "Switch Branch" row
-    // (the tome's last row). Eyeball-tuned against prism live (Task 3).
-    private let childTopOffset: CGFloat = 150
+    private let childListWidth: CGFloat = 160      // snug for the short branch names (main / develop / hotfix)
+    // Push the child list down so its first row tops-aligns with the lit "Switch
+    // Branch" row (the tome's last row). Eyeball-tuned against prism live (Task 3).
+    private let childTopOffset: CGFloat = 176
 
     var body: some View {
         SpecimenBox(title: "wand · tome", p: p) {
@@ -93,7 +95,7 @@ struct MockWandLauncher: View {
                             .frame(width: 232, height: 40)
                         menuCard(rows: tomeRows(), lit: "branch", height: tomeListHeight, width: 232)
                     }
-                    menuCard(rows: branchRows(), lit: "main", height: childListHeight, width: 190)
+                    menuCard(rows: branchRows(), lit: "main", height: childListHeight, width: childListWidth)
                         .padding(.top, childTopOffset)
                 }
 
