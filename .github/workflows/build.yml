@@ -21,6 +21,6 @@ jobs:
 
       # Shared Swift build (setup-xcode + SPM cache + build + test). sill is
       # LIBRARY-ONLY (no .app) so — unlike facet — there is no ./package.sh
-      # step. This is the FIRST place the XCTest targets actually run: local
-      # dev is CommandLineTools-only, which has no XCTest module.
+      # step. XCTest also runs LOCALLY now via `scripts/test.sh` (an installed
+      # Xcode over the CLT-default shell); CI is the canonical required gate.
       - uses: akira-toriyama/.github/actions/swift-build@main
