@@ -81,6 +81,25 @@ breakage risk), so building them now is defensible pre-Phase-B groundwork. If a
 2nd consumer never materialises (candidates: facet toolbar menus, a halo submenu),
 the split-PR fallback (below) keeps the widget change isolated and revertible.
 
+## Phasing (decided 2026-07-01)
+
+Split into two PRs (writing-plans' "separate plans per subsystem" + this spec's
+split fallback), because a deep read of `ThemedMenu` showed the two capabilities
+are very different sizes:
+
+- **PR1 — N-level cascade + wand vertical mock** (the first plan). N-level is a
+  small, high-confidence change: the existing `activeLeaf()` / `teardownAsChild()`
+  / `clickIsInside()` / `.submenu` placement already recurse; only two
+  `parentMenu == nil` guards (`ThemedMenu.swift:446`, `:467`) + one
+  `validateOpenChild()` recursion + doc updates are needed. It covers wand's
+  DEFAULT `.list` launcher — enough for a faithful wand mock.
+- **PR2 — horizontal presentation** (`.toolbar` / `.labeledToolbar`) — chunkier:
+  `ThemedMenu` hosts a *vertical* `ThemedList` (`ThemedMenu.swift:153`), so a
+  horizontal toolbar is a new layout (hover / highlight / ←→ nav / AX rebuilt
+  horizontally) **plus** its own inline-renderable form for the static card, and
+  wand is its only consumer. Deferred to a follow-up. The ② design below stands as
+  the PR2 design.
+
 ## Design
 
 ### ① N-level cascade — approach A: generalize the existing single-child chain
@@ -139,57 +158,80 @@ Add a presentation mode (do **not** fork a second widget): `.vertical` (default)
   clamp / horizontal scroll); `.toolbar` = icon-only buttons with the label as a
   tooltip, `.labeledToolbar` = icon+label pill rows.
 
-### Preview seam (deterministic across-theme cards)
+### Static card + live trigger (the two-tier bench pattern — mechanism corrected)
 
-`ThemedMenu` exposes `previewOpen` / `previewHighlight` for tests (the static
-`MenuShowcase` inline-renders a `ThemedList` for the look). Extend the seam so the
-static prism card can force (a) a cascade opened to depth ≥ 2 and (b) a horizontal
-layout — so `ThemeCard` renders N-level + horizontal **deterministically** for a
-screenshot (the investigation's "Preview Seam Expansion" gap). A **live trigger**
-(the real `ThemedMenu` opening on click) sits beside the static card for real
-interaction / key-routing verification — the perch/glance two-tier pattern.
+A `ThemedMenu` is a floating child-window controller, so its open panels can NOT
+appear in prism's main-window `screencapture` (`MenuShowcase.swift:1-13`). The
+deterministic per-theme card is therefore built from **inline `ThemedListView`s**
+configured exactly as `ThemedMenu` hosts them (the existing `MockMenu` recipe,
+`MenuShowcase.swift:86-102`): to depict an **open cascade**, compose a root
+`ThemedListView` + a second `ThemedListView` offset to its right, each with a
+`previewHighlight` row — a faithful still of a 2-level cascade that re-themes
+across every palette. The **real** extended `ThemedMenu` (N-level live) is proven
+beside it via a **live trigger** (`ThemedMenuTriggerView`: click → real cascade
+panels; hover / ↑↓ / → / ← / Esc). The `previewOpen` / `previewHighlight` seam
+stays **test/live-only** — it drives XCTest and the live trigger, and is NOT the
+screenshot path (so no seam change is needed just for the card).
 
 ## What we build
 
-- **`ThemeKit/ThemedMenu.swift`** — lift the one-level cap (N-level cascade); add
-  the presentation mode (`.vertical` / `.toolbar` / `.labeledToolbar`); extend the
-  preview seam (force cascade depth + horizontal).
-- **`ThemeKit/PopupPanel.swift`** — parent-chain submenu placement at depth N;
-  below-anchor placement for a horizontal parent.
-- **`ListCore/MenuLogic.swift`** — the pure intents already cover cascade
-  navigation; add XCTest for N-level intent routing if any new pure logic lands.
-- **`ThemeKitUI/ThemedMenuTriggerView.swift`** — expose the presentation mode (and,
-  if cheap, a nested-items builder) on the SwiftUI bridge.
+**PR1 (this plan) — N-level cascade + wand vertical mock:**
+
+- **`ThemeKit/ThemedMenu.swift`** — relax the two `parentMenu == nil` guards
+  (`:446` in `handleHover`, `:467` in `openSubmenu`) so a child may open its own
+  child at any depth; recurse `validateOpenChild()` (`:513-524`) so descendants
+  re-anchor when an ancestor reframes/scrolls; refresh the one-level-cap docs
+  (`:59-62`, `:167-171`). The `.submenu` placement (`PopupPanel.swift:211-226`),
+  `activeLeaf()`, `teardownAsChild()`, `clickIsInside()` already recurse — no
+  change. **`PopupPanel.swift` is untouched in PR1.**
+- **`Tests/ThemeKitTests/ThemedMenuTests.swift`** — replace the one-level-cap test
+  (`:419-432`) with depth-N tests: a depth ≥ 2 cascade opens; root dismiss tears
+  the whole chain; Esc closes one level at a time; hovering a non-submenu ancestor
+  row collapses deeper levels. (CI-run — XCTest doesn't run on the CLT-only local.)
 - **New file `Sources/prism/WandShowcase.swift`** housing
   `struct MockWandLauncher: View { let p: ResolvedPalette }` (following
   `PerchShowcase.swift` / `GlanceShowcase.swift`). **Replace + delete** the
-  hand-drawn `MockTome` (`Specimens.swift:305`, real query field + hand-drawn
-  rows). Repoint `case .wand:` (`Gallery.swift:379`) to `MockWandLauncher`.
-  Rationale: hosting the REAL extended `ThemedMenu` is the whole de-risk point; a
-  fake tome beside the real one is drift (the perch `MockPill` / glance
-  `MockMarkdown` precedent).
-- **`Sources/prism/KitCatalog.swift`** — update the `ThemedMenu` entry
-  (`:430-431`) to note N-level cascade + horizontal modes; refresh the wand
-  `AppChrome` (`:596-599`) if the mock now exercises `ThemedMenu`.
+  hand-drawn `MockTome` (`Specimens.swift:305`). Repoint `case .wand:`
+  (`Gallery.swift:379`) to `MockWandLauncher`. Rationale: the de-risk is composing
+  the REAL kit — inline `ThemedListView`s mirror `ThemedMenu`'s own item→row
+  mapping (the `MockMenu` precedent) and the live trigger opens the REAL extended
+  `ThemedMenu`; a hand-drawn fake tome would be drift (the perch `MockPill` /
+  glance `MockMarkdown` precedent).
+- **`Sources/prism/KitCatalog.swift`** — update the `ThemedMenu` entry (`:430-431`)
+  from "one-level" to N-level cascade; refresh the wand `AppChrome` (`:596-599`) to
+  note the mock now exercises `ThemedMenu`.
 
-### Scene composition (`MockWandLauncher`)
+**PR2 (follow-up) — horizontal presentation:**
+
+- **`ThemeKit/ThemedMenu.swift`** — add the presentation mode
+  (`.vertical` / `.toolbar` / `.labeledToolbar`) + the horizontal row layout.
+- **`ThemeKit/PopupPanel.swift`** — below-anchor placement for a horizontal parent.
+- **`ThemeKitUI/ThemedMenuTriggerView.swift`** — expose the presentation mode.
+- **`WandShowcase.swift`** — add the `.toolbar` / `.labeledToolbar` specimen.
+
+### Scene composition (`MockWandLauncher`) — PR1
 
 A non-activating **launcher tome** (the `MockWindowShell` "shell surface" recipe:
-theme `background` fill, rounded, drop shadow, a `panelStroke` outline) containing:
+theme `background` fill, rounded, drop shadow, a `panelStroke` outline) in two tiers:
 
-- the **real** `ThemedTextFieldView` query field (already real in `MockTome` —
-  keep it) — the launcher's `open…` box;
-- the **real (extended)** `ThemedMenu` rendering the command rows: an app-launch
-  result row (real `appIcon`), a couple of action rows (Phosphor glyphs), a
-  **folder that cascades ≥ 2 levels** (proving N-level), and a "Switch
-  Branch"-style folder whose children are **static deferred data** (faux git
-  branches — representing wand's async submenu without a shell);
-- a **second specimen** staging the `.toolbar` / `.labeledToolbar` horizontal
-  variant (icon-only + icon+label rows, with a child opening below).
+- **the tome (static, deterministic)**: the **real** `ThemedTextFieldView` query
+  field (already real in `MockTome` — keep it, the `open…` box) above an **inline
+  `ThemedListView`** of command rows (an app-launch result via real `appIcon`, a
+  couple of Phosphor action rows, a `chevron` "Open in…" folder row, a "Switch
+  Branch" folder row). To depict the **open cascade**, a **second inline
+  `ThemedListView`** is offset to the right of the folder row, showing that
+  folder's children (faux git branches — the static still of wand's async submenu
+  result). Both lists carry a `previewHighlight` so the 2-level cascade reads
+  deterministically on every theme.
+- **the live proof**: a `ThemedMenuTriggerView` beside the tome, whose items
+  include a ≥ 2-level submenu, opens the **real extended `ThemedMenu`** — click,
+  then hover / ↑↓ / → / ← / Esc to feel a true N-level cascade (which the static
+  shot can't hold).
 
 `ThemeCard` supplies `p` across all themes; on an animatable theme its 30 Hz
 `TimelineView` (`Gallery.swift:282-293`) drives `p`, so selection/accent re-theme
-live with the rest of the bench.
+live with the rest of the bench. The `.toolbar` / `.labeledToolbar` horizontal
+specimen is **PR2**.
 
 ## App-essential (stays in wand)
 
