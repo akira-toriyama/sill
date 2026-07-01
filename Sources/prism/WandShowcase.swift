@@ -65,6 +65,30 @@ import ThemeKitUI
     ]
 }
 
+// Horizontal launcher bar items (the .toolbar / .labeledToolbar modes) — the SAME
+// commands as a menu bar. `labeled` keeps the titles (icon+label) + a caret on a
+// folder; icon-only drops them (tooltip carries the name). "Switch Branch" (index 5)
+// is the pre-lit folder.
+@MainActor private func wandBarItems(labeled: Bool) -> [ThemedToolBarView.Item] {
+    func b(_ title: String, _ symbol: String, folder: Bool = false) -> ThemedToolBarView.Item {
+        .button(title: labeled ? title : nil, symbol: symbol,
+                trailingSymbol: (labeled && folder) ? "caret-down" : nil)
+    }
+    return [
+        b("Safari", "compass"), b("Settings", "gear"), b("Theme", "palette"),
+        .divider,
+        b("Open in…", "folder", folder: true), b("Switch Branch", "git-branch", folder: true),
+    ]
+}
+
+// A short labeled bar whose LEADING item is an open folder — so the depicted
+// dropdown sits cleanly (gutter-aligned) beneath it: the still of an OPEN menu bar.
+// Two items keep the bar within the specimen column (no clip).
+@MainActor private func wandOpenBarItems() -> [ThemedToolBarView.Item] {
+    [ .button(title: "Switch Branch", symbol: "git-branch", trailingSymbol: "caret-down"),
+      .button(title: "Open in…", symbol: "folder", trailingSymbol: "caret-down") ]
+}
+
 struct MockWandLauncher: View {
     let p: ResolvedPalette
 
@@ -80,9 +104,9 @@ struct MockWandLauncher: View {
     private let childTopOffset: CGFloat = 176
 
     var body: some View {
-        SpecimenBox(title: "wand · tome", p: p) {
+        SpecimenBox(title: "wand · launcher", p: p) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("wand's launcher tome, rebuilt from the real kit — the query field + inline ThemedLists mirror ThemedMenu's row mapping; the offset child list depicts an OPEN cascade (Switch Branch → faux branches). The live trigger opens the REAL N-level ThemedMenu (Open in… → Editors → VS Code / Xcode). wand's shell-fed submenus + motion stay app-side.")
+                Text("wand's launcher, rebuilt from the real kit. VERTICAL tome (.list): the query field + inline ThemedLists mirror ThemedMenu's row mapping; the offset child depicts an OPEN cascade (Switch Branch → faux branches). HORIZONTAL bar (.toolbar / .labeledToolbar): ThemedMenu composes the real ThemedToolBar; a folder bar-item (▾) opens its vertical submenu BELOW it. The live triggers open the REAL N-level ThemedMenu. wand's shell-fed submenus + motion stay app-side.")
                     .font(sysFont(9, weight: .semibold, design: .monospaced))
                     .foregroundColor(Color(nsColor: p.muted))
                     .fixedSize(horizontal: false, vertical: true)
@@ -107,8 +131,74 @@ struct MockWandLauncher: View {
                     ThemedMenuTriggerView(palette: p, title: "Actions", items: wandMenuItems())
                         .frame(width: 150, height: 38)
                 }
+
+                Divider().overlay(Color(nsColor: p.border))
+
+                // Tier 3 — the HORIZONTAL launcher modes (menu bar).
+                horizontalTier
             }
         }
+    }
+
+    // The .toolbar (icon-only) + .labeledToolbar (icon+label, with an open folder
+    // dropdown) menu-bar modes, + live triggers that open the REAL horizontal menu.
+    @ViewBuilder private var horizontalTier: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("horizontal launcher — menu-bar modes (composes the real ThemedToolBar)")
+                .font(sysFont(8, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.tertiary))
+
+            // .toolbar — icon-only strip (Switch Branch pre-lit).
+            barCard {
+                ThemedToolBarView(palette: p, items: wandBarItems(labeled: false), surface: .transparent,
+                                  variant: .compact, corners: .rounded,
+                                  trackingMode: .nonActivatingPanel, previewHoveredItem: 5)
+                    .fixedSize()
+            }
+
+            // .labeledToolbar — icon+label bar with the leading folder OPEN (a vertical
+            // dropdown beneath it, depicting the cascade a horizontal parent opens BELOW).
+            VStack(alignment: .leading, spacing: 2) {
+                barCard {
+                    ThemedToolBarView(palette: p, items: wandOpenBarItems(), surface: .transparent,
+                                      variant: .dense, corners: .rounded,
+                                      trackingMode: .nonActivatingPanel, previewHoveredItem: 0)
+                        .fixedSize()
+                }
+                HStack(spacing: 0) {
+                    Spacer().frame(width: 14)                 // ≈ the dense bar's leading gutter
+                    menuCard(rows: branchRows(), lit: "main", height: childListHeight, width: childListWidth)
+                }
+            }
+
+            // Live — triggers that open the REAL horizontal ThemedMenu (hover an item,
+            // ↓ opens its dropdown below, ←→ moves along the bar, Esc closes).
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("live · .toolbar").font(sysFont(8, design: .monospaced))
+                        .foregroundColor(Color(nsColor: p.tertiary))
+                    ThemedMenuTriggerView(palette: p, title: "Bar", presentation: .toolbar, items: wandMenuItems())
+                        .frame(width: 110, height: 34)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("live · .labeledToolbar").font(sysFont(8, design: .monospaced))
+                        .foregroundColor(Color(nsColor: p.tertiary))
+                    ThemedMenuTriggerView(palette: p, title: "Labeled", presentation: .labeledToolbar, items: wandMenuItems())
+                        .frame(width: 140, height: 34)
+                }
+            }
+        }
+    }
+
+    // A rounded, bordered, shadowed launcher-bar surface hosting a transparent
+    // ThemedToolBar (the bar's own chrome is off; this card is the menu surface).
+    @ViewBuilder private func barCard<V: View>(@ViewBuilder _ content: () -> V) -> some View {
+        content()
+            .padding(2)
+            .background(surface)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: p.border), lineWidth: 1))
+            .shadow(color: .black.opacity(0.28), radius: 9, y: 4)
     }
 
     // A rounded, bordered, shadowed menu surface hosting a real ThemedList in menu

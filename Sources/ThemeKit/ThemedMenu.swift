@@ -31,6 +31,15 @@
 // `foreground` (row text) · `muted` (shortcut / chevron / header) · `tertiary`
 // (disabled) · `selection` + `primary` (the `.solidAccent` highlight = opaque
 // `primary` fill + `onPrimary()` ink) · `error` (a destructive item's tint).
+//
+// PRESENTATION (`.vertical` default / `.toolbar` / `.labeledToolbar`): the ROOT may
+// lay its items out HORIZONTALLY as a menu bar. It does NOT re-draw a horizontal
+// list — it COMPOSES the real `ThemedToolBar` (icon-only / icon+label, its
+// `.nonActivatingPanel` hover + `frameOnScreen(ofItem:)` were built for exactly this
+// launcher case) as the panel's content, and a folder bar-item opens its submenu
+// BELOW itself (the drop-down `.anchorCorner` placement — no new placement math).
+// Submenu CHILDREN stay vertical `ThemedList`s (a menu bar's dropdowns are vertical);
+// key routing flips per the active leaf's orientation (←→ along a bar, ↓ opens below).
 
 import AppKit
 import QuartzCore
@@ -120,6 +129,18 @@ public final class ThemedMenu: NSObject {
     /// arrow or hover (MUI's `autoFocusItem` vs NSMenu).
     public var highlightsFirstOnOpen = false
 
+    /// How the ROOT lays out its items. `.vertical` (default) is the classic
+    /// drop-down list; `.toolbar` a horizontal ICON-ONLY bar (MUI IconButton row);
+    /// `.labeledToolbar` a horizontal ICON+LABEL bar. A folder item on a horizontal
+    /// root opens its submenu BELOW it; the cascade underneath is the same N-level
+    /// machinery and its CHILDREN are always vertical (mirrors a menu bar). Assigning
+    /// swaps the hosted content (a real `ThemedToolBar` vs the `ThemedList`) and
+    /// reframes an open menu.
+    public enum Presentation: Equatable { case vertical, toolbar, labeledToolbar }
+    public var presentation: Presentation = .vertical {
+        didSet { guard presentation != oldValue else { return }; applyPresentation() }
+    }
+
     // MARK: Callbacks
 
     /// Menu open / close edge.
@@ -142,15 +163,30 @@ public final class ThemedMenu: NSObject {
     /// Anchor used by `previewOpen` when no `present(...)` target is live.
     public weak var previewAnchor: NSView?
     /// Force a highlighted row (by id) for capture/tests; nil = the live highlight.
+    /// Horizontal presentations light the matching toolbar item instead.
     public var previewHighlight: String? {
-        get { list.previewHighlight }
-        set { list.previewHighlight = newValue }
+        get { isHorizontal ? _horizPreviewHighlight : list.previewHighlight }
+        set {
+            if isHorizontal {
+                _horizPreviewHighlight = newValue
+                toolbar?.previewHoveredItem = newValue.flatMap { id in items.firstIndex(where: { $0.id == id }) }
+            } else {
+                list.previewHighlight = newValue
+            }
+        }
     }
 
     // MARK: - Internals
 
-    /// The hosted list, configured for menu semantics once.
+    /// The hosted list, configured for menu semantics once. It is the content for a
+    /// `.vertical` root AND for EVERY submenu child (children are always vertical).
     private let list: ThemedList
+    /// The horizontal menu-bar content, built lazily on the first `.toolbar` /
+    /// `.labeledToolbar` presentation (the ROOT only — children never host one).
+    private var toolbar: ThemedToolBar?
+    /// The keyboard/hover cursor index into `items` while horizontal (nil = none).
+    private var toolbarHighlightIndex: Int?
+    private var _horizPreviewHighlight: String?
     private let container = NSView()             // rounded, bordered menu surface
 
     private var panel: PopupPanel?
@@ -231,6 +267,10 @@ public final class ThemedMenu: NSObject {
     // MARK: - Item → row mapping
 
     private func rebuildRows() {
+        if isHorizontal {
+            ensureToolbar().items = items.map(toolbarItem)
+            return
+        }
         list.items = items.map { mi in
             switch mi.kind {
             case .separator:
@@ -249,6 +289,135 @@ public final class ThemedMenu: NSObject {
         }
     }
 
+    /// A `MenuItem` → `ThemedToolBar.Item` for a horizontal root. `.toolbar` is
+    /// icon-only (title dropped, tooltip = title — MUI IconButton); `.labeledToolbar`
+    /// keeps the label and adds a `caret-down` on a folder item. An icon-only item
+    /// with NO icon degrades to a text button (never a blank square).
+    private func toolbarItem(_ mi: MenuItem) -> ThemedToolBar.Item {
+        switch mi.kind {
+        case .separator: return .divider
+        case .header:    return .label(mi.title)
+        case .item:
+            let iconOnly = (presentation == .toolbar) && (mi.icon != nil)
+            let trailing: String? = (presentation == .labeledToolbar && mi.hasSubmenu) ? "caret-down" : nil
+            return .button(.init(
+                title: iconOnly ? nil : mi.title,
+                trailingSymbol: trailing,
+                image: mi.icon,
+                role: mi.isDestructive ? .error : .primary,
+                variant: .text,
+                isEnabled: mi.isEnabled,
+                tooltip: mi.title))
+        }
+    }
+
+    // MARK: - Presentation (vertical list vs horizontal ThemedToolBar bar)
+
+    private var isHorizontal: Bool { presentation != .vertical }
+    private var orientation: MenuOrientation { isHorizontal ? .horizontal : .vertical }
+
+    /// Build (once) the horizontal toolbar the root hosts. Transparent surface +
+    /// square corners so the container's rounded, stroked menu surface is the chrome;
+    /// `.nonActivatingPanel` tracking because the panel is never key; hover / click
+    /// route back through the same cascade the vertical list drives.
+    @discardableResult
+    private func ensureToolbar() -> ThemedToolBar {
+        if let toolbar { return toolbar }
+        let tb = ThemedToolBar(palette: palette)
+        tb.trackingMode = .nonActivatingPanel
+        tb.surface = .transparent
+        tb.corners = .square
+        tb.onItemHover = { [weak self] idx in self?.toolbarHover(idx) }
+        tb.onItemClick = { [weak self] idx in self?.toolbarClick(idx) }
+        toolbar = tb
+        return tb
+    }
+
+    /// Swap the hosted content view (list ⇄ toolbar) + reframe, after a presentation
+    /// change. The toolbar's variant follows the mode (`.compact` icon strip vs
+    /// `.dense` labeled bar).
+    private func applyPresentation() {
+        if isHorizontal {
+            let tb = ensureToolbar()
+            tb.variant = (presentation == .toolbar) ? .compact : .dense
+        }
+        if panel != nil { installContentView() }
+        rebuildRows()
+        applyTheme()
+        if isOpen { reframe() }
+    }
+
+    /// Make the container host the CURRENT presentation's content view (idempotent).
+    private func installContentView() {
+        list.removeFromSuperview()
+        toolbar?.removeFromSuperview()
+        if isHorizontal, let toolbar { container.addSubview(toolbar) }
+        else { container.addSubview(list) }
+    }
+
+    // MARK: Content (orientation-aware highlight / activation / anchor)
+
+    /// The screen rect of the row / bar-item with `id` — a child's placement anchor.
+    private func rowRectOnScreen(for id: String) -> CGRect? {
+        if isHorizontal {
+            guard let idx = items.firstIndex(where: { $0.id == id }) else { return nil }
+            return toolbar?.frameOnScreen(ofItem: idx)
+        }
+        return list.rowRectOnScreen(for: id)
+    }
+
+    /// Move the highlight one navigable step (wraps — MUI). Vertical → the list;
+    /// horizontal → the toolbar cursor among ENABLED action items (skips
+    /// dividers/labels/disabled).
+    private func moveContentHighlight(_ delta: Int) {
+        guard isHorizontal else { list.moveHighlight(delta); return }
+        let nav = items.indices.filter { items[$0].kind == .item && items[$0].isEnabled }
+        guard !nav.isEmpty else { return }
+        let step = delta >= 0 ? 1 : -1
+        let cur = toolbarHighlightIndex.flatMap { nav.firstIndex(of: $0) }
+        let next = cur.map { ($0 + step + nav.count) % nav.count } ?? (step > 0 ? 0 : nav.count - 1)
+        setToolbarHighlight(nav[next])
+    }
+
+    private func setToolbarHighlight(_ idx: Int?) {
+        toolbarHighlightIndex = idx
+        toolbar?.highlightedItem = idx
+    }
+
+    /// The id of the currently highlighted row / bar-item.
+    private var highlightedContentID: String? {
+        if isHorizontal { return toolbarHighlightIndex.flatMap { items.indices.contains($0) ? items[$0].id : nil } }
+        return list.highlightedID
+    }
+
+    /// Activate the highlighted row / bar-item (⏎ / Space).
+    private func activateContentHighlight() {
+        if isHorizontal { if let id = highlightedContentID { activate(id) } }
+        else { list.activateHighlight() }
+    }
+
+    private func clearContentHighlight() {
+        if isHorizontal { setToolbarHighlight(nil) } else { list.clearHighlight() }
+    }
+
+    /// A hovered toolbar item → move the cursor there + run the same hover-intent the
+    /// list's `onHover` drives (open a folder's child after a beat / collapse on a
+    /// non-folder). A nil idx (pointer left the bar) keeps state (travelling into the
+    /// open child below).
+    private func toolbarHover(_ idx: Int?) {
+        guard let idx, items.indices.contains(idx) else { handleHover(nil); return }
+        setToolbarHighlight(idx)
+        handleHover(items[idx].id)
+    }
+
+    /// A clicked toolbar item → activate it (a folder opens its child below; a leaf
+    /// runs its action + dismisses).
+    private func toolbarClick(_ idx: Int) {
+        guard items.indices.contains(idx) else { return }
+        setToolbarHighlight(idx)
+        activate(items[idx].id)
+    }
+
     /// A template checkmark glyph — the list tints it to `foreground` (resting) /
     /// `onPrimary` (highlighted), so it re-themes with the palette (a native menu
     /// check is the control text colour, not an accent).
@@ -261,6 +430,7 @@ public final class ThemedMenu: NSObject {
         // container shows in the vertical-padding strips + carries the rounded
         // edge), so the menu reads as one seamless opaque card on every theme.
         list.surfaceColor = menuSurface
+        toolbar?.palette = palette          // transparent surface → the container shows through
         // Snap the panel surface / edge (these CALayer props would otherwise
         // implicitly cross-fade on a theme switch — combo parity).
         layerTxn(animated: false) {
@@ -300,7 +470,7 @@ public final class ThemedMenu: NSObject {
         removeKeyMonitor()
         removeMouseMonitor()
         glue.stop()
-        list.clearHighlight()
+        clearContentHighlight()
         fadeOut(animated: animated && !reduceMotion)
         onOpenChange?(false)
     }
@@ -339,9 +509,9 @@ public final class ThemedMenu: NSObject {
         ensurePanel()
         isOpen = true
         rebuildRows()                                   // never open stale
-        if installDismiss { list.previewHighlight = nil }   // the preview path keeps a caller-set highlight
-        list.clearHighlight()
-        if highlightsFirstOnOpen { list.moveHighlight(1) }
+        if installDismiss { previewHighlight = nil }    // the preview path keeps a caller-set highlight
+        clearContentHighlight()
+        if highlightsFirstOnOpen { moveContentHighlight(1) }
         reframe()
         panel?.orderFrontRegardless()                   // NEVER makeKey — keep the host's focus
         if installDismiss {
@@ -362,7 +532,10 @@ public final class ThemedMenu: NSObject {
         container.layer?.cornerRadius = cornerRadius
         container.layer?.masksToBounds = true
         container.layer?.borderWidth = 1
-        container.addSubview(list)
+        if isHorizontal {
+            ensureToolbar().variant = (presentation == .toolbar) ? .compact : .dense
+        }
+        installContentView()
         p.contentView = container
         p.contentView?.setAccessibilityElement(true)    // the popup IS a menu (role set by the factory)
         panel = p
@@ -373,6 +546,14 @@ public final class ThemedMenu: NSObject {
     /// [minWidth, maxWidth]; height = the rows + the vertical padding, capped at
     /// `maxHeight` (overflow scrolls).
     private func menuSize() -> CGSize {
+        if isHorizontal, let toolbar {
+            // A menu bar sizes to the toolbar's own flex layout (its gutters replace
+            // the list's vpad); + the 1pt border L/R + T/B. Overflow wrap/scroll is a
+            // deliberate follow-up (a launcher strip fits its items today).
+            let s = toolbar.intrinsicContentSize
+            let w = (s.width == NSView.noIntrinsicMetric ? maxWidth : s.width) + 2
+            return CGSize(width: w, height: s.height + 2)
+        }
         let contentW = list.fittingWidth(maxWidth: maxWidth - 2)
         let width = min(maxWidth, max(minWidth, contentW + 2))      // +2 for the 1pt border L/R
         let rows = list.contentHeight
@@ -392,9 +573,16 @@ public final class ThemedMenu: NSObject {
             let onScreen = host.convertToScreen(CGRect(origin: p, size: .zero))
             result = placePopup(panel, anchorRectOnScreen: onScreen, .point(onScreen.origin, size: size))
         } else if let rowRect = submenuRowOnScreen {
-            // A child menu beside its parent row (the row's rect is already on-screen,
-            // captured at open from the parent's list); gap 2 so it reads connected.
-            result = placePopup(panel, anchorRectOnScreen: rowRect, .submenu(size: size, gap: 2))
+            // A child menu anchored to its parent row (rect already on-screen, captured
+            // at open); gap 2 so it reads connected. A HORIZONTAL parent (menu bar) drops
+            // its child BELOW the bar item — a drop-down, so it reuses `.anchorCorner`
+            // (below · flip-up on underflow · right-align on overflow); a vertical parent
+            // opens the child to its RIGHT via `.submenu` (flips left on overflow).
+            if parentMenu?.isHorizontal == true {
+                result = placePopup(panel, anchorRectOnScreen: rowRect, .anchorCorner(size: size, gap: 2))
+            } else {
+                result = placePopup(panel, anchorRectOnScreen: rowRect, .submenu(size: size, gap: 2))
+            }
         } else {
             return
         }
@@ -407,12 +595,17 @@ public final class ThemedMenu: NSObject {
         default: return
         }
 
-        // Lay out the inner tree (panel content is NOT flipped → y-up; the list
-        // sits inside the 1pt border with `menuVPad` above/below).
+        // Lay out the inner content (panel content is NOT flipped → y-up). The list
+        // sits inside the 1pt border with `menuVPad` above/below; the toolbar fills the
+        // border box (its own gutters are the breathing room).
         container.frame = CGRect(origin: .zero, size: frame.size)
-        list.frame = CGRect(x: 1, y: 1 + menuVPad,
-                            width: frame.size.width - 2,
-                            height: frame.size.height - 2 * (1 + menuVPad))
+        if isHorizontal, let toolbar {
+            toolbar.frame = CGRect(x: 1, y: 1, width: frame.size.width - 2, height: frame.size.height - 2)
+        } else {
+            list.frame = CGRect(x: 1, y: 1 + menuVPad,
+                                width: frame.size.width - 2,
+                                height: frame.size.height - 2 * (1 + menuVPad))
+        }
 
         let s = host.backingScaleFactor
         container.layer?.contentsScale = s
@@ -470,7 +663,7 @@ public final class ThemedMenu: NSObject {
         hoverWork?.cancel(); hoverWork = nil
         guard isOpen, let host = hostWindow,
               let mi = items.first(where: { $0.id == id }), mi.isEnabled, !mi.submenu.isEmpty,
-              let rowRect = list.rowRectOnScreen(for: id) else { return }
+              let rowRect = rowRectOnScreen(for: id) else { return }
         if childRowID == id, child?.isOpen == true {                // already showing this one
             if highlightFirst { child?.list.moveHighlight(1) }      // re-light its first row (Enter/→ intent)
             return
@@ -504,7 +697,7 @@ public final class ThemedMenu: NSObject {
         closeChild()
         guard isOpen else { return }
         isOpen = false
-        list.clearHighlight()
+        clearContentHighlight()
         fadeOut(animated: false)
         submenuRowOnScreen = nil
     }
@@ -517,7 +710,7 @@ public final class ThemedMenu: NSObject {
         guard items.first(where: { $0.id == id })?.submenu.isEmpty == false else {
             closeChild(); return                             // the submenu row is gone / lost its children
         }
-        if let rect = list.rowRectOnScreen(for: id) {
+        if let rect = rowRectOnScreen(for: id) {
             c.submenuRowOnScreen = rect
             c.reframe()
             c.validateOpenChild()                            // recurse: re-anchor the whole descendant chain
@@ -559,21 +752,23 @@ public final class ThemedMenu: NSObject {
         // The ROOT owns the only monitor; route the keys to the DEEPEST open menu
         // (the active leaf) so a cascade navigates its open child, not the root.
         let leaf = activeLeaf()
-        switch menuKeyIntent(keyCode: ev.keyCode) {
-        case .moveDown: leaf.list.moveHighlight(1);  return nil
-        case .moveUp:   leaf.list.moveHighlight(-1); return nil
+        // Intent flips with the LEAF's orientation: a horizontal bar keys ←→ + ↓;
+        // its vertical child (and every vertical menu) keys ↑↓ + → / ←.
+        switch menuKeyIntent(keyCode: ev.keyCode, orientation: leaf.orientation) {
+        case .moveDown: leaf.moveContentHighlight(1);  return nil
+        case .moveUp:   leaf.moveContentHighlight(-1); return nil
         case .openSubmenu:
-            if let id = leaf.list.highlightedID,
+            if let id = leaf.highlightedContentID,
                leaf.items.first(where: { $0.id == id })?.submenu.isEmpty == false {
                 leaf.openSubmenu(rowID: id, highlightFirst: true)
                 return nil
             }
-            return ev                                        // no submenu on this row → host keeps → (IME safe)
+            return ev                                        // no submenu on this row → host keeps the key (IME safe)
         case .closeLevel:
             guard let parent = leaf.parentMenu else { return ev }
             parent.closeChild()
             return nil
-        case .activate: leaf.list.activateHighlight(); return nil
+        case .activate: leaf.activateContentHighlight(); return nil
         case .escapeLevel:
             if let parent = leaf.parentMenu { parent.closeChild() } else { dismiss() }
             return nil
@@ -729,8 +924,9 @@ public final class ThemedMenu: NSObject {
 extension ThemedMenu {
     struct MenuProbe {
         let isOpen: Bool
-        let rowCount: Int                 // hosted-list row count (incl. separators / headers)
-        let highlightedID: String?
+        let presentation: Presentation    // vertical list vs horizontal toolbar bar
+        let rowCount: Int                 // hosted content item count (list rows, or bar items)
+        let highlightedID: String?        // the highlighted row / bar-item id (orientation-aware)
         let resolvedCorner: PopupCorner
         let menuFrame: CGRect
         let panelOrderedIn: Bool
@@ -749,8 +945,9 @@ extension ThemedMenu {
         let animating = container.layer?.animation(forKey: "opacity") != nil
         return MenuProbe(
             isOpen: isOpen,
-            rowCount: list.listProbe.rowCount,
-            highlightedID: list.highlightedID,
+            presentation: presentation,
+            rowCount: isHorizontal ? (toolbar?.toolBarProbe.itemCount ?? 0) : list.listProbe.rowCount,
+            highlightedID: highlightedContentID,
             resolvedCorner: resolvedCorner,
             menuFrame: lastFrame,
             panelOrderedIn: panel?.isVisible ?? false,
@@ -767,6 +964,8 @@ extension ThemedMenu {
     }
     /// The hosted list (drive its probe / nav directly in tests).
     var _list: ThemedList { list }
+    /// The hosted horizontal toolbar (nil until a `.toolbar`/`.labeledToolbar` open).
+    var _toolbar: ThemedToolBar? { toolbar }
     /// The open submenu child controller, if any (drive its probe in tests).
     var _child: ThemedMenu? { child }
     /// Activate a row by id as if clicked (fires the item's action + dismisses).

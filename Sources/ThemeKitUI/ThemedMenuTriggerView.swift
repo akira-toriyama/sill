@@ -15,13 +15,16 @@ public struct ThemedMenuTriggerView: NSViewRepresentable {
     var title: String
     var trailingSymbol: String?
     var items: [ThemedMenu.MenuItem]
+    var presentation: ThemedMenu.Presentation
 
     public init(palette: ResolvedPalette, title: String = "Actions",
                 trailingSymbol: String? = "caret-down",
+                presentation: ThemedMenu.Presentation = .vertical,
                 items: [ThemedMenu.MenuItem]) {
         self.palette = palette
         self.title = title
         self.trailingSymbol = trailingSymbol
+        self.presentation = presentation
         self.items = items
     }
 
@@ -37,6 +40,7 @@ public struct ThemedMenuTriggerView: NSViewRepresentable {
         host.addSubview(button)
 
         let menu = ThemedMenu.make(palette: palette, items: items)
+        menu.presentation = presentation
         context.coordinator.menu = menu
         context.coordinator.button = button
         button.onTap = { [weak menu, weak button] in
@@ -51,6 +55,7 @@ public struct ThemedMenuTriggerView: NSViewRepresentable {
         context.coordinator.button?.title = title
         context.coordinator.button?.trailingSymbol = trailingSymbol
         context.coordinator.menu?.palette = palette
+        context.coordinator.menu?.presentation = presentation   // swap layout before items rebuild
         context.coordinator.menu?.items = items   // caller-driven items rebuild (ThemedMenu.items didSet)
     }
 
