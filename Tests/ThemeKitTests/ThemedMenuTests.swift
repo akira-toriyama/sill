@@ -435,7 +435,9 @@ final class ThemedMenuTests: XCTestCase {
         XCTAssertTrue(m.menuProbe.childOpen, "the level-1 child opens")
         m._child?._openSubmenu("deep")           // open a grandchild from the child
         XCTAssertTrue(m._child?.menuProbe.childOpen ?? false, "a child now opens its grandchild (N-level)")
-        XCTAssertEqual(m._child?._child?.menuProbe.childRowCount, 2, "the grandchild hosts Deep's rows")
+        // menuProbe.childRowCount = THIS menu's child's row count, so the level-1
+        // child's childRowCount is the grandchild's own row count.
+        XCTAssertEqual(m._child?.menuProbe.childRowCount, 2, "the grandchild hosts Deep's rows")
         m.dismiss(animated: false)
     }
 
