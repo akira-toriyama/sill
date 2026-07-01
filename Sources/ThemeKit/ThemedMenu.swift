@@ -56,10 +56,10 @@ public final class ThemedMenu: NSObject {
         public var isEnabled: Bool
         public var isDestructive: Bool       // tints the leading accent bar `error` (a "Delete" row)
         public var action: (() -> Void)?
-        /// Child rows. Non-empty ⇒ this row opens a ONE-LEVEL cascade (the kit caps
-        /// at one level): hover / `→` / click opens a child menu beside the row; its
-        /// own rows' `submenu` is ignored (no grandchildren). A submenu row's own
-        /// `action` is ignored — opening the child IS its activation.
+        /// Child rows. Non-empty ⇒ this row opens a cascade: hover / `→` / click
+        /// opens a child menu beside the row, and the child's own submenu rows
+        /// cascade further (N-level, arbitrary depth). A submenu row's own `action`
+        /// is ignored — opening the child IS its activation.
         public var submenu: [MenuItem]
         public var kind: Kind
 
@@ -164,11 +164,12 @@ public final class ThemedMenu: NSObject {
     private var anchorGap: CGFloat = CGFloat(Space.xs)
     private var resolvedCorner: PopupCorner = .topLeading
 
-    // Submenu cascade (ONE level). A submenu row owns a CHILD ThemedMenu placed beside
-    // it; the ROOT owns ALL keyboard / mouse / glue, so a child installs none of them.
-    // `parentMenu` is set on a child (≠ nil ⇒ this menu is a submenu and will NOT open
-    // grandchildren — the one-level cap). `submenuRowOnScreen` is a child's placement
-    // anchor (its parent row's screen rect).
+    // Submenu cascade (N-level). A submenu row owns a CHILD ThemedMenu placed beside
+    // it, and that child may open its OWN child — the cascade chains to arbitrary
+    // depth, but only ONE path is open at a time (each menu has a single `child`).
+    // The ROOT owns ALL keyboard / mouse / glue and routes keys to the active leaf,
+    // so a child installs none. `parentMenu` marks a child (walk to the root / close
+    // one level). `submenuRowOnScreen` is a child's placement anchor (its parent row).
     private weak var parentMenu: ThemedMenu?
     private var child: ThemedMenu?
     private var childRowID: String?
@@ -443,7 +444,8 @@ public final class ThemedMenu: NSObject {
     /// on a DIFFERENT row. A nil id (pointer between the panels — e.g. travelling INTO
     /// the open child) is IGNORED so the child stays put.
     private func handleHover(_ id: String?) {
-        guard parentMenu == nil else { return }         // only the root drives the cascade
+        // Each menu drives its OWN child; the cascade chains N deep and only one
+        // path is ever open, so there is no cross-level contention.
         hoverWork?.cancel(); hoverWork = nil
         guard let id else { return }                    // left the rows — keep any open child
         let isSubmenuRow = items.first(where: { $0.id == id })?.submenu.isEmpty == false
@@ -462,9 +464,9 @@ public final class ThemedMenu: NSObject {
     }
 
     /// Open (or re-target) the submenu child for parent row `id`, placed beside it.
-    /// No-op on a child (the one-level cap) or a disabled / non-submenu / off-screen row.
+    /// Runs at any depth (a child opens its own child — the cascade chains). No-op on
+    /// a disabled / non-submenu / off-screen row.
     private func openSubmenu(rowID id: String, highlightFirst: Bool) {
-        guard parentMenu == nil else { return }         // a child opens no grandchild
         hoverWork?.cancel(); hoverWork = nil
         guard isOpen, let host = hostWindow,
               let mi = items.first(where: { $0.id == id }), mi.isEnabled, !mi.submenu.isEmpty,
@@ -518,6 +520,7 @@ public final class ThemedMenu: NSObject {
         if let rect = list.rowRectOnScreen(for: id) {
             c.submenuRowOnScreen = rect
             c.reframe()
+            c.validateOpenChild()                            // recurse: re-anchor the whole descendant chain
         } else {
             closeChild()                                     // the parent row scrolled out of view
         }

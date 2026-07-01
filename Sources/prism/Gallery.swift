@@ -376,7 +376,7 @@ struct ThemeCard: View {
             MockTree(p: p)
         case .wand:
             appCaption(.wand, p: p)
-            MockTome(p: p)
+            MockWandLauncher(p: p)
         case .perch:
             appCaption(.perch, p: p)
             MockPerchOverlay(p: p, themeName: name, showEffects: showEffects)
