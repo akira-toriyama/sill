@@ -4,8 +4,9 @@
 // eye, so the preview can't couple the library to any app.
 //
 // One per family app, each its own per-app tab (KitFamily.appCases):
-// MockTree (facet) · MockTome (wand) here;
-// MockGlancePopover (glance) lives in GlanceShowcase.swift,
+// MockTree (facet) here;
+// MockWandLauncher (wand) lives in WandShowcase.swift,
+// MockGlancePopover (glance) in GlanceShowcase.swift,
 // MockHalo (halo) in HaloShowcase.swift, MockPerchOverlay (perch)
 // in PerchShowcase.swift.
 
@@ -300,71 +301,6 @@ private struct GripDots: View {
     }
 }
 
-// MARK: - wand tome (launcher)
-
-struct MockTome: View {
-    let p: ResolvedPalette
-
-    /// A tome row's icon — mirrors wand's icon-spec vocabulary: `app:<id>`
-    /// resolves a real app icon (falling back to a tinted tile), `symbol:<slug>`
-    /// a tinted Phosphor glyph.
-    private enum RowIcon {
-        case app([String])
-        case symbol(String, NSColor)
-    }
-
-    var body: some View {
-        SpecimenBox(title: "wand · tome", p: p) {
-            VStack(alignment: .leading, spacing: 6) {
-                // Launcher query field — the REAL ThemeKit field (replacing the
-                // hand-drawn one) so the tome mirrors the shared component.
-                ThemedTextFieldView(palette: p, placeholder: "open…",
-                                leading: "magnifying-glass", surface: p.background)
-                    .frame(height: 40)   // ≥ the label-less field's 40pt box, else the top rule clips
-
-                // Rows: an app-launch result (real icon) + two action items
-                // (tinted Phosphor glyphs) — the app:/icon: mix the real tome renders.
-                row(.app(["com.apple.Safari"]), title: "Safari", sub: "launch",
-                    selected: true)
-                row(.symbol("gear", p.secondary), title: "System Settings",
-                    sub: "⌘ ,", selected: false)
-                row(.symbol("palette", p.primary), title: "Switch theme",
-                    sub: "rainbow", selected: false)
-            }
-        }
-    }
-
-    @ViewBuilder private func row(_ icon: RowIcon, title: String, sub: String,
-                                  selected: Bool) -> some View {
-        HStack(spacing: 8) {
-            iconView(icon).frame(width: 18 * uiScale, height: 18 * uiScale)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(sysFont(11, weight: .medium))
-                    .foregroundColor(Color(nsColor: selected ? p.primary : p.foreground))
-                Text(sub).font(sysFont(9, design: .monospaced))
-                    .foregroundColor(Color(nsColor: p.muted))
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 6).padding(.vertical, 4)
-        .background(selected ? Color(nsColor: p.selection) : .clear)
-        .clipShape(RoundedRectangle(cornerRadius: 5))
-    }
-
-    @ViewBuilder private func iconView(_ icon: RowIcon) -> some View {
-        switch icon {
-        case .app(let ids):
-            if let img = appIcon(ids) {
-                Image(nsImage: img).resizable().interpolation(.high)
-            } else {
-                RoundedRectangle(cornerRadius: 4).fill(Color(nsColor: p.secondary))
-            }
-        case .symbol(let name, let tint):
-            Image(nsImage: phosphorImage(name, pt: 18, weight: .fill) ?? NSImage())
-                .resizable()
-                .renderingMode(.template)
-                .foregroundColor(Color(nsColor: tint))
-        }
-    }
-}
+// wand's launcher tome now lives in WandShowcase.swift (MockWandLauncher), rebuilt
+// from the real kit — see that file + docs/superpowers/specs/2026-07-01-wand-prism-mock-design.md.
 
