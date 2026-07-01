@@ -307,7 +307,7 @@ final class ThemedMenuTests: XCTestCase {
         m.dismiss(animated: false)
     }
 
-    // MARK: - Submenu cascade (ONE level)
+    // MARK: - Submenu cascade
 
     /// A menu with one submenu row ("More" → Sub 1/2/3) between two leaf rows.
     private func cascadeItems() -> [ThemedMenu.MenuItem] {
@@ -416,18 +416,66 @@ final class ThemedMenuTests: XCTestCase {
         XCTAssertFalse(m.menuProbe.isOpen)
     }
 
-    func testOneLevelCapOpensNoGrandchild() {
-        let items: [ThemedMenu.MenuItem] = [
-            .init(id: "more", title: "More", submenu: [
-                .init(id: "deep", title: "Deep", submenu: [.init(id: "g1", title: "G1")]),
+    // MARK: - Submenu cascade (N-level)
+
+    /// A two-level cascade: More → Deep → G1/G2.
+    private func deepCascadeItems() -> [ThemedMenu.MenuItem] {
+        [.init(id: "more", title: "More", submenu: [
+            .init(id: "deep", title: "Deep", submenu: [
+                .init(id: "g1", title: "G1"),
+                .init(id: "g2", title: "G2"),
             ]),
-        ]
-        let (m, anchor) = anchoredMenu(items)
+        ])]
+    }
+
+    func testChildOpensGrandchild() {
+        let (m, anchor) = anchoredMenu(deepCascadeItems())
         m.present(from: anchor)
         m._openSubmenu("more")
         XCTAssertTrue(m.menuProbe.childOpen, "the level-1 child opens")
-        m._child?._openSubmenu("deep")           // try to open a grandchild from the child
-        XCTAssertFalse(m._child?.menuProbe.childOpen ?? true, "a child opens NO grandchild (one-level cap)")
+        m._child?._openSubmenu("deep")           // open a grandchild from the child
+        XCTAssertTrue(m._child?.menuProbe.childOpen ?? false, "a child now opens its grandchild (N-level)")
+        XCTAssertEqual(m._child?._child?.menuProbe.childRowCount, 2, "the grandchild hosts Deep's rows")
+        m.dismiss(animated: false)
+    }
+
+    func testDismissTearsDownWholeDeepChain() {
+        let (m, anchor) = anchoredMenu(deepCascadeItems())
+        m.present(from: anchor)
+        m._openSubmenu("more")
+        m._child?._openSubmenu("deep")
+        XCTAssertTrue(m._child?.menuProbe.childOpen ?? false, "grandchild open before dismiss")
+        m.dismiss(animated: false)
+        XCTAssertFalse(m.menuProbe.isOpen, "root closed")
+        XCTAssertFalse(m.menuProbe.childOpen, "child closed (children-first teardown)")
+    }
+
+    func testEscClosesDeepChainOneLevelAtATime() {
+        let (m, anchor) = anchoredMenu(deepCascadeItems())
+        m.present(from: anchor)
+        m._openSubmenu("more")
+        m._child?._openSubmenu("deep")
+        XCTAssertTrue(m._child?.menuProbe.childOpen ?? false, "grandchild open")
+        XCTAssertNil(m._handleKey(keyDown(53)), "Esc swallowed")
+        XCTAssertFalse(m._child?.menuProbe.childOpen ?? true, "first Esc closes the deepest (grandchild) level")
+        XCTAssertTrue(m.menuProbe.childOpen, "the level-1 child stays open")
+        XCTAssertNil(m._handleKey(keyDown(53)))
+        XCTAssertFalse(m.menuProbe.childOpen, "second Esc closes the child level")
+        XCTAssertTrue(m.menuProbe.isOpen, "the root stays open")
+        XCTAssertNil(m._handleKey(keyDown(53)))
+        XCTAssertFalse(m.menuProbe.isOpen, "third Esc dismisses the root")
+    }
+
+    func testCloseChildTearsDownDeeperLevels() {
+        // The mechanism a hover-onto-a-non-submenu-row uses: closeChild() must
+        // recursively collapse EVERY deeper level, not just the direct child.
+        let (m, anchor) = anchoredMenu(deepCascadeItems())
+        m.present(from: anchor)
+        m._openSubmenu("more")
+        m._child?._openSubmenu("deep")
+        XCTAssertTrue(m._child?.menuProbe.childOpen ?? false, "grandchild open")
+        m._closeChild()                          // collapse from the root
+        XCTAssertFalse(m.menuProbe.childOpen, "the whole open chain collapses (child + grandchild)")
         m.dismiss(animated: false)
     }
 
