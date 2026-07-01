@@ -40,8 +40,8 @@ for the full design, decisions, and per-app migration plan.
 ## Build
 
 ```sh
-swift build       # compiles on CommandLineTools
-swift test        # needs Xcode (XCTest); runs in CI
+swift build          # fast compile check (CommandLineTools)
+scripts/test.sh      # XCTest suite — runs locally via an installed Xcode; also in CI
 ```
 
 macOS 13+ · Swift 6.

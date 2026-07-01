@@ -8,17 +8,26 @@ per-app migration plan: [docs/DESIGN.md](docs/DESIGN.md).
 ## Build / test (READ THIS FIRST)
 
 ```sh
-swift build      # the LOCAL bar — compiles on CommandLineTools
-swift test       # needs full Xcode (XCTest); does NOT run on a CLT-only setup
+swift build          # fast compile check — works on CommandLineTools
+scripts/test.sh      # full XCTest suite — runs LOCALLY via an installed Xcode
 ```
 
-The maintainer's machine has **CommandLineTools only, no Xcode**, so
-`import XCTest` fails for every test target locally. **`swift build` is the local
-gate; `swift test` runs in CI** (`.github/workflows/build.yml`, macOS + full
-Xcode). Therefore:
+**Both are local gates now — run them before every commit.** `swift build` is the
+quick CLT compile bar; `scripts/test.sh` runs the whole XCTest suite by pointing
+`DEVELOPER_DIR` at an installed Xcode (auto-detected) and building into an isolated
+`.build-xcode/` so the Swift-6.3 test artifacts never clobber the CLT `.build/`
+that `swift build` uses. CI (`.github/workflows/build.yml`) runs the same tests.
 
-- Write XCTest for logic, but **prove UI behavior LIVE in `prism`** — don't claim
-  a widget works off an unrun test.
+> A plain `swift test` still fails on a CLT-only shell (no XCTest linkage) — use
+> `scripts/test.sh`, or `DEVELOPER_DIR=…/Xcode.app/Contents/Developer swift test`.
+> With no Xcode installed at all, tests fall back to CI only.
+
+**`swift test` catches logic, NOT SwiftUI render** — XCTest exercises the pure/logic
+layers but does not prove a widget actually draws (e.g. #17f's GFM table: parser
+tests passed while the body rows rendered blank, caught only in prism). So still:
+
+- **prove UI behavior LIVE in `prism`** — don't claim a widget works off a green
+  test alone.
 - prism capture recipe (windows jump Spaces under the tiling WM): launch
   `.build/debug/prism` with `PRISM_CONFIG=…toml`, get the window id, then
   `screencapture -l<winid> -o out.png` **without** `osascript`-activating (that
