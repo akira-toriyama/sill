@@ -86,9 +86,10 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         self.preview = preview
     }
 
-    @State private var selectionAnchor: ID?          // sticky anchor for shift-range (M2b)
+    @State private var selectionAnchor: ID?          // sticky anchor for shift-range
     @State private var hoveredID: ID?                // pointer veil + highlightFollowsHover
-    @State private var scrollPos = ScrollPosition(edge: .top)   // frozen-preview scroll offset
+    @State private var scrollPos = ScrollPosition(edge: .top)   // frozen-preview + keyboard scroll
+    @FocusState private var focused: Bool            // standalone keyboard focus (.onKeyPress)
 
     private var metrics: ListMetrics { .forDensity(style.density) }
     private var visible: [ListItem<ID>] { ListItem.visibleRows(items, collapsed: collapsed) }
@@ -247,15 +248,70 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                 }
             }
             .frame(maxWidth: style.horizontalContentScroll ? nil : .infinity, alignment: .leading)
+            .scrollTargetLayout()
         }
         .scrollIndicators(.hidden)
         .scrollPosition($scrollPos)
         .background(surfaceBackground)
+        .focusable(style.selectionMode != .none)          // standalone lists take keyboard focus
+        .focused($focused)
+        .onKeyPress(.upArrow)   { moveHighlight(-1); return .handled }
+        .onKeyPress(.downArrow) { moveHighlight(1);  return .handled }
+        .onKeyPress(.return)    { activateHighlight(); return .handled }
+        .onKeyPress(.escape)    { highlight = nil; return .handled }
+        .onKeyPress(.space)     { spacePressed(); return .handled }
+        .overlay {
+            if focused {
+                RoundedRectangle(cornerRadius: 4).inset(by: 1)   // Radius.sm; matches AppKit managesFirstResponder ring
+                    .stroke(Color(nsColor: palette.primary), lineWidth: 2)
+            }
+        }
         .onAppear {
             // Freeze a deterministic scroll offset for a static prism capture.
             if let p = preview, p.scrollX != nil || p.scrollY != nil {
                 scrollPos.scrollTo(point: CGPoint(x: p.scrollX ?? 0, y: p.scrollY ?? 0))
             }
+        }
+    }
+
+    // MARK: keyboard navigation (standalone focusable list — .onKeyPress)
+
+    private func moveHighlight(_ delta: Int) {
+        let sel = ListItem.selectableIDs(visible)
+        guard !sel.isEmpty else { return }
+        if style.selectionMode == .multiple, NSEvent.modifierFlags.contains(.shift) {
+            let r = extendByKey(current: selection, anchor: selectionAnchor, focus: highlight, delta: delta,
+                                selectable: sel, shiftHeld: true, wraps: style.wrapsHighlight)
+            selection = r.selection; selectionAnchor = r.anchor; highlight = r.focus
+            onSelectionChange(r.selection)
+        } else {
+            let cur = highlight.flatMap { sel.firstIndex(of: $0) }
+            if let next = nextHighlight(current: cur, delta: delta,
+                                        selectableIndices: Array(sel.indices), wraps: style.wrapsHighlight) {
+                highlight = sel[next]
+            }
+        }
+        if let h = highlight { scrollPos.scrollTo(id: h) }
+    }
+
+    private func activateHighlight() {
+        guard let h = highlight else { return }
+        if style.selectionMode != .none {
+            let r = ThemedListSelect.click(id: h, current: selection, anchor: selectionAnchor,
+                                           mods: [], selectable: ListItem.selectableIDs(visible))
+            selection = r.selection; selectionAnchor = r.anchor; onSelectionChange(r.selection)
+        }
+        onActivate(h)
+    }
+
+    private func spacePressed() {
+        guard let h = highlight else { return }
+        if style.selectionMode == .multiple {
+            let r = ThemedListSelect.click(id: h, current: selection, anchor: selectionAnchor,
+                                           mods: .command, selectable: ListItem.selectableIDs(visible))
+            selection = r.selection; selectionAnchor = r.anchor; onSelectionChange(r.selection)
+        } else {
+            activateHighlight()
         }
     }
 
