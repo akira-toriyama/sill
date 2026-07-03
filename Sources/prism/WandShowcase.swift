@@ -17,29 +17,29 @@ import ThemeKitUI
     phosphorImage(name, pt: pt)                    // a Phosphor slug → template NSImage
 }
 
-// The tome's command rows (mirror ThemedMenu's MenuItem→ListItem mapping). The
+// The tome's command rows (mirror ThemedMenu's MenuItem→ThemeKit.ListItem mapping). The
 // "Switch Branch" folder row is pre-lit (previewHighlight) as if hovered; its
 // children render in the offset child list to depict an OPEN cascade.
-@MainActor private func tomeRows() -> [ListItem] {
+@MainActor private func tomeRows() -> [ThemeKit.ListItem] {
     [
-        ListItem(id: "safari", image: appIcon(["com.apple.Safari"]) ?? wandGlyph("compass"),
+        ThemeKit.ListItem(id: "safari", image: appIcon(["com.apple.Safari"]) ?? wandGlyph("compass"),
                  primary: "Safari", secondary: "launch"),
-        ListItem(id: "settings", image: wandGlyph("gear"), primary: "System Settings",
+        ThemeKit.ListItem(id: "settings", image: wandGlyph("gear"), primary: "System Settings",
                  trailing: .shortcut("⌘,")),
-        ListItem(id: "theme", image: wandGlyph("palette"), primary: "Switch theme"),
-        ListItem(id: "sep", primary: "", kind: .separator),
-        ListItem(id: "openin", image: wandGlyph("folder"), primary: "Open in…", trailing: .chevron),
-        ListItem(id: "branch", image: wandGlyph("git-branch"), primary: "Switch Branch", trailing: .chevron),
+        ThemeKit.ListItem(id: "theme", image: wandGlyph("palette"), primary: "Switch theme"),
+        ThemeKit.ListItem(id: "sep", primary: "", kind: .separator),
+        ThemeKit.ListItem(id: "openin", image: wandGlyph("folder"), primary: "Open in…", trailing: .chevron),
+        ThemeKit.ListItem(id: "branch", image: wandGlyph("git-branch"), primary: "Switch Branch", trailing: .chevron),
     ]
 }
 
 // The offset child list = the "Switch Branch" folder's async result (faux git
 // branches, drawn statically — the still of wand's shell-fed submenu).
-@MainActor private func branchRows() -> [ListItem] {
+@MainActor private func branchRows() -> [ThemeKit.ListItem] {
     [
-        ListItem(id: "main", image: wandGlyph("git-branch"), primary: "main"),
-        ListItem(id: "dev",  image: wandGlyph("git-branch"), primary: "develop"),
-        ListItem(id: "hot",  image: wandGlyph("git-branch"), primary: "hotfix"),
+        ThemeKit.ListItem(id: "main", image: wandGlyph("git-branch"), primary: "main"),
+        ThemeKit.ListItem(id: "dev",  image: wandGlyph("git-branch"), primary: "develop"),
+        ThemeKit.ListItem(id: "hot",  image: wandGlyph("git-branch"), primary: "hotfix"),
     ]
 }
 
@@ -203,7 +203,7 @@ struct MockWandLauncher: View {
 
     // A rounded, bordered, shadowed menu surface hosting a real ThemedList in menu
     // config with a lit row — the MockMenu inline-mock recipe.
-    @ViewBuilder private func menuCard(rows: [ListItem], lit: String,
+    @ViewBuilder private func menuCard(rows: [ThemeKit.ListItem], lit: String,
                                        height: CGFloat, width: CGFloat) -> some View {
         ThemedListView(palette: p) { list in
             list.items = rows

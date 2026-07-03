@@ -45,13 +45,13 @@ import ThemeKitUI
 
 // MARK: - Specimen data builders
 
-@MainActor private func facetItems() -> [ListItem] {
-    func win(_ id: String, _ icon: String, _ app: String, _ title: String, _ badges: [Badge]) -> ListItem {
-        ListItem(id: id, image: glyph(icon, 18), primary: app, secondary: title, badges: badges)
+@MainActor private func facetItems() -> [ThemeKit.ListItem] {
+    func win(_ id: String, _ icon: String, _ app: String, _ title: String, _ badges: [Badge]) -> ThemeKit.ListItem {
+        ThemeKit.ListItem(id: id, image: glyph(icon, 18), primary: app, secondary: title, badges: badges)
     }
     let minGlyph = glyph("minus", 10)
     return [
-        ListItem(id: "wsA", primary: "Workspace A",
+        ThemeKit.ListItem(id: "wsA", primary: "Workspace A",
                  kind: .sectionHeader(subtitle: "3 windows")),
         win("w1", "compass", "Safari", "GitHub — akira-toriyama/sill",
             [Badge("⌘3", role: .primary), Badge("Space 2")]),
@@ -59,17 +59,17 @@ import ThemeKitUI
             [Badge("⌘2", role: .primary), Badge("min", symbol: minGlyph, role: .secondary)]),
         win("w3", "terminal-window", "Terminal", "prism — swift build",
             [Badge("⌘1", role: .primary)]),
-        ListItem(id: "wsB", primary: "Workspace B",
+        ThemeKit.ListItem(id: "wsB", primary: "Workspace B",
                  kind: .sectionHeader(subtitle: "2 windows")),
         win("w4", "note", "Notes", "memo.md", [Badge("hidden", role: .neutral)]),
         win("w5", "music-note", "Music", "Focus playlist", [Badge("⌘5", role: .primary)]),
     ]
 }
 
-@MainActor private func wandItems(_ p: ResolvedPalette) -> [ListItem] {
+@MainActor private func wandItems(_ p: ResolvedPalette) -> [ThemeKit.ListItem] {
     func site(_ id: String, _ color: NSColor, _ title: String, _ url: String,
-              _ trailing: TrailingAccessory) -> ListItem {
-        ListItem(id: id, image: favicon("globe", color, 16), primary: title,
+              _ trailing: TrailingAccessory) -> ThemeKit.ListItem {
+        ThemeKit.ListItem(id: id, image: favicon("globe", color, 16), primary: title,
                  secondary: url, secondaryMono: true, trailing: trailing)
     }
     return [
@@ -80,39 +80,39 @@ import ThemeKitUI
     ]
 }
 
-@MainActor private func denseItems() -> [ListItem] {
+@MainActor private func denseItems() -> [ThemeKit.ListItem] {
     [
-        ListItem(id: "cut",   primary: "Cut",          trailing: .shortcut("⌘X")),
-        ListItem(id: "copy",  primary: "Copy",         trailing: .shortcut("⌘C")),
-        ListItem(id: "paste", primary: "Paste",        trailing: .shortcut("⌘V")),
-        ListItem(id: "dup",   primary: "Duplicate",    trailing: .chevron),
-        ListItem(id: "del",   primary: "Delete",       trailing: .shortcut("⌘⌫"), tint: .error),
-        ListItem(id: "off",   primary: "Unavailable",  isDisabled: true),
+        ThemeKit.ListItem(id: "cut",   primary: "Cut",          trailing: .shortcut("⌘X")),
+        ThemeKit.ListItem(id: "copy",  primary: "Copy",         trailing: .shortcut("⌘C")),
+        ThemeKit.ListItem(id: "paste", primary: "Paste",        trailing: .shortcut("⌘V")),
+        ThemeKit.ListItem(id: "dup",   primary: "Duplicate",    trailing: .chevron),
+        ThemeKit.ListItem(id: "del",   primary: "Delete",       trailing: .shortcut("⌘⌫"), tint: .error),
+        ThemeKit.ListItem(id: "off",   primary: "Unavailable",  isDisabled: true),
     ]
 }
 
 // A plain reorder list (no headers) for the `.between` insertion-line affordance.
-@MainActor private func reorderItems() -> [ListItem] {
+@MainActor private func reorderItems() -> [ThemeKit.ListItem] {
     [
-        ListItem(id: "r1", image: glyph("number-circle-one"),   primary: "First task"),
-        ListItem(id: "r2", image: glyph("number-circle-two"),   primary: "Second task"),
-        ListItem(id: "r3", image: glyph("number-circle-three"), primary: "Third task"),
-        ListItem(id: "r4", image: glyph("number-circle-four"),  primary: "Fourth task"),
+        ThemeKit.ListItem(id: "r1", image: glyph("number-circle-one"),   primary: "First task"),
+        ThemeKit.ListItem(id: "r2", image: glyph("number-circle-two"),   primary: "Second task"),
+        ThemeKit.ListItem(id: "r3", image: glyph("number-circle-three"), primary: "Third task"),
+        ThemeKit.ListItem(id: "r4", image: glyph("number-circle-four"),  primary: "Fourth task"),
     ]
 }
 
 // A GENERIC sectioned list (no facet vocabulary) for the chunk-reorder demo: two
 // short single-line sections so a lifted chunk AND the section insertion bar both
 // frame in one static shot. Proves the chunk widget is app-agnostic, not facet-shaped.
-@MainActor private func chunkItems() -> [ListItem] {
-    func task(_ id: String, _ title: String) -> ListItem {
-        ListItem(id: id, image: glyph("circle", 14), primary: title)
+@MainActor private func chunkItems() -> [ThemeKit.ListItem] {
+    func task(_ id: String, _ title: String) -> ThemeKit.ListItem {
+        ThemeKit.ListItem(id: id, image: glyph("circle", 14), primary: title)
     }
     return [
-        ListItem(id: "today", primary: "Today", kind: .sectionHeader()),
+        ThemeKit.ListItem(id: "today", primary: "Today", kind: .sectionHeader()),
         task("t1", "Draft the proposal"),
         task("t2", "Review pull requests"),
-        ListItem(id: "later", primary: "Later", kind: .sectionHeader()),
+        ThemeKit.ListItem(id: "later", primary: "Later", kind: .sectionHeader()),
         task("l1", "Plan the release"),
         task("l2", "Write the changelog"),
     ]
@@ -122,27 +122,27 @@ import ThemeKitUI
 // rows. Shows the indent steps (level 1 / 2), both disclosure states (▾ expanded /
 // ▸ collapsed) on a 2-line AND a 1-line header, and a collapsed section whose child
 // rows the HOST simply omits (the kit hides nothing itself — host owns the shape).
-@MainActor private func treeItems() -> [ListItem] {
+@MainActor private func treeItems() -> [ThemeKit.ListItem] {
     [
-        ListItem(id: "proj", primary: "Project",
+        ThemeKit.ListItem(id: "proj", primary: "Project",
                  kind: .sectionHeader(subtitle: "4 items", collapsed: false)),
-        ListItem(id: "readme", image: glyph("file-text", 16), primary: "README.md", indentLevel: 1),
-        ListItem(id: "src", primary: "src",
+        ThemeKit.ListItem(id: "readme", image: glyph("file-text", 16), primary: "README.md", indentLevel: 1),
+        ThemeKit.ListItem(id: "src", primary: "src",
                  kind: .sectionHeader(collapsed: false), indentLevel: 1),
-        ListItem(id: "f1", image: glyph("file-code", 16), primary: "ThemedList.swift", indentLevel: 2),
-        ListItem(id: "f2", image: glyph("file-code", 16), primary: "ThemedMenu.swift", indentLevel: 2),
-        ListItem(id: "build", primary: "build",
+        ThemeKit.ListItem(id: "f1", image: glyph("file-code", 16), primary: "ThemedList.swift", indentLevel: 2),
+        ThemeKit.ListItem(id: "f2", image: glyph("file-code", 16), primary: "ThemedMenu.swift", indentLevel: 2),
+        ThemeKit.ListItem(id: "build", primary: "build",
                  kind: .sectionHeader(collapsed: true), indentLevel: 1),    // collapsed — children omitted
-        ListItem(id: "archive", primary: "Archive",
+        ThemeKit.ListItem(id: "archive", primary: "Archive",
                  kind: .sectionHeader(collapsed: true)),                     // collapsed — children omitted
     ]
 }
 
 // Long titles that overflow a narrow pane — for the horizontalContentScroll demo
 // (the row extends past the clip and scrolls sideways rather than truncating).
-@MainActor private func longItems() -> [ListItem] {
-    func r(_ id: String, _ icon: String, _ title: String, _ sub: String) -> ListItem {
-        ListItem(id: id, image: glyph(icon, 16), primary: title, secondary: sub, secondaryMono: true,
+@MainActor private func longItems() -> [ThemeKit.ListItem] {
+    func r(_ id: String, _ icon: String, _ title: String, _ sub: String) -> ThemeKit.ListItem {
+        ThemeKit.ListItem(id: id, image: glyph(icon, 16), primary: title, secondary: sub, secondaryMono: true,
                  badges: [Badge("⌘\(id.suffix(1))", role: .primary)])
     }
     return [
@@ -159,7 +159,7 @@ struct MockList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKit · List — the REAL embeddable widget (hover a row, ↑↓/click in the dense list when focused). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list. Middle row: the additive drag layer (default-off) — the lifted row dims under a drop-onto ring or a between insertion-line; a live drag's ghost is a child window (hand-checked, not captured). Chunk row: a section header + its rows drag as ONE unit — every member dims, a thick full-width section insertion bar marks the gap it lands in, a 2×3 grip marks each draggable header (facet shape + a generic sectioned list; a non-header row still lifts solo). 4th row: hierarchy — ListItem.indentLevel shifts content right (selection wash stays full-bleed) + collapsible section headers (▾ expanded / ▸ collapsed, click → onToggleSection; the host omits a collapsed section's rows). Bottom row: facet polish — highlightStyle .outline (a keyboard cursor ring distinct from the filled selection), alternatingRowBackground (zebra; parity resets per section), horizontalContentScroll (long titles draw in full and scroll sideways, never truncated).")
+            Text("ThemeKit · List — the REAL embeddable widget (hover a row, ↑↓/click in the dense list when focused). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list. Middle row: the additive drag layer (default-off) — the lifted row dims under a drop-onto ring or a between insertion-line; a live drag's ghost is a child window (hand-checked, not captured). Chunk row: a section header + its rows drag as ONE unit — every member dims, a thick full-width section insertion bar marks the gap it lands in, a 2×3 grip marks each draggable header (facet shape + a generic sectioned list; a non-header row still lifts solo). 4th row: hierarchy — ThemeKit.ListItem.indentLevel shifts content right (selection wash stays full-bleed) + collapsible section headers (▾ expanded / ▸ collapsed, click → onToggleSection; the host omits a collapsed section's rows). Bottom row: facet polish — highlightStyle .outline (a keyboard cursor ring distinct from the filled selection), alternatingRowBackground (zebra; parity resets per section), horizontalContentScroll (long titles draw in full and scroll sideways, never truncated).")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
                 .fixedSize(horizontal: false, vertical: true)
