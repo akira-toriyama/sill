@@ -18,4 +18,22 @@ final class ListSelectionRoutingTests: XCTestCase {
         XCTAssertEqual(r.selection, ["a"])
         XCTAssertEqual(r.anchor, "a")
     }
+
+    // Multi-select (.multiple) — the net-new M2b feature, routed through ListCore.
+
+    func testCommandTogglesOne() {
+        let r = ThemedListSelect.click(id: "b", current: ["a"], anchor: "a",
+                                       mods: .command, selectable: ["a", "b", "c"])
+        XCTAssertEqual(r.selection, ["a", "b"])
+    }
+
+    func testShiftSelectsRange() {
+        let r = ThemedListSelect.click(id: "c", current: ["a"], anchor: "a",
+                                       mods: .shift, selectable: ["a", "b", "c"])
+        XCTAssertEqual(r.selection, ["a", "b", "c"])
+    }
+
+    func testSelectAll() {
+        XCTAssertEqual(ThemedListSelect.all(selectable: ["a", "b"]), ["a", "b"])
+    }
 }

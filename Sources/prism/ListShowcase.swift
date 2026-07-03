@@ -164,12 +164,23 @@ private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedLi
     ]
 }
 
+// A flat file list for the multi-select demo (⌘ toggle · ⇧ range · ⌘A all).
+@MainActor private func multiItems() -> [ThemeKitUI.ListItem<String>] {
+    func f(_ id: String, _ t: String) -> ThemeKitUI.ListItem<String> {
+        ThemeKitUI.ListItem(id: id, image: glyph("file-text", 16), primary: t)
+    }
+    return [f("m1", "Introduction"), f("m2", "Getting Started"), f("m3", "Configuration"),
+            f("m4", "Theming"), f("m5", "Widgets"), f("m6", "Migration")]
+}
+
 // MARK: - Showcase
 
 struct MockList: View {
     let p: ResolvedPalette
     // Live collapse state for the tree cell — clicking a header animates via this binding.
     @State private var treeCollapsed: Set<String> = ["build", "archive"]
+    // Live multi-selection (⌘/⇧-click to change) — starts with a 3-row range selected.
+    @State private var multiSelection: Set<String> = ["m2", "m3", "m4"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -310,6 +321,20 @@ struct MockList: View {
                                    palette: p,
                                    preview: ListPreview(selection: ["1"], scrollX: 150))
                     .frame(width: 260, height: 150)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(alignment: .top, spacing: 20) {
+                cell("multi-select · ⌘ toggle · ⇧ range · ⌘A all (click to try)") {
+                    ThemedListView(items: multiItems(),
+                                   selection: $multiSelection,
+                                   style: makeStyle { $0.selectionMode = .multiple; $0.showsDividers = true },
+                                   palette: p)
+                    .frame(width: 300, height: 180)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8)
                         .stroke(Color(nsColor: p.border), lineWidth: 1))

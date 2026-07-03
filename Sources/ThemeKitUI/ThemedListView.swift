@@ -193,7 +193,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         case .row where !item.isDisabled:
             if style.selectionMode == .none { onActivate(item.id); return }
             let r = ThemedListSelect.click(id: item.id, current: selection, anchor: selectionAnchor,
-                                           mods: [], selectable: ListItem.selectableIDs(visible))  // multi-mods: M2b
+                                           mods: currentSelectMods(), selectable: ListItem.selectableIDs(visible))
             selection = r.selection
             selectionAnchor = r.anchor
             onSelectionChange(r.selection)
@@ -201,6 +201,17 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         default:
             break
         }
+    }
+
+    /// Live keyboard modifiers at click time → pure `SelectMods` (only in `.multiple`;
+    /// single/none always resolve as a plain click).
+    private func currentSelectMods() -> SelectMods {
+        guard style.selectionMode == .multiple else { return [] }
+        var mods: SelectMods = []
+        let flags = NSEvent.modifierFlags
+        if flags.contains(.command) { mods.insert(.command) }
+        if flags.contains(.shift) { mods.insert(.shift) }
+        return mods
     }
 
     private func handleHover(_ item: ListItem<ID>, _ hovering: Bool) {
