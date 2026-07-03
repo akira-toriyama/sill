@@ -1,8 +1,9 @@
 // ThemeKitUI — the per-row SwiftUI subview for `ThemedListView` (#17b M2). Reproduces
 // the AppKit `ThemedList`'s per-row draw 1:1 from `ResolvedPalette` roles + `ListMetrics`
 // (mirror of `ThemedList.swift` drawRow :1145-1300). Background decorations
-// (zebra/tint/selection/hover/outline) land here in Task 4; leading image (Task 5) and
-// trailing cluster (Task 6) follow. All fills are FULL-BLEED (x=0) — only content indents.
+// (zebra/tint/selection/hover/outline) + leading image column live here; the trailing
+// cluster (badges/shortcut/chevron) lands in Task 6, section-header chrome in Task 7.
+// All fills are FULL-BLEED (x=0) — only content indents (the MUI tree model).
 
 import SwiftUI
 import AppKit
@@ -36,6 +37,8 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
 
     // MARK: geometry
 
+    private var indentWidth: CGFloat { CGFloat(max(0, item.indentLevel)) * metrics.indentStep }
+
     private var rowHeight: CGFloat {
         switch item.kind {
         case .separator:
@@ -47,10 +50,9 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
         }
     }
 
-    /// x of the row's CONTENT (image/text). Decorations stay full-bleed (x=0).
-    private var contentLeadingX: CGFloat {
-        let base = style.reservesLeadingImageColumn ? metrics.textXOrigin : metrics.leadingInset
-        return base + CGFloat(max(0, item.indentLevel)) * metrics.indentStep
+    private var isCollapsibleHeader: Bool {
+        if case let .sectionHeader(_, collapsed) = item.kind { return !item.isDisabled && collapsed != nil }
+        return false
     }
 
     // MARK: colors
@@ -78,14 +80,97 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
         }
     }
 
+    // MARK: body
+
     var body: some View {
-        content
-            .padding(.leading, contentLeadingX)
-            .padding(.trailing, metrics.trailingInset)
+        rowContent
             .frame(height: rowHeight, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(rowBackground)
             .overlay(outlineRing)
+    }
+
+    @ViewBuilder private var rowContent: some View {
+        switch item.kind {
+        case .separator:
+            EmptyView()
+        case let .sectionHeader(subtitle, _):
+            headerContent(subtitle: subtitle)
+                .padding(.leading, metrics.leadingInset + indentWidth + (isCollapsibleHeader ? metrics.disclosureGutter : 0))
+                .padding(.trailing, metrics.trailingInset)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        case .row:
+            HStack(spacing: 0) {
+                Color.clear.frame(width: metrics.leadingInset + indentWidth)
+                if style.reservesLeadingImageColumn {
+                    leadingImage
+                    Color.clear.frame(width: metrics.gapImageToText)
+                }
+                textStack
+                Spacer(minLength: 0)
+            }
+            .padding(.trailing, metrics.trailingInset)
+        }
+    }
+
+    // MARK: leading image (template tint via .template render == AppKit .sourceAtop; colour favicon as-is)
+
+    @ViewBuilder private var leadingImage: some View {
+        Group {
+            if let image = item.image {
+                let side = image.isTemplate ? metrics.iconGlyph : metrics.imageBox
+                if image.isTemplate {
+                    Image(nsImage: image).renderingMode(.template).resizable().scaledToFit()
+                        .frame(width: side, height: side)
+                        .foregroundColor(Color(nsColor: onAccent ? palette.onPrimary(1) : palette.foreground))
+                } else {
+                    Image(nsImage: image).renderingMode(.original).interpolation(.high)
+                        .resizable().scaledToFit()
+                        .frame(width: side, height: side)
+                }
+            } else {
+                Color.clear      // keep the column reserved even when this row has no image
+            }
+        }
+        .frame(width: metrics.imageBox, height: metrics.imageBox)
+    }
+
+    // MARK: text
+
+    @ViewBuilder private var textStack: some View {
+        VStack(alignment: .leading, spacing: metrics.lineGap) {
+            Text(item.primary)
+                .font(Font(palette.uiFont(.body) as CTFont))
+                .foregroundColor(primaryColor)
+                .lineLimit(1)
+            if let secondary = item.secondary {
+                Text(secondary)
+                    .font(secondaryFont())
+                    .foregroundColor(secondaryColor)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    @ViewBuilder private func headerContent(subtitle: String?) -> some View {
+        if let subtitle {
+            VStack(alignment: .leading, spacing: metrics.lineGap) {
+                Text(item.primary)
+                    .font(Font(palette.uiFont(.sectionTitle) as CTFont))
+                    .foregroundColor(Color(nsColor: palette.foreground))
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(Font(palette.uiFont(.caption) as CTFont))
+                    .foregroundColor(Color(nsColor: palette.muted))
+                    .lineLimit(1)
+            }
+        } else {
+            Text(item.primary.uppercased())
+                .font(Font(palette.uiFont(.sectionHeader) as CTFont))
+                .tracking(0.5)
+                .foregroundColor(Color(nsColor: palette.muted))
+                .lineLimit(1)
+        }
     }
 
     // MARK: background decorations (full-bleed, .row only — headers/separators self-draw)
@@ -143,44 +228,6 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
             RoundedRectangle(cornerRadius: metrics.roundedRadius)
                 .inset(by: 1.5)
                 .stroke(Color(nsColor: palette.primary), lineWidth: 1.5)
-        }
-    }
-
-    // MARK: content (text-only for now; image Task 5, trailing cluster Task 6)
-
-    @ViewBuilder private var content: some View {
-        switch item.kind {
-        case .separator:
-            EmptyView()
-        case let .sectionHeader(subtitle, _):
-            if let subtitle {
-                VStack(alignment: .leading, spacing: metrics.lineGap) {
-                    Text(item.primary)
-                        .font(Font(palette.uiFont(.sectionTitle) as CTFont))
-                        .foregroundColor(Color(nsColor: palette.foreground))
-                    Text(subtitle)
-                        .font(Font(palette.uiFont(.caption) as CTFont))
-                        .foregroundColor(Color(nsColor: palette.muted))
-                }
-            } else {
-                Text(item.primary.uppercased())
-                    .font(Font(palette.uiFont(.sectionHeader) as CTFont))
-                    .tracking(0.5)
-                    .foregroundColor(Color(nsColor: palette.muted))
-            }
-        case .row:
-            VStack(alignment: .leading, spacing: metrics.lineGap) {
-                Text(item.primary)
-                    .font(Font(palette.uiFont(.body) as CTFont))
-                    .foregroundColor(primaryColor)
-                    .lineLimit(1)
-                if let secondary = item.secondary {
-                    Text(secondary)
-                        .font(secondaryFont())
-                        .foregroundColor(secondaryColor)
-                        .lineLimit(1)
-                }
-            }
         }
     }
 }
