@@ -13,9 +13,8 @@
 // static shot. prism never imports an app's View — mock data shapes drawn by the real
 // kit, so the bench can't drift from facet / wand.
 //
-// M2 staging note: rendering + single-select land in M2a; the drag affordances
-// (cells 4-7) light up in M2c and animated collapse (cell 8 caret) in M2b — their
-// captions flag what's still pending so the bench never overstates coverage.
+// The drag layer (cells 4-7) + animated collapse (cell 8) + multi-select (cell 12) are
+// all LIVE-interactive here — click / ⌘⇧-click / drag a row to exercise them.
 
 import SwiftUI
 import AppKit
@@ -184,7 +183,7 @@ struct MockList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKitUI · List — the SwiftUI-NATIVE themed list (#17b M2). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list. Middle rows: the additive drag layer (default-off) — lifted row dims under a drop-onto ring or a between insertion-line; chunk drag lifts a header + its rows as one unit with a full-width section insertion bar and a 2×3 grip on draggable headers (drag affordances render in M2c). 4th row: hierarchy — indentLevel shifts content right (selection wash stays full-bleed) + collapsible section headers (▾/▸; animated caret in M2b). Bottom row: highlightStyle .outline (keyboard cursor ring ≠ filled selection), zebra (parity resets per section), horizontalContentScroll (long titles scroll sideways, never truncated).")
+            Text("ThemeKitUI · List — the SwiftUI-NATIVE themed list (#17b M2). facet-tree shape (sticky 2-line headers · badges · single-select), wand-tome shape (solidAccent · rounded · mono url · shortcut/chevron), and a dense menu-style list. Middle rows: the additive drag layer (default-off) — lifted row dims under a drop-onto ring or a between insertion-line; chunk drag lifts a header + its rows as one unit with a full-width section insertion bar and a 2×3 grip on draggable headers (lifted row dims, drop-onto ring, insertion line, chunk section bar). 4th row: hierarchy — indentLevel shifts content right (selection wash stays full-bleed) + collapsible section headers (▾/▸; click to animate). Bottom row: highlightStyle .outline (keyboard cursor ring ≠ filled selection), zebra (parity resets per section), horizontalContentScroll (long titles scroll sideways, never truncated).")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
                 .fixedSize(horizontal: false, vertical: true)
@@ -226,7 +225,7 @@ struct MockList: View {
             }
 
             HStack(alignment: .top, spacing: 20) {
-                cell("drag · drop-onto (facet tree) · w3 → Workspace B  (affordance: M2c)") {
+                cell("drag · drop-onto (facet tree) · w3 → Workspace B") {
                     ThemedListView(items: facetItems(),
                                    style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true; $0.draggable = true; $0.dragMode = .dropOnto },
                                    palette: p,
@@ -238,7 +237,7 @@ struct MockList: View {
                         .stroke(Color(nsColor: p.border), lineWidth: 1))
                 }
 
-                cell("drag · reorder (insertion line) · before 'Third task'  (affordance: M2c)") {
+                cell("drag · reorder (insertion line) · before 'Third task'") {
                     ThemedListView(items: reorderItems(),
                                    style: makeStyle { $0.draggable = true; $0.dragMode = .reorderBetween },
                                    palette: p,
@@ -253,7 +252,7 @@ struct MockList: View {
             }
 
             HStack(alignment: .top, spacing: 20) {
-                cell("drag · chunk reorder (facet) · header + its windows lift as one  (affordance: M2c)") {
+                cell("drag · chunk reorder (facet) · header + its windows lift as one") {
                     ThemedListView(items: facetItems(),
                                    style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true; $0.draggable = true },
                                    palette: p,
@@ -264,7 +263,7 @@ struct MockList: View {
                         .stroke(Color(nsColor: p.border), lineWidth: 1))
                 }
 
-                cell("drag · chunk reorder (generic sections) · section insertion bar  (affordance: M2c)") {
+                cell("drag · chunk reorder (generic sections) · section insertion bar") {
                     ThemedListView(items: chunkItems(),
                                    style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true; $0.draggable = true },
                                    palette: p,
