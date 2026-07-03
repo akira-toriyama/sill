@@ -91,6 +91,11 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     @State private var scrollPos = ScrollPosition(edge: .top)   // frozen-preview + keyboard scroll
     @FocusState private var focused: Bool            // standalone keyboard focus (.onKeyPress)
 
+    // Drag/reorder (M2c) — the live lift + the per-row geometry the pure resolvers consume.
+    private struct DragInfo { var source: ID; var chunkIDs: [ID]; var target: ListCore.DropTarget<ID>?; var translation: CGSize }
+    @State private var dragState: DragInfo?
+    @State private var geomMap: [AnyHashable: RowGeom] = [:]
+
     private var metrics: ListMetrics { .forDensity(style.density) }
     private var visible: [ListItem<ID>] { ListItem.visibleRows(items, collapsed: collapsed) }
     private var effectiveSelection: Set<ID> { preview?.selection ?? selection }
@@ -158,7 +163,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         return result
     }
 
-    private func rowView(_ item: ListItem<ID>, parity: [ID: Bool], opaque: Bool, dividers: [ID: CGFloat]) -> some View {
+    @ViewBuilder private func rowView(_ item: ListItem<ID>, parity: [ID: Bool], opaque: Bool, dividers: [ID: CGFloat]) -> some View {
         ThemedListRow(item: item, metrics: metrics, style: style, palette: palette,
                       isSelected: effectiveSelection.contains(item.id),
                       isHighlighted: effectiveHighlight == item.id,
@@ -166,10 +171,14 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                       zebraOdd: parity[item.id] ?? false,
                       surfaceOpaque: opaque,
                       dividerInset: dividers[item.id],
-                      isCollapsed: headerIsCollapsed(item))
+                      isCollapsed: headerIsCollapsed(item),
+                      dimmed: dimmedIDs.contains(item.id),
+                      drop: rowDrop(item.id))
+            .reportRowGeom(item.id)
             .contentShape(Rectangle())
             .onTapGesture { handleTap(item) }
             .onHover { handleHover(item, $0) }
+            .modifier(OptionalDrag(active: style.draggable && isDragSource(item), gesture: dragGesture(item)))
             .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
@@ -249,6 +258,8 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
             }
             .frame(maxWidth: style.horizontalContentScroll ? nil : .infinity, alignment: .leading)
             .scrollTargetLayout()
+            .coordinateSpace(.named(themedListContentSpace))
+            .onPreferenceChange(RowGeomPreference.self) { geomMap = $0 }
         }
         .scrollIndicators(.hidden)
         .scrollPosition($scrollPos)
@@ -312,6 +323,72 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
             selection = r.selection; selectionAnchor = r.anchor; onSelectionChange(r.selection)
         } else {
             activateHighlight()
+        }
+    }
+
+    // MARK: drag/reorder (M2c) — geometry produced here, drop math in ListCore
+
+    /// Effective drag state = the frozen `preview` seam (static prism shot) OR the live lift.
+    private var effDragSource: ID? { preview?.dragSource ?? dragState?.source }
+    private var effDragChunk: [ID] { preview?.dragChunk ?? dragState?.chunkIDs ?? [] }
+    private var effDropTarget: ListCore.DropTarget<ID>? { preview?.dropTarget ?? dragState?.target }
+    private var dimmedIDs: Set<ID> {
+        guard style.draggable || preview != nil else { return [] }
+        var s = Set(effDragChunk)
+        if let src = effDragSource { s.insert(src) }
+        return s
+    }
+    private func geom(_ id: ID) -> RowGeom? { geomMap[AnyHashable(id)] }
+
+    private func isDragSource(_ item: ListItem<ID>) -> Bool {
+        guard style.draggable else { return false }
+        if case .separator = item.kind { return false }
+        return !item.isDisabled            // headers ARE liftable (they carry their chunk)
+    }
+
+    private func dragGesture(_ item: ListItem<ID>) -> some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .named(themedListContentSpace))
+            .onChanged { value in
+                guard isDragSource(item) else { return }
+                if dragState == nil {
+                    var chunk: [ID] = []
+                    if case .sectionHeader = item.kind { chunk = chunkMemberIDs(forHeader: item.id, rows: visible.map(\.asRow)) }
+                    dragState = DragInfo(source: item.id, chunkIDs: chunk, target: nil, translation: .zero)
+                }
+                var ds = dragState!
+                ds.translation = value.translation
+                let geomArr = visible.map { geom($0.id) ?? RowGeom(yOffset: 0, height: 0) }
+                ds.target = resolveDropTarget(atDocY: value.location.y, source: ds.source, rows: visible.map(\.asRow),
+                                              geom: geomArr, mode: style.dragMode, chunkIDs: ds.chunkIDs,
+                                              validate: { _, _ in true })
+                dragState = ds
+            }
+            .onEnded { _ in
+                if let ds = dragState, let target = ds.target {
+                    let members = ds.chunkIDs.isEmpty ? [ds.source] : ds.chunkIDs
+                    onDrop(ListCore.DragContext(sourceID: ds.source, memberIDs: members), target)
+                }
+                dragState = nil
+            }
+    }
+
+    // MARK: drop affordance — computed PER ROW (each row draws relative to itself; no
+    // cross-row geometry). Mirrors drawDropAffordance :1872.
+
+    private func rowDrop(_ id: ID) -> RowDrop? {
+        guard let target = effDropTarget else { return nil }
+        let isChunk = !effDragChunk.isEmpty
+        switch target.placement {
+        case let .onto(tid):
+            return id == tid ? .onto : nil
+        case let .between(beforeID):
+            if let bid = beforeID {
+                guard id == bid else { return nil }
+                return isChunk ? .sectionBarAbove : .betweenAbove
+            } else {                                   // end gap → bottom of the last row
+                guard id == visible.last?.id else { return nil }
+                return isChunk ? .sectionBarBelow : .betweenBelow
+            }
         }
     }
 

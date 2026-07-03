@@ -23,8 +23,14 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
     var surfaceOpaque: Bool = true     // zebra only paints on an opaque surface
     var dividerInset: CGFloat? = nil   // per-row divider leading x (nil = none; 0 = full-bleed above a header)
     var isCollapsed: Bool = false      // collapsible-header caret state (binding- or Kind-driven)
+    var dimmed: Bool = false           // lifted drag source / chunk member (M2c)
+    var drop: RowDrop? = nil           // drop affordance this row draws (M2c)
 
     private var rowSurface: NSColor? { style.surfaceColor ?? palette.background }
+    /// This row's content text x (for a depth-aligned insertion line).
+    private var contentTextX: CGFloat {
+        (style.reservesLeadingImageColumn ? metrics.textXOrigin : metrics.leadingInset) + indentWidth
+    }
 
     // MARK: draw decisions (mirror ThemedList.highlightFillAndAccent :1261)
 
@@ -93,6 +99,40 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
             .background(rowBackground)
             .overlay(alignment: .bottom) { bottomRule }
             .overlay(outlineRing)
+            .opacity(dimmed ? 0.4 : 1)     // lifted drag source / chunk member dims
+            .overlay { dropOverlay }       // drop affordance at full opacity, above the dim
+    }
+
+    // MARK: drop affordance (drawn relative to this row — ThemedList :1872-1911)
+
+    @ViewBuilder private var dropOverlay: some View {
+        switch drop {
+        case .onto:
+            RoundedRectangle(cornerRadius: metrics.roundedRadius).inset(by: 1.5)
+                .fill(Color(nsColor: palette.primary).opacity(0.12))
+                .overlay(RoundedRectangle(cornerRadius: metrics.roundedRadius).inset(by: 1.5)
+                    .stroke(Color(nsColor: palette.primary), lineWidth: 2))
+        case .betweenAbove:  insertionLine(.top)
+        case .betweenBelow:  insertionLine(.bottom)
+        case .sectionBarAbove: sectionBar(.top)
+        case .sectionBarBelow: sectionBar(.bottom)
+        case .none:          EmptyView()
+        }
+    }
+
+    @ViewBuilder private func insertionLine(_ edge: Alignment) -> some View {
+        Rectangle().fill(Color(nsColor: palette.primary)).frame(height: 2)
+            .padding(.leading, contentTextX)
+            .overlay(alignment: .leading) {
+                Circle().fill(Color(nsColor: palette.primary)).frame(width: 6, height: 6)
+                    .offset(x: contentTextX - 3)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: edge)
+    }
+
+    @ViewBuilder private func sectionBar(_ edge: Alignment) -> some View {
+        Rectangle().fill(Color(nsColor: palette.primary)).frame(height: 3)   // coarse full-bleed chunk bar
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: edge)
     }
 
     @ViewBuilder private var rowContent: some View {
