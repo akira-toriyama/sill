@@ -107,9 +107,99 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
                     Color.clear.frame(width: metrics.gapImageToText)
                 }
                 textStack
-                Spacer(minLength: 0)
+                Spacer(minLength: metrics.budgetMargin)
+                trailingCluster
             }
             .padding(.trailing, metrics.trailingInset)
+        }
+    }
+
+    // MARK: trailing cluster (badges in order, then the accessory rightmost — ThemedList :1397-1439)
+
+    @ViewBuilder private var trailingCluster: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(item.badges.enumerated()), id: \.offset) { idx, badge in
+                badgeView(badge).padding(.leading, idx == 0 ? 0 : metrics.badgeGap)
+            }
+            accessoryView
+        }
+        .fixedSize()          // never compress the cluster; the text budget yields instead
+    }
+
+    @ViewBuilder private var accessoryView: some View {
+        let leadGap: CGFloat = item.badges.isEmpty ? 0 : metrics.clusterGap
+        switch item.trailing {
+        case .none:
+            EmptyView()
+        case .chevron:
+            templateGlyph("caret-right", pt: metrics.chevronPt,
+                          color: Color(nsColor: onAccent ? palette.onPrimary(0.55) : palette.tertiary))
+                .padding(.leading, leadGap)
+        case let .shortcut(text):
+            shortcutLozenge(text).padding(.leading, leadGap)
+        case let .custom(img):
+            customAccessory(img).padding(.leading, leadGap)
+        }
+    }
+
+    @ViewBuilder private func badgeView(_ badge: Badge) -> some View {
+        let (fill, ink) = badgeColors(badge.role)
+        HStack(spacing: 3) {
+            if let sym = badge.symbol {
+                Image(nsImage: sym).renderingMode(.template).resizable().scaledToFit()
+                    .frame(width: metrics.badgeSymbolPt, height: metrics.badgeSymbolPt)
+                    .foregroundColor(ink)
+            }
+            Text(badge.text)
+                .font(Font(palette.uiFont(.badge) as CTFont))
+                .foregroundColor(ink)
+        }
+        .padding(.horizontal, metrics.badgeHPad)
+        .frame(height: metrics.badgeHeight)
+        .background(Capsule().fill(fill))
+    }
+
+    /// Badge fill (a @0.16 wash of the role) + ink (the full role color); onAccent flips
+    /// to onPrimary (ThemedList :1508-1516).
+    private func badgeColors(_ role: BadgeRole) -> (fill: Color, ink: Color) {
+        if onAccent { return (Color(nsColor: palette.onPrimary(0.18)), Color(nsColor: palette.onPrimary(1))) }
+        let base: NSColor
+        switch role {
+        case .neutral:   base = palette.muted
+        case .primary:   base = palette.primary
+        case .secondary: base = palette.secondary
+        case .error:     base = palette.error
+        }
+        return (Color(nsColor: base).opacity(0.16), Color(nsColor: base))
+    }
+
+    private func shortcutLozenge(_ text: String) -> some View {
+        Text(text)
+            .font(Font(palette.uiFont(.shortcut) as CTFont))
+            .foregroundColor(Color(nsColor: onAccent ? palette.onPrimary(1) : palette.muted))
+            .padding(.horizontal, metrics.shortcutHPad)
+            .frame(height: metrics.shortcutHeight)
+            .overlay(RoundedRectangle(cornerRadius: metrics.shortcutRadius)
+                .stroke(Color(nsColor: onAccent ? palette.onPrimary(0.4) : palette.border), lineWidth: 1))
+    }
+
+    @ViewBuilder private func customAccessory(_ img: NSImage) -> some View {
+        let w = metrics.badgeHeight * (img.size.width / max(img.size.height, 1))
+        if img.isTemplate {
+            Image(nsImage: img).renderingMode(.template).resizable().scaledToFit()
+                .frame(width: w, height: metrics.badgeHeight)
+                .foregroundColor(Color(nsColor: onAccent ? palette.onPrimary(1) : palette.foreground))
+        } else {
+            Image(nsImage: img).renderingMode(.original).resizable().scaledToFit()
+                .frame(width: w, height: metrics.badgeHeight)
+        }
+    }
+
+    @ViewBuilder private func templateGlyph(_ name: String, pt: CGFloat, color: Color) -> some View {
+        if let img = phosphorImage(name, pt: pt) {
+            Image(nsImage: img).renderingMode(.template).resizable().scaledToFit()
+                .frame(width: pt, height: pt)
+                .foregroundColor(color)
         }
     }
 
