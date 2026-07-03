@@ -13,7 +13,9 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    # macos-26: the package floor is macOS 26 — `swift test` executes the
+    # built binaries, and a macos-15 host cannot load minos-26 images.
+    runs-on: macos-26
     # Bounded so a hung `swift build` can't burn 6 h of free macOS minutes.
     timeout-minutes: 20
     steps:

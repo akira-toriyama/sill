@@ -52,20 +52,20 @@ final class SampleTests: XCTestCase {
         XCTAssertEqual(s.t, 0.5)
     }
 
-    func testSpanIsMaxAbsDisplacementFromFirst() {
+    func testExcursionIsMaxAbsDisplacementFromFirst() {
         let samples = [Sample(x: 0, y: 0, t: 0),
                        Sample(x: 10, y: -3, t: 1),
                        Sample(x: 4, y: 8, t: 2)]
-        let span = samples.span
-        XCTAssertEqual(span.dx, 10)   // |10-0| is the largest x excursion
-        XCTAssertEqual(span.dy, 8)    // |8-0| is the largest y excursion
+        let excursion = samples.excursion
+        XCTAssertEqual(excursion.dx, 10)   // |10-0| is the largest x excursion
+        XCTAssertEqual(excursion.dy, 8)    // |8-0| is the largest y excursion
     }
 
-    func testSpanOfEmptyIsZero() {
+    func testExcursionOfEmptyIsZero() {
         let empty: [Sample] = []
-        let span = empty.span
-        XCTAssertEqual(span.dx, 0)
-        XCTAssertEqual(span.dy, 0)
+        let excursion = empty.excursion
+        XCTAssertEqual(excursion.dx, 0)
+        XCTAssertEqual(excursion.dy, 0)
     }
 
     func testEquatable() {

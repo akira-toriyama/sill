@@ -82,7 +82,10 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
             }
             .focusable()
             .focused($isFocused)
-            .modifier(ReturnKeyActivation { if let c = cursor { onActivate?(c) } })
+            .onKeyPress(.return) {
+                if let c = cursor { onActivate?(c); return .handled }
+                return .ignored
+            }
             .onMoveCommand { move($0) }
             .onAppear { recomputeColumns(width: crossWidth(geo)) }
             .onChange(of: geo.size) { _ in recomputeColumns(width: crossWidth(geo)) }
@@ -228,17 +231,5 @@ private struct AspectModifier: ViewModifier {
     func body(content: Content) -> some View {
         if let ratio { content.aspectRatio(ratio, contentMode: .fit) }
         else { content }
-    }
-}
-
-/// Return-key activation, available only on macOS 14+ (onKeyPress). A no-op on 13.
-private struct ReturnKeyActivation: ViewModifier {
-    let action: () -> Void
-    func body(content: Content) -> some View {
-        if #available(macOS 14.0, *) {
-            content.onKeyPress(.return) { action(); return .handled }
-        } else {
-            content
-        }
     }
 }

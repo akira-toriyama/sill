@@ -44,4 +44,4 @@ swift build          # fast compile check (CommandLineTools)
 scripts/test.sh      # XCTest suite — runs locally via an installed Xcode; also in CI
 ```
 
-macOS 13+ · Swift 6.
+macOS 26+ · Swift 6.
