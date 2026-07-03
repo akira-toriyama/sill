@@ -92,9 +92,11 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     @FocusState private var focused: Bool            // standalone keyboard focus (.onKeyPress)
 
     // Drag/reorder (M2c) — the live lift + the per-row geometry the pure resolvers consume.
-    private struct DragInfo { var source: ID; var chunkIDs: [ID]; var target: ListCore.DropTarget<ID>?; var translation: CGSize }
+    private struct DragInfo { var source: ID; var chunkIDs: [ID]; var target: ListCore.DropTarget<ID>?; var location: CGPoint; var isKeyboard: Bool = false }
     @State private var dragState: DragInfo?
     @State private var geomMap: [AnyHashable: RowGeom] = [:]
+    @State private var dragAim: [ListCore.DropTarget<ID>] = []   // ordered keyboard-drag targets
+    @State private var dragAimIndex = 0
 
     private var metrics: ListMetrics { .forDensity(style.density) }
     private var visible: [ListItem<ID>] { ListItem.visibleRows(items, collapsed: collapsed) }
@@ -260,17 +262,23 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
             .scrollTargetLayout()
             .coordinateSpace(.named(themedListContentSpace))
             .onPreferenceChange(RowGeomPreference.self) { geomMap = $0 }
+            .overlay { dragGhostLayer }
         }
         .scrollIndicators(.hidden)
         .scrollPosition($scrollPos)
         .background(surfaceBackground)
         .focusable(style.selectionMode != .none)          // standalone lists take keyboard focus
         .focused($focused)
-        .onKeyPress(.upArrow)   { moveHighlight(-1); return .handled }
-        .onKeyPress(.downArrow) { moveHighlight(1);  return .handled }
-        .onKeyPress(.return)    { activateHighlight(); return .handled }
-        .onKeyPress(.escape)    { highlight = nil; return .handled }
-        .onKeyPress(.space)     { spacePressed(); return .handled }
+        .onKeyPress(.upArrow)   { if keyboardDragging { aimKeyboard(-1) } else { moveHighlight(-1) }; return .handled }
+        .onKeyPress(.downArrow) { if keyboardDragging { aimKeyboard(1) }  else { moveHighlight(1) };  return .handled }
+        .onKeyPress(.return)    { if keyboardDragging { commitDrag() } else { activateHighlight() }; return .handled }
+        .onKeyPress(.escape)    { if keyboardDragging { cancelDrag() } else { highlight = nil }; return .handled }
+        .onKeyPress(.space)     {
+            if keyboardDragging { commitDrag() }
+            else if style.draggable && highlight != nil { liftKeyboard() }
+            else { spacePressed() }
+            return .handled
+        }
         .overlay {
             if focused {
                 RoundedRectangle(cornerRadius: 4).inset(by: 1)   // Radius.sm; matches AppKit managesFirstResponder ring
@@ -353,10 +361,10 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                 if dragState == nil {
                     var chunk: [ID] = []
                     if case .sectionHeader = item.kind { chunk = chunkMemberIDs(forHeader: item.id, rows: visible.map(\.asRow)) }
-                    dragState = DragInfo(source: item.id, chunkIDs: chunk, target: nil, translation: .zero)
+                    dragState = DragInfo(source: item.id, chunkIDs: chunk, target: nil, location: value.location)
                 }
                 var ds = dragState!
-                ds.translation = value.translation
+                ds.location = value.location
                 let geomArr = visible.map { geom($0.id) ?? RowGeom(yOffset: 0, height: 0) }
                 ds.target = resolveDropTarget(atDocY: value.location.y, source: ds.source, rows: visible.map(\.asRow),
                                               geom: geomArr, mode: style.dragMode, chunkIDs: ds.chunkIDs,
@@ -374,6 +382,64 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
 
     // MARK: drop affordance — computed PER ROW (each row draws relative to itself; no
     // cross-row geometry). Mirrors drawDropAffordance :1872.
+
+    // SwiftUI drag ghost — follows the pointer during a live lift; REPLACES the AppKit
+    // DragGhost child window (an in-bounds overlay, so it's screencaptureable + no window).
+    @ViewBuilder private var dragGhostLayer: some View {
+        if let ds = dragState, preview == nil {
+            let count = ds.chunkIDs.isEmpty ? 1 : ds.chunkIDs.count
+            let title = items.first { $0.id == ds.source }?.primary ?? ""
+            HStack(spacing: 6) {
+                Text(title).font(Font(palette.uiFont(.body) as CTFont)).lineLimit(1)
+                    .foregroundColor(Color(nsColor: palette.foreground))
+                if count > 1 {
+                    Text("\(count)")
+                        .font(Font(palette.uiFont(.badge) as CTFont))
+                        .foregroundColor(Color(nsColor: palette.onPrimary(1)))
+                        .padding(.horizontal, 7).frame(height: 16)
+                        .background(Capsule().fill(Color(nsColor: palette.primary)))
+                }
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: palette.background ?? .windowBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: palette.primary), lineWidth: 1))
+            .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
+            .position(ds.location)
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        }
+    }
+
+    // MARK: keyboard drag (lift / aim / commit / cancel — ThemedList handleDragKey)
+
+    private var keyboardDragging: Bool { dragState?.isKeyboard == true }
+
+    private func liftKeyboard() {
+        guard style.draggable, let h = highlight else { return }
+        var chunk: [ID] = []
+        if let item = visible.first(where: { $0.id == h }), case .sectionHeader = item.kind {
+            chunk = chunkMemberIDs(forHeader: h, rows: visible.map(\.asRow))
+        }
+        dragAim = dragCandidates(source: h, rows: visible.map(\.asRow), mode: style.dragMode,
+                                 chunkIDs: chunk, validate: { _, _ in true })
+        dragAimIndex = 0
+        dragState = DragInfo(source: h, chunkIDs: chunk, target: dragAim.first, location: .zero, isKeyboard: true)
+    }
+
+    private func aimKeyboard(_ delta: Int) {
+        guard keyboardDragging, !dragAim.isEmpty else { return }
+        dragAimIndex = max(0, min(dragAim.count - 1, dragAimIndex + delta))
+        dragState?.target = dragAim[dragAimIndex]
+    }
+
+    private func commitDrag() {
+        guard let ds = dragState, let target = ds.target else { cancelDrag(); return }
+        let members = ds.chunkIDs.isEmpty ? [ds.source] : ds.chunkIDs
+        onDrop(ListCore.DragContext(sourceID: ds.source, memberIDs: members), target)
+        cancelDrag()
+    }
+
+    private func cancelDrag() { dragState = nil; dragAim = []; dragAimIndex = 0 }
 
     private func rowDrop(_ id: ID) -> RowDrop? {
         guard let target = effDropTarget else { return nil }
