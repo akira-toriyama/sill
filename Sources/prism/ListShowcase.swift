@@ -127,9 +127,10 @@ private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedLi
 }
 
 // A nested tree: collapsible section headers at varying `indentLevel` + indented
-// rows. Shows the indent steps (level 1 / 2), both disclosure states (▾ expanded /
-// ▸ collapsed) on a 2-line AND a 1-line header, and a collapsed section whose child
-// rows the HOST simply omits (the kit hides nothing itself — host owns the shape).
+// rows. Shows the indent steps (level 1 / 2), the disclosure caret (▾ / ▸), and — with
+// a live `collapsed` binding — animated collapse: clicking a header rotates its caret
+// and animates its child rows in/out (ListCore.toggleSection + flattenVisible). All
+// child rows are PRESENT; the kit hides the collapsed ones via the binding.
 @MainActor private func treeItems() -> [ThemeKitUI.ListItem<String>] {
     [
         ThemeKitUI.ListItem(id: "proj", primary: "Project",
@@ -140,9 +141,12 @@ private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedLi
         ThemeKitUI.ListItem(id: "f1", image: glyph("file-code", 16), primary: "ThemedList.swift", indentLevel: 2),
         ThemeKitUI.ListItem(id: "f2", image: glyph("file-code", 16), primary: "ThemedMenu.swift", indentLevel: 2),
         ThemeKitUI.ListItem(id: "build", primary: "build",
-                 kind: .sectionHeader(collapsed: true), indentLevel: 1),    // collapsed — children omitted
-        ThemeKitUI.ListItem(id: "archive", primary: "Archive",
-                 kind: .sectionHeader(collapsed: true)),                     // collapsed — children omitted
+                 kind: .sectionHeader(collapsed: false), indentLevel: 1),
+        ThemeKitUI.ListItem(id: "b1", image: glyph("file-code", 16), primary: "Debug",   indentLevel: 2),
+        ThemeKitUI.ListItem(id: "b2", image: glyph("file-code", 16), primary: "Release", indentLevel: 2),
+        ThemeKitUI.ListItem(id: "archive", primary: "Archive", kind: .sectionHeader(collapsed: false)),
+        ThemeKitUI.ListItem(id: "a1", image: glyph("file-text", 16), primary: "2024.zip", indentLevel: 1),
+        ThemeKitUI.ListItem(id: "a2", image: glyph("file-text", 16), primary: "2023.zip", indentLevel: 1),
     ]
 }
 
@@ -164,6 +168,8 @@ private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedLi
 
 struct MockList: View {
     let p: ResolvedPalette
+    // Live collapse state for the tree cell — clicking a header animates via this binding.
+    @State private var treeCollapsed: Set<String> = ["build", "archive"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -262,8 +268,9 @@ struct MockList: View {
             }
 
             HStack(alignment: .top, spacing: 20) {
-                cell("tree · indentLevel + collapsible sections (▾ / ▸)  (animated caret: M2b)") {
+                cell("tree · indent + collapsible sections (click a header → animates ▾ / ▸)") {
                     ThemedListView(items: treeItems(),
+                                   collapsed: $treeCollapsed,
                                    style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true },
                                    palette: p,
                                    preview: ListPreview(selection: ["f1"]))

@@ -22,6 +22,7 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
     var zebraOdd: Bool = false         // parity from ThemedListView (resets per section)
     var surfaceOpaque: Bool = true     // zebra only paints on an opaque surface
     var dividerInset: CGFloat? = nil   // per-row divider leading x (nil = none; 0 = full-bleed above a header)
+    var isCollapsed: Bool = false      // collapsible-header caret state (binding- or Kind-driven)
 
     private var rowSurface: NSColor? { style.surfaceColor ?? palette.background }
 
@@ -99,10 +100,16 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
         case .separator:
             Color.clear.overlay(Rectangle().fill(Color(nsColor: palette.border)).frame(height: 1))
         case let .sectionHeader(subtitle, _):
-            headerContent(subtitle: subtitle)
-                .padding(.leading, metrics.leadingInset + indentWidth + (isCollapsibleHeader ? metrics.disclosureGutter : 0))
-                .padding(.trailing, metrics.trailingInset)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 0) {
+                if isCollapsibleHeader {
+                    disclosureCaret
+                    Color.clear.frame(width: metrics.disclosureGap)
+                }
+                headerContent(subtitle: subtitle)
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, metrics.leadingInset + indentWidth)
+            .padding(.trailing, metrics.trailingInset)
         case .row:
             HStack(spacing: 0) {
                 Color.clear.frame(width: metrics.leadingInset + indentWidth)
@@ -205,6 +212,14 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
                 .frame(width: pt, height: pt)
                 .foregroundColor(color)
         }
+    }
+
+    /// A single caret-down glyph that ROTATES to ▸ when collapsed (the M2 improvement
+    /// over the AppKit widget's static two-glyph swap).
+    private var disclosureCaret: some View {
+        templateGlyph("caret-down", pt: metrics.disclosurePt, color: Color(nsColor: palette.muted))
+            .rotationEffect(.degrees(isCollapsed ? -90 : 0))
+            .animation(.easeInOut(duration: 0.2), value: isCollapsed)
     }
 
     // MARK: leading image (template tint via .template render == AppKit .sourceAtop; colour favicon as-is)

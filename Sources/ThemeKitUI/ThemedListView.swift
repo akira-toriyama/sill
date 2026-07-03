@@ -37,7 +37,7 @@ public struct ListPreview<ID: Hashable & Sendable> {
 public struct ThemedListView<ID: Hashable & Sendable>: View {
     let items: [ListItem<ID>]
     @Binding var selection: Set<ID>
-    @Binding var expanded: Set<ID>          // collapsed-section set: id ∈ set ⇒ that header is collapsed
+    @Binding var collapsed: Set<ID>          // collapsed-section set: id ∈ set ⇒ that header is collapsed
     @Binding var highlight: ID?
     let style: ThemedListStyle
     let palette: ResolvedPalette
@@ -54,7 +54,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
 
     public init(items: [ListItem<ID>],
                 selection: Binding<Set<ID>> = .constant([]),
-                expanded: Binding<Set<ID>> = .constant([]),
+                collapsed: Binding<Set<ID>> = .constant([]),
                 highlight: Binding<ID?> = .constant(nil),
                 style: ThemedListStyle = ThemedListStyle(),
                 palette: ResolvedPalette,
@@ -70,7 +70,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                 preview: ListPreview<ID>? = nil) {
         self.items = items
         self._selection = selection
-        self._expanded = expanded
+        self._collapsed = collapsed
         self._highlight = highlight
         self.style = style
         self.palette = palette
@@ -91,7 +91,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     @State private var scrollPos = ScrollPosition(edge: .top)   // frozen-preview scroll offset
 
     private var metrics: ListMetrics { .forDensity(style.density) }
-    private var visible: [ListItem<ID>] { ListItem.visibleRows(items, collapsed: expanded) }
+    private var visible: [ListItem<ID>] { ListItem.visibleRows(items, collapsed: collapsed) }
     private var effectiveSelection: Set<ID> { preview?.selection ?? selection }
     private var effectiveHighlight: ID? { preview?.highlight ?? highlight }
 
@@ -164,18 +164,32 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                       isHovered: preview == nil && hoveredID == item.id,
                       zebraOdd: parity[item.id] ?? false,
                       surfaceOpaque: opaque,
-                      dividerInset: dividers[item.id])
+                      dividerInset: dividers[item.id],
+                      isCollapsed: headerIsCollapsed(item))
             .contentShape(Rectangle())
             .onTapGesture { handleTap(item) }
             .onHover { handleHover(item, $0) }
+            .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     // MARK: interaction (inert under a frozen `preview` / constant bindings)
 
+    /// A header is collapsed if the binding says so (view-managed) OR its declared Kind
+    /// says so (host-managed / prism static). Drives the caret + row visibility.
+    private func headerIsCollapsed(_ item: ListItem<ID>) -> Bool {
+        if collapsed.contains(item.id) { return true }
+        if case let .sectionHeader(_, c) = item.kind { return c == true }
+        return false
+    }
+
     private func handleTap(_ item: ListItem<ID>) {
         switch item.kind {
-        case let .sectionHeader(_, collapsed):
-            if collapsed != nil, !item.isDisabled { onToggleSection(item.id) }   // collapse animates in M2b
+        case let .sectionHeader(_, kindCollapsed):
+            guard kindCollapsed != nil, !item.isDisabled else { return }   // collapsible only
+            withAnimation(.easeInOut(duration: 0.2)) {
+                collapsed = toggleSection(item.id, in: collapsed)          // ListCore — animates the row diff + caret
+            }
+            onToggleSection(item.id)
         case .row where !item.isDisabled:
             if style.selectionMode == .none { onActivate(item.id); return }
             let r = ThemedListSelect.click(id: item.id, current: selection, anchor: selectionAnchor,

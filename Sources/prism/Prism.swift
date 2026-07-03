@@ -23,8 +23,14 @@ enum Prism {
         let app = NSApplication.shared
         app.setActivationPolicy(.regular)
 
+        // Window size — default 1120×820 (×uiScale); `PRISM_WINDOW_W` / `PRISM_WINDOW_H`
+        // override it (a screenshot seam so a tall capture can frame every card at once,
+        // matching prism's other PRISM_* env knobs).
+        let env = ProcessInfo.processInfo.environment
+        let winW = env["PRISM_WINDOW_W"].flatMap(Double.init).map { CGFloat($0) } ?? 1120 * uiScale
+        let winH = env["PRISM_WINDOW_H"].flatMap(Double.init).map { CGFloat($0) } ?? 820 * uiScale
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1120 * uiScale, height: 820 * uiScale),
+            contentRect: NSRect(x: 0, y: 0, width: winW, height: winH),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered, defer: false)
         window.title = "prism — sill theme preview"
