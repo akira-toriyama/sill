@@ -15,8 +15,6 @@ public final class ListController<ID: Hashable & Sendable> {
     public var selection: Set<ID> = []
     public var query: String = ""
     public var noOptionsText: String = "No options"
-    /// Deterministic still-capture seam (mirrors `ThemedList.previewHighlight`).
-    public var previewHighlight: ID?
     public var style = ThemedListStyle()
     /// When set, an empty `items` offers ONE synthetic actionable row (the combo's
     /// "create ‹query›"). Returns the row's label, or nil to keep the empty state inert.

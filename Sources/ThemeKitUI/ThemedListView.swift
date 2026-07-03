@@ -47,6 +47,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     var onHover: (ID?) -> Void
     var onDrop: (ListCore.DragContext<ID>, ListCore.DropTarget<ID>) -> Void
     var onEmptyAction: (String) -> Void
+    var onRowRects: ([ID: CGRect]) -> Void        // hosted popup: per-row viewport frames → host hit-test
     var emptyActionRow: ((String) -> String?)?
     var query: String
     var noOptionsText: String
@@ -64,6 +65,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                 onHover: @escaping (ID?) -> Void = { _ in },
                 onDrop: @escaping (ListCore.DragContext<ID>, ListCore.DropTarget<ID>) -> Void = { _, _ in },
                 onEmptyAction: @escaping (String) -> Void = { _ in },
+                onRowRects: @escaping ([ID: CGRect]) -> Void = { _ in },
                 emptyActionRow: ((String) -> String?)? = nil,
                 query: String = "",
                 noOptionsText: String = "No options",
@@ -80,6 +82,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         self.onHover = onHover
         self.onDrop = onDrop
         self.onEmptyAction = onEmptyAction
+        self.onRowRects = onRowRects
         self.emptyActionRow = emptyActionRow
         self.query = query
         self.noOptionsText = noOptionsText
@@ -177,9 +180,11 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                       dimmed: dimmedIDs.contains(item.id),
                       drop: rowDrop(item.id))
             .reportRowGeom(item.id)
+            .reportRowRect(item.id, when: style.hosted)
             .contentShape(Rectangle())
-            .onTapGesture { handleTap(item) }
-            .onHover { handleHover(item, $0) }
+            .modifier(StandaloneRowInteraction(active: !style.hosted,
+                                               onTap: { handleTap(item) },
+                                               onHover: { handleHover(item, $0) }))
             .modifier(OptionalDrag(active: style.draggable && isDragSource(item), gesture: dragGesture(item)))
             .transition(.opacity.combined(with: .move(edge: .top)))
     }
@@ -266,6 +271,12 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         }
         .scrollIndicators(.hidden)
         .scrollPosition($scrollPos)
+        .coordinateSpace(.named(themedListViewportSpace))          // hosted hit-test (M3)
+        .onPreferenceChange(RowRectPreference.self) { rects in
+            onRowRects(Dictionary(uniqueKeysWithValues: rects.compactMap { key, rect in
+                (key.base as? ID).map { ($0, rect) }
+            }))
+        }
         .background(surfaceBackground)
         .focusable(style.selectionMode != .none)          // standalone lists take keyboard focus
         .focused($focused)
