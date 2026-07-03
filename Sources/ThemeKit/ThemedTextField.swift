@@ -706,8 +706,9 @@ extension ThemedTextField {
     }
 
     /// The GROUND-TRUTH first-responder state (field or its field editor), for an
-    /// embedding ThemedComboBox to assert the popup never stole focus.
-    var isFirstResponderNow: Bool { isFieldFirstResponder }
+    /// embedding ThemedComboBox to assert the popup never stole focus. `public` since
+    /// #17b M3 moved `ThemedComboBox` to ThemeKitUI (it reads this across the module edge).
+    public var isFirstResponderNow: Bool { isFieldFirstResponder }
 
     /// The supporting/helper-line font — `.secondaryBody` (11pt medium),
     /// the #8 readability fix. Distinct code path from the floated label.

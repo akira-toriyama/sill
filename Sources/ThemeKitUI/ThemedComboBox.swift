@@ -1,6 +1,6 @@
-// ThemeKit — ThemedComboBox: an MUI <Autocomplete> (basic) for the family. A
+// ThemeKitUI — ThemedComboBox: an MUI <Autocomplete> (basic) for the family. A
 // single-line filter field with a themed drop-down list of options. Themed by
-// assigning a PaletteKit `ResolvedPalette`. AppKit / @MainActor.
+// assigning a PaletteKit `ResolvedPalette`. AppKit shell + SwiftUI list / @MainActor.
 //
 // It is a per-field CONTROLLER (like `ThemedTooltip`, NOT an NSView): it COMPOSES
 // a real `ThemedTextField` as its visible control (so cmd+a/c/v/x/z, the field
@@ -9,19 +9,19 @@
 // responder THROUGHOUT — the panel never becomes key — so typing keeps working
 // while the list is up and clickable.
 //
-// The drop-down rows are a HOSTED `ThemedList` (`.comfortable` density == the
-// combo's 30 pt row), NOT a private row painter: 0.31 dropped the bespoke
-// `ComboListView` for the shared list once it shipped (0.29) the public nav
-// surface (`moveHighlight`/`activateHighlight`/`clearHighlight`/`highlightedID`)
-// + the actionable empty row this control needs. The list is configured
-// `selectionMode = .none` (the COMBO owns the committed selection; the dropdown
-// only ever HIGHLIGHTS) · `hoverStyle = .wash` (selection wash + a `primary`
-// accent bar that reads on neon) · `wrapsHighlight` · `highlightFollowsHover` ·
-// `managesFirstResponder = false` (so the FIELD keeps first responder and the
-// combo forwards ↑↓/⏎ into the list). The load-bearing discipline is UNCHANGED:
-// the panel is INTERACTIVE (`ignoresMouseEvents = false`) and the list commits a
-// row click SYNCHRONOUSLY on `mouseUp` (`onActivate`) so the value lands before
-// the field's (async, next-tick) focus reconcile can run.
+// #17b M3: the drop-down rows are now the SwiftUI-native `ThemedListView` (via
+// `HostedThemedList`/`ListController`, hosted in a `HostingListView`), NOT the AppKit
+// `ThemedList`. That move is WHY this widget lives in ThemeKitUI (the SwiftUI front)
+// while its non-key `PopupPanel` shell + `ThemedTextField` field-editor come from
+// ThemeKit (the AppKit floors it depends on) — the reverse edge would cycle. The
+// controller is configured `selectionMode = .none` (the COMBO owns the committed
+// pick; the dropdown only HIGHLIGHTS) · `hoverStyle = .wash` (+ a `primary` accent
+// bar that reads on neon) · `wrapsHighlight` · `highlightFollowsHover` · `hosted`
+// (the field keeps first responder; the combo forwards ↑↓/⏎ into the controller and
+// the AppKit `mouseUp` commits a row click SYNCHRONOUSLY so the value lands before
+// the field's async next-tick focus reconcile). The empty / actionable-empty rows
+// are modelled as sentinel-id `ListItem`s (see `emptyActionRowID`/`noOptionsRowID`),
+// reusing the list's normal row draw + hit-test.
 //
 // Canonical roles only: `background` (surface) · `border` (edge) · `foreground`
 // (row text) · `selection` (highlight wash) + a `primary` accent bar so the
@@ -34,6 +34,7 @@ import Palette
 import PaletteKit
 import Motion
 import ListCore
+import ThemeKit          // PopupPanel/themedPopupPanel/placePopup/PopupFade/PopupGlue shell + ThemedTextField field (AppKit floors)
 
 @MainActor
 public final class ThemedComboBox: NSObject {
@@ -116,7 +117,7 @@ public final class ThemedComboBox: NSObject {
 
     /// Shown as a single non-selectable row when the filter matches nothing AND
     /// `emptyActionRow` is nil (or returns nil for the query).
-    public var noOptionsText = "No options" { didSet { list?.noOptionsText = noOptionsText } }
+    public var noOptionsText = "No options" { didSet { if isOpen { syncList() } } }
 
     /// OPT-IN actionable empty state. When the filter matches NOTHING, this is
     /// called with the live query; return a row label (e.g. facet's
@@ -174,7 +175,16 @@ public final class ThemedComboBox: NSObject {
 
     private var panel: PopupPanel?
     private let container = NSView()             // rounded, bordered popup surface
-    private var list: ThemedList!                // hosted shared list (replaces the private ComboListView)
+    // #17b M3: the SwiftUI list, driven imperatively via `controller`, hosted in an
+    // AppKit `HostingListView` (its `mouseUp` does the synchronous row-click commit).
+    private let controller = ListController<String>()
+    private var hosting: HostingListView<String>!
+
+    /// Sentinel row ids for the empty states (the SwiftUI list draws + hit-tests them
+    /// as normal rows; `controller.onActivate` routes them). Chosen to never collide
+    /// with a real option id.
+    static let emptyActionRowID = "\u{7f}combo.emptyAction"
+    static let noOptionsRowID   = "\u{7f}combo.noOptions"
 
     private var isOpen = false
     private var isInvalidated = false
@@ -262,16 +272,41 @@ public final class ThemedComboBox: NSObject {
         // container edge + surface are ALSO read back by `comboProbe` as the real
         // rendered state, so keep painting them here even though the hosted list
         // paints its own surface on top.
-        layerTxn(animated: false) {
-            container.layer?.backgroundColor = listSurface.cgColor
-            container.layer?.borderColor = palette.border.cgColor
-        }
-        list?.palette = palette
-        list?.surfaceColor = listSurface
+        // Snap (no implicit cross-fade) — a theme switch must not smear the surface.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        container.layer?.backgroundColor = listSurface.cgColor
+        container.layer?.borderColor = palette.border.cgColor
+        CATransaction.commit()
+        rehostList()          // re-render the SwiftUI list with the new palette + surface
     }
 
     private var listSurface: NSColor {
         surfaceColor ?? palette.background ?? .textBackgroundColor
+    }
+
+    /// The dropdown's list config — `.none` selection (combo owns the pick), wash +
+    /// accent-bar highlight, wrap, hover-drives-highlight, image-less flush rows,
+    /// and `hosted` (AppKit `mouseUp` owns the click; the SwiftUI rows are inert).
+    private func comboListStyle() -> ThemedListStyle {
+        var style = ThemedListStyle()
+        style.density = .comfortable
+        style.selectionMode = .none
+        style.hoverStyle = .wash
+        style.wrapsHighlight = true
+        style.highlightFollowsHover = true
+        style.showsDividers = false
+        style.reservesLeadingImageColumn = false   // option rows carry no image → text flush at leadingInset
+        style.surfaceColor = listSurface
+        style.hosted = true
+        return style
+    }
+
+    /// Re-render the hosted SwiftUI list (palette/surface live in the value-typed
+    /// root, so a theme change rebuilds it; `@Bindable` handles items/highlight).
+    private func rehostList() {
+        controller.style = comboListStyle()
+        hosting?.rootView = HostedThemedList(controller: controller, style: controller.style, palette: palette)
     }
 
     // MARK: - Options / filter / selection
@@ -332,25 +367,35 @@ public final class ThemedComboBox: NSObject {
     /// with), the highlight, hover, dividers and drawing. A no-op before the panel
     /// (and its list) is lazily created.
     private func syncList() {
-        guard let list else { return }
-        list.noOptionsText = noOptionsText
-        list.query = field.stringValue
-        list.items = filtered.map {
-            ListItem(id: $0.id, primary: $0.label, isDisabled: isDisabled($0))
+        controller.query = field.stringValue
+        if filtered.isEmpty {
+            // Model the empty state as ONE sentinel row so the list's normal row draw
+            // + hit-test cover it: an ENABLED actionable row (→ onEmptyAction) when the
+            // consumer offers one, else the inert `tertiary` "No options" row.
+            if let label = emptyActionText {
+                controller.items = [ListItem(id: Self.emptyActionRowID, primary: label)]
+            } else {
+                controller.items = [ListItem(id: Self.noOptionsRowID, primary: noOptionsText, isDisabled: true)]
+            }
+        } else {
+            controller.items = filtered.map {
+                ListItem(id: $0.id, primary: $0.label, isDisabled: isDisabled($0))
+            }
         }
         syncPreviewHighlight()
     }
 
-    /// Forward the combo's index-based `previewHighlight` to the list's id-based
-    /// one (the action row maps to its synthetic id).
+    /// Forward the combo's index-based `previewHighlight` (capture/test override) to the
+    /// controller's id-based highlight; the action row maps to its sentinel id. A nil
+    /// `previewHighlight` leaves the LIVE highlight untouched.
     private func syncPreviewHighlight() {
-        guard let list else { return }
+        guard previewHighlight != nil else { return }
         if let pv = previewHighlight, !filtered.isEmpty {
-            list.previewHighlight = filtered[max(0, min(pv, filtered.count - 1))].id
-        } else if previewHighlight != nil, isActionRowActive {
-            list.previewHighlight = ThemedList.emptyActionID
+            controller.highlight = filtered[max(0, min(pv, filtered.count - 1))].id
+        } else if isActionRowActive {
+            controller.highlight = Self.emptyActionRowID
         } else {
-            list.previewHighlight = nil
+            controller.highlight = nil
         }
     }
 
@@ -370,7 +415,7 @@ public final class ThemedComboBox: NSObject {
     private func handleFocusChange(_ focused: Bool) {
         if focused {
             onFocusChange?(true)
-            if opensOnFocus { presentPopup(); list?.clearHighlight() }
+            if opensOnFocus { presentPopup(); controller.clearHighlight() }
             return
         }
         // Blur. A row interaction in flight is NOT a real blur — the synchronous
@@ -389,12 +434,13 @@ public final class ThemedComboBox: NSObject {
 
     private func handleReturn() -> Bool {
         guard isOpen else { return false }           // closed → let the host's Return fire
-        // The list's `activateHighlight` commits the highlighted row (firing
-        // `onActivate` → `commitItem`) OR fires the action row (→ `onEmptyAction`);
-        // it fires the action row even when un-highlighted (combo parity). With a
-        // normal list and NO highlight, Enter just closes.
-        if isActionRowActive || list?.highlightedID != nil {
-            list?.activateHighlight()
+        // The action row fires even when un-highlighted (combo parity). Otherwise a
+        // highlighted row commits (`controller.activateHighlight` → `onActivate` →
+        // `commitItem`); with NO highlight, Enter just closes.
+        if isActionRowActive {
+            fireEmptyAction()
+        } else if controller.highlightedID != nil {
+            controller.activateHighlight()
         } else {
             dismissPopup()
         }
@@ -408,14 +454,14 @@ public final class ThemedComboBox: NSObject {
     }
 
     private func handleMoveDown() -> Bool {
-        if !isOpen { presentPopup(); list?.clearHighlight() }
-        list?.moveHighlight(1)
+        if !isOpen { presentPopup(); controller.clearHighlight() }
+        controller.moveHighlight(1)
         return true
     }
 
     private func handleMoveUp() -> Bool {
-        if !isOpen { presentPopup(); list?.clearHighlight() }
-        list?.moveHighlight(-1)
+        if !isOpen { presentPopup(); controller.clearHighlight() }
+        controller.moveHighlight(-1)
         return true
     }
 
@@ -478,7 +524,7 @@ public final class ThemedComboBox: NSObject {
 
     private func toggleOpen() {
         if isOpen { dismissPopup() }
-        else { field.focus(); presentPopup(); list?.clearHighlight() }
+        else { field.focus(); presentPopup(); controller.clearHighlight() }
     }
 
     private func presentPopup(animated: Bool = true, installDismiss: Bool = true) {
@@ -507,7 +553,7 @@ public final class ThemedComboBox: NSObject {
         // blur's clearOnBlur revert + onFocusChange(false). Harmless on the
         // synchronous-commit path (commitItem owns isCommitting + re-asserts focus).
         pointerInPopup = false
-        list?.clearHighlight()
+        controller.clearHighlight()
         stopGlue()
         removeMouseMonitor()
         fadeOut(animated: animated && !reduceMotion)
@@ -543,28 +589,25 @@ public final class ThemedComboBox: NSObject {
         // HIGHLIGHT (selectionMode = .none — the combo owns the committed pick),
         // to wash + accent-bar the highlight (reads on neon), to wrap, and to let
         // the pointer drive the same highlight the arrows do.
-        let l = ThemedList(palette: palette)
-        l.density = .comfortable
-        l.selectionMode = .none
-        l.hoverStyle = .wash
-        l.wrapsHighlight = true
-        l.highlightFollowsHover = true
-        l.managesFirstResponder = false
-        l.showsDividers = false
-        l.reservesLeadingImageColumn = false         // option rows carry no image → text flush at leadingInset (12), like the old ComboListView
-        l.surfaceColor = listSurface
-        l.noOptionsText = noOptionsText
-        l.emptyActionRow = { [weak self] q in self?.emptyActionRow?(q) }
-        l.onActivate = { [weak self] item in self?.commitItem(item.id) }
-        l.onEmptyAction = { [weak self] _ in self?.fireEmptyAction() }
-        // The list never vends per-row mouseEntered/Up to the combo, so drive the
-        // `pointerInPopup` guard off its hover edge (enter ⇒ id, exit ⇒ nil) — the
-        // synchronous mouseUp commit (between which the pointer is necessarily over
-        // a row, so the guard is already raised) is unaffected.
-        l.onHover = { [weak self] id in self?.pointerInPopup = (id != nil) }
-        list = l
+        // Route a row COMMIT (AppKit mouseUp → controller.fireActivate, or Enter →
+        // activateHighlight): a sentinel id fires the actionable-empty action; the
+        // inert "No options" row is a no-op; a real id commits.
+        controller.onActivate = { [weak self] id in
+            guard let self else { return }
+            if id == Self.emptyActionRowID { self.fireEmptyAction() }
+            else if id == Self.noOptionsRowID { /* inert row — no-op */ }
+            else { self.commitItem(id) }
+        }
+        // Drive the `pointerInPopup` guard off the list's hover edge (enter ⇒ id,
+        // exit ⇒ nil) — the synchronous mouseUp commit (pointer necessarily over a
+        // row, so the guard is already raised) is unaffected.
+        controller.onHover = { [weak self] id in self?.pointerInPopup = (id != nil) }
+        controller.style = comboListStyle()
 
-        container.addSubview(l)
+        let root = HostedThemedList(controller: controller, style: controller.style, palette: palette)
+        let h = HostingListView(controller: controller, rootView: root)
+        hosting = h
+        container.addSubview(h)
         p.contentView = container
         p.contentView?.setAccessibilityElement(true)  // the popup IS a listbox (role set by the factory)
         // NOTE (BASIC limitation): the field is marked .comboBox (see init) so
@@ -595,10 +638,10 @@ public final class ThemedComboBox: NSObject {
         else { return }
         flippedAbove = flipped
 
-        // Lay out the inner tree (panel content is NOT flipped → y-up). The list
-        // fills the container inside its 1pt border; it owns its own scrolling.
+        // Lay out the inner tree (panel content is NOT flipped → y-up). The hosted
+        // SwiftUI list fills the container inside its 1pt border; it owns its scrolling.
         container.frame = CGRect(origin: .zero, size: frame.size)
-        list.frame = container.bounds.insetBy(dx: 1, dy: 1)
+        hosting.frame = container.bounds.insetBy(dx: 1, dy: 1)
 
         // Read the scale from the already-on-screen HOST window — the panel isn't
         // ordered in on the first present, so its backingScaleFactor is stale then.
@@ -725,8 +768,9 @@ extension ThemedComboBox {
             if filtered.isEmpty { return isActionRowActive ? 0 : nil }
             return max(0, min(pv, filtered.count - 1))
         }
-        guard let id = list?.highlightedID else { return nil }
-        if id == ThemedList.emptyActionID { return isActionRowActive ? 0 : nil }
+        guard let id = controller.highlightedID else { return nil }
+        if id == Self.emptyActionRowID { return isActionRowActive ? 0 : nil }
+        if id == Self.noOptionsRowID { return nil }
         return filtered.firstIndex(where: { $0.id == id })
     }
 
