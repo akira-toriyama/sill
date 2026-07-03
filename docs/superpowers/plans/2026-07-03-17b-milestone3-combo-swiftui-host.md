@@ -21,6 +21,23 @@
 
 ---
 
+## Revision 2026-07-03 — Option A (cycle resolution) ⚠ SUPERSEDES §File-Structure/Task-3/Task-4 module placement
+
+**Blocker found during Task 3:** the spec §1's "ThemeKit depends on ThemeKitUI (new edge)" is a **circular dependency** — `ThemeKitUI → ThemeKit` already exists and is load-bearing (ThemeKitUI's SwiftUI views wrap the AppKit widgets: `ThemedButton` ×28, `ThemedToolBar` ×17, `ThemedList` ×15 refs). SwiftPM forbids the cycle. The spec §1 also said "ThemedComboBox/ThemedMenu stay in ThemeKit," which contradicts both the cycle and the newer **AppKit policy (CLAUDE.md, 2026-06-30): the 3 AppKit floors — IME field-editor, non-key popup shell, selectable rich-text — live in `ThemeKitUI`.** The combo IS floors #1 (field editor) + #2 (popup shell).
+
+**Resolution (user-approved Option A):** **`ThemedComboBox` moves `ThemeKit → ThemeKitUI`** (its natural home per the AppKit policy). `HostingListView` lives in `ThemeKitUI` too (done, Task 3). ThemeKit keeps the shared popup primitives (`PopupPanel`/`themedPopupPanel`/`placePopup`/`PopupFade`/`PopupGlue` — also used by `ThemedMenu`/`ThemedTooltip`/`WindowShell`, so they can't move without cascading); the moved combo consumes them from ThemeKit (ThemeKitUI→ThemeKit is fine). This sets the pattern for **M4 (menu moves too)** and **M5**.
+
+**Panel-construction sub-decision (Task 4 start):** the primitives combo uses are `internal` to ThemeKit. Two ways for the moved combo to build its panel:
+- **(pref) refactor combo onto the PUBLIC `makeWindowShell(_ spec:) -> ShellPanel`** (WindowShell.swift:133, the #17i public shell) — keeps ThemeKit's encapsulation; combo stops using the internal `themedPopupPanel`. Verify `makeWindowShell` covers: non-activating + non-key + interactive (`ignoresMouseEvents=false`) + `.list` AX role + fade + `.anchorWidthBelow` placement + outside-click/Esc dismissal (PopupGlue).
+- **(fallback) publicize** `themedPopupPanel`/`PopupPanel`/`placePopup`/`PopupPlacement(Result)`/`PopupFade`/`PopupGlue` and keep the combo's current panel code verbatim. Mechanical, but expands ThemeKit's public surface (partly undoing #17i's encapsulation).
+- **`ThemedTextField` is already `public`** with its full combo-facing API (`onMoveDown/onMoveUp/onReturn/onEscape`, `focus(selectingAll:)`, `announceAccessibilityValue`) — the field needs NO publicize work.
+
+**Revised file placement (overrides the list below):** `HostingListView` → `Sources/ThemeKitUI/HostingListView.swift` (done). `HostedThemedList` → `Sources/ThemeKitUI/HostedThemedList.swift` (done, replaces the convenience-init idea — `@Bindable` observation drives re-render, so NO manual `rehostRoot`). Task 4 `Move:` `Sources/ThemeKit/ThemedComboBox.swift` → `Sources/ThemeKitUI/ThemedComboBox.swift`; `Tests/ThemeKitTests/ThemedComboBoxTests.swift` → `Tests/ThemeKitUITests/ThemedComboBoxTests.swift` (+ Package.swift: ThemeKitUITests already deps ThemeKit/ListCore ✓). The `ThemedComboBoxView` SwiftUI bridge is already in ThemeKitUI (now same-module as the widget).
+
+**Status:** Tasks 1-3 shipped (ListController + hosted ThemedListView + HostingListView, all in ThemeKitUI, build+tests green). Next = Task 4 (the move+rewire) then Task 5 (prism live gate).
+
+---
+
 ## File Structure
 
 - **`Sources/ThemeKitUI/ListController.swift`** (NEW) — `@Observable @MainActor final class ListController<ID>`. The imperative popup driver: `items`/`highlight`/`selection`/`query`/`noOptionsText`/`previewHighlight`, the `moveHighlight`/`activateHighlight`/`clearHighlight`/`highlightedID` contract (→ `ListCore`), the `onActivate`/`onEmptyAction`/`onHover` callbacks, and the `rowRects: [ID: CGRect]` hit-test map + `row(at:)` resolver the AppKit host reads.
