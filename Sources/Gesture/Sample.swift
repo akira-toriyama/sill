@@ -18,9 +18,10 @@ public struct Sample: Sendable, Equatable {
 
 extension Array where Element == Sample {
     /// Largest absolute displacement from the FIRST sample on each axis.
-    /// Diagnostic for "why was nothing recognised" — a tiny span means the
-    /// user barely moved.
-    public var span: (dx: Double, dy: Double) {
+    /// Diagnostic for "why was nothing recognised" — a tiny excursion means
+    /// the user barely moved. (Named `excursion`, not `span`: the macOS 26
+    /// stdlib added `Array.span`, which makes any `span` member ambiguous.)
+    public var excursion: (dx: Double, dy: Double) {
         guard let first = first else { return (0, 0) }
         var dx = 0.0, dy = 0.0
         for s in self {

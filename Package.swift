@@ -22,14 +22,18 @@
 // `ThemeSpec` (NOT `Palette`), so there is no module/type collision
 // and no umbrella-typealias dance is needed.
 //
-// macOS 13+ (facet's floor). Linkage is AUTOMATIC (no `type:`) so the
-// consuming app picks static vs dynamic.
+// macOS 26+ (t-tbar floor bump; consumers adopt when they next bump their
+// sill pin). Spelled ".macOS("26.0")" — the string form is the only one both
+// toolchains accept: CLT's PackageDescription 6.1 lacks the `.v26` case, and
+// raising swift-tools-version to 6.2 would break CLT manifest parsing.
+// Linkage is AUTOMATIC (no `type:`) so the consuming app picks static vs
+// dynamic.
 
 import PackageDescription
 
 let package = Package(
     name: "sill",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS("26.0")],
     products: [
         .library(name: "Palette", targets: ["Palette"]),
         .library(name: "PaletteKit", targets: ["PaletteKit"]),
