@@ -86,6 +86,10 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         self.preview = preview
     }
 
+    @State private var selectionAnchor: ID?          // sticky anchor for shift-range (M2b)
+    @State private var hoveredID: ID?                // pointer veil + highlightFollowsHover
+    @State private var scrollPos = ScrollPosition(edge: .top)   // frozen-preview scroll offset
+
     private var metrics: ListMetrics { .forDensity(style.density) }
     private var visible: [ListItem<ID>] { ListItem.visibleRows(items, collapsed: expanded) }
     private var effectiveSelection: Set<ID> { preview?.selection ?? selection }
@@ -157,10 +161,45 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         ThemedListRow(item: item, metrics: metrics, style: style, palette: palette,
                       isSelected: effectiveSelection.contains(item.id),
                       isHighlighted: effectiveHighlight == item.id,
-                      isHovered: false,                    // wired in Task 8
+                      isHovered: preview == nil && hoveredID == item.id,
                       zebraOdd: parity[item.id] ?? false,
                       surfaceOpaque: opaque,
                       dividerInset: dividers[item.id])
+            .contentShape(Rectangle())
+            .onTapGesture { handleTap(item) }
+            .onHover { handleHover(item, $0) }
+    }
+
+    // MARK: interaction (inert under a frozen `preview` / constant bindings)
+
+    private func handleTap(_ item: ListItem<ID>) {
+        switch item.kind {
+        case let .sectionHeader(_, collapsed):
+            if collapsed != nil, !item.isDisabled { onToggleSection(item.id) }   // collapse animates in M2b
+        case .row where !item.isDisabled:
+            if style.selectionMode == .none { onActivate(item.id); return }
+            let r = ThemedListSelect.click(id: item.id, current: selection, anchor: selectionAnchor,
+                                           mods: [], selectable: ListItem.selectableIDs(visible))  // multi-mods: M2b
+            selection = r.selection
+            selectionAnchor = r.anchor
+            onSelectionChange(r.selection)
+            onActivate(item.id)
+        default:
+            break
+        }
+    }
+
+    private func handleHover(_ item: ListItem<ID>, _ hovering: Bool) {
+        guard case .row = item.kind, !item.isDisabled else { return }
+        if hovering {
+            hoveredID = item.id
+            onHover(item.id)
+            if style.highlightFollowsHover { highlight = item.id }    // menu: hover drives the cursor
+        } else if hoveredID == item.id {
+            hoveredID = nil
+            onHover(nil)
+            // highlightFollowsHover keeps the last-lit row on exit (AppKit menu parity) — don't clear highlight
+        }
     }
 
     public var body: some View {
@@ -185,7 +224,14 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
             .frame(maxWidth: style.horizontalContentScroll ? nil : .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
+        .scrollPosition($scrollPos)
         .background(surfaceBackground)
+        .onAppear {
+            // Freeze a deterministic scroll offset for a static prism capture.
+            if let p = preview, p.scrollX != nil || p.scrollY != nil {
+                scrollPos.scrollTo(point: CGPoint(x: p.scrollX ?? 0, y: p.scrollY ?? 0))
+            }
+        }
     }
 
     @ViewBuilder private var surfaceBackground: some View {
