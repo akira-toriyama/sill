@@ -287,6 +287,6 @@ final class TrailTests: XCTestCase {
         XCTAssertEqual(path.lineWidth, 2, accuracy: 1e-9)
         var pts = [NSPoint](repeating: .zero, count: 3)
         XCTAssertEqual(path.element(at: 0, associatedPoints: &pts), .moveTo)
-        XCTAssertEqual(path.element(at: 2, associatedPoints: &pts), .curveTo)
+        XCTAssertEqual(path.element(at: 2, associatedPoints: &pts), .cubicCurveTo)
     }
 }

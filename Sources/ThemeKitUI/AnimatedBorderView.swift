@@ -115,7 +115,7 @@ public struct AnimatedBorderView<S: Shape>: View {
     private var maxBreath: CGFloat { max(lineWidth, breathTo ?? lineWidth * 2.5) }
 
     public var body: some View {
-        content.onChange(of: flashToken) { _ in rollFlashBurst() }
+        content.onChange(of: flashToken) { rollFlashBurst() }
     }
 
     @ViewBuilder

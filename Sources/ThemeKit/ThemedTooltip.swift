@@ -163,7 +163,7 @@ public final class ThemedTooltip: NSObject {
     /// mouse event can't message a freed controller. `removeTrackingArea` is
     /// @MainActor: on the main thread we assume isolation; if the controller is
     /// somehow released off-main we bounce the removal to main (laundering the
-    /// non-Sendable anchor / area through `nonisolated(unsafe)` locals — they are
+    /// non-Sendable tracking area through a `nonisolated(unsafe)` local — it is
     /// dead in this object, so there is no real concurrent access, and the work
     /// runs ON main where the call is valid). Releasing `panel` clears the screen.
     deinit {
@@ -173,7 +173,7 @@ public final class ThemedTooltip: NSObject {
         if Thread.isMainThread {
             MainActor.assumeIsolated { a.removeTrackingArea(t) }
         } else {
-            nonisolated(unsafe) let view = a
+            let view = a
             nonisolated(unsafe) let area = t
             DispatchQueue.main.async { MainActor.assumeIsolated { view.removeTrackingArea(area) } }
         }
