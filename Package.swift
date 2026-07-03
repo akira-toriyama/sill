@@ -207,7 +207,7 @@ let package = Package(
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit", "Effects"]),
         .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", "PaletteKit", "Palette", "Effects"]),
-        .testTarget(name: "ThemeKitUITests", dependencies: ["ThemeKitUI", "PaletteKit", "Palette"]),
+        .testTarget(name: "ThemeKitUITests", dependencies: ["ThemeKitUI", "PaletteKit", "Palette", "ThemeKit", "ListCore"]),
         .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette", "PixelArt"]),
         .testTarget(name: "MotionTests", dependencies: ["Motion"]),
         .testTarget(name: "ConfigSchemaTests",

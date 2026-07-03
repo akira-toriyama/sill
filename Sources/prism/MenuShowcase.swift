@@ -9,7 +9,7 @@
 // 演出 to feel even though the floating panel won't sit in a static shot.
 //
 // prism never imports an app's View: these are mock data shapes drawn by the real
-// kit, mirroring `ThemedMenu`'s own MenuItem → ListItem mapping, so the bench can't
+// kit, mirroring `ThemedMenu`'s own MenuItem → ThemeKitUI.ListItem mapping, so the bench can't
 // drift from facet / wand.
 
 import SwiftUI
@@ -25,19 +25,24 @@ import ThemeKitUI
     phosphorImage(name, pt: pt)   // a Phosphor slug → template NSImage
 }
 
-// MARK: - Inline-mock rows (mirror ThemedMenu's MenuItem → ListItem mapping)
+/// Build a `ThemedListStyle` inline (the kit's config value type is assign-based).
+private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedListStyle {
+    var s = ThemedListStyle(); configure(&s); return s
+}
 
-@MainActor private func menuRows() -> [ListItem] {
+// MARK: - Inline-mock rows (mirror ThemedMenu's MenuItem → ThemeKitUI.ListItem mapping)
+
+@MainActor private func menuRows() -> [ThemeKitUI.ListItem<String>] {
     [
-        ListItem(id: "new",    image: menuGlyph("file-plus"), primary: "New Window",  trailing: .shortcut("⌘N")),
-        ListItem(id: "open",   image: menuGlyph("folder"),         primary: "Open…",        trailing: .shortcut("⌘O")),
-        ListItem(id: "recent", image: menuGlyph("clock"),          primary: "Open Recent",  trailing: .chevron),
-        ListItem(id: "sep1",   primary: "", kind: .separator),
-        ListItem(id: "side",   image: menuGlyph("check"),      primary: "Show Sidebar", trailing: .shortcut("⌘\\")),
-        ListItem(id: "sep2",   primary: "", kind: .separator),
-        ListItem(id: "rename", image: menuGlyph("pencil"),         primary: "Rename"),
-        ListItem(id: "del",    image: menuGlyph("trash"),          primary: "Delete", trailing: .shortcut("⌘⌫"), tint: .error),
-        ListItem(id: "off",    image: menuGlyph("prohibit"),         primary: "Unavailable", isDisabled: true),
+        ThemeKitUI.ListItem(id: "new",    image: menuGlyph("file-plus"), primary: "New Window",  trailing: .shortcut("⌘N")),
+        ThemeKitUI.ListItem(id: "open",   image: menuGlyph("folder"),         primary: "Open…",        trailing: .shortcut("⌘O")),
+        ThemeKitUI.ListItem(id: "recent", image: menuGlyph("clock"),          primary: "Open Recent",  trailing: .chevron),
+        ThemeKitUI.ListItem(id: "sep1",   primary: "", kind: .separator),
+        ThemeKitUI.ListItem(id: "side",   image: menuGlyph("check"),      primary: "Show Sidebar", trailing: .shortcut("⌘\\")),
+        ThemeKitUI.ListItem(id: "sep2",   primary: "", kind: .separator),
+        ThemeKitUI.ListItem(id: "rename", image: menuGlyph("pencil"),         primary: "Rename"),
+        ThemeKitUI.ListItem(id: "del",    image: menuGlyph("trash"),          primary: "Delete", trailing: .shortcut("⌘⌫"), tint: .error),
+        ThemeKitUI.ListItem(id: "off",    image: menuGlyph("prohibit"),         primary: "Unavailable", isDisabled: true),
     ]
 }
 // 7 rows @ 26 (compact) + 2 separators @ 7 = 196pt of content.
@@ -84,14 +89,10 @@ struct MockMenu: View {
 
             HStack(alignment: .top, spacing: 24) {
                 cell("inline mock · the open menu") {
-                    ThemedListView(palette: p) { list in
-                        list.items = menuRows()
-                        list.selectionMode = .none
-                        list.hoverStyle = .solidAccent
-                        list.highlightFollowsHover = true
-                        list.density = .compact
-                        list.previewHighlight = "open"          // a lit row for capture
-                    }
+                    ThemedListView(items: menuRows(),
+                                   style: makeStyle { $0.selectionMode = .none; $0.hoverStyle = .solidAccent; $0.highlightFollowsHover = true; $0.density = .compact },
+                                   palette: p,
+                                   preview: ListPreview(highlight: "open"))
                     .frame(width: 232, height: mockMenuContentHeight)
                     .padding(.vertical, 4)                       // the menu's vertical breathing room
                     .background(surface)
