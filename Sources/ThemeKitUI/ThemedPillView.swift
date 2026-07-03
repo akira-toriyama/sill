@@ -128,8 +128,7 @@ public struct ThemedPillView: View {
     /// the rest in `foreground`.
     private var labelView: some View {
         let parts = PillLogic.splitLabel(label, typedCount: typedCount)
-        return (Text(parts.prefix).foregroundColor(prefixColor)
-                + Text(parts.suffix).foregroundColor(foreground))
+        return Text("\(Text(parts.prefix).foregroundColor(prefixColor))\(Text(parts.suffix).foregroundColor(foreground))")
             .font(labelFont)
             .lineLimit(1)
             .fixedSize()

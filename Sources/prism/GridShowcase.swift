@@ -72,7 +72,7 @@ struct MockThumbnailGrid: View {
                                     aspectRatio: 1, palette: p,
                                     onActivate: { lastActivated = $0; prismLog("activated \($0)") })
                 .frame(height: 240)
-                .onChange(of: selection) { prismLog("selected [\($0.sorted().joined(separator: ", "))]") }
+                .onChange(of: selection) { _, sel in prismLog("selected [\(sel.sorted().joined(separator: ", "))]") }
 
             Text("horizontal rail strip · fixed 1-row").font(.system(size: 9, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))

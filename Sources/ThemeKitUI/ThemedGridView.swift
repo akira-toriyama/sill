@@ -88,8 +88,8 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
             }
             .onMoveCommand { move($0) }
             .onAppear { recomputeColumns(width: crossWidth(geo)) }
-            .onChange(of: geo.size) { _ in recomputeColumns(width: crossWidth(geo)) }
-            .onChange(of: ids) { newIds in
+            .onChange(of: geo.size) { recomputeColumns(width: crossWidth(geo)) }
+            .onChange(of: ids) { _, newIds in
                 let present = Set(newIds)
                 if selectionBinding == nil {
                     internalSelection = reconcileGridSelection(internalSelection, existing: present)
