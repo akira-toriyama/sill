@@ -93,13 +93,37 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
 
     private var scrollAxes: Axis.Set { style.horizontalContentScroll ? [.horizontal, .vertical] : .vertical }
 
+    /// The effective surface — nil ⇒ vibrancy (host material shows through).
+    private var effectiveSurface: NSColor? { style.surfaceColor ?? palette.background }
+    private var surfaceIsOpaque: Bool { (effectiveSurface?.alphaComponent ?? 0) >= 1 }
+
+    /// Zebra parity per row id: ordinal among `.row`s, RESETTING to 0 at each header
+    /// (mirror ThemedList recomputeLayout :670-682). Headers/separators get `false`.
+    private var zebraParity: [ID: Bool] {
+        var map: [ID: Bool] = [:]
+        var ordinal = 0
+        for item in visible {
+            switch item.kind {
+            case .row:            map[item.id] = (ordinal % 2 == 1); ordinal += 1
+            case .sectionHeader:  ordinal = 0
+            case .separator:      break
+            }
+        }
+        return map
+    }
+
     public var body: some View {
+        let parity = zebraParity
+        let opaque = surfaceIsOpaque
         ScrollView(scrollAxes) {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(visible, id: \.id) { item in
                     ThemedListRow(item: item, metrics: metrics, style: style, palette: palette,
                                   isSelected: effectiveSelection.contains(item.id),
-                                  isHighlighted: effectiveHighlight == item.id)
+                                  isHighlighted: effectiveHighlight == item.id,
+                                  isHovered: false,                    // wired in Task 8
+                                  zebraOdd: parity[item.id] ?? false,
+                                  surfaceOpaque: opaque)
                 }
             }
             .frame(maxWidth: style.horizontalContentScroll ? nil : .infinity, alignment: .leading)
@@ -110,8 +134,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
 
     @ViewBuilder private var surfaceBackground: some View {
         // opaque ⇒ paint the surface; nil / translucent ⇒ .clear so a host material shows through (vibrancy)
-        let surface = style.surfaceColor ?? palette.background
-        if let surface, surface.alphaComponent >= 1 {
+        if let surface = effectiveSurface, surface.alphaComponent >= 1 {
             Color(nsColor: surface)
         } else {
             Color.clear
