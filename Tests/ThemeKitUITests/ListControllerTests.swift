@@ -1,10 +1,14 @@
 import XCTest
+import AppKit
+import Palette
+import PaletteKit
 import ListCore
 @testable import ThemeKitUI
 
 @MainActor
 final class ListControllerTests: XCTestCase {
     private func opt(_ id: String) -> ListItem<String> { ListItem(id: id, primary: id) }
+    private func theme(_ name: String = "terminal") -> ResolvedPalette { resolve(paletteFor(name)) }
 
     func testMoveHighlightWrapsAndSkipsHeaders() {
         let c = ListController<String>()
@@ -49,5 +53,71 @@ final class ListControllerTests: XCTestCase {
         c.clearHighlight()
         XCTAssertNil(c.highlight)
         XCTAssertNil(c.highlightedID)
+    }
+
+    // MARK: - Measurement (M4 — a popup host sizes its panel + anchors a submenu)
+
+    func testContentHeightSumsRowKinds() {
+        let c = ListController<String>()          // .comfortable: header1 28, singleRow 30, separatorBand 9
+        c.items = [ListItem(id: "H", primary: "Head", kind: .sectionHeader()),
+                   opt("a"), ListItem(id: "s", primary: "", kind: .separator), opt("b")]
+        XCTAssertEqual(c.contentHeight(), 28 + 30 + 9 + 30, accuracy: 0.5)
+    }
+
+    func testContentHeightEmptyIsOneRowAndCompactShrinks() {
+        let c = ListController<String>()
+        c.items = []
+        XCTAssertEqual(c.contentHeight(), 30, accuracy: 0.5, "empty keeps one synthetic comfortable row")
+        c.items = [opt("a"), opt("b")]
+        c.style.density = .compact                // singleRow 26
+        XCTAssertEqual(c.contentHeight(), 52, accuracy: 0.5)
+    }
+
+    func testFittingWidthGrowsWithLabelAndClampsToMax() {
+        let c = ListController<String>()
+        c.style.reservesLeadingImageColumn = false
+        let pal = theme()
+        c.items = [opt("Hi")]
+        let narrow = c.fittingWidth(palette: pal)
+        c.items = [opt("A much much much longer menu label")]
+        let wide = c.fittingWidth(palette: pal)
+        XCTAssertGreaterThan(wide, narrow, "a longer label needs more width")
+        let clamped = c.fittingWidth(maxWidth: 40, palette: pal)
+        XCTAssertLessThanOrEqual(clamped, 40, "capped at maxWidth (past the cap ellipsizes)")
+    }
+
+    func testFittingWidthAccountsForTrailingShortcut() {
+        let c = ListController<String>()
+        let pal = theme()
+        c.items = [ListItem(id: "x", primary: "Save")]
+        let plain = c.fittingWidth(palette: pal)
+        c.items = [ListItem(id: "x", primary: "Save", trailing: .shortcut("⌘S"))]
+        let withShortcut = c.fittingWidth(palette: pal)
+        XCTAssertGreaterThan(withShortcut, plain, "a trailing lozenge widens the row")
+    }
+
+    func testRowRectOnScreenNilWithoutHost() {
+        let c = ListController<String>()
+        c.items = [opt("a")]
+        XCTAssertNil(c.rowRectOnScreen("a"), "no hosting view / window ⇒ no screen rect")
+    }
+
+    func testRowRectOnScreenPureLayoutStacksRows() {
+        let c = ListController<String>()
+        c.items = [opt("a"), opt("b"), opt("c")]           // comfortable singleRow 30
+        let pal = theme()
+        let host = HostingListView(controller: c,
+                                   rootView: HostedThemedList(controller: c, style: c.style, palette: pal))
+        let win = NSWindow(contentRect: NSRect(x: 120, y: 120, width: 200, height: 200),
+                           styleMask: [.borderless], backing: .buffered, defer: true)
+        win.contentView?.addSubview(host)
+        host.frame = NSRect(x: 0, y: 0, width: 200, height: 120)
+        guard let ra = c.rowRectOnScreen("a"), let rb = c.rowRectOnScreen("b") else {
+            return XCTFail("a hosted, windowed row resolves a screen rect from the pure layout")
+        }
+        XCTAssertEqual(ra.width, 200, accuracy: 0.5, "the row spans the hosting view width")
+        XCTAssertEqual(ra.height, 30, accuracy: 0.5, "one comfortable row tall")
+        XCTAssertEqual(abs(ra.minY - rb.minY), 30, accuracy: 0.5, "adjacent rows sit one row-height apart")
+        XCTAssertNil(c.rowRectOnScreen("nope"), "an unknown id has no rect")
     }
 }

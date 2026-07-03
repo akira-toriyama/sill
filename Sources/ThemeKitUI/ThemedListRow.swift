@@ -101,7 +101,13 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
             .overlay(outlineRing)
             .opacity(dimmed ? 0.4 : 1)     // lifted drag source / chunk member dims
             .overlay { dropOverlay }       // drop affordance at full opacity, above the dim
+            .modifier(RowAX(vends: style.vendsRowAXElements && item.asRow.isSelectable, label: axLabel))
     }
+
+    /// The label VoiceOver reads for an actionable row (opt-in via `vendsRowAXElements`,
+    /// the menu's per-row `.menuItem` parity) — the primary text, with a spoken
+    /// "checked" marker folded in for a checked (toggle) row.
+    private var axLabel: String { item.axChecked ? "\(item.primary), checked" : item.primary }
 
     // MARK: drop affordance (drawn relative to this row — ThemedList :1872-1911)
 
@@ -403,6 +409,25 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
             RoundedRectangle(cornerRadius: metrics.roundedRadius)
                 .inset(by: 1.5)
                 .stroke(Color(nsColor: palette.primary), lineWidth: 1.5)
+        }
+    }
+}
+
+/// Opt-in per-row accessibility (the menu's `vendsRowAXElements`): expose an
+/// actionable row as ONE button-trait element whose label is the menu-item text
+/// (VoiceOver reads it as a menu row + activates on press). Default (off / a
+/// non-actionable row) leaves SwiftUI's automatic per-view AX untouched.
+private struct RowAX: ViewModifier {
+    let vends: Bool
+    let label: String
+    func body(content: Content) -> some View {
+        if vends {
+            content
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(label)
+                .accessibilityAddTraits(.isButton)
+        } else {
+            content
         }
     }
 }

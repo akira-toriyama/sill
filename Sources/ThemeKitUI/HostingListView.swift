@@ -19,6 +19,7 @@ public final class HostingListView<ID: Hashable & Sendable>: NSHostingView<Hoste
     public init(controller: ListController<ID>, rootView: HostedThemedList<ID>) {
         self.controller = controller
         super.init(rootView: rootView)
+        controller.hostView = self          // for rowRectOnScreen's viewport→screen conversion (weak)
     }
     @available(*, unavailable) public required init(rootView: HostedThemedList<ID>) { fatalError("use init(controller:rootView:)") }
     @available(*, unavailable) public required init?(coder: NSCoder) { nil }

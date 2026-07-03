@@ -427,10 +427,10 @@ let kitCatalog: [KitComponent] = [
              ],
         family: .collection),
     KitComponent(
-        name: "ThemedMenu", module: "ThemeKit",
+        name: "ThemedMenu", module: "ThemeKitUI",
         kind: "MUI <Menu> — a themed floating pop-up menu of action rows with N-level submenu cascade + horizontal (menu-bar) presentation",
         summary: "Floating action-menu controller owning a non-key child panel; themed by assigning a ResolvedPalette. Vertical drop-down OR a horizontal menu bar (composing the real ThemedToolBar).",
-        consumes: "A retained CONTROLLER (NSObject), not an NSView: build via ThemedMenu.make(palette:items:) (or init), retain it, then call present(from:)/present(at:in:); it owns a borderless non-key PopupPanel hosting a ThemedList (vertical) or a ThemedToolBar (horizontal) — the host window stays key.",
+        consumes: "A retained CONTROLLER (NSObject), not an NSView: build via ThemedMenu.make(palette:items:) (or init), retain it, then call present(from:)/present(at:in:); it owns a borderless non-key PopupPanel hosting the SwiftUI ThemedListView (vertical) or a ThemedToolBar (horizontal) — the host window stays key.",
         keyAPI: [
                  "palette: ResolvedPalette — assign to (re)theme; repaints list + panel surface/edge",
                  "items: [MenuItem] — rows; each MenuItem carries title/icon/shortcut/isChecked/isDestructive/isEnabled + its own action closure (実処理). .separator(id:)/.header(_:id:) statics build non-interactive rows",

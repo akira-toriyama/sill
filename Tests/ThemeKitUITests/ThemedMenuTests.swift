@@ -1,15 +1,20 @@
-// ThemeKit / ThemedMenu tests — DETERMINISTIC in headless CI (no Xcode locally →
+// ThemeKitUI / ThemedMenu tests — DETERMINISTIC in headless CI (no Xcode locally →
 // these first compile + run in CI). The menu is driven via its public API + the
-// DEBUG `menuProbe` / `_list` / `_activate` seams; the hosted list's nav / AX are
-// exercised through the same list the controller configures. Open / monitor-
-// lifecycle uses a real (un-ordered) NSWindow + anchor. The Grow appearance + live
-// VoiceOver traversal are proven LIVE in prism, not asserted here.
+// DEBUG `menuProbe` / `_controller` / `_activate` seams; the hosted SwiftUI list's
+// nav / AX are exercised through the `ListController` the menu configures. Open /
+// monitor-lifecycle uses a real (un-ordered) NSWindow + anchor. The Grow appearance
+// + live VoiceOver traversal are proven LIVE in prism, not asserted here.
+//
+// #17b M4: the menu moved ThemeKit → ThemeKitUI (its rows are now the SwiftUI
+// `ThemedListView`); `@testable import ThemeKit` stays for the composed
+// `ThemedToolBar`'s probe/tap seams (the horizontal presentation) + `PopupCorner`.
 
 import XCTest
 import AppKit
 import Palette
 import PaletteKit
 @testable import ThemeKit
+@testable import ThemeKitUI
 
 @MainActor
 final class ThemedMenuTests: XCTestCase {
@@ -74,8 +79,8 @@ final class ThemedMenuTests: XCTestCase {
     func testItemKindsMapToRows() {
         let m = ThemedMenu(palette: theme())
         m.items = [.init("A"), .separator(), .init("B", isEnabled: false), .header("Group")]
-        XCTAssertEqual(m._list.listProbe.rowCount, 4)
-        let rows = m._list.items
+        XCTAssertEqual(m._controller.items.count, 4)
+        let rows = m._controller.items
         XCTAssertEqual(rows[1].kind, .separator)
         XCTAssertTrue(rows[2].isDisabled, "a disabled item maps to a disabled row")
         XCTAssertEqual(rows[3].kind, .sectionHeader(subtitle: nil), "a header maps to a section header")
@@ -91,7 +96,7 @@ final class ThemedMenuTests: XCTestCase {
             .init(id: "sc",  title: "Save", shortcut: "⌘S"),
             .init(id: "both", title: "Checked over icon", icon: suppliedIcon, isChecked: true),
         ]
-        let rows = m._list.items
+        let rows = m._controller.items
         XCTAssertNotNil(rows[0].image, "a checked item gets a leading checkmark glyph")
         XCTAssertTrue(rows[0].axChecked, "a checked item carries the AX checked flag")
         XCTAssertEqual(rows[1].tint, .error, "a destructive item → error tint")
@@ -105,7 +110,7 @@ final class ThemedMenuTests: XCTestCase {
         let m = ThemedMenu(palette: theme())
         m.items = [.init(id: "on", title: "Show Sidebar", isChecked: true),
                    .init(id: "off", title: "Show Toolbar")]
-        let labels = m._list._axChildren().compactMap { $0.accessibilityLabel() }
+        let labels = m.menuProbe.axMenuItemLabels
         XCTAssertTrue(labels.contains("Show Sidebar, checked"), "a checked item's AX label carries the marker")
         XCTAssertTrue(labels.contains("Show Toolbar"), "an unchecked item's label is unmarked")
     }
@@ -131,8 +136,9 @@ final class ThemedMenuTests: XCTestCase {
         var fired: [String] = []
         let m = ThemedMenu(palette: theme())
         m.items = [.init(id: "x", title: "X", action: { fired.append("x") })]
-        // The list's onActivate (a row click / Enter) is wired to the controller.
-        m._list.activateRow("x")
+        // The controller's onActivate (a row click's synchronous mouseUp commit) is
+        // wired to the item's action.
+        m._controller.fireActivate("x")
         XCTAssertEqual(fired, ["x"])
     }
 
@@ -142,14 +148,14 @@ final class ThemedMenuTests: XCTestCase {
         let m = ThemedMenu(palette: theme())
         m.items = [.init("A"), .separator(),
                    .init("B"), .init(id: "c", title: "C", isEnabled: false), .init("D")]
-        m._list.moveHighlight(1); XCTAssertEqual(m.menuProbe.highlightedID, "A")
-        m._list.moveHighlight(1); XCTAssertEqual(m.menuProbe.highlightedID, "B", "skips the separator")
-        m._list.moveHighlight(1); XCTAssertEqual(m.menuProbe.highlightedID, "D", "skips the disabled C")
-        m._list.moveHighlight(1); XCTAssertEqual(m.menuProbe.highlightedID, "A", "wraps to the first (MUI)")
-        m._list.moveHighlight(-1); XCTAssertEqual(m.menuProbe.highlightedID, "D", "wraps back to the last")
+        m._controller.moveHighlight(1); XCTAssertEqual(m.menuProbe.highlightedID, "A")
+        m._controller.moveHighlight(1); XCTAssertEqual(m.menuProbe.highlightedID, "B", "skips the separator")
+        m._controller.moveHighlight(1); XCTAssertEqual(m.menuProbe.highlightedID, "D", "skips the disabled C")
+        m._controller.moveHighlight(1); XCTAssertEqual(m.menuProbe.highlightedID, "A", "wraps to the first (MUI)")
+        m._controller.moveHighlight(-1); XCTAssertEqual(m.menuProbe.highlightedID, "D", "wraps back to the last")
     }
 
-    // MARK: - Synthetic AX (only actionable rows are .menuItem; AXPress activates)
+    // MARK: - Per-row AX (only actionable rows are exposed; activating runs the action)
 
     func testAXVendsMenuItemsAndPressActivates() {
         var fired: [String] = []
@@ -157,13 +163,13 @@ final class ThemedMenuTests: XCTestCase {
         m.items = [.init(id: "a", title: "Apple", action: { fired.append("a") }),
                    .separator(),
                    .init(id: "b", title: "Banana", isEnabled: false)]
-        let kids = m._list._axChildren()
-        XCTAssertEqual(kids.count, 1, "only the one actionable row vends an AX element")
-        XCTAssertEqual(kids.first?.accessibilityRole(), .menuItem)
-        XCTAssertEqual(kids.first?.accessibilityLabel(), "Apple")
-        XCTAssertEqual(m.menuProbe.axMenuItemLabels, ["Apple"])
-        _ = kids.first?.accessibilityPerformPress()
-        XCTAssertEqual(fired, ["a"], "AXPress activates the row → runs the item action")
+        // Only the one actionable row is exposed as a menu item (separator + disabled
+        // excluded). The SwiftUI rows carry the real per-row `.isButton` AX
+        // (`vendsRowAXElements`); the live VoiceOver press is proven in prism, and the
+        // AXPress-equivalent (a row activation) runs the item's action here.
+        XCTAssertEqual(m.menuProbe.axMenuItemLabels, ["Apple"], "only the actionable row is a menu item")
+        m._controller.fireActivate("a")
+        XCTAssertEqual(fired, ["a"], "activating the actionable row runs its action")
     }
 
     // MARK: - Open / dismiss + monitor lifecycle (the load-bearing risk)
@@ -216,6 +222,20 @@ final class ThemedMenuTests: XCTestCase {
         m.dismiss(animated: false)
     }
 
+    // MARK: - Preview seam (deterministic capture — the hosted list's `highlight` is
+    // the vertical preview override now, so a caller-set highlight must survive open)
+
+    func testVerticalPreviewOpenKeepsCallerHighlight() {
+        let (m, anchor) = anchoredMenu([.init("A"), .init("B"), .init("C")])
+        m.previewAnchor = anchor
+        m.previewHighlight = "B"
+        m.previewOpen = true
+        XCTAssertTrue(m.menuProbe.isOpen, "previewOpen presents the menu (no dismiss monitors)")
+        XCTAssertEqual(m.menuProbe.highlightedID, "B",
+                       "a caller-set previewHighlight survives the preview open (not cleared)")
+        m.previewOpen = false
+    }
+
     // MARK: - Activation closes the menu
 
     func testActivatingHighlightClosesAndRuns() {
@@ -223,7 +243,7 @@ final class ThemedMenuTests: XCTestCase {
         let (m, anchor) = anchoredMenu([.init(id: "a", title: "A", action: { fired = true })]) { $0.highlightsFirstOnOpen = true }
         m.present(from: anchor)
         XCTAssertTrue(m.menuProbe.isOpen)
-        m._list.activateHighlight()             // ⏎ on the highlight
+        m._controller.activateHighlight()       // ⏎ on the highlight
         XCTAssertTrue(fired, "Enter on the highlight runs the action")
         XCTAssertFalse(m.menuProbe.isOpen, "and closes the menu")
         XCTAssertFalse(m.menuProbe.hasKeyMonitor, "activation tears down the keyDown monitor (no global key swallow)")
@@ -324,7 +344,7 @@ final class ThemedMenuTests: XCTestCase {
         let m = ThemedMenu(palette: theme())
         m.items = cascadeItems()
         XCTAssertTrue(m.items[1].hasSubmenu, "non-empty submenu auto-sets hasSubmenu")
-        XCTAssertEqual(m._list.items[1].trailing, .chevron, "a submenu row → trailing chevron")
+        XCTAssertEqual(m._controller.items[1].trailing, .chevron, "a submenu row → trailing chevron")
     }
 
     func testOpenSubmenuShowsChildRows() {
@@ -343,8 +363,8 @@ final class ThemedMenuTests: XCTestCase {
     func testRightArrowOpensAndLeftClosesSubmenu() {
         let (m, anchor) = anchoredMenu(cascadeItems())
         m.present(from: anchor)
-        m._list.moveHighlight(1)                 // A
-        m._list.moveHighlight(1)                 // More (the submenu row)
+        m._controller.moveHighlight(1)                 // A
+        m._controller.moveHighlight(1)                 // More (the submenu row)
         XCTAssertEqual(m.menuProbe.highlightedID, "more")
         XCTAssertNil(m._handleKey(keyDown(124)), "→ is swallowed")
         XCTAssertTrue(m.menuProbe.childOpen, "→ on a submenu row opens the child")
@@ -484,7 +504,7 @@ final class ThemedMenuTests: XCTestCase {
     func testRightArrowOnNonSubmenuRowPassesThrough() {
         let (m, anchor) = anchoredMenu(cascadeItems())
         m.present(from: anchor)
-        m._list.moveHighlight(1)                 // A — a leaf row with no submenu
+        m._controller.moveHighlight(1)                 // A — a leaf row with no submenu
         XCTAssertEqual(m.menuProbe.highlightedID, "A")
         let right = keyDown(124)
         XCTAssertTrue(m._handleKey(right) === right, "→ on a non-submenu row passes through UNCHANGED (host IME safe)")
