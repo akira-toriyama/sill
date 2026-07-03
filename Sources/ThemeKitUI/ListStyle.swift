@@ -1,5 +1,5 @@
 // ThemeKitUI — value-type configuration for the SwiftUI-native `ThemedListView`
-// (#17b M2). `ListStyle` is the assign-once config surface (density, selection mode,
+// (#17b M2). `ThemedListStyle` is the assign-once config surface (density, selection mode,
 // decorations, drag). `ListMetrics` is the pure, density-keyed constant table that
 // reproduces the AppKit `ThemedList`'s fixed metrics 1:1 — the fidelity source of
 // truth (see the plan's Metrics section; mirror of `ThemedList.swift:471-510`).
@@ -16,7 +16,7 @@ public enum SelectionMode: Equatable { case none, single, multiple }   // .multi
 public enum HoverStyle: Equatable { case wash, solidAccent }
 public enum HighlightStyle: Equatable { case fill, outline }
 
-public struct ListStyle {
+public struct ThemedListStyle {
     public var density: Density = .comfortable
     public var selectionMode: SelectionMode = .single
     public var hoverStyle: HoverStyle = .wash

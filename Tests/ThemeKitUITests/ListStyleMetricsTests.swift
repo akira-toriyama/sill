@@ -26,7 +26,7 @@ final class ListStyleMetricsTests: XCTestCase {
     }
 
     func testDefaultStyle() {
-        let s = ListStyle()
+        let s = ThemedListStyle()
         XCTAssertEqual(s.density, .comfortable)
         XCTAssertEqual(s.selectionMode, .single)
         XCTAssertFalse(s.draggable)
