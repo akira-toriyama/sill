@@ -61,9 +61,11 @@ to MUI-quality readability so "I want to see THIS widget in THIS state" is reach
 | Nav model | **A1** — split-view: searchable widget sidebar → one-widget detail page. |
 | Theme axis | Default = **single theme**; **"All"** kept as an option (detail tiles the one widget across all themes). |
 | Many-cell default | Page opens on **representative 1–2 cell Overview**; segmented **Overview \| Variants \| States \| API** anchors; **"Show all"** reveals the full cell grid. |
+| Decomposition scope | **Pragmatic** — only the **tall / many-cell mocks** are refactored into addressable cells (where the density pain lives); short mocks keep Overview = the whole mock. |
 | Live prop controls | **Skip v1 → icebox.** Rely on the widgets' existing `preview*` state overrides. |
 | copy ref | **Restructure** `KitComponent` (structured fields) + split `referenceText` into an **agent-optimized paste-ready core** + a collapsed full-API appendix. |
-| Deep-link | Add `widget=` (implies family) + keep `theme=` (and `family=` for foundation/app pages). `section=` / `state=` → **icebox.** |
+| Deep-link | Add `widget=` (implies family) + `theme=` + **`section=` + `showAll=`** (deterministic agent captures); keep `family=` for foundation/app pages. `state=` → **icebox.** |
+| Capture-first | All capture-relevant navigation is reachable via **config/deep-link, never requiring window activation** (§4.8) — serves Claude Code's non-activating screenshot recipe. |
 
 ## 4. Design
 
@@ -135,13 +137,18 @@ enum SidebarItem: Identifiable {
   specific state is **one click**, not a 900pt scroll.
 - **Overview default = representative cells only**, so a tall widget like `ThemedList` fits a
   viewport on open. **"Show all"** expands the full grid — prism's differentiator over MUI.
-- **Cell decomposition (scope)**: the current `Mock*` views are *monolithic* (e.g. `MockList`
-  builds ~12 cells inline through a private `cell(_:content:)` helper, [ListShowcase.swift:177-360](../../../Sources/prism/ListShowcase.swift#L177)),
-  so there is no external handle to render "just the representative cell". Each of the **29
-  mocks** must be refactored to expose its specimen cells as an addressable list (each cell an
-  identifiable sub-view). This is prism-specimen-scaffolding work (widget draw unchanged, §2).
-  **Representative rule** (avoids an editorial bottleneck): default to **cell index 0–1**; a
-  widget may override which indices are "Overview" via a small per-mock annotation.
+- **Cell decomposition (pragmatic scope)**: the current `Mock*` views are *monolithic* (e.g.
+  `MockList` builds ~12 cells inline through a private `cell(_:content:)` helper,
+  [ListShowcase.swift:177-360](../../../Sources/prism/ListShowcase.swift#L177)), so there is no
+  external handle to render "just the representative cell". **Only the tall / many-cell mocks**
+  (where the density pain lives — `MockList` first, plus any mock whose specimen exceeds ~1
+  viewport or has many cells) are refactored to expose their specimen cells as an addressable
+  list (each cell an identifiable sub-view). **Short mocks are left whole** — their Overview is
+  the entire mock (already viewport-sized), and "Show all" is a no-op / hidden for them. This is
+  prism-specimen-scaffolding work (widget draw unchanged, §2). **Representative rule** (avoids an
+  editorial bottleneck): default to **cell index 0–1**; a widget may override which indices are
+  "Overview" via a small per-mock annotation. The exact set of "tall" mocks is enumerated in the
+  implementation plan.
 - Deterministic `previewHovered/Pressed/Focused` overrides keep each state a stable screenshot.
 - The page renderer is factored out of `ThemeCard`'s `widgetFamily` switch
   ([Gallery.swift:339-390](../../../Sources/prism/Gallery.swift#L339)) into a `WidgetPage(component:mock:…)` view.
@@ -242,8 +249,15 @@ Value = a `KitComponent.name`, case-insensitive; since each `KitComponent` carri
   item (do **not** open the empty `.text` stub `kitComponent()` returns for an unknown name).
 - **Keep `family=`** — it (not `widget=`) is how a deep-link targets a **foundation/app** page
   (Palette/Icons/facet/… are `KitFamily`/foundation values, not `KitComponent.name`s).
-- `widget = "ThemedList"` + `theme = "dracula"` opens directly on one (widget × theme) page.
-- `section=` / `state=` are **icebox** (anchors still allow manual reach).
+- **`section=`** (`overview`|`variants`|`states`|`api`, default `overview`) seeds the segmented
+  section so a capture lands on a specific anchor with **zero clicks**; **`showAll=true`** opens
+  the page with the full cell grid expanded. Both exist chiefly to make Claude Code's captures
+  deterministic (§4.8) — promoted out of icebox for that reason.
+- `widget = "ThemedList"` + `theme = "dracula"` + `section = "states"` + `showAll = true` opens
+  directly on ThemedList's full States grid in dracula — one launch, no interaction.
+- `state=` (a specific hover/pressed/focused specimen) stays **icebox** — states are per-widget
+  `preview*` booleans, not a uniform enum, so a generic key is content-heavy; anchors + `showAll`
+  cover the capture need for v1.
 
 ### 4.7 AppKit compliance & the hosting constraint
 
@@ -265,15 +279,39 @@ hosting constraint must be recorded so implementation doesn't drift into AppKit:
 - The only `Prism.swift` host changes are within the accepted bucket: `NSHostingController`,
   `contentMinSize`, opening-height clamp.
 
+### 4.8 Capture-friendliness (Claude Code screenshots)
+
+prism is captured by **Claude Code** to prove UI behavior live (CLAUDE.md; [[prism-bench]]).
+The capture recipe is **non-activating** — `screencapture -l<winid>` **without** osascript-activating
+the app, because activating jumps Spaces under the tiling WM and flakes the shot. So the shell is
+designed for capture as a first-class consumer:
+
+- **Zero-interaction targeting.** Everything a capture needs to reach — widget, theme, section,
+  full-grid — is set by **config/deep-link** (`widget=` / `theme=` / `section=` / `showAll=`,
+  §4.6), so a capture never needs a click or keypress (which would require making the window key).
+  Keyboard ↑/↓ nav (§6) is a *live/manual* convenience, explicitly **not** on the capture path.
+- **Renders without activation.** The in-content top bar, `.searchable(.sidebar)`, and page
+  content all live in the content view (§4.7), so they paint whether or not the window is key —
+  unlike window-`.toolbar` chrome, which can render differently or lazily when inactive.
+- **Reachability = capture-ability.** `screencapture -l` grabs only the window's on-screen
+  bounds; off-window overflow is lost. The display-safe `contentMinSize` + opening-height clamp +
+  detail-owns-scroll (§4.5) keep the targeted page/section **on-window**. For a genuinely tall
+  "Show all" grid, capture **section-by-section** via `section=` rather than one giant shot.
+- **Deterministic state.** `previewHovered/Pressed/Focused` overrides freeze hover/pressed/focus
+  so a static screenshot is reproducible (no live cursor/timing dependence). For animated themes,
+  effects still run; pass `show-effects=false` for a frozen capture when motion isn't the subject.
+- **Stable window id.** Bootstrap unchanged in spirit — one titled `NSWindow` whose id the
+  recipe resolves by matching "prism"; the redesign keeps a single top-level window.
+
 ## 5. Files touched
 
 | File | Change |
 |---|---|
 | [Sources/prism/Gallery.swift](../../../Sources/prism/Gallery.swift) | **Major** — replace header `VStack` + `FlowLayout` + tab rows with the split-view (in-content top bar + `.searchable(.sidebar)` sidebar of `SidebarItem`s + detail); add the `SidebarItem` registry (§4.1.1) + selection state; factor `WidgetPage` and the bespoke foundation/app page out of `ThemeCard`'s `widgetFamily` switch; Overview/segmented/anchors/"Show all"; in-content collapse toggle. |
-| [Sources/prism/Prism.swift](../../../Sources/prism/Prism.swift) | `NSHostingController` host; add `PrismConfig.widget` + parse arm; **change `theme` default off `"all"`**; set display-safe `contentMinSize`; clamp opening height to `visibleFrame`. |
+| [Sources/prism/Prism.swift](../../../Sources/prism/Prism.swift) | `NSHostingController` host; add `PrismConfig.widget` / `section` / `showAll` + parse arms; **change `theme` default off `"all"`**; set display-safe `contentMinSize`; clamp opening height to `visibleFrame`. |
 | `prism.toml` (shipped) | Update `theme = "all"` → the new single-theme default. |
 | [Sources/prism/KitCatalog.swift](../../../Sources/prism/KitCatalog.swift) | Add structured `KitComponent` fields; split `referenceText` into paste-ready core + full-API appendix; add missing catalog entries (`ThemedGrid`, decide `MarkdownView`); **re-derive + compile** the recipe for each of the **23** entries against current signatures. |
-| `Sources/prism/*Showcase.swift`, `Specimens.swift` | Refactor each of the **29** `Mock*` views to **expose their specimen cells** as an addressable list (for Overview subset + "Show all"). Widget draw unchanged; only prism's arrangement changes. Add `MockMarkdownView` if `MarkdownView` gets its own page. |
+| `Sources/prism/*Showcase.swift`, `Specimens.swift` | Refactor **only the tall / many-cell `Mock*` views** (§4.2, `MockList` first) to **expose their specimen cells** as an addressable list (Overview subset + "Show all"); short mocks unchanged. Widget draw unchanged; only prism's arrangement changes. Add `MockMarkdownView` if `MarkdownView` gets its own page. |
 
 ## 6. Verification
 
@@ -290,7 +328,10 @@ Not a green-test claim — **prove live in prism** (CLAUDE.md + [[judge-ui-via-r
   display-safe `contentMinSize`);
 - **copy ref** pastes the ~15-line agent-ready core (imports + compilable init + source pointer);
 - `PRISM_CONFIG` with `widget="ThemedList"` + `theme="dracula"` opens straight onto that page;
-  an unknown `widget=` falls back (no blank page).
+  an unknown `widget=` falls back (no blank page);
+- **non-activating capture (§4.8)**: `widget=` + `theme=` + `section="states"` + `showAll=true`
+  lands on the target with zero clicks, and `screencapture -l<winid>` (no osascript activation)
+  grabs it cleanly with the content fully on-window.
 - **Keyboard ↑/↓ selection is a LIVE/manual step** (window activated) with `@FocusState` routing
   so arrows target the `List` while the search field is a separate focus target — this is
   **separate** from the non-activating screenshot recipe (which never makes the window key).
@@ -300,7 +341,9 @@ Also `scripts/test.sh` for the logic layers (shell is UI — tests won't prove r
 ## 7. Icebox (explicitly deferred, not built)
 
 - **Live prop-editing inspector** (Storybook Controls addon) — the main bloat vector.
-- **`section=` / `state=` deep-link keys** for scripted per-state captures.
+- **`state=` deep-link key** (a specific hover/pressed/focused specimen) — per-widget `preview*`
+  content; `section=` + `showAll=` cover v1 capture needs. (`section=`/`showAll=` were promoted
+  into v1 for capture, §4.6/§4.8.)
 
 ## 8. Risks / watch-items
 
