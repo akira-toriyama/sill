@@ -11,7 +11,7 @@ import XCTest
 import AppKit
 import Palette
 import PaletteKit
-@testable import ThemeKit   // for the DEBUG `comboProbe`
+@testable import ThemeKitUI   // ThemedComboBox moved here (#17b M3); for the DEBUG `comboProbe`
 
 @MainActor
 final class ThemedComboBoxTests: XCTestCase {

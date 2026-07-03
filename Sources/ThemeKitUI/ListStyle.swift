@@ -28,6 +28,13 @@ public struct ThemedListStyle {
     public var reservesLeadingImageColumn: Bool = true
     public var wrapsHighlight: Bool = false
     public var highlightFollowsHover: Bool = false
+    /// Hosted in a non-key AppKit popup (combo/menu): the SwiftUI rows do NOT own
+    /// activation — the host's AppKit `mouseUp` fires the synchronous commit, and
+    /// hover comes from an AppKit tracking area (a non-key panel's `.onHover`/tap
+    /// can slip a tick or miss). `false` (default) = standalone (facet inline): rows
+    /// own tap-select + `.onHover` as in M2. When true the view reports per-row
+    /// viewport rects via `RowRectPreference` so the host can hit-test a click.
+    public var hosted: Bool = false
     public var vendsRowAXElements: Bool = false
     public var surfaceColor: NSColor? = nil
     public var backgroundAlpha: CGFloat = 1            // parity-PLUS (design decision ⑤)
