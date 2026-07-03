@@ -28,14 +28,23 @@ enum Prism {
         // matching prism's other PRISM_* env knobs).
         let env = ProcessInfo.processInfo.environment
         let winW = env["PRISM_WINDOW_W"].flatMap(Double.init).map { CGFloat($0) } ?? 1120 * uiScale
-        let winH = env["PRISM_WINDOW_H"].flatMap(Double.init).map { CGFloat($0) } ?? 820 * uiScale
+        let winH = env["PRISM_WINDOW_H"].flatMap { Double($0) }.map { CGFloat($0) }
+            ?? min(820 * uiScale, NSScreen.main?.visibleFrame.height ?? 820 * uiScale)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: winW, height: winH),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered, defer: false)
         window.title = "prism — sill theme preview"
         window.center()
-        window.contentView = NSHostingView(rootView: Gallery(config: config))
+
+        let controller = NSHostingController(rootView: Gallery(config: config))
+        controller.sizingOptions = []          // stop NSHostingController auto-resizing the window to its fitting size
+        window.contentViewController = controller
+        window.setContentSize(NSSize(width: winW, height: winH))  // re-assert the explicit contentRect (winW/winH + env overrides)
+
+        let visibleH = NSScreen.main?.visibleFrame.height ?? 900
+        window.contentMinSize = NSSize(width: 920 * uiScale, height: min(600 * uiScale, visibleH - 40))
+
         window.makeKeyAndOrderFront(nil)
 
         app.activate(ignoringOtherApps: true)
@@ -50,7 +59,7 @@ enum Prism {
 /// `$PRISM_CONFIG` then `./prism.toml`; missing file ⇒ defaults.
 struct PrismConfig {
     /// `"all"` = the full gallery, or a single canonical theme name.
-    var theme: String = "all"
+    var theme: String = "dracula"
     /// Specimen text scale.
     var fontScale: CGFloat = 1.0
     /// Show the effect flash palette strip for animatable themes.
@@ -60,6 +69,12 @@ struct PrismConfig {
     /// screenshot target a tab deterministically instead of clicking. Default =
     /// `palette` (the foundations).
     var family: String = "palette"
+    /// Deep-link: which widget to focus.
+    var widget: String = ""
+    /// Deep-link: which section opens within the focused widget.
+    var section: String = "overview"
+    /// Deep-link: show every widget instead of the focused one.
+    var showAll: Bool = false
 
     static func load() -> PrismConfig {
         var c = PrismConfig()
@@ -79,6 +94,9 @@ struct PrismConfig {
             case "font-scale":   if let d = Double(val) { c.fontScale = CGFloat(d) }
             case "show-effects": c.showEffects = (val.lowercased() == "true")
             case "family":       if !val.isEmpty { c.family = val.lowercased() }
+            case "widget":       if !val.isEmpty { c.widget = val }
+            case "section":      if !val.isEmpty { c.section = val.lowercased() }
+            case "show-all":     c.showAll = (val.lowercased() == "true")
             default: break
             }
         }
