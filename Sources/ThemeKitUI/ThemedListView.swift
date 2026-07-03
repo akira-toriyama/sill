@@ -112,18 +112,74 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         return map
     }
 
+    /// Per-row divider leading x, keyed by id. Only after a `.row` (not headers /
+    /// separators), suppressed above a separator; full-bleed (0) above a header, else
+    /// inset to the row's text x (mirror drawRow :1211-1220).
+    private var dividerMap: [ID: CGFloat] {
+        guard style.showsDividers else { return [:] }
+        var map: [ID: CGFloat] = [:]
+        let rows = visible
+        for i in rows.indices where i < rows.count - 1 {
+            let cur = rows[i]
+            guard case .row = cur.kind else { continue }
+            let next = rows[i + 1]
+            if case .separator = next.kind { continue }
+            var nextIsHeader = false
+            if case .sectionHeader = next.kind { nextIsHeader = true }
+            let indent = CGFloat(max(0, cur.indentLevel)) * metrics.indentStep
+            map[cur.id] = nextIsHeader ? 0
+                : (style.reservesLeadingImageColumn ? metrics.textXOrigin : metrics.leadingInset) + indent
+        }
+        return map
+    }
+
+    private struct RowSection { let header: ListItem<ID>?; let rows: [ListItem<ID>] }
+
+    /// Group `visible` into header-led sections (rows before the first header form a
+    /// header-less section) so section headers can pin via `.sectionHeaders`.
+    private var groupedSections: [RowSection] {
+        var result: [RowSection] = []
+        var header: ListItem<ID>? = nil
+        var rows: [ListItem<ID>] = []
+        for item in visible {
+            if case .sectionHeader = item.kind {
+                if header != nil || !rows.isEmpty { result.append(RowSection(header: header, rows: rows)) }
+                header = item; rows = []
+            } else {
+                rows.append(item)
+            }
+        }
+        if header != nil || !rows.isEmpty { result.append(RowSection(header: header, rows: rows)) }
+        return result
+    }
+
+    private func rowView(_ item: ListItem<ID>, parity: [ID: Bool], opaque: Bool, dividers: [ID: CGFloat]) -> some View {
+        ThemedListRow(item: item, metrics: metrics, style: style, palette: palette,
+                      isSelected: effectiveSelection.contains(item.id),
+                      isHighlighted: effectiveHighlight == item.id,
+                      isHovered: false,                    // wired in Task 8
+                      zebraOdd: parity[item.id] ?? false,
+                      surfaceOpaque: opaque,
+                      dividerInset: dividers[item.id])
+    }
+
     public var body: some View {
         let parity = zebraParity
         let opaque = surfaceIsOpaque
+        let dividers = dividerMap
+        let sections = groupedSections
         ScrollView(scrollAxes) {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(visible, id: \.id) { item in
-                    ThemedListRow(item: item, metrics: metrics, style: style, palette: palette,
-                                  isSelected: effectiveSelection.contains(item.id),
-                                  isHighlighted: effectiveHighlight == item.id,
-                                  isHovered: false,                    // wired in Task 8
-                                  zebraOdd: parity[item.id] ?? false,
-                                  surfaceOpaque: opaque)
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                ForEach(Array(sections.enumerated()), id: \.offset) { _, sec in
+                    if let header = sec.header {
+                        Section {
+                            ForEach(sec.rows, id: \.id) { rowView($0, parity: parity, opaque: opaque, dividers: dividers) }
+                        } header: {
+                            rowView(header, parity: parity, opaque: opaque, dividers: dividers)
+                        }
+                    } else {
+                        ForEach(sec.rows, id: \.id) { rowView($0, parity: parity, opaque: opaque, dividers: dividers) }
+                    }
                 }
             }
             .frame(maxWidth: style.horizontalContentScroll ? nil : .infinity, alignment: .leading)

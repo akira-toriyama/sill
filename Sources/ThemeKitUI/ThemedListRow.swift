@@ -21,6 +21,9 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
     var isHovered: Bool = false        // wired in Task 8; drives the wash-mode pointer veil
     var zebraOdd: Bool = false         // parity from ThemedListView (resets per section)
     var surfaceOpaque: Bool = true     // zebra only paints on an opaque surface
+    var dividerInset: CGFloat? = nil   // per-row divider leading x (nil = none; 0 = full-bleed above a header)
+
+    private var rowSurface: NSColor? { style.surfaceColor ?? palette.background }
 
     // MARK: draw decisions (mirror ThemedList.highlightFillAndAccent :1261)
 
@@ -87,13 +90,14 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
             .frame(height: rowHeight, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(rowBackground)
+            .overlay(alignment: .bottom) { bottomRule }
             .overlay(outlineRing)
     }
 
     @ViewBuilder private var rowContent: some View {
         switch item.kind {
         case .separator:
-            EmptyView()
+            Color.clear.overlay(Rectangle().fill(Color(nsColor: palette.border)).frame(height: 1))
         case let .sectionHeader(subtitle, _):
             headerContent(subtitle: subtitle)
                 .padding(.leading, metrics.leadingInset + indentWidth + (isCollapsibleHeader ? metrics.disclosureGutter : 0))
@@ -266,7 +270,8 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
     // MARK: background decorations (full-bleed, .row only — headers/separators self-draw)
 
     @ViewBuilder private var rowBackground: some View {
-        if case .row = item.kind {
+        switch item.kind {
+        case .row:
             ZStack(alignment: .leading) {
                 if paintsZebra {
                     Rectangle().fill(Color(nsColor: palette.hover).opacity(0.4))
@@ -283,6 +288,31 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
                     selectionShape(Color(nsColor: palette.hover))
                 }
             }
+        case .sectionHeader:
+            // Opaque "punch" so a PINNED header occludes the rows scrolling under it;
+            // skipped on a nil/vibrancy surface (rows show through, by design).
+            if surfaceOpaque, let surface = rowSurface {
+                Color(nsColor: surface)
+            }
+        case .separator:
+            EmptyView()
+        }
+    }
+
+    /// Bottom rule: a full-bleed 1pt underline under a section header, or the per-row
+    /// divider (leading-inset to the row's text, or full-bleed above a header).
+    @ViewBuilder private var bottomRule: some View {
+        switch item.kind {
+        case .sectionHeader:
+            Rectangle().fill(Color(nsColor: palette.border)).frame(height: 1)
+        case .row:
+            if let inset = dividerInset {
+                Rectangle().fill(Color(nsColor: palette.border)).frame(height: 1)
+                    .padding(.leading, inset)
+                    .padding(.trailing, inset == 0 ? 0 : metrics.trailingInset)
+            }
+        case .separator:
+            EmptyView()
         }
     }
 
