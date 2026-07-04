@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege: the build job only checks out + compiles/tests, so read is
+# enough. Making it explicit closes zizmor's excessive-permissions finding ahead
+# of the fleet-wide zizmor gate (akira-toriyama/.github t-qbp1).
+permissions:
+  contents: read
+
 concurrency:
   # Cancel in-flight builds on the same PR / branch when a new push
   # arrives — only the latest commit matters for the required check.
