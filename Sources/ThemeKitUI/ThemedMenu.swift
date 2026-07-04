@@ -1,31 +1,42 @@
-// ThemeKit — ThemedMenu: an MUI <Menu> (basic) for the family. A themed pop-up
+// ThemeKitUI — ThemedMenu: an MUI <Menu> (basic) for the family. A themed pop-up
 // menu of action rows — the floating list facet's 528-line hand-rolled `PopupMenu`
 // and wand's launcher cascade both reinvent today. Themed by assigning a PaletteKit
-// `ResolvedPalette`. AppKit / @MainActor.
+// `ResolvedPalette`. AppKit popup shell + SwiftUI-native rows / @MainActor.
 //
 // Like `ThemedTooltip` / `ThemedComboBox` (NOT an NSView), it is a CONTROLLER that
-// OWNS a borderless, non-activating `PopupPanel` and HOSTS a real `ThemedList` of
-// action rows. The host window stays key — the panel never becomes key — so the
-// menu floats above without stealing focus. Because the panel is non-key, the list
-// can't receive keyDown; the controller drives ↑↓/⏎/Esc through ONE local keyDown
-// monitor (the verified mechanism — a non-key panel's list never becomes first
-// responder, so there is no responder to route keys through, unlike the combo's
-// embedded field).
+// OWNS a borderless, non-activating `PopupPanel`. The host window stays key — the
+// panel never becomes key — so the menu floats above without stealing focus.
+// Because the panel is non-key, the hosted list can't receive keyDown; the
+// controller drives ↑↓/⏎/Esc through ONE local keyDown monitor (the verified
+// mechanism — a non-key panel's content never becomes first responder, so there is
+// no responder to route keys through, unlike the combo's embedded field).
+//
+// #17b M4: the action rows are now the SwiftUI-native `ThemedListView` (via
+// `HostedThemedList` / `ListController`, hosted in a `HostingListView`), NOT the
+// AppKit `ThemedList` — the same move M3 made for `ThemedComboBox`. That is WHY this
+// widget lives in ThemeKitUI (the SwiftUI front) while its non-key `PopupPanel`
+// shell + the composed `ThemedToolBar` (horizontal presentation) come from ThemeKit
+// (the AppKit floors it depends on) — the reverse edge would cycle. The controller
+// is configured `selectionMode = .none` (the menu only HIGHLIGHTS) · `hoverStyle =
+// .solidAccent` (+ `onPrimary` ink) · `highlightFollowsHover` · `wrapsHighlight` ·
+// `vendsRowAXElements` (per-row `.menuItem` AX) · `hosted` (the host window keeps
+// key; the keyDown monitor drives nav and the AppKit `mouseUp` commits a row click).
 //
 // The React-component contract (the kit's mental model): the component owns render
 // + interaction + theming; the HOST passes data + behavior. A `MenuItem` carries
 // the title / icon / shortcut / enabled-ness AND its `action` closure (the 実処理);
-// ThemedMenu maps it onto a `ThemedList` `ListItem`, and on activation runs the
-// matching item's closure. The kit knows no domain — the host passes a pre-resolved
-// `NSImage` and supplies the action.
+// ThemedMenu maps it onto a `ListItem`, and on activation runs the matching item's
+// closure. The kit knows no domain — the host passes a pre-resolved `NSImage` and
+// supplies the action.
 //
 // Mechanics lifted from the shared `PopupPanel` factory + the combo/tooltip
-// precedent: `themedPopupPanel(interactive:role:)`, `placePopup` (with the new
-// `.anchorCorner` / `.point` cases), `PopupFade` (monotonic-token teardown),
-// `PopupGlue` (host move / resize / close / resign-key), `removeMonitorSafely`.
-// The MUI Grow (a gentle scale + fade from the anchor-facing corner) is a transient
-// transform on the panel content's layer (model stays identity — it never fights
-// the placement's frame resets), fully gated on reduce-motion.
+// precedent: `themedPopupPanel(interactive:role:)`, `placePopup` (with the
+// `.anchorCorner` / `.point` / `.submenu` cases), `PopupFade` (monotonic-token
+// teardown), `PopupGlue` (host move / resize / close / resign-key),
+// `removeMonitorSafely`. The MUI Grow (a gentle scale + fade from the anchor-facing
+// corner) is a transient transform on the panel content's layer (model stays
+// identity — it never fights the placement's frame resets), fully gated on
+// reduce-motion.
 //
 // Canonical roles only: `background` (surface) · `border` (edge / separator) ·
 // `foreground` (row text) · `muted` (shortcut / chevron / header) · `tertiary`
@@ -38,13 +49,14 @@
 // `.nonActivatingPanel` hover + `frameOnScreen(ofItem:)` were built for exactly this
 // launcher case) as the panel's content, and a folder bar-item opens its submenu
 // BELOW itself (the drop-down `.anchorCorner` placement — no new placement math).
-// Submenu CHILDREN stay vertical `ThemedList`s (a menu bar's dropdowns are vertical);
+// Submenu CHILDREN stay vertical SwiftUI lists (a menu bar's dropdowns are vertical);
 // key routing flips per the active leaf's orientation (←→ along a bar, ↓ opens below).
 
 import AppKit
 import QuartzCore
 import Palette
 import PaletteKit
+import ThemeKit          // PopupPanel/placePopup/PopupFade/PopupGlue shell + ThemedToolBar + phosphorImage + Trailing/Tint value types (AppKit floors)
 import ListCore
 
 @MainActor
@@ -107,15 +119,15 @@ public final class ThemedMenu: NSObject {
 
     /// The theme. Assigning re-themes the hosted list AND the (snapped) panel
     /// surface + edge — the mandated contract.
-    public var palette: ResolvedPalette { didSet { list.palette = palette; applyTheme() } }
+    public var palette: ResolvedPalette { didSet { applyTheme() } }
 
     /// The items. Assigning rebuilds the hosted list rows + reframes an open menu.
     public var items: [MenuItem] = [] { didSet { rebuildRows(); if isOpen { reframe(); validateOpenChild() } } }
 
     /// Row density — `.compact` (the native-menu default, 26pt rows) or
     /// `.comfortable` (30pt, the dropdown-list metric).
-    public var density: ThemedList.Density = .compact {
-        didSet { list.density = density; if isOpen { reframe() } }
+    public var density: Density = .compact {
+        didSet { rehostList(); if isOpen { reframe() } }
     }
 
     /// Surface behind the rows (a lifted / vibrant host sets its panel colour).
@@ -134,7 +146,7 @@ public final class ThemedMenu: NSObject {
     /// `.labeledToolbar` a horizontal ICON+LABEL bar. A folder item on a horizontal
     /// root opens its submenu BELOW it; the cascade underneath is the same N-level
     /// machinery and its CHILDREN are always vertical (mirrors a menu bar). Assigning
-    /// swaps the hosted content (a real `ThemedToolBar` vs the `ThemedList`) and
+    /// swaps the hosted content (a real `ThemedToolBar` vs the SwiftUI list) and
     /// reframes an open menu.
     public enum Presentation: Equatable { case vertical, toolbar, labeledToolbar }
     public var presentation: Presentation = .vertical {
@@ -163,24 +175,29 @@ public final class ThemedMenu: NSObject {
     /// Anchor used by `previewOpen` when no `present(...)` target is live.
     public weak var previewAnchor: NSView?
     /// Force a highlighted row (by id) for capture/tests; nil = the live highlight.
-    /// Horizontal presentations light the matching toolbar item instead.
+    /// Horizontal presentations light the matching toolbar item instead. (The hosted
+    /// list has no separate preview override — its `highlight` IS the state — so the
+    /// vertical case drives the controller's live highlight directly.)
     public var previewHighlight: String? {
-        get { isHorizontal ? _horizPreviewHighlight : list.previewHighlight }
+        get { isHorizontal ? _horizPreviewHighlight : controller.highlight }
         set {
             if isHorizontal {
                 _horizPreviewHighlight = newValue
                 toolbar?.previewHoveredItem = newValue.flatMap { id in items.firstIndex(where: { $0.id == id }) }
             } else {
-                list.previewHighlight = newValue
+                controller.highlight = newValue
             }
         }
     }
 
     // MARK: - Internals
 
-    /// The hosted list, configured for menu semantics once. It is the content for a
-    /// `.vertical` root AND for EVERY submenu child (children are always vertical).
-    private let list: ThemedList
+    /// The hosted SwiftUI list, driven imperatively via `controller` and hosted in an
+    /// AppKit `HostingListView` (its `mouseUp` does the synchronous row-click commit).
+    /// It is the content for a `.vertical` root AND for EVERY submenu child (children
+    /// are always vertical). #17b M4: was the AppKit `ThemedList`.
+    private let controller = ListController<String>()
+    private var hosting: HostingListView<String>!
     /// The horizontal menu-bar content, built lazily on the first `.toolbar` /
     /// `.labeledToolbar` presentation (the ROOT only — children never host one).
     private var toolbar: ThemedToolBar?
@@ -219,7 +236,9 @@ public final class ThemedMenu: NSObject {
 
     /// 0.14 s fade (a hair longer than the combo's 0.12 — a menu is taller, and the
     /// Grow scale wants a beat to read) + host glue (dismiss on move / close / resign).
-    private let fade = PopupFade(duration: 0.14)
+    /// `PopupFade.duration` is module-internal, so the Grow reads this local copy.
+    private let fadeDuration: TimeInterval = 0.14
+    private lazy var fade = PopupFade(duration: fadeDuration)
     private let glue = PopupGlue()
 
     // Metrics (native-menu trims — MUI's 48/8 px touch metrics shrunk for macOS).
@@ -237,21 +256,46 @@ public final class ThemedMenu: NSObject {
 
     public init(palette: ResolvedPalette) {
         self.palette = palette
-        self.list = ThemedList(palette: palette)
         super.init()
         // Menu semantics: no persistent selection, opaque hover highlight that the
-        // pointer AND the arrows share, MUI wrap, real per-row AX; the controller
-        // owns the keys (the list must not try to be first responder).
-        list.selectionMode = .none
-        list.hoverStyle = .solidAccent
-        list.highlightFollowsHover = true
-        list.wrapsHighlight = true
-        list.vendsRowAXElements = true
-        list.managesFirstResponder = false
-        list.density = density
-        list.onActivate = { [weak self] item in self?.activate(item.id) }
-        list.onHover = { [weak self] id in self?.handleHover(id) }
+        // pointer AND the arrows share, MUI wrap, real per-row AX, hosted (the host
+        // window keeps key — the list never becomes first responder). Route a row
+        // COMMIT (mouseUp → fireActivate, or ⏎ → activateHighlight) and hover through
+        // the menu's own handlers.
+        controller.style = menuListStyle()
+        controller.onActivate = { [weak self] id in self?.activate(id) }
+        controller.onHover = { [weak self] id in self?.handleHover(id) }
         rebuildRows()
+    }
+
+    /// The hosted list's config — menu semantics, re-derived on a theme / density /
+    /// surface change (the surface lives in the style so a theme switch rebuilds it).
+    private func menuListStyle() -> ThemedListStyle {
+        var s = ThemedListStyle()
+        s.density = density
+        s.selectionMode = .none
+        s.hoverStyle = .solidAccent
+        s.highlightFollowsHover = true
+        s.wrapsHighlight = true
+        s.vendsRowAXElements = true          // per-row `.menuItem` AX (VoiceOver)
+        s.hosted = true                      // AppKit mouseUp owns the click; rows are inert
+        s.surfaceColor = menuSurface
+        return s                             // reservesLeadingImageColumn stays true (checkmark/icon gutter)
+    }
+
+    /// Build the hosted `NSHostingView` once (the controller was configured in init).
+    private func buildHosting() {
+        controller.style = menuListStyle()
+        let root = HostedThemedList(controller: controller, style: controller.style, palette: palette)
+        hosting = HostingListView(controller: controller, rootView: root)
+    }
+
+    /// Re-render the hosted SwiftUI list (palette / surface / density live in the
+    /// value-typed root, so those changes rebuild it; `@Bindable` handles items /
+    /// highlight). A no-op before the panel (and its hosting view) is created.
+    private func rehostList() {
+        controller.style = menuListStyle()
+        hosting?.rootView = HostedThemedList(controller: controller, style: controller.style, palette: palette)
     }
 
     /// Build + return the RETAINED controller (one-liner ergonomics, like
@@ -271,7 +315,7 @@ public final class ThemedMenu: NSObject {
             ensureToolbar().items = items.map(toolbarItem)
             return
         }
-        list.items = items.map { mi in
+        controller.items = items.map { mi in
             switch mi.kind {
             case .separator:
                 return ListItem(id: mi.id, primary: "", kind: .separator)
@@ -349,10 +393,10 @@ public final class ThemedMenu: NSObject {
 
     /// Make the container host the CURRENT presentation's content view (idempotent).
     private func installContentView() {
-        list.removeFromSuperview()
+        hosting?.removeFromSuperview()
         toolbar?.removeFromSuperview()
         if isHorizontal, let toolbar { container.addSubview(toolbar) }
-        else { container.addSubview(list) }
+        else if let hosting { container.addSubview(hosting) }
     }
 
     // MARK: Content (orientation-aware highlight / activation / anchor)
@@ -363,14 +407,14 @@ public final class ThemedMenu: NSObject {
             guard let idx = items.firstIndex(where: { $0.id == id }) else { return nil }
             return toolbar?.frameOnScreen(ofItem: idx)
         }
-        return list.rowRectOnScreen(for: id)
+        return controller.rowRectOnScreen(id)
     }
 
     /// Move the highlight one navigable step (wraps — MUI). Vertical → the list;
     /// horizontal → the toolbar cursor among ENABLED action items (skips
     /// dividers/labels/disabled).
     private func moveContentHighlight(_ delta: Int) {
-        guard isHorizontal else { list.moveHighlight(delta); return }
+        guard isHorizontal else { controller.moveHighlight(delta); return }
         let nav = items.indices.filter { items[$0].kind == .item && items[$0].isEnabled }
         guard !nav.isEmpty else { return }
         let step = delta >= 0 ? 1 : -1
@@ -387,17 +431,17 @@ public final class ThemedMenu: NSObject {
     /// The id of the currently highlighted row / bar-item.
     private var highlightedContentID: String? {
         if isHorizontal { return toolbarHighlightIndex.flatMap { items.indices.contains($0) ? items[$0].id : nil } }
-        return list.highlightedID
+        return controller.highlightedID
     }
 
     /// Activate the highlighted row / bar-item (⏎ / Space).
     private func activateContentHighlight() {
         if isHorizontal { if let id = highlightedContentID { activate(id) } }
-        else { list.activateHighlight() }
+        else { controller.activateHighlight() }
     }
 
     private func clearContentHighlight() {
-        if isHorizontal { setToolbarHighlight(nil) } else { list.clearHighlight() }
+        if isHorizontal { setToolbarHighlight(nil) } else { controller.clearHighlight() }
     }
 
     /// A hovered toolbar item → move the cursor there + run the same hover-intent the
@@ -426,17 +470,18 @@ public final class ThemedMenu: NSObject {
     // MARK: - Theming
 
     public func applyTheme() {
-        // Paint the OPAQUE menu surface on BOTH the list and the container (the
-        // container shows in the vertical-padding strips + carries the rounded
-        // edge), so the menu reads as one seamless opaque card on every theme.
-        list.surfaceColor = menuSurface
+        // Paint the OPAQUE menu surface on BOTH the hosted list (via its style) and
+        // the container (which shows in the vertical-padding strips + carries the
+        // rounded edge), so the menu reads as one seamless opaque card on every theme.
         toolbar?.palette = palette          // transparent surface → the container shows through
         // Snap the panel surface / edge (these CALayer props would otherwise
         // implicitly cross-fade on a theme switch — combo parity).
-        layerTxn(animated: false) {
-            container.layer?.backgroundColor = menuSurface.cgColor
-            container.layer?.borderColor = palette.border.cgColor
-        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        container.layer?.backgroundColor = menuSurface.cgColor
+        container.layer?.borderColor = palette.border.cgColor
+        CATransaction.commit()
+        rehostList()          // re-render the hosted SwiftUI list with the new palette + surface
     }
 
     private var menuSurface: NSColor { surfaceColor ?? palette.background ?? .textBackgroundColor }
@@ -509,8 +554,10 @@ public final class ThemedMenu: NSObject {
         ensurePanel()
         isOpen = true
         rebuildRows()                                   // never open stale
-        if installDismiss { previewHighlight = nil }    // the preview path keeps a caller-set highlight
-        clearContentHighlight()
+        // The preview path keeps a caller-set highlight: the hosted list's `highlight`
+        // IS the vertical preview seam now (no separate override), so only a NON-preview
+        // open clears it — else `previewHighlight` set before `previewOpen` is wiped.
+        if installDismiss { previewHighlight = nil; clearContentHighlight() }
         if highlightsFirstOnOpen { moveContentHighlight(1) }
         reframe()
         panel?.orderFrontRegardless()                   // NEVER makeKey — keep the host's focus
@@ -532,6 +579,7 @@ public final class ThemedMenu: NSObject {
         container.layer?.cornerRadius = cornerRadius
         container.layer?.masksToBounds = true
         container.layer?.borderWidth = 1
+        if hosting == nil { buildHosting() }        // the SwiftUI list host (vertical content)
         if isHorizontal {
             ensureToolbar().variant = (presentation == .toolbar) ? .compact : .dense
         }
@@ -554,9 +602,9 @@ public final class ThemedMenu: NSObject {
             let w = (s.width == NSView.noIntrinsicMetric ? maxWidth : s.width) + 2
             return CGSize(width: w, height: s.height + 2)
         }
-        let contentW = list.fittingWidth(maxWidth: maxWidth - 2)
+        let contentW = controller.fittingWidth(maxWidth: maxWidth - 2, palette: palette)
         let width = min(maxWidth, max(minWidth, contentW + 2))      // +2 for the 1pt border L/R
-        let rows = list.contentHeight
+        let rows = controller.contentHeight()
         let height = min(maxHeight, rows + 2 * (1 + menuVPad))       // border + vpad, top & bottom
         return CGSize(width: width, height: height)
     }
@@ -601,10 +649,10 @@ public final class ThemedMenu: NSObject {
         container.frame = CGRect(origin: .zero, size: frame.size)
         if isHorizontal, let toolbar {
             toolbar.frame = CGRect(x: 1, y: 1, width: frame.size.width - 2, height: frame.size.height - 2)
-        } else {
-            list.frame = CGRect(x: 1, y: 1 + menuVPad,
-                                width: frame.size.width - 2,
-                                height: frame.size.height - 2 * (1 + menuVPad))
+        } else if let hosting {
+            hosting.frame = CGRect(x: 1, y: 1 + menuVPad,
+                                   width: frame.size.width - 2,
+                                   height: frame.size.height - 2 * (1 + menuVPad))
         }
 
         let s = host.backingScaleFactor
@@ -665,7 +713,7 @@ public final class ThemedMenu: NSObject {
               let mi = items.first(where: { $0.id == id }), mi.isEnabled, !mi.submenu.isEmpty,
               let rowRect = rowRectOnScreen(for: id) else { return }
         if childRowID == id, child?.isOpen == true {                // already showing this one
-            if highlightFirst { child?.list.moveHighlight(1) }      // re-light its first row (Enter/→ intent)
+            if highlightFirst { child?.controller.moveHighlight(1) }    // re-light its first row (Enter/→ intent)
             return
         }
         closeChild()
@@ -678,7 +726,7 @@ public final class ThemedMenu: NSObject {
         child = c
         childRowID = id
         c.presentAsSubmenu(rowRectOnScreen: rowRect, in: host)
-        if highlightFirst { c.list.moveHighlight(1) }
+        if highlightFirst { c.controller.moveHighlight(1) }
     }
 
     /// Collapse the open submenu child (idempotent). Cancels a pending hover-intent.
@@ -860,13 +908,13 @@ public final class ThemedMenu: NSObject {
         let from = ThemedMenu.growTransform(about: cornerPoint(in: cl.bounds), scale: growScale, bounds: cl.bounds)
         cl.opacity = 0
         CATransaction.begin()
-        CATransaction.setAnimationDuration(fade.duration)
+        CATransaction.setAnimationDuration(fadeDuration)
         CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
         cl.opacity = 1                                  // implicit fade (model → 1)
         let grow = CABasicAnimation(keyPath: "transform")
         grow.fromValue = NSValue(caTransform3D: from)
         grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        grow.duration = fade.duration
+        grow.duration = fadeDuration
         grow.timingFunction = CAMediaTimingFunction(name: .easeOut)
         grow.isRemovedOnCompletion = true
         cl.add(grow, forKey: "grow")
@@ -946,24 +994,33 @@ extension ThemedMenu {
         return MenuProbe(
             isOpen: isOpen,
             presentation: presentation,
-            rowCount: isHorizontal ? (toolbar?.toolBarProbe.itemCount ?? 0) : list.listProbe.rowCount,
+            rowCount: isHorizontal ? items.count : controller.items.count,      // bar items are 1:1 with menu items
             highlightedID: highlightedContentID,
             resolvedCorner: resolvedCorner,
             menuFrame: lastFrame,
             panelOrderedIn: panel?.isVisible ?? false,
             hasKeyMonitor: keyMon != nil,
             hasMouseMonitor: mouseMon != nil,
-            axMenuItemLabels: list._axChildren().compactMap { $0.accessibilityLabel() },
+            axMenuItemLabels: axMenuItemLabels,
             hasOpacityAnimation: animating,
             reduceMotionRespected: !(reduceMotion && animating),
             childOpen: child?.isOpen ?? false,
             childRowID: childRowID,
-            childRowCount: child?.list.listProbe.rowCount ?? 0,
-            childHighlightedID: child?.list.highlightedID,
+            childRowCount: child?.controller.items.count ?? 0,
+            childHighlightedID: child?.controller.highlightedID,
             leafIsChild: activeLeaf() !== self)
     }
-    /// The hosted list (drive its probe / nav directly in tests).
-    var _list: ThemedList { list }
+    /// The per-row AX menu-item labels VoiceOver reads — the vertical list's ACTIONABLE
+    /// rows (enabled `.item`s), with a "checked" marker folded in (mirrors the AppKit
+    /// widget's synthetic `.menuItem` children; the real SwiftUI AX is proven in prism).
+    /// Empty for a horizontal root (the composed `ThemedToolBar` vends its own button AX).
+    private var axMenuItemLabels: [String] {
+        guard !isHorizontal else { return [] }
+        return items.filter { $0.kind == .item && $0.isEnabled }
+                    .map { $0.isChecked ? "\($0.title), checked" : $0.title }
+    }
+    /// The hosted list controller (drive its probe / nav directly in tests).
+    var _controller: ListController<String> { controller }
     /// The hosted horizontal toolbar (nil until a `.toolbar`/`.labeledToolbar` open).
     var _toolbar: ThemedToolBar? { toolbar }
     /// The open submenu child controller, if any (drive its probe in tests).

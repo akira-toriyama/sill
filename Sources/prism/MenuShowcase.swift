@@ -1,9 +1,9 @@
-// prism — ThemeKit Menu bench. `ThemedMenu` is a CONTROLLER that owns a child
+// prism — ThemeKitUI Menu bench. `ThemedMenu` is a CONTROLLER that owns a child
 // window (like the combo / tooltip), so the open menu can't appear in a
 // `screencapture` of prism's main window. The per-theme grid therefore renders an
-// INLINE MOCK of the open menu — a REAL `ThemedList` configured exactly as
+// INLINE MOCK of the open menu — a REAL `ThemedListView` configured exactly as
 // `ThemedMenu` hosts it (selectionMode .none · solidAccent highlight ·
-// highlightFollowsHover · compact · separators), with `previewHighlight` forcing a
+// highlightFollowsHover · compact · separators), with `preview` forcing a
 // lit row — so the menu's look reads across all themes deterministically. Beside it
 // a LIVE trigger opens the REAL `ThemedMenu` (touch it: hover, ↑↓, Enter, Esc), the
 // 演出 to feel even though the floating panel won't sit in a static shot.

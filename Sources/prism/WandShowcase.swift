@@ -206,7 +206,7 @@ struct MockWandLauncher: View {
             .shadow(color: .black.opacity(0.28), radius: 9, y: 4)
     }
 
-    // A rounded, bordered, shadowed menu surface hosting a real ThemedList in menu
+    // A rounded, bordered, shadowed menu surface hosting a real ThemedListView in menu
     // config with a lit row — the MockMenu inline-mock recipe.
     @ViewBuilder private func menuCard(rows: [ThemeKitUI.ListItem<String>], lit: String,
                                        height: CGFloat, width: CGFloat) -> some View {
