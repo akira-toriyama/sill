@@ -1,13 +1,12 @@
 // ThemeKitUI — the render-bearing row model for the SwiftUI-native `ThemedListView`
 // (#17b M2). It carries an `NSImage`, so it can't live in the pure/Sendable
 // `ListCore`; instead it PROJECTS to `ListCore.ListRow` (`asRow`) — the pure shadow
-// every selection / collapse / DnD core reasons over. Reuses ThemeKit's `Badge` /
-// `TrailingAccessory` / `ListTint` value types (ThemeKitUI already depends on
-// ThemeKit). Generic over `ID` per the spec; the AppKit widget's own String-keyed
-// `ThemeKit.ListItem` coexists until the M5 retire (prism qualifies `ThemeKitUI.ListItem`).
+// every selection / collapse / DnD core reasons over. The `Badge` /
+// `TrailingAccessory` / `ListTint` value types live beside it in
+// `ListAccessories.swift` (rescued at the #17b M5 retire of the AppKit widget).
+// Generic over `ID` per the spec.
 
 import AppKit
-import ThemeKit          // Badge, TrailingAccessory, ListTint, BadgeRole
 import ListCore
 
 public struct ListItem<ID: Hashable & Sendable> {

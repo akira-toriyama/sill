@@ -22,6 +22,7 @@ import Palette
 import PaletteKit
 import ThemeKit
 import ThemeKitUI
+import ListCore          // DropTarget<ID> (the String typealias died with the AppKit widget)
 
 // MARK: - Mock image helpers (pre-resolved NSImages — the kit parses no SF name)
 
