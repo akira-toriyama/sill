@@ -4,8 +4,8 @@
 // optional track) with a `ResolvedPalette` role instead, so EVERY scrollable
 // surface in the family scrolls in-theme rather than in macOS grey.
 //
-// In-kit, `ThemedList` installs one for its vertical scroller. A host app gets
-// the same treatment on its own scroll views:
+// Kept in ThemeKit for DIRECT app consumption (facet themes its own NSScrollViews
+// with it; the retired AppKit `ThemedList` was the in-kit installer). A host app:
 //
 //     scrollView.verticalScroller = ThemedScroller()          // keep .overlay
 //     // on (re)theme:

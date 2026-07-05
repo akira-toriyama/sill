@@ -361,7 +361,7 @@ struct ThemeCard: View {
             WidgetSection(kitComponent("ThemedBackdrop"), p: p) { MockBackdrop(p: p) }
             WidgetSection(kitComponent("WindowShell"), p: p) { MockWindowShell(p: p) }
         case .collection:
-            WidgetSection(kitComponent("ThemedList"), p: p) { MockList(p: p) }
+            WidgetSection(kitComponent("ThemedListView"), p: p) { MockList(p: p) }
             WidgetSection(kitComponent("ThemedMenu"), p: p) { MockMenu(p: p) }
             WidgetSection(kitComponent("ThemedGrid"), p: p) { MockThumbnailGrid(p: p) }
         case .motion:

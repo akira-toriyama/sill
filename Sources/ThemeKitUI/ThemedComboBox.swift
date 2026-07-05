@@ -208,12 +208,12 @@ public final class ThemedComboBox: NSObject {
     private var flippedAbove = false
 
     // MARK: Metrics (final — not configurable in BASIC)
-    fileprivate let rowHeight: CGFloat = 30       // == ThemedList `.comfortable` singleRow
+    fileprivate let rowHeight: CGFloat = 30       // == ListMetrics `.comfortable` singleRow
     private let maxVisibleRows = 8
     private let gap: CGFloat = CGFloat(Space.xs)
     private let cornerRadius: CGFloat = CGFloat(Radius.lg)
     // (the visible-frame margin now lives in the shared `popupScreenMargin`;
-    //  row insets / fonts / accent-bar now live in ThemedList `.comfortable`.)
+    //  row insets / fonts / accent-bar now live in ListMetrics `.comfortable`.)
 
     // MARK: - Init
 

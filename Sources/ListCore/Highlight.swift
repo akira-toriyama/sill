@@ -1,7 +1,8 @@
 import Foundation
 
-/// One roving-highlight step over the selectable indices, mirroring the core math
-/// of `ThemedList.moveHighlight`: from the current position move by `delta`,
+/// One roving-highlight step over the selectable indices — the core math behind
+/// `ListController.moveHighlight` (lifted from the retired AppKit `ThemedList`):
+/// from the current position move by `delta`,
 /// wrapping (`((p+delta)%n+n)%n`) or clamping (`min(max(p+delta,0),n-1)`); an empty
 /// list → nil; no current → first (delta>0) or last (delta<0). Pure / Foundation-only.
 public func nextHighlight(current: Int?, delta: Int,

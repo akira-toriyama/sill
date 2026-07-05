@@ -1,9 +1,8 @@
 import XCTest
 import ListCore          // ListRow derived-flag members accessed via `.asRow`
 @testable import ThemeKitUI
-// NB: deliberately NOT `import ThemeKit` — that would make the bare `ListItem`
-// ambiguous with `ThemeKit.ListItem`. Tests that need `Badge`/`TrailingAccessory`
-// must qualify `ThemeKitUI.ListItem` instead.
+// (The old "NOT import ThemeKit" ambiguity guard is moot since the M5 retire —
+// `ListItem` and the accessories all live in ThemeKitUI now.)
 
 final class ListItemProjectionTests: XCTestCase {
     private func item(_ id: String, kind: ListItem<String>.Kind = .row,
