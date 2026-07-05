@@ -1,6 +1,6 @@
 import Foundation
 
-/// The kind of a list row — the pure shadow of `ThemeKit.ListItem.Kind`. Carries no
+/// The kind of a list row — the pure shadow of `ThemeKitUI.ListItem.Kind`. Carries no
 /// `ID` (a header/separator's identity lives on `ListRow.id`).
 public enum RowKind: Hashable, Sendable {
     case row

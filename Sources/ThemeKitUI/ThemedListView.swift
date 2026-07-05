@@ -6,7 +6,8 @@
 //
 // M2 stages: M2a = rendering + single-select + hover (this file's initial form);
 // M2b = animated collapse + multi-select + keyboard; M2c = drag + overlay ghost.
-// The AppKit `ThemedList` and its tests stay intact until the M5 retire.
+// The AppKit `ThemedList` was deleted at the M5 retire — this view is the only
+// themed list now (combo/menu host it via `ListController`/`HostingListView`).
 
 import SwiftUI
 import AppKit

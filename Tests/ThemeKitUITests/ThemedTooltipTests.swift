@@ -1,15 +1,15 @@
-// ThemeKit / ThemedTooltip tests — DETERMINISTIC in headless CI (no Xcode
-// locally → these first compile + run in CI). The bubble is driven via
-// `previewVisible` (the force-show seam) and read through the DEBUG
-// `tooltipProbe`; no synthetic mouse events. The live hover-show / fade /
-// placement-flip 演出 is proven in prism, not here. Placement assertions need a
-// screen — guarded with XCTSkip so a truly headless box doesn't hard-fail.
+// ThemeKitUI / ThemedTooltip tests (moved with the widget at the #17b M5 retire).
+// DETERMINISTIC headless: the bubble is driven via `previewVisible` (the
+// force-show seam) and read through the DEBUG `tooltipProbe`; no synthetic mouse
+// events. The live hover-show / fade / placement-flip 演出 is proven in prism,
+// not here. Placement assertions need a screen — guarded with XCTSkip so a truly
+// headless box doesn't hard-fail.
 
 import XCTest
 import AppKit
 import Palette
 import PaletteKit
-@testable import ThemeKit   // for the DEBUG `tooltipProbe` + the internal `Side`
+@testable import ThemeKitUI   // for the DEBUG `tooltipProbe` + the internal `Side`
 
 @MainActor
 final class ThemedTooltipTests: XCTestCase {

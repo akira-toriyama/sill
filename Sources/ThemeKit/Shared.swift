@@ -14,8 +14,8 @@ import Motion
 /// themed widgets share. `animated: true` eases over `duration` (default = the
 /// standard enter step) with the system ease-out; `animated: false` disables
 /// implicit actions so the change snaps (a theme switch must not smear). Nine
-/// widgets had this exact block inline; the `duration` knob also folds
-/// `PopupFade.transact`, which passes its own combo / tooltip fade length.
+/// widgets had this exact block inline. (ThemeKitUI's popup machinery keeps its
+/// own copy in `PopupPanel.swift` — it moved out at the #17b M5 retire.)
 @MainActor
 func layerTxn(animated: Bool,
               duration: TimeInterval = ThemedTransition.Duration.enter,
@@ -48,4 +48,25 @@ extension NSView {
     /// Call ONLY at firing-door sites (user-intent / `notifying:` setters) — NEVER
     /// on every transient highlight, hover, or keystroke (that floods VoiceOver).
     func postAXValueChanged() { NSAccessibility.post(element: self, notification: .valueChanged) }
+}
+
+// MARK: - Outside-click monitor teardown
+
+/// Remove an `NSEvent` monitor token safely from ANY thread — inline on main,
+/// bounced to main otherwise. Used from a `nonisolated` `deinit` (`WindowShell`'s
+/// dismiss monitor): the token is dead in the owner, so laundering it through
+/// `nonisolated(unsafe)` has no real concurrent access, and the removal runs ON
+/// main where the call is valid. (ThemeKitUI's popup machinery keeps its own copy
+/// in `PopupPanel.swift`, which moved out of ThemeKit at the #17b M5 retire.)
+func removeMonitorSafely(_ token: Any?) {
+    guard let token else { return }
+    // Launder the non-Sendable token through `nonisolated(unsafe)` BEFORE either
+    // branch captures it into a `@MainActor` closure — it is dead in the owner, so
+    // there is no real concurrent access.
+    nonisolated(unsafe) let t = token
+    if Thread.isMainThread {
+        MainActor.assumeIsolated { NSEvent.removeMonitor(t) }
+    } else {
+        DispatchQueue.main.async { MainActor.assumeIsolated { NSEvent.removeMonitor(t) } }
+    }
 }

@@ -1,12 +1,12 @@
 // ThemeKitUI — value-type configuration for the SwiftUI-native `ThemedListView`
 // (#17b M2). `ThemedListStyle` is the assign-once config surface (density, selection mode,
-// decorations, drag). `ListMetrics` is the pure, density-keyed constant table that
-// reproduces the AppKit `ThemedList`'s fixed metrics 1:1 — the fidelity source of
-// truth (see the plan's Metrics section; mirror of `ThemedList.swift:471-510`).
+// decorations, drag). `ListMetrics` is the pure, density-keyed constant table carried
+// over 1:1 from the retired AppKit `ThemedList`'s fixed metrics — the fidelity source
+// of truth (see the M2 plan's Metrics section).
 //
-// The enums are FRESH ThemeKitUI module-level types (NOT the `ThemedList`-nested
-// ThemeKit ones, which die at the M5 retire) so ThemeKitUI carries no coupling to
-// the AppKit widget it replaces.
+// The enums are ThemeKitUI module-level types; the `ThemedList`-nested ThemeKit
+// originals died at the M5 retire, so ThemeKitUI carries no coupling to the AppKit
+// widget it replaced.
 
 import AppKit
 import ListCore
