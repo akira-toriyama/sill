@@ -6,11 +6,13 @@
 // SwiftUI view hosted through `NSHostingView` — this layer owns only the window
 // SHELL (the AppKit floor policy's permitted "窓の殻"), never the contents.
 //
-// SEPARATE from the INTERNAL transient-popup machinery in `PopupPanel.swift`
-// (`themedPopupPanel` / `placePopup` / `PopupFade`): those stay byte-identical for
-// the tooltip / combo / menu. A transient popup is `.popUpMenu`-level, never-key,
-// and lives for one hover/open; a shell is long-lived, can take key on demand, and
-// can span displays. The two share only low-level primitives (`removeMonitorSafely`).
+// SEPARATE from the INTERNAL transient-popup machinery in ThemeKitUI's
+// `PopupPanel.swift` (`themedPopupPanel` / `placePopup` / `PopupFade` — it moved up
+// with the tooltip / combo / menu at the #17b M5 retire): a transient popup is
+// `.popUpMenu`-level, never-key, and lives for one hover/open; a shell is
+// long-lived, can take key on demand, and can span displays. The two share only
+// the tiny `removeMonitorSafely` idea (each module keeps its own internal copy —
+// ThemeKit's lives in `Shared.swift`).
 //
 // Why a factory, not a controller: the existing transient widgets each COMPOSE the
 // helpers their own way (tooltip ≠ combo ≠ menu), and the five apps' shells differ

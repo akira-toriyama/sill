@@ -476,11 +476,10 @@ public final class ThemedMenu: NSObject {
         toolbar?.palette = palette          // transparent surface → the container shows through
         // Snap the panel surface / edge (these CALayer props would otherwise
         // implicitly cross-fade on a theme switch — combo parity).
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        container.layer?.backgroundColor = menuSurface.cgColor
-        container.layer?.borderColor = palette.border.cgColor
-        CATransaction.commit()
+        layerTxn(animated: false) {
+            container.layer?.backgroundColor = menuSurface.cgColor
+            container.layer?.borderColor = palette.border.cgColor
+        }
         rehostList()          // re-render the hosted SwiftUI list with the new palette + surface
     }
 

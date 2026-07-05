@@ -273,11 +273,10 @@ public final class ThemedComboBox: NSObject {
         // rendered state, so keep painting them here even though the hosted list
         // paints its own surface on top.
         // Snap (no implicit cross-fade) — a theme switch must not smear the surface.
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        container.layer?.backgroundColor = listSurface.cgColor
-        container.layer?.borderColor = palette.border.cgColor
-        CATransaction.commit()
+        layerTxn(animated: false) {
+            container.layer?.backgroundColor = listSurface.cgColor
+            container.layer?.borderColor = palette.border.cgColor
+        }
         rehostList()          // re-render the SwiftUI list with the new palette + surface
     }
 

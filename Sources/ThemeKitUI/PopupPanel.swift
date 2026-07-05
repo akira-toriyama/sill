@@ -1,12 +1,12 @@
-// ThemeKit — shared child-window popup foundation. The borderless, non-activating
-// `NSPanel` plumbing that EVERY themed popup needs (a tooltip bubble, a combo
-// dropdown, the coming menu): the panel subclass + its themed configuration, the
+// ThemeKitUI — shared child-window popup foundation. The borderless, non-activating
+// `NSPanel` plumbing that EVERY themed popup needs (the tooltip bubble, the combo
+// dropdown, the menu): the panel subclass + its themed configuration, the
 // visibleFrame placement math (screen-by-geometry · flip · clamp · invalidateShadow),
 // the fade-token teardown, the host glue, and the outside-click monitor helper.
 //
 // This is the rule-of-three extraction: `ThemedTooltip` and `ThemedComboBox` each
 // hand-copied this machinery (tooltip first, combo lifted it from tooltip), and
-// `ThemedMenu` is the imminent third consumer. The factory is a PURE refactor —
+// `ThemedMenu` was the third consumer. The factory is a PURE refactor —
 // every per-widget DIFFERENCE is preserved as an explicit parameter, NOT unified:
 //   * `interactive` → `ignoresMouseEvents` (tooltip click-through, combo/menu live);
 //   * `PopupFade(duration:)` keeps each widget's own fade (combo 0.12s, tooltip
@@ -15,14 +15,16 @@
 //   * placement is a per-case enum so the combo's 1-D below/above flip and the
 //     tooltip's 4-side arrow placement each reproduce byte-for-byte.
 //
-// Public (transitional, #17b M3): apps consume the WIDGETS, not this scaffold — but
-// `ThemedComboBox` moved to ThemeKitUI (the SwiftUI front) and drives this non-key
-// popup shell across the module edge, so the shell API is `public`. `ThemedMenu`/
-// `ThemedTooltip` still use it in-module. When they move too (M4+), this file follows
-// them into ThemeKitUI and these markers revert to internal.
+// INTERNAL again (#17b M5): M3/M4 made this surface `public` only because the
+// widgets crossed the ThemeKit→ThemeKitUI module edge ahead of it. At the M5
+// retire the last consumers (tooltip + this file) moved up too, so the scaffold
+// is module-private once more — apps consume the WIDGETS, never this. The window
+// SHELL for long-lived panels is separate (`ThemeKit.WindowShell`, #17i); the two
+// share only the tiny `removeMonitorSafely` idea (each module keeps its own copy).
 
 import AppKit
 import QuartzCore
+import Motion
 
 // MARK: - PopupPanel (never key — the non-activating discipline)
 
@@ -33,9 +35,9 @@ import QuartzCore
 /// so the override is harmless there. Receives mouse events only when its owner
 /// sets `ignoresMouseEvents = false` (see `themedPopupPanel(interactive:)`).
 @MainActor
-public final class PopupPanel: NSPanel {
-    public override var canBecomeKey: Bool { false }
-    public override var canBecomeMain: Bool { false }
+final class PopupPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
 }
 
 /// Build the shared themed popup panel: a borderless `.nonactivatingPanel` at
@@ -47,7 +49,7 @@ public final class PopupPanel: NSPanel {
 ///     AX; combo `.list`; menu `.menu`).
 /// The caller assigns `contentView` and (if interactive) marks it an AX element.
 @MainActor
-public func themedPopupPanel(interactive: Bool, role: NSAccessibility.Role) -> PopupPanel {
+func themedPopupPanel(interactive: Bool, role: NSAccessibility.Role) -> PopupPanel {
     let p = PopupPanel(contentRect: .zero,
                        styleMask: [.borderless, .nonactivatingPanel],
                        backing: .buffered, defer: false)
@@ -70,19 +72,19 @@ public func themedPopupPanel(interactive: Bool, role: NSAccessibility.Role) -> P
 /// The concrete, post-flip side a popup sits on relative to its anchor (never an
 /// `.auto`). Promoted out of `ThemedTooltip.Side` so the placement engine and the
 /// future menu share one vocabulary.
-public enum PopupSide { case top, bottom, leading, trailing }
+enum PopupSide { case top, bottom, leading, trailing }
 
 /// The corner of a popup pinned to its anchor / cursor — the Grow transform origin
 /// (a menu scales OUT from this corner, MUI's transform-origin). Read in the panel
 /// content's UN-FLIPPED y-up space: `.top*` = the upper edge (y = height),
 /// `.bottom*` = the lower edge (y = 0); `*Leading` = x 0, `*Trailing` = x width.
-public enum PopupCorner: Equatable { case topLeading, topTrailing, bottomLeading, bottomTrailing }
+enum PopupCorner: Equatable { case topLeading, topTrailing, bottomLeading, bottomTrailing }
 
 /// A placement REQUEST. Each case carries exactly the inputs its geometry needs;
 /// the engine shares only the screen-pick + clamp + `setFrame`/`invalidateShadow`
 /// scaffold around the per-case origin/flip math (so the two existing layouts stay
 /// byte-identical). New cases (`.anchorCorner`/`.point`) arrive with the menu.
-public enum PopupPlacement {
+enum PopupPlacement {
     /// Combo: width = the anchor's on-screen width, sits `gap` below the anchor,
     /// flips above only when below would underflow the visible frame.
     case anchorWidthBelow(gap: CGFloat, height: CGFloat)
@@ -108,7 +110,7 @@ public enum PopupPlacement {
 
 /// A placement RESULT — per case, never a god-tuple. The caller reads only the
 /// fields meaningful to its layout (combo: did it flip; tooltip: which side).
-public enum PopupPlacementResult {
+enum PopupPlacementResult {
     case anchorWidthBelow(frame: CGRect, flippedAbove: Bool)
     case sideRelative(frame: CGRect, side: PopupSide)
     case anchorCorner(frame: CGRect, corner: PopupCorner)
@@ -130,8 +132,8 @@ let popupScreenMargin: CGFloat = 4
 /// Returns nil (without touching the panel) when no screen can be resolved — the
 /// caller then leaves the popup where it was, exactly as the hand-written code did.
 @MainActor
-public func placePopup(_ panel: NSPanel, anchorRectOnScreen onScreen: CGRect,
-                       _ placement: PopupPlacement) -> PopupPlacementResult? {
+func placePopup(_ panel: NSPanel, anchorRectOnScreen onScreen: CGRect,
+                _ placement: PopupPlacement) -> PopupPlacementResult? {
     let centre = CGPoint(x: onScreen.midX, y: onScreen.midY)
     let screen = NSScreen.screens.first { $0.frame.contains(centre) }
         ?? NSScreen.main ?? NSScreen.screens.first
@@ -265,14 +267,14 @@ func popupOriginFor(_ side: PopupSide, onScreen: CGRect, size: CGSize, gap: CGFl
 /// #1 child-window bug after invalidateShadow. Duration is a PARAM (combo 0.12s,
 /// tooltip 0.16s) so this is behavior-neutral for both consumers.
 @MainActor
-public struct PopupFade {
+struct PopupFade {
     let duration: TimeInterval
 
-    public init(duration: TimeInterval) { self.duration = duration }
+    init(duration: TimeInterval) { self.duration = duration }
 
     /// Bring `layer` to opacity 1. The caller orders the panel front BEFORE this
     /// (the two widgets do it at different points in their show flow).
-    public func fadeIn(_ layer: CALayer, animated: Bool) {
+    func fadeIn(_ layer: CALayer, animated: Bool) {
         if animated {
             layer.opacity = 0
             transact(animated: true) { layer.opacity = 1 }
@@ -283,8 +285,8 @@ public struct PopupFade {
 
     /// Fade `layer` to 0, then `orderOut` the panel — but only if `shouldOrderOut()`
     /// still holds when the animation completes (same fade generation, still hidden).
-    public func fadeOut(_ layer: CALayer, panel: NSPanel, animated: Bool,
-                        shouldOrderOut: @escaping @MainActor () -> Bool) {
+    func fadeOut(_ layer: CALayer, panel: NSPanel, animated: Bool,
+                 shouldOrderOut: @escaping @MainActor () -> Bool) {
         if animated {
             CATransaction.begin()
             CATransaction.setAnimationDuration(duration)
@@ -310,6 +312,27 @@ public struct PopupFade {
     }
 }
 
+/// A snapped or eased CALayer mutation — the single `CATransaction` wrapper the
+/// popup widgets share (ThemeKitUI's copy of ThemeKit's internal helper, moved
+/// here with this file at the #17b M5 retire; the M3/M4 per-widget inline snap
+/// blocks fold back into it). `animated: true` eases over `duration` (default =
+/// the standard enter step) with the system ease-out; `animated: false` disables
+/// implicit actions so the change snaps (a theme switch must not smear).
+@MainActor
+func layerTxn(animated: Bool,
+              duration: TimeInterval = ThemedTransition.Duration.enter,
+              _ body: () -> Void) {
+    CATransaction.begin()
+    if animated {
+        CATransaction.setAnimationDuration(duration)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+    } else {
+        CATransaction.setDisableActions(true)
+    }
+    body()
+    CATransaction.commit()
+}
+
 // MARK: - Host glue (pin the popup to a moving / scrolling / closing host)
 
 /// Keeps a shown popup glued to its host window: re-place on move/resize/scroll,
@@ -319,18 +342,18 @@ public struct PopupFade {
 /// widget before); the widget owns one of these and feeds it closures. Removal is
 /// SCOPED (per name/object), so a future host holding other observers is unharmed.
 @MainActor
-public final class PopupGlue: NSObject {
+final class PopupGlue: NSObject {
     private weak var window: NSWindow?
     private weak var clip: NSClipView?
     private var onGeometryChange: (() -> Void)?
     private var onClose: (() -> Void)?
     private var onResignKey: (() -> Void)?
 
-    public override init() { super.init() }
+    override init() { super.init() }
 
     /// Begin observing `window` (+ an optional enclosing scroll `clip`). `onResignKey`
     /// nil ⇒ the host resigning key is NOT observed (the tooltip's case).
-    public func start(window: NSWindow, clip: NSClipView?,
+    func start(window: NSWindow, clip: NSClipView?,
                onGeometryChange: @escaping () -> Void,
                onClose: @escaping () -> Void,
                onResignKey: (() -> Void)? = nil) {
@@ -359,7 +382,7 @@ public final class PopupGlue: NSObject {
     }
 
     /// Scoped teardown (NOT the blunt `removeObserver(self)`).
-    public func stop() {
+    func stop() {
         guard let window else { return }
         let nc = NotificationCenter.default
         nc.removeObserver(self, name: NSWindow.didMoveNotification, object: window)
@@ -389,7 +412,7 @@ public final class PopupGlue: NSObject {
 /// bounced to main otherwise. Used from a `nonisolated` `deinit`: the token is
 /// dead in the owner, so laundering it through `nonisolated(unsafe)` has no real
 /// concurrent access, and the removal runs ON main where the call is valid.
-public func removeMonitorSafely(_ token: Any?) {
+func removeMonitorSafely(_ token: Any?) {
     guard let token else { return }
     // Launder the non-Sendable token through `nonisolated(unsafe)` BEFORE either
     // branch captures it into a `@MainActor` closure — it is dead in the owner, so

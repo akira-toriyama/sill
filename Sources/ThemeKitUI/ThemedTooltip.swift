@@ -1,16 +1,16 @@
-// ThemeKit — ThemedTooltip: a passive, pointer-driven tooltip (MUI <Tooltip>,
+// ThemeKitUI — ThemedTooltip: a passive, pointer-driven tooltip (MUI <Tooltip>,
 // basic). A small inverted-surface bubble on a free, borderless, non-activating
 // `NSPanel` that floats ABOVE the host window — it must draw outside the
 // anchor's clip / bounds, so it is a per-anchor CONTROLLER (not an NSView
 // wrapper). Themed by assigning a PaletteKit `ResolvedPalette`. AppKit /
-// @MainActor.
+// @MainActor (the permitted popup-shell floor; `ThemedTooltipAnchorView` is the
+// SwiftUI front).
 //
-// This is sill's FIRST owned child window. It LIFTS (does not fork) facet's
-// KeyablePanel / PopupMenu child-window ideas — panel configuration, the
-// visibleFrame placement + 4-side flip, and deterministic teardown — as
-// ThemeKit-LOCAL code (sill must never depend on facet). A future shared
-// `themedPopupPanel(...)` / `placePopup(...)` factory that this and the coming
-// ComboBox / Popover consume is DEFERRED.
+// Sill's FIRST owned child window (it LIFTED facet's KeyablePanel / PopupMenu
+// child-window ideas — sill must never depend on facet). The shared factory that
+// grew out of it — `themedPopupPanel(...)` / `placePopup(...)` — is what this,
+// ThemedComboBox and ThemedMenu all consume today (`PopupPanel.swift`, moved to
+// ThemeKitUI with the widgets at the #17b M5 retire).
 //
 // Mechanics worth calling out:
 //   * The panel is a FREE (un-parented) NSPanel — NOT addChildWindow (a child
