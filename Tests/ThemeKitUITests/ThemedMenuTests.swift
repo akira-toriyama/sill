@@ -465,6 +465,70 @@ final class ThemedMenuTests: XCTestCase {
         XCTAssertFalse(m.menuProbe.isOpen)
     }
 
+    // MARK: - Deferred submenu (submenuProvider)
+
+    func testProviderPresentThenFill() {
+        let items: [ThemedMenu.MenuItem] = [
+            .init(id: "branch", title: "Switch Branch",
+                  submenuProvider: { [.init(id: "main", title: "main"), .init(id: "dev", title: "develop")] }),
+        ]
+        let (m, anchor) = anchoredMenu(items)
+        m.present(from: anchor)
+        m._openSubmenu("branch")
+        XCTAssertTrue(m.menuProbe.childOpen, "the child opens immediately")
+        XCTAssertEqual(m.menuProbe.childRowCount, 1, "synchronously shows a single Loading… row")
+        XCTAssertEqual(m._child?._controller.items.first?.isDisabled, true, "the Loading… row is disabled")
+        pump()                                             // let the async provider + assignment run (FIFO)
+        XCTAssertEqual(m.menuProbe.childRowCount, 2, "the child fills with the resolved rows")
+        XCTAssertEqual(m.menuProbe.childHighlightedID, "main", "highlightFirst lights the first resolved row")
+        m.dismiss(animated: false)
+    }
+
+    func testProviderEmptyResultShowsNoItemsRow() {
+        let items: [ThemedMenu.MenuItem] = [
+            .init(id: "branch", title: "Switch Branch", submenuProvider: { [] }),
+        ]
+        let (m, anchor) = anchoredMenu(items)
+        m.present(from: anchor)
+        m._openSubmenu("branch")
+        pump()
+        XCTAssertEqual(m.menuProbe.childRowCount, 1, "an empty result shows a single row")
+        XCTAssertEqual(m._child?._controller.items.first?.isDisabled, true, "the No items row is disabled")
+        m.dismiss(animated: false)
+    }
+
+    func testProviderStaleResolveIsDroppedAfterClose() {
+        let items: [ThemedMenu.MenuItem] = [
+            .init(id: "branch", title: "Switch Branch", submenuProvider: { [.init("main")] }),
+        ]
+        let (m, anchor) = anchoredMenu(items)
+        m.present(from: anchor)
+        m._openSubmenu("branch")
+        XCTAssertEqual(m.menuProbe.childRowCount, 1, "loading row shown")
+        m._closeChild()                                    // tear the child down BEFORE the async resolves
+        XCTAssertFalse(m.menuProbe.childOpen)
+        pump()                                             // the awaited result must be dropped, not repopulate
+        XCTAssertFalse(m.menuProbe.childOpen, "the torn-down child is not repopulated")
+        m.dismiss(animated: false)
+    }
+
+    func testStaticChildrenWinOverProvider() {
+        var providerConsulted = false
+        let items: [ThemedMenu.MenuItem] = [
+            .init(id: "more", title: "More",
+                  submenu: [.init(id: "s1", title: "Sub 1"), .init(id: "s2", title: "Sub 2")],
+                  submenuProvider: { providerConsulted = true; return [.init("P")] }),
+        ]
+        let (m, anchor) = anchoredMenu(items)
+        m.present(from: anchor)
+        m._openSubmenu("more")
+        XCTAssertEqual(m.menuProbe.childRowCount, 2, "static children render immediately")
+        pump()
+        XCTAssertFalse(providerConsulted, "the provider is not consulted when static children exist")
+        XCTAssertEqual(m.menuProbe.childRowCount, 2, "and the static rows are unchanged")
+        m.dismiss(animated: false)
+    }
+
     // MARK: - Submenu cascade (N-level)
 
     /// A two-level cascade: More → Deep → G1/G2.

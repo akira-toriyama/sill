@@ -247,6 +247,9 @@ public final class ThemedMenu: NSObject {
     private let submenuHoverDelay: TimeInterval = 0.16
 
     private var fadeGen = 0
+    /// The in-flight deferred-submenu fetch while THIS menu is an open child.
+    /// Cancelled on teardown so a hover-away / re-target stops the provider's work.
+    private var itemsTask: Task<Void, Never>?
     nonisolated(unsafe) private var keyMon: Any?
     nonisolated(unsafe) private var mouseMon: Any?
 
@@ -483,6 +486,11 @@ public final class ThemedMenu: NSObject {
     /// check is the control text colour, not an accent).
     private static let checkmark: NSImage? = phosphorImage("check", pt: 12, weight: .bold)
 
+    // Disabled, non-interactive placeholder rows for a deferred submenu (computed so
+    // no stored non-Sendable global is captured).
+    private static var loadingRow: MenuItem { MenuItem(id: "__themedmenu.loading", title: "Loading…", isEnabled: false) }
+    private static var emptyRow: MenuItem   { MenuItem(id: "__themedmenu.empty",   title: "No items", isEnabled: false) }
+
     // MARK: - Theming
 
     public func applyTheme() {
@@ -539,6 +547,7 @@ public final class ThemedMenu: NSObject {
     public func invalidate() {
         guard !isInvalidated else { return }
         isInvalidated = true
+        itemsTask?.cancel(); itemsTask = nil
         hoverWork?.cancel(); hoverWork = nil
         child?.invalidate(); child = nil; childRowID = nil
         removeKeyMonitor()
@@ -743,11 +752,22 @@ public final class ThemedMenu: NSObject {
         c.surfaceColor = surfaceColor
         c.highlightsFirstOnOpen = false
         c.density = density
-        c.items = mi.submenu
         child = c
         childRowID = id
-        c.presentAsSubmenu(rowRectOnScreen: rowRect, in: host)
-        if highlightFirst { c.controller.moveHighlight(1) }
+        if !mi.submenu.isEmpty {
+            c.items = mi.submenu                                 // static children — byte-identical legacy path
+            c.presentAsSubmenu(rowRectOnScreen: rowRect, in: host)
+            if highlightFirst { c.controller.moveHighlight(1) }
+        } else if let provider = mi.submenuProvider {
+            c.items = [ThemedMenu.loadingRow]                    // present-then-fill: a disabled placeholder
+            c.presentAsSubmenu(rowRectOnScreen: rowRect, in: host)
+            c.itemsTask = Task { [weak c] in
+                let kids = await provider()
+                guard let c, c.isOpen, !Task.isCancelled else { return }   // dropped if torn down / re-targeted
+                c.items = kids.isEmpty ? [ThemedMenu.emptyRow] : kids
+                if highlightFirst { c.controller.moveHighlight(1) }
+            }
+        }
     }
 
     /// Collapse the open submenu child (idempotent). Cancels a pending hover-intent.
@@ -763,6 +783,7 @@ public final class ThemedMenu: NSObject {
     /// snap the panel out. It installed NO monitors / glue (the root owns them), so
     /// there is nothing to remove.
     private func teardownAsChild() {
+        itemsTask?.cancel(); itemsTask = nil
         closeChild()
         guard isOpen else { return }
         isOpen = false
