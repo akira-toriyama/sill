@@ -186,13 +186,68 @@ struct Gallery: View {
     @ViewBuilder private var detailPage: some View {
         if let selection {
             switch selection {
-            case .widget(let n):     Text("widget → \(n) @ \(selectedTheme)")
+            case .widget(let name):
+                // The real "all"-theme tiling is a LATER task — a single theme
+                // (dracula when "all" is selected) is fine now. `cells: nil` ⇒
+                // Overview + Specimens both render the whole mock (Task 8 supplies
+                // decomposed cells). `section` seeds case-insensitively from the
+                // config; `show-all` forces Specimens.
+                WidgetPage(
+                    component: kitComponent(name),
+                    themeName: selectedTheme == "all" ? "dracula" : selectedTheme,
+                    showEffects: showEffects,
+                    mock: { p in AnyView(mock(for: name, p: p,
+                        themeName: selectedTheme == "all" ? "dracula" : selectedTheme,
+                        showEffects: showEffects)) },
+                    cells: nil,
+                    section: config.showAll ? .specimens
+                        : (PageSection.allCases.first { $0.rawValue.lowercased() == config.section } ?? .overview),
+                    showAll: config.showAll)
             case .foundation(let f): Text("foundation → \(f.rawValue)")
             case .app(let a):        Text("app → \(a.rawValue)")
             }
         } else {
             Text("Select a widget").foregroundColor(.secondary)
         }
+    }
+}
+
+// MARK: - Widget mock map (file-level; one case per wired widget)
+
+/// The single widget's live mock for `WidgetPage`, factored from the WIDGET
+/// cases of `ThemeCard.widgetFamily(p:)` (which still holds its own copy this
+/// task — Task 7 removes ThemeCard and this becomes the sole map). Every case
+/// renders the same `Mock…(p:)` the card does; `themeName` is threaded to the two
+/// that need it (`MockThemedPill`, `MockBorder`). The switch cases MUST equal
+/// `wiredMockNames` exactly — a widget that fell to `default:` would render a
+/// blank page (the Task-4 render-map test guards that equality). App mocks
+/// (MockTree/…/MockGlancePopover) are NOT here — they belong to the app page.
+@MainActor @ViewBuilder func mock(for name: String, p: ResolvedPalette, themeName: String, showEffects: Bool) -> some View {
+    switch name {
+    case "ThemedTextField":    MockField(p: p)
+    case "ThemedComboBox":     MockComboBox(p: p)
+    case "ThemedButton":       MockButton(p: p)
+    case "ThemedButtonGroup":  MockButtonGroup(p: p)
+    case "ThemedToolBar":      MockToolBar(p: p)
+    case "ThemedChip":         MockChip(p: p)
+    case "ThemedPill":         MockThemedPill(p: p, themeName: themeName)
+    case "ThemedCheckbox":     MockCheckbox(p: p)
+    case "ThemedFAB":          MockFAB(p: p)
+    case "ThemedDivider":      MockDivider(p: p)
+    case "AnimatedBorderView": MockBorder(p: p, themeName: themeName)
+    case "ThemedSkeleton":     MockSkeleton(p: p)
+    case "ThemedTooltip":      MockTooltip(p: p)
+    case "ThemedBackdrop":     MockBackdrop(p: p)
+    case "WindowShell":        MockWindowShell(p: p)
+    case "ThemedListView":     MockList(p: p)
+    case "ThemedMenu":         MockMenu(p: p)
+    case "ThemedGrid":         MockThumbnailGrid(p: p)
+    case "ThemedTransition":   MockMotion(p: p)
+    case "ParticleBurst":      MockParticles(p: p)
+    case "SplatterShape":      MockSplatter(p: p)
+    case "TrailGeometry":      MockTrail(p: p)
+    case "PixelSprite":        MockPixelArt(p: p)
+    default:                   EmptyView()
     }
 }
 

@@ -1,0 +1,95 @@
+// prism — the single-widget detail page. A user lands here when they pick a
+// widget in the sidebar: a header (name · MUI kind · family · copy-ref), an
+// Overview | Specimens | API segmented control, and three anchored blocks the
+// control (and a `section=` deep-link) scroll to. The widget renders LIVE in the
+// chosen palette — cycling through `animated(forTheme:at:)` for an animatable
+// theme with effects on, mirroring `ThemeCard`'s live-theming (Gallery.swift).
+//
+// Overview and Specimens both render the WHOLE mock this task (`cells == nil`);
+// a later task (Task 8) supplies decomposed `cells` so Overview can show the
+// first couple and Specimens the full set. `import Effects` is here only for
+// `isAnimatableTheme` (not re-exported by PaletteKit). `mock`/`cells` are plain
+// stored closures — NOT `@ViewBuilder` stored properties (that won't compile).
+
+import SwiftUI
+import Palette
+import PaletteKit
+import Effects      // isAnimatableTheme lives here (not re-exported by PaletteKit)
+
+/// The three sections of a widget page — also the segmented-control tags and the
+/// scroll-anchor ids. The `section=` config deep-link seeds the initial section
+/// case-insensitively by matching `rawValue.lowercased()`.
+enum PageSection: String, CaseIterable, Identifiable {
+    case overview = "Overview", specimens = "Specimens", api = "API"
+    var id: String { rawValue }
+}
+
+struct WidgetPage: View {
+    let component: KitComponent
+    let themeName: String
+    let showEffects: Bool
+    let mock: (ResolvedPalette) -> AnyView                     // whole-mock renderer (Gallery supplies)
+    let cells: ((ResolvedPalette) -> [(String, AnyView)])?     // set by Task 8 for decomposed mocks; else nil
+    @State var section: PageSection
+    @State var showAll: Bool
+
+    var body: some View {
+        let base = resolve(paletteFor(themeName))
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    header(base)
+                    Picker("", selection: $section) {
+                        ForEach(PageSection.allCases) { Text($0.rawValue).tag($0) }
+                    }.pickerStyle(.segmented).labelsHidden()
+                    block(.overview, base) { overviewBody(base) }
+                    block(.specimens, base) { specimensBody(base) }
+                    block(.api, base) {
+                        Text(component.fullAPI).font(sysFont(9, design: .monospaced))
+                            .foregroundColor(Color(nsColor: base.foreground)).textSelection(.enabled)
+                    }
+                }.padding(18)
+            }
+            .onChange(of: section) { _, s in withAnimation { proxy.scrollTo(s, anchor: .top) } }
+            .onAppear { proxy.scrollTo(section, anchor: .top) }   // section= deep-link lands here, zero clicks
+        }
+    }
+
+    @ViewBuilder private func overviewBody(_ base: ResolvedPalette) -> some View {
+        if let cells { living(base) { p in AnyView(VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(cells(p).prefix(2).enumerated()), id: \.offset) { $0.element.1 } }) } }
+        else { living(base, mock) }         // whole mock (compact enough or not yet decomposed)
+    }
+    @ViewBuilder private func specimensBody(_ base: ResolvedPalette) -> some View {
+        if let cells { living(base) { p in AnyView(VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(cells(p).enumerated()), id: \.offset) { $0.element.1 } }) } }
+        else { living(base, mock) }
+    }
+
+    // Live (animated) for animatable themes, else static — mirrors ThemeCard
+    // (Gallery.swift widgetFamily live branch): a 30 Hz TimelineView drives the
+    // palette through `animated(forTheme:at:)` so the widget breathes exactly as
+    // it will in an app; otherwise the frozen `resolve` palette.
+    @ViewBuilder private func living(_ base: ResolvedPalette, _ render: @escaping (ResolvedPalette) -> AnyView) -> some View {
+        if showEffects, isAnimatableTheme(themeName) {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { t in
+                render(base.animated(forTheme: themeName, at: CGFloat(t.date.timeIntervalSinceReferenceDate / effectCycleSeconds)))
+            }
+        } else { render(base) }
+    }
+
+    @ViewBuilder private func header(_ p: ResolvedPalette) -> some View {
+        HStack(spacing: 8) {
+            Text(component.name).font(sysFont(16, weight: .bold)).foregroundColor(Color(nsColor: p.foreground))
+            Text("MUI \(component.kind) · \(component.family.rawValue)")
+                .font(sysFont(9, design: .monospaced)).foregroundColor(Color(nsColor: p.muted)).lineLimit(1)
+            Spacer(); CopyRefButton(component: component, p: p)
+        }
+    }
+    @ViewBuilder private func block<C: View>(_ s: PageSection, _ p: ResolvedPalette, @ViewBuilder _ c: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(s.rawValue.uppercased()).font(sysFont(9, weight: .bold, design: .monospaced)).foregroundColor(Color(nsColor: p.muted))
+            c()
+        }.id(s)
+    }
+}
