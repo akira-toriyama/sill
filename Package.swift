@@ -218,5 +218,6 @@ let package = Package(
         .testTarget(name: "ListCoreTests", dependencies: ["ListCore"]),
         .testTarget(name: "GridCoreTests", dependencies: ["GridCore"]),
         .testTarget(name: "PixelArtTests", dependencies: ["PixelArt"]),
+        .testTarget(name: "prismTests", dependencies: ["prism"]),
     ]
 )

@@ -6,7 +6,7 @@
 # name — e.g. terminal · neon-noir · synthwave · ghostwire · cyberpunk ·
 # tron · dracula · github-light · system (the full list is
 # `Palette.canonicalThemeNames`). Unknown names fall back to terminal.
-theme = "all"
+theme = "dracula"
 
 # Specimen text scale (1.0 = default).
 font-scale = 1.0

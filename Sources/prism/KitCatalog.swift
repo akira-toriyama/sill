@@ -34,16 +34,48 @@ enum KitFamily: String, CaseIterable, Identifiable {
     static var appCases: [KitFamily] { allCases.filter { $0.group == .app } }
 }
 
-/// One ThemeKit component's identifying info — NOT its source. `referenceText`
+/// One ThemeKit component's identifying info — NOT its source. `pasteReadyCore`
 /// is the paste-ready block the "copy ref" button puts on the clipboard.
 struct KitComponent: Identifiable {
     let name, module, kind, summary, consumes: String
     let keyAPI, variants: [String]
     let family: KitFamily
+
+    // Structured recipe fields (Task 3) — all defaulted so existing entries
+    // compile unchanged; only a worked-example entry (ThemedListView) fills them.
+    // NOTE: `var`, not `let` — a `let` property with an inline default is FIXED
+    // (Swift's memberwise init omits it as a settable parameter entirely), which
+    // would make it impossible to override per-entry.
+    var defaultType: String = ""
+    var imports: [String] = []
+    var initSnippet: String = ""
+    var cellType: String = ""
+    var cellInit: String = ""
+    var sourcePath: String = ""
+    var appkitEscape: String = ""
+    var isAtom: Bool = false
+
     var id: String { name }
 
-    var referenceText: String {
-        var s = "\(name) · \(module) (sill)\n\(kind)\n\n\(summary)\n\nUSE: \(consumes)\n\nKEY API:\n"
+    /// The paste-ready CORE: type-to-use + imports + a minimal compilable-shape
+    /// init — what an agent needs to DROP the component into code. Falls back to
+    /// gracefully omitting any section whose recipe field is empty (most entries,
+    /// until they get their own recipe).
+    var pasteReadyCore: String {
+        var s = "\(name) — \(kind) (sill · \(module) widget)\n"
+        if !defaultType.isEmpty { s += "TYPE TO USE (SwiftUI): \(defaultType)\n" }
+        if !imports.isEmpty { s += "IMPORTS:\n" + imports.map { "  \($0)" }.joined(separator: "\n") + "\n" }
+        if !initSnippet.isEmpty { s += (isAtom ? "USE:\n" : "MINIMAL:\n") + initSnippet + "\n" }
+        if !cellInit.isEmpty { s += "CELL: \(cellInit)\n" }
+        if !appkitEscape.isEmpty { s += "ESCAPE HATCH (AppKit only): \(appkitEscape)\n" }
+        if !sourcePath.isEmpty { s += "SOURCE: \(sourcePath)  ·  ADVANCED (opt-in) → full API." }
+        return s
+    }
+
+    /// The full descriptive reference (name/module/kind/summary/key API/variants) —
+    /// the ADVANCED, opt-in dump behind `pasteReadyCore`'s "SOURCE" pointer.
+    var fullAPI: String {
+        var s = "\(name) · \(module) (sill)\n\(kind)\n\n\(summary)\n\nKEY API:\n"
         s += keyAPI.map { "  • \($0)" }.joined(separator: "\n")
         s += "\n\nVARIANTS:\n" + variants.map { "  • \($0)" }.joined(separator: "\n")
         return s
@@ -72,7 +104,20 @@ let kitCatalog: [KitComponent] = [
                  "previewFocused: Bool — forces focused appearance for screenshots (no first responder)",
                  "surfaceColor: NSColor? — backdrop for the outlined notch (defaults to palette.background)",
              ],
-        family: .text),
+        family: .text,
+        defaultType: "ThemedTextFieldView",
+        imports: [
+            "import ThemeKitUI   // ThemedTextFieldView — the SwiftUI front",
+            "import ThemeKit     // ThemedTextField.Variant (.outlined/.filled/.standard)",
+            "import PaletteKit   // ResolvedPalette + resolve(_:)",
+        ],
+        initSnippet: """
+ThemedTextFieldView(palette: resolve(themeSpec), label: "Filter",
+                     placeholder: "type to filter…",
+                     leading: "magnifying-glass")
+""",
+        sourcePath: "ThemeKitUI/ThemedTextFieldView.swift",
+        appkitEscape: "ThemedTextField (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedTextFieldView wraps it via NSViewRepresentable for the IME field-editor floor"),
     KitComponent(
         name: "ThemedComboBox", module: "ThemeKitUI",
         kind: "MUI <Autocomplete> (basic, select-only filter field with themed drop-down list)",
@@ -95,7 +140,18 @@ let kitCatalog: [KitComponent] = [
                  "popup: open / closed; flips above on underflow; row states = highlighted (selection wash + primary accent bar) / disabled (tertiary) / hovered",
                  "preview seam: previewOpen / previewHighlight force deterministic open+highlight for capture/tests (DEBUG comboProbe)",
              ],
-        family: .text),
+        family: .text,
+        defaultType: "ThemedComboBoxView",
+        imports: [
+            "import ThemeKitUI   // ThemedComboBoxView — the SwiftUI front",
+            "import PaletteKit   // ResolvedPalette + resolve(_:)",
+        ],
+        initSnippet: """
+ThemedComboBoxView(palette: resolve(themeSpec), options: ["Apple", "Banana", "Grape"],
+                    label: "Fruit", placeholder: "type to filter…")
+""",
+        sourcePath: "ThemeKitUI/ThemedComboBoxView.swift",
+        appkitEscape: "ThemedComboBox (NSObject controller, module ThemeKit) — a per-field CONTROLLER (not an NSView) that composes a real ThemedTextField as `combo.field` + owns a borderless non-activating PopupPanel; only reach for it directly (skipping ThemedComboBoxView) if you need the controller API (options/selectedIndex/onSelect/commitSelection/emptyActionRow) outside a SwiftUI tree."),
     KitComponent(
         name: "ThemedButton", module: "ThemeKit",
         kind: "MUI <Button> (basic, three-variant push button)",
@@ -119,7 +175,23 @@ let kitCatalog: [KitComponent] = [
                  "previewHovered/previewPressed/previewFocused: Bool — force appearance for deterministic capture",
                  "grouping (ThemedButtonGroup): roundedCorners: CACornerMask, drawnBorderEdges: BorderEdges, groupedShadow: Bool",
              ],
-        family: .action),
+        family: .action,
+        defaultType: "ThemedButtonView",
+        imports: [
+            "import ThemeKitUI    // ThemedButtonView — the SwiftUI front",
+            "import PaletteKit    // ResolvedPalette + resolve(_:)",
+            "import ThemeKit      // ThemedButton.Variant/Size/Role types used as param defaults",
+        ],
+        initSnippet: """
+ThemedButtonView(
+    palette: resolve(themeSpec),
+    variant: .contained,
+    title: "Button",
+    onTap: { }
+)
+""",
+        sourcePath: "ThemeKitUI/ThemedButtonView.swift",
+        appkitEscape: "ThemedButton (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedButtonView is an NSViewRepresentable wrapping it"),
     KitComponent(
         name: "ThemedButtonGroup", module: "ThemeKit",
         kind: "MUI <ButtonGroup> (basic, joined) — composes real ThemedButtons into one control; .segmented mode adds exclusive single-select",
@@ -145,7 +217,23 @@ let kitCatalog: [KitComponent] = [
                  "fullWidth on/off; disableElevation; per-member + group isEnabled",
                  "demoed states: live actions+segmented, hover/focus/selected member, disabled member, fullWidth",
              ],
-        family: .action),
+        family: .action,
+        defaultType: "ThemedButtonGroupView",
+        imports: [
+            "import SwiftUI       // View front",
+            "import ThemeKitUI    // ThemedButtonGroupView — the SwiftUI front",
+            "import PaletteKit    // ResolvedPalette + resolve(_:)",
+            "import ThemeKit      // ThemedButtonGroup.Orientation / ThemedButton.Variant,Size,Role types used as param defaults",
+        ],
+        initSnippet: """
+ThemedButtonGroupView(
+    palette: resolve(themeSpec),
+    titles: ["Cut", "Copy", "Paste"],
+    onTap: { index in }
+)
+""",
+        sourcePath: "ThemeKitUI/ThemedButtonGroupView.swift",
+        appkitEscape: "ThemedButtonGroup (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedButtonGroupView is an NSViewRepresentable wrapping it"),
     KitComponent(
         name: "ThemedToolBar", module: "ThemeKit",
         kind: "MUI <AppBar> + <Toolbar> (fused) — a horizontal app bar that composes real ThemedButtons",
@@ -170,7 +258,29 @@ let kitCatalog: [KitComponent] = [
                  "tracking: standard (items self-hover) / nonActivatingPanel (bar-driven hover, .activeAlways)",
                  "NOTE: responsive overflow (… menu) is a follow-up; an over-long row extends past the bar",
              ],
-        family: .action),
+        family: .action,
+        defaultType: "ThemedToolBarView",
+        imports: [
+            "import ThemeKitUI   // ThemedToolBarView — the SwiftUI bridge for ThemeKit's ThemedToolBar",
+            "import ThemeKit     // ThemedToolBar.Surface / .Variant / .Corners / .TrackingMode enums referenced by the bridge's params",
+            "import PaletteKit   // ResolvedPalette + resolve(_:)",
+        ],
+        initSnippet: """
+let palette = resolve(themeSpec)
+let items: [ThemedToolBarView.Item] = [
+    .button(title: nil, symbol: "list"),
+    .label("Inbox"),
+    .flex,
+    .button(title: "Compose", symbol: "note-pencil", variant: .contained),
+]
+ThemedToolBarView(palette: palette, items: items) { index in
+    // onItemClick — index into `items`
+}
+""",
+        cellType: "ThemedToolBarView.Item",
+        cellInit: ".button(title: nil, symbol: \"list\")",
+        sourcePath: "ThemeKitUI/ThemedToolBarView.swift",
+        appkitEscape: "ThemedToolBar (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedToolBarView.makeNSView hosts it directly"),
     KitComponent(
         name: "ThemedChip", module: "ThemeKit",
         kind: "MUI <Chip> fused with HTML <kbd> — a compact token: tag / status pill / keycap",
@@ -194,7 +304,21 @@ let kitCatalog: [KitComponent] = [
                  "interaction (clickable only): hover / pressed / keyboard-focus (themed ring) / disabled",
                  "selected: emphasized fill (selection wash) — independent of clickable",
              ],
-        family: .action),
+        family: .action,
+        defaultType: "ThemedChipView",
+        imports: [
+            "import ThemeKitUI   // ThemedChipView — the public SwiftUI front",
+            "import ThemeKit     // ThemedChip.Variant / .Size / .Role enums",
+            "import PaletteKit   // ResolvedPalette + resolve(_:)",
+        ],
+        initSnippet: """
+  let palette = resolve(themeSpec)
+  ThemedChipView(palette: palette, variant: .filled, size: .medium, role: .neutral,
+                 title: "Tag", leading: nil, selected: false, enabled: true,
+                 clickable: true, deletable: false, onTap: { })
+""",
+        sourcePath: "ThemeKitUI/ThemedChipView.swift",
+        appkitEscape: "ThemedChip (NSView, module ThemeKit) — the real AppKit chip ThemedChipView wraps via NSViewRepresentable; drop to it only if ThemedChipView can't be hosted (e.g. non-SwiftUI AppKit call site)"),
     KitComponent(
         name: "ThemedPill", module: "ThemeKitUI",
         kind: "Display/indicator pill — perch's universal hint pill in ONE SwiftUI surface (tag/badge/status/search-indicator)",
@@ -215,7 +339,14 @@ let kitCatalog: [KitComponent] = [
                  "fill: solid / scrim(surfaceAlpha) / frosted (Material)",
                  "borderEffect: nil (static tri-state) / set (animated neon rim — cycles + blooms on idle/matched, suppressed on miss; underline becomes a neon bar)",
              ],
-        family: .action),
+        family: .action,
+        defaultType: "ThemedPillView",
+        imports: [ "import ThemeKitUI   // ThemedPillView", "import PaletteKit   // resolve(_:) → ResolvedPalette" ],
+        initSnippet: """
+  let palette = resolve(themeSpec)
+  ThemedPillView(palette: palette, label: "GH")
+""",
+        sourcePath: "ThemeKitUI/ThemedPillView.swift"),
     KitComponent(
         name: "ThemedCheckbox", module: "ThemeKit",
         kind: "MUI <Checkbox> (basic, tri-state) — outline-box ↔ primary-filled box with a draw-in checkmark/dash",
@@ -239,7 +370,23 @@ let kitCatalog: [KitComponent] = [
                  "interaction: hover, pressed, focus (themed primary ring), disabled",
                  "preview overrides for deterministic capture: previewHovered/Pressed/Focused + previewChecked/previewIndeterminate (Bool?) — force visuals without mutating bound value or firing events",
              ],
-        family: .action),
+        family: .action,
+        defaultType: "ThemedCheckboxView",
+        imports: [
+            "import ThemeKitUI   // ThemedCheckboxView — SwiftUI front (NSViewRepresentable)",
+            "import ThemeKit     // ThemedCheckbox.Size (the .small/.medium enum used by the view)",
+            "import PaletteKit   // ResolvedPalette + resolve(_:)",
+        ],
+        initSnippet: """
+ThemedCheckboxView(
+    palette: resolve(themeSpec),
+    label: "Enable notifications",
+    isChecked: on,
+    onChange: { on = $0 }
+)
+""",
+        sourcePath: "ThemeKitUI/ThemedCheckboxView.swift",
+        appkitEscape: "ThemedCheckbox (NSControl, module ThemeKit) — only if NOT usable via SwiftUI; ThemedCheckboxView already wraps it as makeNSView/updateNSView."),
     KitComponent(
         name: "ThemedFAB", module: "ThemeKit",
         kind: "MUI <Fab> (basic) — circular icon FAB + extended icon+label pill, accent-only",
@@ -261,7 +408,18 @@ let kitCatalog: [KitComponent] = [
                  "Role: .primary (default) | .secondary — accent only, no neutral/error role",
                  "States: rest / hover (0.08 overlay) / pressed (0.12 overlay + deepened elevation) / keyboard-focus (themed primary ring) / disabled",
              ],
-        family: .action),
+        family: .action,
+        defaultType: "ThemedFABView",
+        imports: [ "import ThemeKitUI   // ThemedFABView (the SwiftUI front)",
+                   "import ThemeKit     // ThemedFAB.Variant / .Size / .Role enums",
+                   "import PaletteKit   // ResolvedPalette + resolve(_:)" ],
+        initSnippet: """
+  ThemedFABView(palette: resolve(themeSpec), variant: .circular, size: .large,
+                role: .primary, symbol: "plus")
+      .frame(width: 56, height: 56)
+""",
+        sourcePath: "ThemeKitUI/ThemedFABView.swift",
+        appkitEscape: "ThemedFAB (NSView, module ThemeKit) — only if NOT in SwiftUI"),
     KitComponent(
         name: "ThemedDivider", module: "ThemeKit",
         kind: "MUI <Divider> (themed device-pixel hairline rule, optional text-in-divider)",
@@ -283,7 +441,24 @@ let kitCatalog: [KitComponent] = [
                  "deviceHairline true (1px) vs false (literal thickness, e.g. 2pt heavier rule)",
                  "plain rule vs text-in-divider (label, horizontal only)",
              ],
-        family: .feedback),
+        family: .feedback,
+        defaultType: "ThemedDividerView",
+        imports: [
+            "import PaletteKit   // ResolvedPalette + resolve(themeSpec)",
+            "import ThemeKit     // ThemedDivider.Orientation / .Variant enums",
+            "import ThemeKitUI   // ThemedDividerView (SwiftUI front)",
+        ],
+        initSnippet: """
+ThemedDividerView(
+    palette: resolve(themeSpec),
+    orientation: .horizontal,
+    variant: .fullWidth,
+    label: nil,
+    surface: nil
+)
+""",
+        sourcePath: "ThemeKitUI/ThemedDividerView.swift",
+        appkitEscape: "ThemedDivider (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedDividerView is an NSViewRepresentable hosting it"),
     KitComponent(
         name: "AnimatedBorderView", module: "ThemeKitUI",
         kind: "Themed surface border — universal: static primary stroke ↔ live effect rim (glow/breathe/cycle), SwiftUI-native (#17d)",
@@ -307,7 +482,22 @@ let kitCatalog: [KitComponent] = [
                  "states: live-cycling / frozen (previewFrozen) / reduce-motion (rests on the effect steady hue)",
                  "the effect rim reuses Effects.resolveBorder (rainbow hue-rotate, flash blend, breathing width) — the same animator facet/halo/perch drive",
              ],
-        family: .feedback),
+        family: .feedback,
+        defaultType: "AnimatedBorderView",
+        imports: [
+            "import SwiftUI       // View front (Shape, RoundedRectangle default)",
+            "import ThemeKitUI    // AnimatedBorderView — the SwiftUI front",
+            "import PaletteKit    // ResolvedPalette + resolve(_:)",
+            "import Effects       // EffectSpec (.rainbow, etc.) for the live rim",
+        ],
+        initSnippet: """
+AnimatedBorderView(
+    palette: resolve(themeSpec),
+    effect: .rainbow,
+    effectsEnabled: true
+)
+""",
+        sourcePath: "ThemeKitUI/AnimatedBorderView.swift"),
     KitComponent(
         name: "ThemedSkeleton", module: "ThemeKit",
         kind: "MUI <Skeleton> (low-alpha loading placeholder with pulse/wave ambient animation)",
@@ -329,7 +519,20 @@ let kitCatalog: [KitComponent] = [
                  "size: explicit width/height vs intrinsic (text from font, circular diameter, block default)",
                  "states: live-animating / frozen (previewFrozen) / reduce-motion-respecting / auto-torn-down when window hidden-miniaturized-occluded",
              ],
-        family: .feedback),
+        family: .feedback,
+        defaultType: "ThemedSkeletonView",
+        imports: [
+            "import ThemeKitUI   // ThemedSkeletonView — the public SwiftUI front",
+            "import ThemeKit     // ThemedSkeleton.Variant / .Animation enums",
+            "import PaletteKit   // ResolvedPalette + resolve(_:)",
+        ],
+        initSnippet: """
+  let palette = resolve(themeSpec)
+  ThemedSkeletonView(palette: palette, variant: .text, animation: .pulse,
+                      width: 120, height: nil)
+""",
+        sourcePath: "ThemeKitUI/ThemedSkeletonView.swift",
+        appkitEscape: "ThemedSkeleton (NSView, module ThemeKit) — the real AppKit loading placeholder ThemedSkeletonView wraps via NSViewRepresentable; drop to it only if ThemedSkeletonView can't be hosted (e.g. non-SwiftUI AppKit call site)"),
     KitComponent(
         name: "ThemedTooltip", module: "ThemeKitUI",
         kind: "MUI <Tooltip> (basic) — passive pointer-driven hint bubble",
@@ -351,7 +554,18 @@ let kitCatalog: [KitComponent] = [
                  "Text: single-line vs wrapped (wraps past 300px max width)",
                  "Color: inverted surface foreground@0.92 with best-contrast (WCAG) black/white ink — robust on light/dark/neon themes",
              ],
-        family: .feedback),
+        family: .feedback,
+        defaultType: "ThemedTooltipAnchorView",
+        imports: [
+            "import ThemeKitUI   // ThemedTooltipAnchorView — the SwiftUI front",
+            "import PaletteKit   // ResolvedPalette + resolve(_:)",
+        ],
+        initSnippet: """
+ThemedTooltipAnchorView(palette: resolve(themeSpec), text: "A live themed tooltip",
+                         placement: .auto)
+""",
+        sourcePath: "ThemeKitUI/ThemedTooltipAnchorView.swift",
+        appkitEscape: "ThemedTooltip (NSObject controller, module ThemeKitUI) — a per-anchor CONTROLLER (not an NSView) that owns a free, click-through, non-activating NSPanel floating above the host window; its anchor is a real ThemedButton (module ThemeKit, NSView). Only reach for ThemedTooltip.attach(to:text:palette:placement:) directly (skipping ThemedTooltipAnchorView) if you need the controller API (show()/hide()/invalidate(), enterDelay/leaveDelay, previewVisible) on an existing NSView outside a SwiftUI tree."),
     KitComponent(
         name: "ThemedBackdrop", module: "ThemeKitUI",
         kind: "SwiftUI-native themed backdrop surface — what panels/pills/cards sit on (solid or alpha scrim, any Shape; NO blur)",
@@ -369,7 +583,18 @@ let kitCatalog: [KitComponent] = [
                  "shape: any SwiftUI Shape — rounded-rect (cards), Capsule (pills), custom",
                  "bordered on/off; live re-theme by reassigning palette",
              ],
-        family: .feedback),
+        family: .feedback,
+        defaultType: "ThemedBackdropView",
+        imports: [
+            "import PaletteKit   // ResolvedPalette + resolve(themeSpec)",
+            "import ThemeKitUI   // ThemedBackdropView (pure SwiftUI, no AppKit wrap)",
+        ],
+        initSnippet: """
+ThemedBackdropView(
+    palette: resolve(themeSpec)
+)
+""",
+        sourcePath: "ThemeKitUI/ThemedBackdropView.swift"),
     KitComponent(
         name: "WindowShell", module: "ThemeKit",
         kind: "The family's ONE parameterized AppKit window-shell factory — a long-lived non-activating NSPanel whose key behavior / chrome / level / collectionBehavior / click-through are knobs; content is SwiftUI via NSHostingView (the permitted 「窓の殻」 AppKit floor). SEPARATE from the internal transient-popup machinery (themedPopupPanel / placePopup / PopupFade).",
@@ -391,7 +616,21 @@ let kitCatalog: [KitComponent] = [
                  "screen-union contentRect spanning every display; live hotplug reflow needs real multi-display hardware (union MATH is unit-tested)",
                  "prism: inline mock of a shell surface + live triggers spawning the REAL shell (key-on-demand typing, click-through, titled-resizable, HUD, screen-union) for single-display verification",
              ],
-        family: .feedback),
+        family: .feedback,
+        imports: [
+            "import AppKit   // ShellPanel (NSPanel) + NSHostingView host content SwiftUI",
+            "import SwiftUI  // NSHostingView(rootView:) wraps the shell's content",
+            "import ThemeKit // WindowShellSpec, makeWindowShell(_:), ShellPanel, ShellFade",
+        ],
+        initSnippet: """
+  let spec = WindowShellSpec(keyMode: .onDemand)   // all WindowShellSpec params are defaulted
+  let panel: ShellPanel = makeWindowShell(spec)
+  panel.contentView = NSHostingView(rootView: MyShellContent())
+  panel.setFrame(CGRect(x: 0, y: 0, width: 380, height: 200), display: true)
+  ShellFade().fadeIn(panel)   // orderFrontRegardless + animator().alphaValue fade
+""",
+        sourcePath: "ThemeKit/WindowShell.swift",
+        isAtom: true),
     KitComponent(
         name: "ThemedListView", module: "ThemeKitUI",
         kind: "MUI <List> (basic) — the SwiftUI-native themed list/menu row renderer",
@@ -421,7 +660,28 @@ let kitCatalog: [KitComponent] = [
                  "drag affordance: .onto lights the target row (2pt primary ring + faint fill); .between draws a 2pt primary insertion line + leading dot in the gap; the lifted source row dims. A CHUNK lift dims EVERY member row and draws a THICKER full-bleed section insertion bar; the overlay ghost is the members' capped (60%) union with an 'N items' badge. grid/rail/real-window drag stay app-side (not in sill)",
                  "capture seams: preview: ListPreview(selection:highlight:scrollX:scrollY:dragSource:dropTarget:dragChunk:) — one frozen value pins every interactive state for a deterministic prism shot",
              ],
-        family: .collection),
+        family: .collection,
+        // Structured recipe (Task 3 worked example) — verified against the real
+        // ThemedListView.swift / ListStyle.swift / ListItem.swift init signatures.
+        defaultType: "ThemedListView<ID>",
+        imports: [
+            "import ThemeKitUI   // ThemedListView, ListItem, ThemedListStyle, Badge/TrailingAccessory/ListTint",
+            "import PaletteKit   // ResolvedPalette + resolve(_:)",
+        ],
+        initSnippet: """
+          let palette = resolve(themeSpec)              // @MainActor; themeSpec: ThemeSpec
+          var style = ThemedListStyle()                 // selectionMode defaults to .single
+          ThemedListView(
+              items: [ ListItem(id: "inbox",   primary: "Inbox"),
+                       ListItem(id: "starred", primary: "Starred", secondary: "3 unread") ],
+              style: style,
+              palette: palette,
+              onActivate: { id in open(id) })           // id IS the ListItem.id
+        """,
+        cellType: "ListItem",
+        cellInit: "ListItem(id:primary:) — only id + primary required (image/secondary/badges/trailing/tint/kind default).",
+        sourcePath: "ThemeKitUI/ThemedListView.swift",
+        appkitEscape: ""),
     KitComponent(
         name: "ThemedMenu", module: "ThemeKitUI",
         kind: "MUI <Menu> — a themed floating pop-up menu of action rows with N-level submenu cascade + horizontal (menu-bar) presentation",
@@ -449,7 +709,68 @@ let kitCatalog: [KitComponent] = [
                  "presentation: .vertical drop-down list, .toolbar icon-only bar, .labeledToolbar icon+label bar",
                  "interaction states demoed: hover/highlight (solidAccent), ↑↓ nav (vertical) / ←→ nav (horizontal bar), ⏎/Space activate, → open submenu (vertical) / ↓ open submenu (horizontal) / ← + Esc close one level, Esc/Tab dismiss",
              ],
-        family: .collection),
+        family: .collection,
+        defaultType: "ThemedMenuTriggerView",
+        imports: [
+            "import ThemeKitUI   // ThemedMenuTriggerView — the SwiftUI front; ThemedMenu.MenuItem lives here too",
+            "import PaletteKit   // ResolvedPalette + resolve(_:)",
+        ],
+        initSnippet: """
+let items: [ThemedMenu.MenuItem] = [
+    ThemedMenu.MenuItem("New Window", shortcut: "⌘N") {},
+    ThemedMenu.MenuItem("Open…") {},
+    .separator(),
+    ThemedMenu.MenuItem("Delete", isDestructive: true) {},
+]
+ThemedMenuTriggerView(palette: resolve(themeSpec), title: "Actions", items: items)
+""",
+        cellType: "ThemedMenu.MenuItem",
+        cellInit: "MenuItem(_:icon:shortcut:isEnabled:isDestructive:submenu:action:) — MenuItem(\"Title\") { } — only the title is required (icon/shortcut/isEnabled/isDestructive/submenu/action all default; `.separator(id:)`/`.header(_:id:)` build non-interactive rows).",
+        sourcePath: "ThemeKitUI/ThemedMenuTriggerView.swift",
+        appkitEscape: "ThemedButton (NSView, module ThemeKit) — the trigger button ThemedMenuTriggerView hosts. ThemedMenu ITSELF (module ThemeKitUI, Sources/ThemeKitUI/ThemedMenu.swift) is an NSObject CONTROLLER — not an NSView — that owns a borderless non-key ThemeKit PopupPanel; only reach for it directly (skipping the trigger view) if you need the controller API (ThemedMenu.make(palette:items:) + present(from:)/present(at:in:)/dismiss()/onOpenChange) outside a SwiftUI tree, e.g. a context menu opened from a raw NSEvent."),
+    KitComponent(
+        name: "ThemedGrid", module: "ThemeKitUI",
+        kind: "MUI <ImageList> (basic) — a general, content-agnostic themed thumbnail/photo grid; ThemedGrid is the batteries-included form (ThemedThumbnailGridView) of the generic ThemedGridView (#17e)",
+        summary: "100% SwiftUI-native grid: responsive LazyVGrid/LazyHGrid layout (ScrollView + GeometryReader), themed cell chrome (rest/hover/selected/keyboard-focused ring+fill+shadow, canonical roles), controlled/uncontrolled selection, 2D keyboard nav (onMoveCommand, a single roving cursor) + double-click/Return activation. ThemedThumbnailGridView supplies the default cell (image fill or a SwiftUI shimmer placeholder + optional bottom-scrim label) over ThemedGridView's generic cell-content seam; themed by passing a ResolvedPalette. NO AppKit (#17e AppKit policy) — DnD + carousel/hero are out of scope.",
+        consumes: "A SwiftUI View: `ThemedThumbnailGridView(items:[ThumbnailItem], selection:, layout:, axis:, aspectRatio:, palette:, onActivate:)` — multi-select via `Binding<Set<String>>?` or the single-select convenience over `Binding<String?>` (bridged to a 0/1 set internally); embed directly, it owns its own scrolling + responsive columns. For a custom cell, drop to the generic `ThemedGridView<Data,ID,Cell>(_:id:selection:layout:axis:aspectRatio:palette:onActivate:allowsMultiSelect:cell:)` and supply your own `@ViewBuilder` cell — it still owns all chrome/selection/keyboard nav.",
+        keyAPI: [
+                 "items: [ThumbnailItem] — id: String, image: NSImage?, label: String?; nil image renders a SwiftUI shimmer placeholder (no AppKit)",
+                 "selection: Binding<Set<String>>? (multi-select init) or Binding<String?> (single-select convenience) — nil ⇒ uncontrolled (internal @State)",
+                 "layout: GridLayout — .fixed(columns:) fixed column count / .adaptive(minCellWidth:) as many columns as fit (default, 160pt)",
+                 "axis: Axis — .vertical (LazyVGrid, default) / .horizontal (LazyHGrid)",
+                 "aspectRatio: CGFloat? — fixes each cell's w/h ratio; nil = natural cell sizing",
+                 "palette: ResolvedPalette — theme; drives fill/stroke/shadow/focus-ring canonical roles (selection/hover/muted/border/primary/foreground)",
+                 "onActivate: ((String) -> Void)? — fires on double-click or Return-on-cursor",
+                 "allowsMultiSelect: Bool — set internally by which init is used (multi-select ⇒ true, single-select convenience ⇒ false); Cmd-click toggles only when true, else replaces",
+                 "keyboard: onMoveCommand arrow keys move a single roving cursor that REPLACES the selection (macOS grid convention); Return activates the cursor",
+                 "GridCellState (isSelected/isHovered/isFocused) is handed to a custom cell builder so it can layer its own emphasis atop the kit's chrome",
+             ],
+        variants: [
+                 "layout: fixed(columns:) / adaptive(minCellWidth:)",
+                 "axis: vertical / horizontal",
+                 "cell states: rest / hovered / selected / keyboard-focused (each its own fill+stroke+shadow+focus-ring per canonical roles)",
+                 "default cell (ThemedThumbnailCell): image (resizable, .fill aspect) or shimmer-loading placeholder (nil image) + optional bottom-scrim label",
+                 "selection: uncontrolled / controlled, single-select / multi-select (Cmd-click toggle, plain click replaces)",
+                 "DnD + carousel/hero are OUT OF SCOPE (design spec §3.2/§11)",
+             ],
+        family: .collection,
+        defaultType: "ThemedThumbnailGridView",
+        imports: [
+            "import SwiftUI      // View front",
+            "import ThemeKitUI   // ThemedThumbnailGridView + ThumbnailItem",
+            "import PaletteKit   // ResolvedPalette + resolve(_:)",
+        ],
+        initSnippet: """
+let palette = resolve(themeSpec)
+let items: [ThumbnailItem] = [
+    ThumbnailItem(id: "1", image: nil, label: "One"),
+    ThumbnailItem(id: "2", image: nil, label: "Two"),
+]
+ThemedThumbnailGridView(items, palette: palette)
+""",
+        cellType: "ThumbnailItem",
+        cellInit: "ThumbnailItem(id: \"1\", image: nil, label: \"One\")",
+        sourcePath: "ThemeKitUI/ThemedThumbnailGridView.swift"),
     KitComponent(
         name: "ThemedTransition", module: "Motion",
         kind: "MUI theme.transitions analog — pure one-shot animation math (Duration/Easing tokens, Tween, lerp, spring, frameStep)",
@@ -470,7 +791,24 @@ let kitCatalog: [KitComponent] = [
                  "Primitives: Tween · progress/eased · lerp (scalar + CG) · spring · dampedSine · frameStep (discrete) · autoDuration · scaled",
                  "DIVISION OF LABOUR: Motion = one-shot (slide/fade/pop/reorder); Effects = cyclic (border breathe/flash, rainbow, line-pets). No timer/state here — app owns the clock (sill f(now) convention)",
              ],
-        family: .motion),
+        family: .motion,
+        imports: [
+            "import Motion   // ThemedTransition namespace — Tween/Easing/Duration, pure math, no palette needed",
+        ],
+        initSnippet: """
+// ThemedTransition is a pure, caseless-enum NAMESPACE — never instantiated.
+// Store a Tween in your animation cell, sample it each frame off your own
+// wall-clock (CACurrentMediaTime()-style `now`); nothing to retain/init.
+let tween = ThemedTransition.Tween(
+    start: now,
+    duration: ThemedTransition.Duration.move,   // .snap/.exit/.enter(default)/.move/.emphasis
+    delay: 0,
+    easing: .easeOutCubic
+)
+let x = tween.value(at: now, from: x0, to: x1)   // eased lerp, this frame
+""",
+        sourcePath: "Motion/ThemedTransition.swift",
+        isAtom: true),
     KitComponent(
         name: "ParticleBurst", module: "Effects",
         kind: "Celebratory particle burst — 紙吹雪 / 花火 (confetti / fireworks). The FlashState pre-roll → wall-clock decay pattern, scaled to a field of moving particles",
@@ -489,7 +827,22 @@ let kitCatalog: [KitComponent] = [
                  "Intensity: subtle 0.6× / normal 1.0× / bold 1.6× / wild 2.5× (count + reach)",
                  "DIVISION OF LABOUR: a burst is one-shot, but it lives in Effects (not Motion) — it is the color-dynamic FlashState pattern at scale, and reuses the EffectSpec palettes + NSColor bridge. No timer/state — app owns the clock (sill f(now) convention)",
              ],
-        family: .particles),
+        family: .particles,
+        defaultType: "ParticleBurstView",
+        imports: [
+            "import ThemeKitUI   // ParticleBurstView — the public SwiftUI front (pure Canvas, no AppKit wrap)",
+            "import Effects      // ParticleEmission / EffectIntensity enums used as param types",
+        ],
+        initSnippet: """
+ParticleBurstView(
+    emission: .fireworks,
+    colors: [0xFFD700, 0xFF6EC7, 0x00E5FF],
+    intensity: .bold,
+    loopPeriod: 1.5
+)
+""",
+        sourcePath: "ThemeKitUI/ParticleBurstView.swift",
+        appkitEscape: "drawParticles(_:now:scale:) (free function, module Effects, @MainActor) — the pre-#17a AppKit draw helper; paints a rolled ParticleBurst's resolveParticles() into the CURRENT NSGraphicsContext. Only reach for it hosting inside a plain NSView.draw(_:), not SwiftUI."),
     KitComponent(
         name: "SplatterShape", module: "Effects",
         kind: "Ink-splat decal — Splatoon-style post-fire splatter. The roll → resolve-alpha → draw pattern, but a static shape that only fades (a stamp, not a burst)",
@@ -507,7 +860,18 @@ let kitCatalog: [KitComponent] = [
                  "Lifetime: hold 66% at full → linear fade to 0; static shape (only alpha moves)",
                  "DIVISION OF LABOUR: lives in Effects with the particle burst (fire-moment FX). Pure vertices (Double tuples), Catmull-Rom + NSColor stay in the gated draw helper. No timer/state — app owns the clock",
              ],
-        family: .particles),
+        family: .particles,
+        defaultType: "InkSplatterView",
+        imports: [
+            "import ThemeKitUI   // InkSplatterView (pure SwiftUI Canvas, no AppKit wrap)",
+        ],
+        initSnippet: """
+InkSplatterView(
+    colors: [0xFFD700, 0xFF6EC7, 0x00E5FF]
+)
+.frame(width: 160, height: 150)
+""",
+        sourcePath: "ThemeKitUI/InkSplatterView.swift"),
     KitComponent(
         name: "TrailGeometry", module: "Effects",
         kind: "Path-geometry primitives — arc-length resampler + corner rounding (wand's gesture-trail tooling, generalized)",
@@ -524,7 +888,25 @@ let kitCatalog: [KitComponent] = [
                  "roundedCornerPath: the straightened-gesture trail's corner softening (PathStep is cross-platform; NSBezierPath stays gated)",
                  "DIVISION OF LABOUR: pure geometry in Effects (no f(now), no theming); NSBezierPath behind canImport(AppKit). Color cycling for a trail reuses Effects.blendThrough; fade reuses Motion",
              ],
-        family: .particles),
+        family: .particles,
+        imports: [
+            "import Effects   // resampleAlongPolyline, roundedCornerPath, TrailMark, PathStep",
+        ],
+        initSnippet: """
+let points: [(x: Double, y: Double)] = [(0, 0), (40, 0), (40, 40), (80, 40)]
+
+// (a) lay glyphs along the path, oriented by the local tangent
+for m in resampleAlongPolyline(points, interval: 24) {
+    let angle = atan2(m.tangent.y, m.tangent.x)
+    // drawGlyph(at: m.point, angle: angle)
+}
+
+// (b) soften the polyline's interior corners into a pure step list
+let steps = roundedCornerPath(points, radius: 8)   // [PathStep] — .move/.line/.quadCurve
+""",
+        sourcePath: "Effects/Trail.swift",
+        appkitEscape: "nsBezierPath(_:lineWidth:) -> NSBezierPath (Effects, @MainActor) — turns a [PathStep] into a round-capped NSBezierPath; only needed outside SwiftUI. In SwiftUI, translate PathStep into a Path yourself (ThemeKitUI's swiftUIPath(from:) is `internal`, not public API) via .move(to:)/.addLine(to:)/.addQuadCurve(to:control:)",
+        isAtom: true),
     KitComponent(
         name: "PixelSprite", module: "PixelArt + Effects",
         kind: "Pixel-art sprite atom — wand's chomp (Pac-Man) arcade decals as resolution-independent integer pixel grids (#12 Ph1+Ph2: line-pets unified to pixel, mouth/waddle via Motion.frameStep; Ph3: ghost line-pet is UPRIGHT + directional)",
@@ -545,7 +927,17 @@ let kitCatalog: [KitComponent] = [
                  "DIVISION OF LABOUR: pure grids + circle/wedge/hash math in PixelArt (zero AppKit, zero Palette — intrinsic UInt32 colours); NSRect fill behind canImport(AppKit) in Effects. Theme-INVARIANT by design (chomp is always yellow/red/blue/black)",
                  "Ph roadmap (#12): Ph1 sprites+blitter ✓ → Ph2 unify line-pets + Motion.frameStep ✓ → Ph3 upright directional-eye ghost ✓ (this) + PathPet next → Ph4 neon corridor + pellets → Ph5 eat + rainbow flash + score",
              ],
-        family: .particles),
+        family: .particles,
+        defaultType: "PixelSpriteView",
+        imports: [
+            "import ThemeKitUI   // PixelSpriteView — pure SwiftUI front (Image + .interpolation(.none), no AppKit wrap)",
+            "import Effects      // CanonicalSprite.cherry — a ready-made PixelSprite value (also re-exports PixelArt's PixelSprite type)",
+        ],
+        initSnippet: """
+PixelSpriteView(sprite: CanonicalSprite.cherry, cell: 6)
+""",
+        sourcePath: "ThemeKitUI/PixelSpriteView.swift",
+        appkitEscape: "drawPixelSprite(_:cell:at:color:) (free function, module Effects, @MainActor) — the pre-#17a AppKit blit; fills each opaque PixelSprite cell as an antialias-off NSRect into the CURRENT NSGraphicsContext (host in an isFlipped NSView). Only reach for it outside SwiftUI."),
     KitComponent(
         name: "MarkdownView", module: "MarkdownKitUI",
         kind: "Themed Markdown renderer — full GFM, selectable NSTextView (AppKit floor-3)",
