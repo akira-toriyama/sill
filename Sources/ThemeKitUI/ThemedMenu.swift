@@ -678,9 +678,15 @@ public final class ThemedMenu: NSObject {
 
     // MARK: - Activation
 
+    /// A row opens a cascade when it has static children OR a deferred provider.
+    /// The single source of truth for "is this a folder row?".
+    private func hasChildren(_ mi: MenuItem) -> Bool {
+        !mi.submenu.isEmpty || mi.submenuProvider != nil
+    }
+
     private func activate(_ id: String) {
         guard let mi = items.first(where: { $0.id == id }), mi.isEnabled, mi.kind == .item else { return }
-        if !mi.submenu.isEmpty {
+        if hasChildren(mi) {
             // A submenu row: opening the child IS its activation (its own `action` is
             // ignored). Light the child's first row so ⏎-into-submenu reads naturally.
             openSubmenu(rowID: id, highlightFirst: true)
@@ -704,7 +710,7 @@ public final class ThemedMenu: NSObject {
         // path is ever open, so there is no cross-level contention.
         hoverWork?.cancel(); hoverWork = nil
         guard let id else { return }                    // left the rows — keep any open child
-        let isSubmenuRow = items.first(where: { $0.id == id })?.submenu.isEmpty == false
+        let isSubmenuRow = items.first(where: { $0.id == id }).map(hasChildren) ?? false
         if isSubmenuRow {
             if childRowID == id, child?.isOpen == true { return }   // already showing this one
             schedule { [weak self] in self?.openSubmenu(rowID: id, highlightFirst: false) }
@@ -725,7 +731,7 @@ public final class ThemedMenu: NSObject {
     private func openSubmenu(rowID id: String, highlightFirst: Bool) {
         hoverWork?.cancel(); hoverWork = nil
         guard isOpen, let host = hostWindow,
-              let mi = items.first(where: { $0.id == id }), mi.isEnabled, !mi.submenu.isEmpty,
+              let mi = items.first(where: { $0.id == id }), mi.isEnabled, hasChildren(mi),
               let rowRect = rowRectOnScreen(for: id) else { return }
         if childRowID == id, child?.isOpen == true {                // already showing this one
             if highlightFirst { child?.controller.moveHighlight(1) }    // re-light its first row (Enter/→ intent)
@@ -770,7 +776,7 @@ public final class ThemedMenu: NSObject {
     /// rect, or close it if the row vanished / is no longer a submenu. Root-only.
     private func validateOpenChild() {
         guard let c = child, let id = childRowID else { return }
-        guard items.first(where: { $0.id == id })?.submenu.isEmpty == false else {
+        guard let vmi = items.first(where: { $0.id == id }), hasChildren(vmi) else {
             closeChild(); return                             // the submenu row is gone / lost its children
         }
         if let rect = rowRectOnScreen(for: id) {
@@ -822,7 +828,7 @@ public final class ThemedMenu: NSObject {
         case .moveUp:   leaf.moveContentHighlight(-1); return nil
         case .openSubmenu:
             if let id = leaf.highlightedContentID,
-               leaf.items.first(where: { $0.id == id })?.submenu.isEmpty == false {
+               let kmi = leaf.items.first(where: { $0.id == id }), leaf.hasChildren(kmi) {
                 leaf.openSubmenu(rowID: id, highlightFirst: true)
                 return nil
             }

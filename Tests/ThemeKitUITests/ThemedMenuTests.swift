@@ -372,6 +372,23 @@ final class ThemedMenuTests: XCTestCase {
         m.dismiss(animated: false)
     }
 
+    func testProviderRowActivatesAsFolder() {
+        // Gate coverage: activating a provider-only row opens its child (does NOT
+        // run a leaf action).
+        var leafActionFired = false
+        let items: [ThemedMenu.MenuItem] = [
+            .init(id: "branch", title: "Switch Branch",
+                  action: { leafActionFired = true },
+                  submenuProvider: { [.init("main")] }),
+        ]
+        let (m, anchor) = anchoredMenu(items)
+        m.present(from: anchor)
+        m._activate("branch")
+        XCTAssertTrue(m.menuProbe.childOpen, "activating a provider row opens the child (folder gate)")
+        XCTAssertFalse(leafActionFired, "a provider/folder row's own action is ignored")
+        m.dismiss(animated: false)
+    }
+
     func testRightArrowOpensAndLeftClosesSubmenu() {
         let (m, anchor) = anchoredMenu(cascadeItems())
         m.present(from: anchor)
