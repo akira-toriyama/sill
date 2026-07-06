@@ -2,6 +2,37 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## ⚠ Reconcile deltas (decided 2026-07-06 — READ FIRST, they override conflicting text below)
+
+This plan was authored 2026-07-03 (**Effort 1**). A second independent design pass on
+2026-07-06 (**Effort 2**, brainstorming + a 4-lens adversarial review) reached the SAME core
+decisions, so we **resume this plan via reconcile** rather than restart. Task 1 is already
+shipped on this branch (`worktree-t-ftqa-prism-shell` = Effort 1's 4 commits cherry-picked onto
+current origin/main; `swift build` green). Apply these deltas before/while executing:
+
+**D1 — Container = custom `HStack`, NOT `NavigationSplitView`.** (User 2026-07-06: 破壊的変更OK・高品質優先.)
+**Task 5 is REWRITTEN**: replace `NavigationSplitView` with a custom `HStack { sidebar ; Divider() ; detail }`
+for full MUI-docs造形 control. Consequences:
+  - Sidebar collapse = a `@State` visibility/width toggle animated with `withAnimation` (no free NavigationSplitView collapse).
+  - Selection = `@State selection: SidebarItem?` driving a plain `List(selection:)` (or custom rows) INSIDE the HStack.
+  - Search = a **SwiftUI `TextField`** in the sidebar header (NOT `.searchable`, NOT an AppKit `ThemedTextField` — CLAUDE.md shell-purity). Reuse `filteredSections` as-is.
+  - Keyboard ↑/↓ = via `List(selection:)`; re-verify focus (no `.searchable` to steal it now → simpler than Task 5 Step 10).
+  - The **"window-NSToolbar trap" hardening is MOOT** for a custom HStack (nothing renders into a window `NSToolbar`) — keep the in-content top bar, drop the trap-specific caveats in Task 5 Steps 4/9 and the Testing-approach note.
+  - Shell stays **pure SwiftUI**; no new AppKit (Global Constraints still hold).
+  - Treat the Task 5 code snippets below as NavigationSplitView-era illustrations — **rewrite + `swift build` during execution**; D1 is authoritative where they conflict (incl. the Architecture line and File-Structure/Interface `NavigationSplitViewVisibility` bits).
+
+**D2 — Factual fixes for current main (#108 retired the AppKit `ThemedList`).** Apply everywhere in this plan + its test code:
+  - The catalog id is **`ThemedListView`**, NOT `ThemedList`. Rename in: `wiredMockNames`, the `mock(for:)` case, `sidebarItem(forWidget:)`/copy-ref test strings, and every deep-link example. (The catalog entry at `KitCatalog.swift:396` is already `name: "ThemedListView"`.) Do a WORD-BOUNDARY rename — don't turn existing `ThemedListView` into `ThemedListViewView`.
+  - **Drop the deleted AppKit escape**: Task 3 Step 3's `appkitEscape: "ThemedList(palette:) → addSubview"` references a type #108 DELETED → set `appkitEscape: ""` (ThemedListView is now the only front).
+  - Catalog count = **24** (verified). #108 M5d already refreshed some `consumes`/`keyAPI` → Task 10 is partly done; re-verify per entry, don't assume all recipes are stale.
+  - **MarkdownView**: keep E1's approach (stays `family:.glance`, EXCLUDED from standalone rows via `excludedStandalone`, rendered only inside the glance app page). E2's ".text standalone node" idea is NOT adopted (less churn).
+
+**D3 — Anti-duplication.** A stale duplicate branch **`worktree-t-ftqa-prism-focus`** (pre-#108 base) also exists — **DO NOT use it**. THIS branch (`worktree-t-ftqa-prism-shell`) is the reconciled one. The 2026-07-06 Effort-2 spec is folded into D1/D2 and is intentionally NOT committed as a separate doc.
+
+**Execution entry point:** Task 1 done → start at **Task 2**, applying D1/D2 as you reach Tasks 3/4/5/6.
+
+---
+
 **Goal:** Redesign prism's shell into a Storybook/MUI searchable-sidebar split-view so one widget fills one screen and any widget/cell is reached fastest — widget rendering unchanged.
 
 **Architecture:** Replace prism's header (theme-chip wall + Kit/Apps tab rows) + per-theme card stack with a `NavigationSplitView`: an in-content top bar (theme `Picker` + `EffectToggle` + sidebar toggle), a `.searchable(.sidebar)` `List` driven by an explicit `SidebarItem` registry, and a detail column rendering one widget page (Overview | Specimens | API + copy ref) or a bespoke foundation/app page. Deep-link config (`widget`/`family`/`theme`/`section`/`showAll`) makes captures deterministic without activating the window.

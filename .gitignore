@@ -9,3 +9,6 @@ Package.resolved
 
 # Claude Code local config + git worktrees (machine-specific; never commit worktrees)
 .claude/
+
+# Superpowers brainstorming visual-companion working dir (mockups, not source)
+.superpowers/
