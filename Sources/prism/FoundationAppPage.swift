@@ -57,7 +57,8 @@ func appCaption(_ tab: KitFamily, p: ResolvedPalette) -> AnyView {
             .font(sysFont(8.5, design: .monospaced))
             .foregroundColor(Color(nsColor: p.muted))
     }
-    .fixedSize(horizontal: false, vertical: true))
+    .fixedSize(horizontal: false, vertical: true)
+    .padding(.bottom, 2))   // fidelity: matches the retired ThemeCard.appCaption gap
 }
 
 // MARK: - Foundation / App page
