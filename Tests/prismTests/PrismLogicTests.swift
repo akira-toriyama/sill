@@ -39,3 +39,25 @@ final class CopyRefTests: XCTestCase {
         XCTAssertFalse(ref.contains("{ list in"))
     }
 }
+
+final class SidebarRegistryTests: XCTestCase {
+    private var widgetRows: Set<String> {
+        Set(sidebarSections.flatMap { $0.items }.compactMap { if case .widget(let n) = $0 { return n }; return nil })
+    }
+    func testEveryCataloguedStandaloneWidgetHasARow() {
+        for c in kitCatalog where c.name != "MarkdownView" {
+            XCTAssertTrue(widgetRows.contains(c.name), "\(c.name) cataloged but no sidebar row")
+        }
+    }
+    func testRenderMapExactlyMatchesWidgetRows() {
+        // Drift guard: a widget row with no render case, or a render case with no row.
+        XCTAssertEqual(Set(wiredMockNames), widgetRows, "wiredMockNames must equal the .widget sidebar rows")
+    }
+    func testThemedGridCatalogued() { XCTAssertFalse(kitComponent("ThemedGrid").kind.isEmpty) }
+    func testLookups() {
+        XCTAssertEqual(sidebarItem(forWidget: "themedlistview"), .widget("ThemedListView"))
+        XCTAssertNil(sidebarItem(forWidget: "nope"))
+        XCTAssertEqual(sidebarItem(forFamily: "facet"), .app(.facet))
+        XCTAssertEqual(sidebarItem(forFamily: "palette"), .foundation(.palette))
+    }
+}
