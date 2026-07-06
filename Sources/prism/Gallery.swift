@@ -30,9 +30,10 @@ struct Gallery: View {
     let config: PrismConfig
 
     /// Catalog names the theme Picker offers — the `random` meta-name is a roll
-    /// action, not a persistent selection, so it's excluded. (Stays `private` this
-    /// task; a later task widens its reach beyond the top-bar Picker.)
-    private static let switchable = canonicalThemeNames.filter { $0 != "random" }
+    /// action, not a persistent selection, so it's excluded. Internal (not
+    /// `private`) so the sibling `FoundationAppPage` can reuse this same list for
+    /// the palette page's 36-chip swatch wall.
+    static let switchable = canonicalThemeNames.filter { $0 != "random" }
 
     /// The first real widget row's name — the fallback selection when the config
     /// deep-links neither a widget nor a family. Derived from the SAME
@@ -203,8 +204,10 @@ struct Gallery: View {
                     section: config.showAll ? .specimens
                         : (PageSection.allCases.first { $0.rawValue.lowercased() == config.section } ?? .overview),
                     showAll: config.showAll)
-            case .foundation(let f): Text("foundation → \(f.rawValue)")
-            case .app(let a):        Text("app → \(a.rawValue)")
+            case .foundation, .app:
+                FoundationAppPage(item: selection,
+                                  themeName: selectedTheme,
+                                  showEffects: showEffects)
             }
         } else {
             Text("Select a widget").foregroundColor(.secondary)
@@ -214,10 +217,9 @@ struct Gallery: View {
 
 // MARK: - Widget mock map (file-level; one case per wired widget)
 
-/// The single widget's live mock for `WidgetPage`, factored from the WIDGET
-/// cases of `ThemeCard.widgetFamily(p:)` (which still holds its own copy this
-/// task — Task 7 removes ThemeCard and this becomes the sole map). Every case
-/// renders the same `Mock…(p:)` the card does; `themeName` is threaded to the two
+/// The single widget's live mock for `WidgetPage` — the SOLE widget-mock map now
+/// that the retired `ThemeCard.widgetFamily(p:)` is gone (its cases were folded
+/// here). Every case renders a `Mock…(p:)`; `themeName` is threaded to the two
 /// that need it (`MockThemedPill`, `MockBorder`). The switch cases MUST equal
 /// `wiredMockNames` exactly — a widget that fell to `default:` would render a
 /// blank page (the Task-4 render-map test guards that equality). App mocks
@@ -251,13 +253,15 @@ struct Gallery: View {
     }
 }
 
-// MARK: - Theme chip (one header switch button)
+// MARK: - Theme chip (a theme swatch tile)
 
-/// One header button: the theme name on a tile tinted with that theme's
-/// OWN resolved colours (bg / foreground / primary), so the switch row is
-/// itself a colour preview. `"all"` renders in neutral app chrome. The
-/// selected chip gets a 2.5 px primary ring + bold label + a soft accent
-/// glow; clicking it switches the gallery live (no relaunch).
+/// One theme swatch tile: the theme name on a tile tinted with that theme's
+/// OWN resolved colours (bg / foreground / primary), so a wall of them is
+/// itself a colour preview. `"all"` renders in neutral app chrome. A
+/// `selected` chip gets a 2.5 px primary ring + bold label + a soft accent
+/// glow. The palette foundation page tiles the whole catalog into a swatch
+/// grid (non-interactive, `selected: false`); the `action` closure lets a
+/// caller make a chip a live switcher.
 struct ThemeChip: View {
     let name: String          // "all" or a canonical theme name
     let label: String
@@ -341,219 +345,7 @@ struct FlowLayout: Layout {
     }
 }
 
-// MARK: - Theme card
-
-struct ThemeCard: View {
-    let name: String
-    let family: KitFamily
-    let scale: CGFloat
-    let showEffects: Bool
-
-    var body: some View {
-        let spec = paletteFor(name)
-        let base = resolve(spec)
-        let cardBG = base.background.map { Color(nsColor: $0) }
-            ?? Color(nsColor: .underPageBackgroundColor)
-        let fg = Color(nsColor: base.foreground)
-
-        VStack(alignment: .leading, spacing: 14) {
-            // Header: name + font/mode badges. Steady — only the accent cycles,
-            // and the header reads none of the accent roles.
-            HStack(spacing: 8) {
-                Text(name)
-                    .font(themeFont(spec.font, size: 16 * scale).weight(.bold))
-                    .foregroundColor(fg)
-                Text(spec.font.label.uppercased())
-                    .font(sysFont(9, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Color(nsColor: base.muted))
-                    .padding(.horizontal, 5).padding(.vertical, 2)
-                    .overlay(RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color(nsColor: base.border), lineWidth: 1))
-                if spec.background == nil {
-                    Text("VIBRANCY")
-                        .font(sysFont(9, weight: .semibold, design: .monospaced))
-                        .foregroundColor(Color(nsColor: base.muted))
-                }
-                Spacer()
-            }
-
-            // The body. `.palette` is the (static) theme foundations; the widget
-            // families render the REAL ThemeKit widgets. For an animatable theme
-            // those widgets cycle LIVE: a 30 Hz `TimelineView` drives each mock's
-            // palette through `ResolvedPalette.animated(forTheme:at:)`, so a
-            // button's accent / a list's selection wash / a FAB fill breathe
-            // through the effect exactly as they will in an app — not the frozen
-            // `resolve(spec)` accent the cards used to show.
-            if family == .palette {
-                paletteFoundations(spec: spec, p: base)
-            } else if showEffects, isAnimatableTheme(name) {
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-                    let now = timeline.date.timeIntervalSinceReferenceDate
-                    let live = base.animated(forTheme: name,
-                                             at: CGFloat(now / effectCycleSeconds))
-                    widgetFamily(p: live)
-                }
-            } else {
-                widgetFamily(p: base)
-            }
-        }
-        .padding(16)
-        .background(cardBG)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        // The card rim is the REAL shared `AnimatedBorderView` (dogfood) — the ONE
-        // part every theme uses: a static `primary` stroke normally, the LIVE
-        // glowing / breathing / cycling effect rim when the theme has an effect AND
-        // the master `effectsEnabled` (here prism's `show-effects`) is on.
-        .overlay {
-            AnimatedBorderView(
-                palette: base,
-                effect: isAnimatableTheme(name) ? borderEffectFor(name) : nil,
-                effectsEnabled: showEffects,
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous),
-                lineWidth: 1.5)
-                // The rim is a full-frame `Canvas`, which hit-tests its whole bounds
-                // and would otherwise swallow every hover/click meant for the widget
-                // content beneath — a decorative border must never capture events.
-                .allowsHitTesting(false)
-        }
-    }
-
-    /// The `.palette` family — the STATIC theme foundations: every resolved
-    /// role as a swatch (kept static so the hex labels stay readable as
-    /// documentation), a font specimen, and — for an animatable theme — the
-    /// `LiveEffectStrip` (which animates on its own clock). The accent-cycling
-    /// demo for the real widgets lives in the other families, not here.
-    @ViewBuilder
-    private func paletteFoundations(spec: ThemeSpec, p: ResolvedPalette) -> some View {
-        SwatchRow(p: p)
-        Text("AaBbCcGg 0123 — The quick brown fox jumps")
-            .font(themeFont(spec.font, size: 15 * scale))
-            .foregroundColor(Color(nsColor: p.foreground))
-        TypeScaleSpecimen(p: p)
-        TokenSpecimen(p: p)
-        if showEffects, let fx = borderEffectFor(name) {
-            LiveEffectStrip(fx: fx, name: name, fallback: p.primary)
-        }
-    }
-
-    /// The widget families — the REAL ThemeKit widgets, each over a `copy ref`
-    /// section header. `p` is the LIVE (cycling) palette for an animatable
-    /// theme, else the static resolve; the mocks re-theme by reassigning
-    /// `palette` each frame (cheap — a snap-recolour, no animation restart).
-    @ViewBuilder
-    private func widgetFamily(p: ResolvedPalette) -> some View {
-        switch family {
-        case .palette:
-            EmptyView()   // handled by `paletteFoundations`
-        case .icon:
-            MockIcons(p: p)
-        case .text:
-            WidgetSection(kitComponent("ThemedTextField"), p: p) { MockField(p: p) }
-            WidgetSection(kitComponent("ThemedComboBox"), p: p) { MockComboBox(p: p) }
-        case .action:
-            WidgetSection(kitComponent("ThemedButton"), p: p) { MockButton(p: p) }
-            WidgetSection(kitComponent("ThemedButtonGroup"), p: p) { MockButtonGroup(p: p) }
-            WidgetSection(kitComponent("ThemedToolBar"), p: p) { MockToolBar(p: p) }
-            WidgetSection(kitComponent("ThemedChip"), p: p) { MockChip(p: p) }
-            WidgetSection(kitComponent("ThemedPill"), p: p) { MockThemedPill(p: p, themeName: name) }
-            WidgetSection(kitComponent("ThemedCheckbox"), p: p) { MockCheckbox(p: p) }
-            WidgetSection(kitComponent("ThemedFAB"), p: p) { MockFAB(p: p) }
-        case .feedback:
-            WidgetSection(kitComponent("ThemedDivider"), p: p) { MockDivider(p: p) }
-            WidgetSection(kitComponent("AnimatedBorderView"), p: p) { MockBorder(p: p, themeName: name) }
-            WidgetSection(kitComponent("ThemedSkeleton"), p: p) { MockSkeleton(p: p) }
-            WidgetSection(kitComponent("ThemedTooltip"), p: p) { MockTooltip(p: p) }
-            WidgetSection(kitComponent("ThemedBackdrop"), p: p) { MockBackdrop(p: p) }
-            WidgetSection(kitComponent("WindowShell"), p: p) { MockWindowShell(p: p) }
-        case .collection:
-            WidgetSection(kitComponent("ThemedListView"), p: p) { MockList(p: p) }
-            WidgetSection(kitComponent("ThemedMenu"), p: p) { MockMenu(p: p) }
-            WidgetSection(kitComponent("ThemedGrid"), p: p) { MockThumbnailGrid(p: p) }
-        case .motion:
-            WidgetSection(kitComponent("ThemedTransition"), p: p) { MockMotion(p: p) }
-        case .particles:
-            WidgetSection(kitComponent("ParticleBurst"), p: p) { MockParticles(p: p) }
-            WidgetSection(kitComponent("SplatterShape"), p: p) { MockSplatter(p: p) }
-            WidgetSection(kitComponent("TrailGeometry"), p: p) { MockTrail(p: p) }
-            WidgetSection(kitComponent("PixelSprite"), p: p) { MockPixelArt(p: p) }
-        case .facet:
-            appCaption(.facet, p: p)
-            MockTree(p: p)
-        case .wand:
-            appCaption(.wand, p: p)
-            MockWandLauncher(p: p)
-        case .perch:
-            appCaption(.perch, p: p)
-            MockPerchOverlay(p: p, themeName: name, showEffects: showEffects)
-        case .halo:
-            appCaption(.halo, p: p)
-            MockHalo(p: p, themeName: name, showEffects: showEffects)
-        case .glance:
-            appCaption(.glance, p: p)
-            MockGlancePopover(p: p)
-        }
-    }
-
-    /// The per-app tab caption — what this app's surface is + what it ACTUALLY
-    /// consumes from sill + its notable themes (the consumer reality; apps barely
-    /// use the ThemeKit widgets the Kit tabs showcase). Grounded data, see
-    /// `appChromes` in KitCatalog.swift. Takes the SAME `p` the sibling mocks get
-    /// (the card's live/animated palette) — no separate re-resolve.
-    @ViewBuilder
-    private func appCaption(_ tab: KitFamily, p: ResolvedPalette) -> some View {
-        if let a = appChrome(tab) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(a.blurb)
-                    .font(sysFont(10, weight: .medium))
-                    .foregroundColor(Color(nsColor: p.foreground))
-                Text("uses: \(a.uses)")
-                    .font(sysFont(8.5, design: .monospaced))
-                    .foregroundColor(Color(nsColor: p.muted))
-                Text(a.themes)
-                    .font(sysFont(8.5, design: .monospaced))
-                    .foregroundColor(Color(nsColor: p.muted))
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.bottom, 2)
-        }
-    }
-}
-
-// MARK: - Widget section (kit-widget header + copy-ref button + the live mock)
-
-/// A kit-widget block inside a theme card: a header row — the component name, its
-/// MUI kind, and a `copy ref` button that puts the component's IDENTIFYING info on
-/// the clipboard — over the live `Mock<Widget>`. The header is the only addition
-/// vs the old flat stack; the mock itself is unchanged.
-struct WidgetSection<Content: View>: View {
-    let component: KitComponent
-    let p: ResolvedPalette
-    let content: Content
-
-    init(_ component: KitComponent, p: ResolvedPalette,
-         @ViewBuilder content: () -> Content) {
-        self.component = component
-        self.p = p
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 8) {
-                Text(component.name)
-                    .font(sysFont(11, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color(nsColor: p.foreground))
-                Text(component.kind)
-                    .font(sysFont(8.5, design: .monospaced))
-                    .foregroundColor(Color(nsColor: p.muted))
-                    .lineLimit(1).truncationMode(.tail)
-                Spacer(minLength: 8)
-                CopyRefButton(component: component, p: p)
-            }
-            content
-        }
-    }
-}
+// MARK: - Copy-ref button
 
 /// Copies a component's `pasteReadyCore` (type-to-use · imports · a minimal
 /// compilable-shape init) to the clipboard — so the user can paste it into
