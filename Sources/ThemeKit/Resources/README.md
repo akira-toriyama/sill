@@ -45,6 +45,21 @@ bloat git + every `swift build`'s resource copy. Adding one is trivial.)
    tinted to the role colour; for a full-colour app icon build an `NSImage`
    from the real `.app` and pass it as `leadingImage` / `ButtonItem.image`.)
 
+## Custom glyphs (house-authored, not upstream)
+
+A few glyphs in `Phosphor/regular/` are **original**, drawn in Phosphor's
+convention (viewBox-256, `fill="currentColor"`, ~40 px margin) so they tint and
+sit alongside the vendored set — but they have **no upstream source** and are
+**not** covered by Phosphor's MIT notice (they're house work, freely usable):
+
+- `bsp`, `master-left`, `master-right`, `master-top`, `master-bottom`,
+  `master-center` — facet's tiling-layout badges. `master-center` in
+  particular has no clean equivalent in any permissive set, so the whole
+  5-glyph master family + `bsp` were drawn together for visual coherence.
+
+When adding more custom glyphs, keep them filename-distinct from real Phosphor
+slugs (upstream has no `bsp` / `master-*`) so a later `curl` never collides.
+
 ## License hygiene
 
 `Phosphor/LICENSE` (MIT) and `SimpleIcons/LICENSE.md` (CC0) ship in the bundle.
