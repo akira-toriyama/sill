@@ -178,7 +178,7 @@ ThemedComboBoxView(palette: resolve(themeSpec), options: ["Apple", "Banana", "Gr
         family: .action,
         defaultType: "ThemedButtonView",
         imports: [
-            "import SwiftUI       // View front",
+            "import ThemeKitUI    // ThemedButtonView — the SwiftUI front",
             "import PaletteKit    // ResolvedPalette + resolve(_:)",
             "import ThemeKit      // ThemedButton.Variant/Size/Role types used as param defaults",
         ],
@@ -221,6 +221,7 @@ ThemedButtonView(
         defaultType: "ThemedButtonGroupView",
         imports: [
             "import SwiftUI       // View front",
+            "import ThemeKitUI    // ThemedButtonGroupView — the SwiftUI front",
             "import PaletteKit    // ResolvedPalette + resolve(_:)",
             "import ThemeKit      // ThemedButtonGroup.Orientation / ThemedButton.Variant,Size,Role types used as param defaults",
         ],
@@ -485,6 +486,7 @@ ThemedDividerView(
         defaultType: "AnimatedBorderView",
         imports: [
             "import SwiftUI       // View front (Shape, RoundedRectangle default)",
+            "import ThemeKitUI    // AnimatedBorderView — the SwiftUI front",
             "import PaletteKit    // ResolvedPalette + resolve(_:)",
             "import Effects       // EffectSpec (.rainbow, etc.) for the live rim",
         ],
