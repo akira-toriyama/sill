@@ -36,29 +36,42 @@ struct WidgetPage: View {
 
     var body: some View {
         let base = resolve(paletteFor(themeName))
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    header(base)
-                    Picker("", selection: $section) {
-                        ForEach(PageSection.allCases) { Text($0.rawValue).tag($0) }
-                    }.pickerStyle(.segmented).labelsHidden()
-                    block(.overview, base) { overviewBody(base) }
-                    block(.specimens, base) { specimensBody(base) }
-                    block(.api, base) {
-                        Text(component.fullAPI).font(sysFont(9, design: .monospaced))
-                            .foregroundColor(Color(nsColor: base.foreground)).textSelection(.enabled)
-                    }
-                }.padding(18)
+        // Header + segmented control are PINNED above the scroll region so the widget
+        // name, copy-ref, and the Overview|Specimens|API tabs stay visible while the
+        // section blocks scroll under them (MUI-docs layout). Only the blocks scroll.
+        VStack(alignment: .leading, spacing: 12) {
+            header(base)
+            Picker("", selection: $section) {
+                ForEach(PageSection.allCases) { Text($0.rawValue).tag($0) }
+            }.pickerStyle(.segmented).labelsHidden()
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        block(.overview, base) { overviewBody(base) }
+                        block(.specimens, base) { specimensBody(base) }
+                        block(.api, base) {
+                            Text(component.fullAPI).font(sysFont(9, design: .monospaced))
+                                .foregroundColor(Color(nsColor: base.foreground)).textSelection(.enabled)
+                        }
+                    }.padding(.top, 4)
+                }
+                .onChange(of: section) { _, s in withAnimation { proxy.scrollTo(s, anchor: .top) } }
+                .onAppear { proxy.scrollTo(section, anchor: .top) }   // section= deep-link lands here, zero clicks
             }
-            .onChange(of: section) { _, s in withAnimation { proxy.scrollTo(s, anchor: .top) } }
-            .onAppear { proxy.scrollTo(section, anchor: .top) }   // section= deep-link lands here, zero clicks
-        }
+        }.padding(18)
     }
 
     @ViewBuilder private func overviewBody(_ base: ResolvedPalette) -> some View {
+        // Compact: the first two representative cells, each captioned like a specimen
+        // (the whole grid lives under Specimens) so the two are self-identifying.
         if let cells { living(base) { p in AnyView(VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(cells(p).prefix(2).enumerated()), id: \.offset) { $0.element.1 } }) } }
+            ForEach(Array(cells(p).prefix(2).enumerated()), id: \.offset) { item in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(item.element.0).font(sysFont(8, design: .monospaced))
+                        .foregroundColor(Color(nsColor: p.tertiary))
+                    item.element.1
+                }
+            } }) } }
         else { living(base, mock) }         // whole mock (compact enough or not yet decomposed)
     }
     @ViewBuilder private func specimensBody(_ base: ResolvedPalette) -> some View {
@@ -80,7 +93,8 @@ struct WidgetPage: View {
     @ViewBuilder private func header(_ p: ResolvedPalette) -> some View {
         HStack(spacing: 8) {
             Text(component.name).font(sysFont(16, weight: .bold)).foregroundColor(Color(nsColor: p.foreground))
-            Text("MUI \(component.kind) · \(component.family.rawValue)")
+            // `kind` already carries its "MUI <X>" label where applicable — don't prepend a second "MUI".
+            Text("\(component.kind) · \(component.family.rawValue)")
                 .font(sysFont(9, design: .monospaced)).foregroundColor(Color(nsColor: p.muted)).lineLimit(1)
             Spacer(); CopyRefButton(component: component, p: p)
         }
