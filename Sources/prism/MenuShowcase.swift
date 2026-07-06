@@ -63,6 +63,16 @@ private let mockMenuContentHeight: CGFloat = 196
             .separator(),
             ThemedMenu.MenuItem("Clear Menu", icon: menuGlyph("trash"), isDestructive: true) {},
         ]),
+        // A DEFERRED folder — children supplied async on open (Loading… → filled),
+        // showcasing MenuItem.submenuProvider independent of wand.
+        ThemedMenu.MenuItem(id: "insert", title: "Insert Snippet", icon: menuGlyph("code"),
+                            submenuProvider: {
+            try? await Task.sleep(for: .milliseconds(300))
+            return [
+                ThemedMenu.MenuItem("Header", icon: menuGlyph("file")) {},
+                ThemedMenu.MenuItem("Footer", icon: menuGlyph("file")) {},
+            ]
+        }),
         .separator(),
         ThemedMenu.MenuItem(id: "side", title: "Show Sidebar", icon: menuGlyph("check"),
                             shortcut: "⌘\\", isChecked: true),

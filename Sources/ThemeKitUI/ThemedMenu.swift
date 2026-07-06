@@ -82,30 +82,46 @@ public final class ThemedMenu: NSObject {
         /// cascade further (N-level, arbitrary depth). A submenu row's own `action`
         /// is ignored — opening the child IS its activation.
         public var submenu: [MenuItem]
+        /// Deferred children. When set (and `submenu` is empty), opening this row
+        /// presents the child with a disabled `Loading…` row, then fills it with the
+        /// closure's result. Re-invoked on every open (cache-free). `@MainActor`,
+        /// non-throwing. Static `submenu` wins if both are present. Consumer: wand's
+        /// real launcher (an async PanelTree walk).
+        public var submenuProvider: (@MainActor () async -> [MenuItem])?
         public var kind: Kind
 
         public enum Kind: Equatable { case item, separator, header }
 
+        // NOTE: `submenuProvider` is declared AFTER `action` so the ubiquitous
+        // `MenuItem("X") { action }` trailing-closure idiom keeps binding to `action`
+        // (a single trailing closure forward-scans to the FIRST function-typed param).
+        // A provider is therefore always passed with its explicit `submenuProvider:` label.
         public init(id: String, title: String, icon: NSImage? = nil, shortcut: String? = nil,
                     hasSubmenu: Bool = false, isChecked: Bool = false, isEnabled: Bool = true,
-                    isDestructive: Bool = false, submenu: [MenuItem] = [], action: (() -> Void)? = nil) {
+                    isDestructive: Bool = false, submenu: [MenuItem] = [],
+                    action: (() -> Void)? = nil,
+                    submenuProvider: (@MainActor () async -> [MenuItem])? = nil) {
             self.id = id; self.title = title; self.icon = icon; self.shortcut = shortcut
-            self.hasSubmenu = hasSubmenu || !submenu.isEmpty
+            self.hasSubmenu = hasSubmenu || !submenu.isEmpty || submenuProvider != nil
             self.isChecked = isChecked; self.isEnabled = isEnabled
-            self.isDestructive = isDestructive; self.submenu = submenu; self.action = action; self.kind = .item
+            self.isDestructive = isDestructive; self.submenu = submenu
+            self.submenuProvider = submenuProvider; self.action = action; self.kind = .item
         }
         public init(_ title: String, icon: NSImage? = nil, shortcut: String? = nil,
                     isEnabled: Bool = true, isDestructive: Bool = false,
-                    submenu: [MenuItem] = [], action: (() -> Void)? = nil) {
+                    submenu: [MenuItem] = [],
+                    action: (() -> Void)? = nil,
+                    submenuProvider: (@MainActor () async -> [MenuItem])? = nil) {
             self.init(id: title, title: title, icon: icon, shortcut: shortcut,
-                      isEnabled: isEnabled, isDestructive: isDestructive, submenu: submenu, action: action)
+                      isEnabled: isEnabled, isDestructive: isDestructive, submenu: submenu,
+                      action: action, submenuProvider: submenuProvider)
         }
 
         private init(id: String, title: String, kind: Kind) {
             self.id = id; self.title = title; self.kind = kind
             self.icon = nil; self.shortcut = nil; self.hasSubmenu = false
             self.isChecked = false; self.isEnabled = false; self.isDestructive = false
-            self.submenu = []; self.action = nil
+            self.submenu = []; self.submenuProvider = nil; self.action = nil
         }
         /// A non-interactive divider between groups. `id` only needs to be unique.
         public static func separator(id: String = "—") -> MenuItem { MenuItem(id: id, title: "", kind: .separator) }
@@ -231,6 +247,9 @@ public final class ThemedMenu: NSObject {
     private let submenuHoverDelay: TimeInterval = 0.16
 
     private var fadeGen = 0
+    /// The in-flight deferred-submenu fetch while THIS menu is an open child.
+    /// Cancelled on teardown so a hover-away / re-target stops the provider's work.
+    private var itemsTask: Task<Void, Never>?
     nonisolated(unsafe) private var keyMon: Any?
     nonisolated(unsafe) private var mouseMon: Any?
 
@@ -467,6 +486,11 @@ public final class ThemedMenu: NSObject {
     /// check is the control text colour, not an accent).
     private static let checkmark: NSImage? = phosphorImage("check", pt: 12, weight: .bold)
 
+    // Disabled, non-interactive placeholder rows for a deferred submenu (computed so
+    // no stored non-Sendable global is captured).
+    private static var loadingRow: MenuItem { MenuItem(id: "__themedmenu.loading", title: "Loading…", isEnabled: false) }
+    private static var emptyRow: MenuItem   { MenuItem(id: "__themedmenu.empty",   title: "No items", isEnabled: false) }
+
     // MARK: - Theming
 
     public func applyTheme() {
@@ -523,6 +547,7 @@ public final class ThemedMenu: NSObject {
     public func invalidate() {
         guard !isInvalidated else { return }
         isInvalidated = true
+        itemsTask?.cancel(); itemsTask = nil
         hoverWork?.cancel(); hoverWork = nil
         child?.invalidate(); child = nil; childRowID = nil
         removeKeyMonitor()
@@ -662,9 +687,15 @@ public final class ThemedMenu: NSObject {
 
     // MARK: - Activation
 
+    /// A row opens a cascade when it has static children OR a deferred provider.
+    /// The single source of truth for "is this a folder row?".
+    private func hasChildren(_ mi: MenuItem) -> Bool {
+        !mi.submenu.isEmpty || mi.submenuProvider != nil
+    }
+
     private func activate(_ id: String) {
         guard let mi = items.first(where: { $0.id == id }), mi.isEnabled, mi.kind == .item else { return }
-        if !mi.submenu.isEmpty {
+        if hasChildren(mi) {
             // A submenu row: opening the child IS its activation (its own `action` is
             // ignored). Light the child's first row so ⏎-into-submenu reads naturally.
             openSubmenu(rowID: id, highlightFirst: true)
@@ -688,7 +719,7 @@ public final class ThemedMenu: NSObject {
         // path is ever open, so there is no cross-level contention.
         hoverWork?.cancel(); hoverWork = nil
         guard let id else { return }                    // left the rows — keep any open child
-        let isSubmenuRow = items.first(where: { $0.id == id })?.submenu.isEmpty == false
+        let isSubmenuRow = items.first(where: { $0.id == id }).map(hasChildren) ?? false
         if isSubmenuRow {
             if childRowID == id, child?.isOpen == true { return }   // already showing this one
             schedule { [weak self] in self?.openSubmenu(rowID: id, highlightFirst: false) }
@@ -709,7 +740,7 @@ public final class ThemedMenu: NSObject {
     private func openSubmenu(rowID id: String, highlightFirst: Bool) {
         hoverWork?.cancel(); hoverWork = nil
         guard isOpen, let host = hostWindow,
-              let mi = items.first(where: { $0.id == id }), mi.isEnabled, !mi.submenu.isEmpty,
+              let mi = items.first(where: { $0.id == id }), mi.isEnabled, hasChildren(mi),
               let rowRect = rowRectOnScreen(for: id) else { return }
         if childRowID == id, child?.isOpen == true {                // already showing this one
             if highlightFirst { child?.controller.moveHighlight(1) }    // re-light its first row (Enter/→ intent)
@@ -721,11 +752,22 @@ public final class ThemedMenu: NSObject {
         c.surfaceColor = surfaceColor
         c.highlightsFirstOnOpen = false
         c.density = density
-        c.items = mi.submenu
         child = c
         childRowID = id
-        c.presentAsSubmenu(rowRectOnScreen: rowRect, in: host)
-        if highlightFirst { c.controller.moveHighlight(1) }
+        if !mi.submenu.isEmpty {
+            c.items = mi.submenu                                 // static children — byte-identical legacy path
+            c.presentAsSubmenu(rowRectOnScreen: rowRect, in: host)
+            if highlightFirst { c.controller.moveHighlight(1) }
+        } else if let provider = mi.submenuProvider {
+            c.items = [ThemedMenu.loadingRow]                    // present-then-fill: a disabled placeholder
+            c.presentAsSubmenu(rowRectOnScreen: rowRect, in: host)
+            c.itemsTask = Task { [weak c] in
+                let kids = await provider()
+                guard let c, c.isOpen, !Task.isCancelled else { return }   // dropped if torn down / re-targeted
+                c.items = kids.isEmpty ? [ThemedMenu.emptyRow] : kids
+                if highlightFirst { c.controller.moveHighlight(1) }
+            }
+        }
     }
 
     /// Collapse the open submenu child (idempotent). Cancels a pending hover-intent.
@@ -741,6 +783,7 @@ public final class ThemedMenu: NSObject {
     /// snap the panel out. It installed NO monitors / glue (the root owns them), so
     /// there is nothing to remove.
     private func teardownAsChild() {
+        itemsTask?.cancel(); itemsTask = nil
         closeChild()
         guard isOpen else { return }
         isOpen = false
@@ -754,7 +797,7 @@ public final class ThemedMenu: NSObject {
     /// rect, or close it if the row vanished / is no longer a submenu. Root-only.
     private func validateOpenChild() {
         guard let c = child, let id = childRowID else { return }
-        guard items.first(where: { $0.id == id })?.submenu.isEmpty == false else {
+        guard let vmi = items.first(where: { $0.id == id }), hasChildren(vmi) else {
             closeChild(); return                             // the submenu row is gone / lost its children
         }
         if let rect = rowRectOnScreen(for: id) {
@@ -806,7 +849,7 @@ public final class ThemedMenu: NSObject {
         case .moveUp:   leaf.moveContentHighlight(-1); return nil
         case .openSubmenu:
             if let id = leaf.highlightedContentID,
-               leaf.items.first(where: { $0.id == id })?.submenu.isEmpty == false {
+               let kmi = leaf.items.first(where: { $0.id == id }), leaf.hasChildren(kmi) {
                 leaf.openSubmenu(rowID: id, highlightFirst: true)
                 return nil
             }

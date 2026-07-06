@@ -62,11 +62,15 @@ private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedLi
             ]),
             ThemedMenu.MenuItem("Finder", icon: wandGlyph("folder")) {},
         ]),
-        ThemedMenu.MenuItem(id: "branch", title: "Switch Branch", icon: wandGlyph("git-branch"), submenu: [
-            ThemedMenu.MenuItem("main",    icon: wandGlyph("git-branch")) {},
-            ThemedMenu.MenuItem("develop", icon: wandGlyph("git-branch")) {},
-            ThemedMenu.MenuItem("hotfix",  icon: wandGlyph("git-branch")) {},
-        ]),
+        ThemedMenu.MenuItem(id: "branch", title: "Switch Branch", icon: wandGlyph("git-branch"),
+                            submenuProvider: {
+            try? await Task.sleep(for: .milliseconds(400))     // faux `git branch` shell-out (deferred)
+            return [
+                ThemedMenu.MenuItem("main",    icon: wandGlyph("git-branch")) {},
+                ThemedMenu.MenuItem("develop", icon: wandGlyph("git-branch")) {},
+                ThemedMenu.MenuItem("hotfix",  icon: wandGlyph("git-branch")) {},
+            ]
+        }),
     ]
 }
 
