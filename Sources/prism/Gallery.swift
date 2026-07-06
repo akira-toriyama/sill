@@ -189,10 +189,11 @@ struct Gallery: View {
             switch selection {
             case .widget(let name):
                 // The real "all"-theme tiling is a LATER task — a single theme
-                // (dracula when "all" is selected) is fine now. `cells: nil` ⇒
-                // Overview + Specimens both render the whole mock (Task 8 supplies
-                // decomposed cells). `section` seeds case-insensitively from the
-                // config; `show-all` forces Specimens.
+                // (dracula when "all" is selected) is fine now. `ThemedListView`
+                // supplies decomposed `cells` (its 12 specimens) so Overview shows a
+                // COMPACT prefix(2) while Specimens keeps the whole grid; every other
+                // widget passes `cells: nil` (whole mock in both). `section` seeds
+                // case-insensitively from the config; `show-all` forces Specimens.
                 WidgetPage(
                     component: kitComponent(name),
                     themeName: selectedTheme == "all" ? "dracula" : selectedTheme,
@@ -200,7 +201,7 @@ struct Gallery: View {
                     mock: { p in AnyView(mock(for: name, p: p,
                         themeName: selectedTheme == "all" ? "dracula" : selectedTheme,
                         showEffects: showEffects)) },
-                    cells: nil,
+                    cells: name == "ThemedListView" ? { p in MockList.cellViews(p: p) } : nil,
                     section: config.showAll ? .specimens
                         : (PageSection.allCases.first { $0.rawValue.lowercased() == config.section } ?? .overview),
                     showAll: config.showAll)

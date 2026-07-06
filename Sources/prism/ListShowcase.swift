@@ -358,4 +358,121 @@ struct MockList: View {
             content()
         }
     }
+
+    // MARK: Decomposed cells — the same 12 specimens as `body`, WITHOUT the caption
+    // wrapper (the caption is the tuple's String). A widget page renders `prefix(2)` of
+    // these as a COMPACT Overview while the full grid lives in Specimens (the whole
+    // `mock` — i.e. `body`). Per-cell CONTENT is byte-identical to `body`; the ONLY
+    // difference is the two LIVE-interactive cells (tree collapse · multi-select): a
+    // `static func` has no `@State`, so here they use a STATIC representation — a
+    // `.constant` collapse set (matching body's initial state) and a `preview`
+    // selection. That's harmless: only `prefix(2)` (the two static facet/wand
+    // specimens) is ever rendered through this, so the interactive cells keep their
+    // LIVE behavior where it matters (body → Specimens).
+    @MainActor static func cellViews(p: ResolvedPalette) -> [(String, AnyView)] {
+        [
+            ("facet tree · sticky headers · single-select",
+             chrome(ThemedListView(items: facetItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["w2"], scrollY: 30)),
+                    320, 188, p)),
+
+            ("wand tome · solidAccent · no-select",
+             chrome(ThemedListView(items: wandItems(p),
+                                   style: makeStyle { $0.selectionMode = .none; $0.hoverStyle = .solidAccent; $0.roundedSelection = true },
+                                   palette: p,
+                                   preview: ListPreview(highlight: "s2")),
+                    300, 188, p)),
+
+            ("dense · compact · menu-style",
+             chrome(ThemedListView(items: denseItems(),
+                                   style: makeStyle { $0.density = .compact },
+                                   palette: p,
+                                   preview: ListPreview(highlight: "copy")),
+                    220, 188, p)),
+
+            ("drag · drop-onto (facet tree) · w3 → Workspace B",
+             chrome(ThemedListView(items: facetItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true; $0.draggable = true; $0.dragMode = .dropOnto },
+                                   palette: p,
+                                   preview: ListPreview(scrollY: 120, dragSource: "w3",
+                                                        dropTarget: DropTarget(placement: .onto(id: "wsB")))),
+                    320, 188, p)),
+
+            ("drag · reorder (insertion line) · before 'Third task'",
+             chrome(ThemedListView(items: reorderItems(),
+                                   style: makeStyle { $0.draggable = true; $0.dragMode = .reorderBetween },
+                                   palette: p,
+                                   preview: ListPreview(dragSource: "r1",
+                                                        dropTarget: DropTarget(placement: .between(beforeID: "r3")))),
+                    300, 140, p)),
+
+            ("drag · chunk reorder (facet) · header + its windows lift as one",
+             chrome(ThemedListView(items: facetItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true; $0.draggable = true },
+                                   palette: p,
+                                   preview: ListPreview(scrollY: 0, dragChunk: ["wsA", "w1", "w2", "w3"])),
+                    320, 188, p)),
+
+            ("drag · chunk reorder (generic sections) · section insertion bar",
+             chrome(ThemedListView(items: chunkItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true; $0.draggable = true },
+                                   palette: p,
+                                   preview: ListPreview(dropTarget: DropTarget(placement: .between(beforeID: "today")),
+                                                        dragChunk: ["later", "l1", "l2"])),
+                    300, 188, p)),
+
+            // LIVE in `body` (collapsed: $treeCollapsed). Static here: a `.constant`
+            // collapse set matching body's initial @State ["build","archive"].
+            ("tree · indent + collapsible sections (click a header → animates ▾ / ▸)",
+             chrome(ThemedListView(items: treeItems(),
+                                   collapsed: .constant(["build", "archive"]),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["f1"])),
+                    320, 224, p)),
+
+            ("highlight .outline (cursor) ≠ selection (fill)",
+             chrome(ThemedListView(items: facetItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.highlightStyle = .outline },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["w1"], highlight: "w2")),
+                    320, 150, p)),
+
+            ("zebra · alternating rows (resets per section)",
+             chrome(ThemedListView(items: facetItems(),
+                                   style: makeStyle { $0.zebra = true; $0.selectionMode = .none },
+                                   palette: p),
+                    300, 150, p)),
+
+            ("horizontalContentScroll · long titles, no truncation",
+             chrome(ThemedListView(items: longItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.horizontalContentScroll = true },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["1"], scrollX: 150)),
+                    260, 150, p)),
+
+            // LIVE in `body` (selection: $multiSelection). Static here: a `preview`
+            // selection matching body's initial @State ["m2","m3","m4"].
+            ("multi-select · ⌘ toggle · ⇧ range · ⌘A all (click to try)",
+             chrome(ThemedListView(items: multiItems(),
+                                   style: makeStyle { $0.selectionMode = .multiple; $0.showsDividers = true },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["m2", "m3", "m4"])),
+                    300, 180, p)),
+        ]
+    }
+
+    /// Shared per-cell chrome — the fixed frame + rounded clip + 1 px border overlay
+    /// each specimen's `ThemedListView` wears (IDENTICAL to `body`'s inline chrome), so
+    /// `cellViews` doesn't verbatim-duplicate it 12 times.
+    @MainActor private static func chrome<V: View>(_ view: V, _ w: CGFloat, _ h: CGFloat,
+                                                   _ p: ResolvedPalette) -> AnyView {
+        AnyView(view
+            .frame(width: w, height: h)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(nsColor: p.border), lineWidth: 1)))
+    }
 }

@@ -5,11 +5,12 @@
 // chosen palette — cycling through `animated(forTheme:at:)` for an animatable
 // theme with effects on, mirroring `ThemeCard`'s live-theming (Gallery.swift).
 //
-// Overview and Specimens both render the WHOLE mock this task (`cells == nil`);
-// a later task (Task 8) supplies decomposed `cells` so Overview can show the
-// first couple and Specimens the full set. `import Effects` is here only for
-// `isAnimatableTheme` (not re-exported by PaletteKit). `mock`/`cells` are plain
-// stored closures — NOT `@ViewBuilder` stored properties (that won't compile).
+// Specimens ALWAYS renders the WHOLE `mock` (the full "everything" view — for
+// the decomposed ThemedListView that IS its 12-cell grid, byte-identical). When
+// Gallery supplies decomposed `cells`, Overview shows a COMPACT `cells.prefix(2)`;
+// otherwise Overview falls back to the whole mock too. `import Effects` is here
+// only for `isAnimatableTheme` (not re-exported by PaletteKit). `mock`/`cells`
+// are plain stored closures — NOT `@ViewBuilder` stored properties (won't compile).
 
 import SwiftUI
 import Palette
@@ -61,9 +62,7 @@ struct WidgetPage: View {
         else { living(base, mock) }         // whole mock (compact enough or not yet decomposed)
     }
     @ViewBuilder private func specimensBody(_ base: ResolvedPalette) -> some View {
-        if let cells { living(base) { p in AnyView(VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(cells(p).enumerated()), id: \.offset) { $0.element.1 } }) } }
-        else { living(base, mock) }
+        living(base, mock)   // the whole mock IS the full "everything" view (byte-identical to today's grid)
     }
 
     // Live (animated) for animatable themes, else static — mirrors ThemeCard
