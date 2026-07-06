@@ -187,20 +187,45 @@ struct Gallery: View {
     @ViewBuilder private var detailPage: some View {
         if let selection {
             switch selection {
+            case .widget(let name) where selectedTheme == "all":
+                // "All" tiles the ONE selected widget's live mock across every
+                // switchable theme — a comparison grid, and the deterministic
+                // capture target for `theme="all"` deep-links. One mock per
+                // theme (not the decomposed cell grid) keeps live-animation load
+                // no worse than the prior single-theme "all" fallback.
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 320 * uiScale), spacing: 16)], spacing: 16) {
+                        ForEach(Gallery.switchable, id: \.self) { theme in
+                            let base = resolve(paletteFor(theme))
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(theme).font(sysFont(9, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(Color(nsColor: base.muted))
+                                if showEffects, isAnimatableTheme(theme) {
+                                    TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { t in
+                                        mock(for: name, p: base.animated(forTheme: theme,
+                                            at: CGFloat(t.date.timeIntervalSinceReferenceDate / effectCycleSeconds)),
+                                            themeName: theme, showEffects: showEffects)
+                                    }
+                                } else {
+                                    mock(for: name, p: base, themeName: theme, showEffects: showEffects)
+                                }
+                            }
+                        }
+                    }.padding(18)
+                }
             case .widget(let name):
-                // The real "all"-theme tiling is a LATER task — a single theme
-                // (dracula when "all" is selected) is fine now. `ThemedListView`
-                // supplies decomposed `cells` (its 12 specimens) so Overview shows a
-                // COMPACT prefix(2) while Specimens keeps the whole grid; every other
-                // widget passes `cells: nil` (whole mock in both). `section` seeds
-                // case-insensitively from the config; `show-all` forces Specimens.
+                // `ThemedListView` supplies decomposed `cells` (its 12 specimens)
+                // so Overview shows a COMPACT prefix(2) while Specimens keeps the
+                // whole grid; every other widget passes `cells: nil` (whole mock
+                // in both). `section` seeds case-insensitively from the config;
+                // `show-all` forces Specimens. `selectedTheme` is never "all"
+                // here — the case above catches that.
                 WidgetPage(
                     component: kitComponent(name),
-                    themeName: selectedTheme == "all" ? "dracula" : selectedTheme,
+                    themeName: selectedTheme,
                     showEffects: showEffects,
                     mock: { p in AnyView(mock(for: name, p: p,
-                        themeName: selectedTheme == "all" ? "dracula" : selectedTheme,
-                        showEffects: showEffects)) },
+                        themeName: selectedTheme, showEffects: showEffects)) },
                     cells: name == "ThemedListView" ? { p in MockList.cellViews(p: p) } : nil,
                     section: config.showAll ? .specimens
                         : (PageSection.allCases.first { $0.rawValue.lowercased() == config.section } ?? .overview),
