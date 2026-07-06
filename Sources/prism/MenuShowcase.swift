@@ -114,7 +114,7 @@ struct MockMenu: View {
 
                 cell("live trigger · opens the real menu") {
                     ThemedMenuTriggerView(palette: p, items: menuTriggerItems())
-                        .frame(width: 150, height: 38)
+                        .fixedSize()   // intrinsic-content sized — no fixed frame
                 }
                 Spacer(minLength: 0)
             }

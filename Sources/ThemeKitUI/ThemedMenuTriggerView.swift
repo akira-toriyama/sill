@@ -1,9 +1,9 @@
 // ThemeKitUI — SwiftUI bridge for ThemeKit's `ThemedMenu`. `ThemedMenu` is a
 // CONTROLLER that owns a child window (like the combo / tooltip), so it can't be
-// an embeddable NSView. This bridge hosts a real `ThemedButton` trigger that
-// opens the REAL `ThemedMenu` built from the caller's `items`; the Coordinator
-// retains the controller. (The open menu floats on its own window — it won't
-// appear in a screenshot of the host window.)
+// an embeddable NSView. This bridge IS the real `ThemedButton` trigger that opens
+// the REAL `ThemedMenu` built from the caller's `items`; the Coordinator retains
+// the controller. (The open menu floats on its own window — it won't appear in a
+// screenshot of the host window.)
 
 import SwiftUI
 import AppKit
@@ -30,37 +30,39 @@ public struct ThemedMenuTriggerView: NSViewRepresentable {
 
     public func makeCoordinator() -> Coordinator { Coordinator() }
 
-    public func makeNSView(context: Context) -> NSView {
-        let host = NSView(frame: NSRect(x: 0, y: 0, width: 150, height: 34))
+    // The trigger IS the button — no fixed-size host wrapper. SwiftUI sizes us via
+    // `sizeThatFits` off the button's intrinsic content size (mirrors ThemedButtonView).
+    public func makeNSView(context: Context) -> ThemedButton {
         let button = ThemedButton(palette: palette)
         button.variant = .outlined
         button.title = title
         button.trailingSymbol = trailingSymbol
-        button.frame = NSRect(x: 0, y: 0, width: 130, height: 34)
-        host.addSubview(button)
 
         let menu = ThemedMenu.make(palette: palette, items: items)
         menu.presentation = presentation
         context.coordinator.menu = menu
-        context.coordinator.button = button
         button.onTap = { [weak menu, weak button] in
             guard let menu, let button else { return }
             menu.present(from: button)
         }
-        return host
+        return button
     }
 
-    public func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.button?.palette = palette
-        context.coordinator.button?.title = title
-        context.coordinator.button?.trailingSymbol = trailingSymbol
+    public func updateNSView(_ button: ThemedButton, context: Context) {
+        button.palette = palette
+        button.title = title
+        button.trailingSymbol = trailingSymbol
         context.coordinator.menu?.palette = palette
         context.coordinator.menu?.presentation = presentation   // swap layout before items rebuild
         context.coordinator.menu?.items = items   // caller-driven items rebuild (ThemedMenu.items didSet)
     }
 
+    public func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedButton,
+                             context: Context) -> CGSize? {
+        nsView.intrinsicContentSize
+    }
+
     @MainActor public final class Coordinator {
         var menu: ThemedMenu?
-        weak var button: ThemedButton?
     }
 }

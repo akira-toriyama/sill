@@ -138,7 +138,7 @@ struct MockWandLauncher: View {
                         .font(sysFont(8, design: .monospaced))
                         .foregroundColor(Color(nsColor: p.tertiary))
                     ThemedMenuTriggerView(palette: p, title: "Actions", items: wandMenuItems())
-                        .frame(width: 150, height: 38)
+                        .fixedSize()   // intrinsic-content sized
                 }
 
                 Divider().overlay(Color(nsColor: p.border))
@@ -187,13 +187,13 @@ struct MockWandLauncher: View {
                     Text("live · .toolbar").font(sysFont(8, design: .monospaced))
                         .foregroundColor(Color(nsColor: p.tertiary))
                     ThemedMenuTriggerView(palette: p, title: "Bar", presentation: .toolbar, items: wandMenuItems())
-                        .frame(width: 110, height: 34)
+                        .fixedSize()   // intrinsic-content sized
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("live · .labeledToolbar").font(sysFont(8, design: .monospaced))
                         .foregroundColor(Color(nsColor: p.tertiary))
                     ThemedMenuTriggerView(palette: p, title: "Labeled", presentation: .labeledToolbar, items: wandMenuItems())
-                        .frame(width: 140, height: 34)
+                        .fixedSize()   // intrinsic-content sized
                 }
             }
         }
