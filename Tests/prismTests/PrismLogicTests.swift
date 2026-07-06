@@ -38,6 +38,15 @@ final class CopyRefTests: XCTestCase {
         XCTAssertFalse(ref.contains("list.items ="))   // not the old non-existent builder shape
         XCTAssertFalse(ref.contains("{ list in"))
     }
+    func testEveryRecipeFilled() {
+        for c in kitCatalog where c.name != "MarkdownView" {
+            XCTAssertFalse(c.imports.isEmpty, "\(c.name) missing imports")
+            XCTAssertFalse(c.initSnippet.isEmpty, "\(c.name) missing initSnippet")
+            if !c.isAtom {
+                XCTAssertFalse(c.defaultType.isEmpty, "\(c.name) (widget) missing SwiftUI defaultType")
+            }
+        }
+    }
 }
 
 final class SidebarRegistryTests: XCTestCase {
