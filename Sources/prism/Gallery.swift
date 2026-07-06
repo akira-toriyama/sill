@@ -29,119 +29,169 @@ func sysFont(_ size: CGFloat, weight: Font.Weight = .regular,
 struct Gallery: View {
     let config: PrismConfig
 
-    /// Catalog names the header switcher offers — the `random` meta-name is
-    /// a roll action, not a persistent selection, so it's excluded.
+    /// Catalog names the theme Picker offers — the `random` meta-name is a roll
+    /// action, not a persistent selection, so it's excluded. (Stays `private` this
+    /// task; a later task widens its reach beyond the top-bar Picker.)
     private static let switchable = canonicalThemeNames.filter { $0 != "random" }
 
-    /// Live selection: `"all"` (the full gallery) or one canonical theme.
-    /// Seeded from the config so `theme = "dracula"` still opens on dracula;
-    /// the header chips then drive it at runtime — no relaunch, no file edit.
-    @State private var selected: String
+    /// The first real widget row's name — the fallback selection when the config
+    /// deep-links neither a widget nor a family. Derived from the SAME
+    /// `sidebarSections` registry the sidebar renders (first non-Foundations /
+    /// non-Apps section, its first `.widget`), so it can't drift from the list.
+    private static let firstWidgetName: String =
+        sidebarSections
+            .first { $0.title != "Foundations" && $0.title != "Apps" }?
+            .items
+            .compactMap { item -> String? in
+                if case .widget(let n) = item { return n }
+                return nil
+            }
+            .first ?? "ThemedButton"
 
-    /// The widget-family tab in view. Each card renders ONLY this family's content,
-    /// so a card stays short (no more 11-mock scroll). `.palette` = theme foundations.
-    @State private var selectedFamily: KitFamily
+    /// Which sidebar row is open — drives the detail page. Optional because
+    /// `List(selection:)` binds a `Binding<SidebarItem?>`. Seeded from the config
+    /// (widget deep-link → family → the first widget), then driven by the List
+    /// (click or ↑/↓ when the List has focus).
+    @State private var selection: SidebarItem?
+
+    /// Live theme selection for the top-bar Picker: `"all"` (every theme) or one
+    /// canonical theme name. Seeded from the config; the detail pages (Tasks 6-7)
+    /// read it to render a widget in the chosen palette.
+    @State private var selectedTheme: String
+
+    /// The sidebar search query — a plain SwiftUI `TextField` in the sidebar
+    /// header filters `sidebarSections` by it (see `filteredSections`).
+    @State private var searchText = ""
+
+    /// Whether the sidebar column is shown. The top-bar toggle flips it with an
+    /// animation; the body simply drops the sidebar + its divider when false.
+    @State private var sidebarVisible = true
 
     /// The live effect 演出 master toggle (派手 ON / 静か OFF). Seeded from the
-    /// config's `show-effects`, then driven by the header toggle at runtime — it
-    /// flips the animated widget accents, the cycling card rim, and the `.palette`
-    /// `LiveEffectStrip` together (the live mirror of the library's `effectsEnabled`),
-    /// with no relaunch or file edit.
+    /// config's `show-effects`, then driven by the top-bar toggle at runtime — it
+    /// flips the animated widget accents, the cycling card rim, and the effect
+    /// strips together (the live mirror of the library's `effectsEnabled`).
     @State private var showEffects: Bool
 
     init(config: PrismConfig) {
         self.config = config
         let t = config.theme
-        _selected = State(initialValue:
+        _selectedTheme = State(initialValue:
             (t == "all" || Gallery.switchable.contains(t)) ? t : "all")
         _showEffects = State(initialValue: config.showEffects)
-        // Accept either the displayed tab label ("icons") or the enum case name
-        // ("icon") — the latter is what the ROADMAP / docs use.
-        _selectedFamily = State(initialValue:
-            KitFamily.allCases.first {
-                $0.rawValue.lowercased() == config.family
-                    || String(describing: $0) == config.family
-            } ?? .palette)
+        // Open on the config's widget deep-link if it names one, else its family
+        // (a Foundation or an app tab), else the first widget row.
+        _selection = State(initialValue:
+            sidebarItem(forWidget: config.widget)
+            ?? sidebarItem(forFamily: config.family)
+            ?? .widget(Gallery.firstWidgetName))
     }
 
-    /// The card(s) currently rendered: every theme when "all", else the one.
-    private var shown: [String] {
-        selected == "all" ? Gallery.switchable : [selected]
-    }
+    // MARK: body — a custom split view (sidebar | detail column)
+    //
+    // A hand-rolled `HStack` split (NOT `NavigationSplitView`) so the shell keeps
+    // full MUI-docs造形 control of both columns — decision D1. The sidebar + its
+    // divider simply drop out of the layout when `sidebarVisible` is false; the
+    // top-bar toggle animates that. Shell stays pure SwiftUI (CLAUDE.md AppKit
+    // policy) — no window `NSToolbar`, so the top bar is in-content.
 
     var body: some View {
-        VStack(spacing: 0) {
-            header                       // pinned — stays put as the cards scroll
-            Divider()
-            ScrollView {
-                LazyVStack(spacing: 18) {
-                    ForEach(shown, id: \.self) { name in
-                        ThemeCard(name: name, family: selectedFamily, scale: config.fontScale,
-                                  showEffects: showEffects)
-                    }
-                }
-                .padding(18)
+        HStack(spacing: 0) {
+            if sidebarVisible {
+                sidebar
+                Divider()
             }
+            detailColumn
         }
         .frame(minWidth: 920 * uiScale, minHeight: 600 * uiScale)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    // MARK: header — title + the theme-switch chip row
+    // MARK: detail column — an in-content top bar over the per-selection page
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Title row. The Effects 演出 master toggle lives HERE now (#11) — it
-            // is a THEME-axis control (effects animate themes), not a tab, so it
-            // sits with the title, clear of both tab groups below.
-            HStack(spacing: 10) {
-                Text("prism — \(selected == "all" ? "\(Gallery.switchable.count) themes" : selected)")
-                    .font(sysFont(12, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.secondary)
-                Spacer(minLength: 12)
-                EffectToggle(on: showEffects) { showEffects.toggle() }
-            }
-            // A wrapping flow of theme buttons — "All" first, then the catalog in
-            // order. Each chip is tinted in its own theme colours, so the switch
-            // row doubles as an at-a-glance colour preview.
-            FlowLayout(spacing: 6, lineSpacing: 6) {
-                ThemeChip(name: "all", label: "All",
-                          selected: selected == "all") { selected = "all" }
-                ForEach(Gallery.switchable, id: \.self) { name in
-                    ThemeChip(name: name, label: name,
-                              selected: selected == name) { selected = name }
-                }
-            }
-            // A rule separating the two control axes: WHICH theme (the colour
-            // chips above) vs WHICH content (the tabs below).
+    private var detailColumn: some View {
+        VStack(spacing: 0) {
+            topBar
             Divider()
-            // Two tab groups (#10): the Kit library showcase, then one tab per
-            // app. Each group wraps so a narrow window stacks tabs instead of
-            // clipping them.
-            tabGroup(label: "Kit",  families: KitFamily.kitCases)
-            tabGroup(label: "Apps", families: KitFamily.appCases)
+            detailPage
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// One labeled, wrapping tab row (Kit or Apps). The leading label aligns the
-    /// two rows so the tabs start at the same x.
-    @ViewBuilder
-    private func tabGroup(label: String, families: [KitFamily]) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(label.uppercased())
-                .font(sysFont(9, weight: .bold, design: .monospaced))
-                .foregroundColor(.secondary)
-                .frame(width: 32 * uiScale, alignment: .leading)
-                .padding(.top, 6)
-            FlowLayout(spacing: 6, lineSpacing: 6) {
-                ForEach(families) { fam in
-                    FamilyTab(family: fam, selected: selectedFamily == fam) {
-                        selectedFamily = fam
+    // MARK: top bar — sidebar toggle · theme Picker · effect master toggle
+
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            Button { withAnimation { sidebarVisible.toggle() } } label: {
+                phosphorIcon("list", 13)
+            }
+            .buttonStyle(.plain)
+            .help("Toggle the sidebar")
+
+            Picker("Theme", selection: $selectedTheme) {
+                Text("All").tag("all")
+                ForEach(Gallery.switchable, id: \.self) { Text($0).tag($0) }
+            }
+            .labelsHidden()
+            .frame(maxWidth: 220 * uiScale)
+
+            Spacer()
+            EffectToggle(on: showEffects) { showEffects.toggle() }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+    }
+
+    // MARK: sidebar — a search field over the selectable widget List
+    //
+    // Plain SwiftUI throughout: a `TextField` (NOT `.searchable`, NOT an AppKit
+    // ThemedTextField) filters the list; `List(selection:)` gives click + ↑/↓
+    // selection when it holds focus. No `@FocusState` gymnastics are needed now
+    // that `.searchable` is gone — the TextField doesn't grab first responder at
+    // launch, so the List is free to take arrow-key focus on first click.
+
+    private var sidebar: some View {
+        VStack(spacing: 0) {
+            TextField("Search widgets", text: $searchText)
+                .textFieldStyle(.roundedBorder)
+                .font(sysFont(11))
+                .padding(.horizontal, 10).padding(.vertical, 8)
+            List(selection: $selection) {
+                ForEach(filteredSections) { section in
+                    Section(section.title) {
+                        ForEach(section.items) { item in
+                            Text(sidebarLabel(item)).tag(item)
+                        }
                     }
                 }
             }
+            .listStyle(.sidebar)
+        }
+        .frame(width: 220 * uiScale)
+    }
+
+    /// `sidebarSections` filtered by `searchText` (case-insensitive over each
+    /// item's `sidebarSearchText`). Empty query ⇒ the full registry; a section
+    /// with no surviving items drops out entirely.
+    private var filteredSections: [SidebarSection] {
+        let q = searchText.lowercased().trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return sidebarSections }
+        return sidebarSections.compactMap { s in
+            let items = s.items.filter { sidebarSearchText($0).contains(q) }
+            return items.isEmpty ? nil : SidebarSection(title: s.title, items: items)
+        }
+    }
+
+    // MARK: detail page — placeholder per selection (real pages: Tasks 6-7)
+
+    @ViewBuilder private var detailPage: some View {
+        if let selection {
+            switch selection {
+            case .widget(let n):     Text("widget → \(n) @ \(selectedTheme)")
+            case .foundation(let f): Text("foundation → \(f.rawValue)")
+            case .app(let a):        Text("app → \(a.rawValue)")
+            }
+        } else {
+            Text("Select a widget").foregroundColor(.secondary)
         }
     }
 }
@@ -482,38 +532,10 @@ struct CopyRefButton: View {
     }
 }
 
-// MARK: - Family tab (one widget-family selector in the header)
+// MARK: - Effect toggle (the 演出 master switch in the top bar)
 
-/// One widget-family tab. Neutral app chrome (it selects across ALL themes, so it
-/// is NOT theme-tinted like the ThemeChip row); the selected tab fills with the
-/// system accent.
-struct FamilyTab: View {
-    let family: KitFamily
-    let selected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(family.rawValue)
-                .font(sysFont(11, weight: selected ? .bold : .medium, design: .monospaced))
-                .foregroundColor(selected ? Color.white : Color(nsColor: .labelColor))
-                .padding(.horizontal, 11).padding(.vertical, 5)
-                .background(RoundedRectangle(cornerRadius: 7)
-                    .fill(selected ? Color(nsColor: .controlAccentColor)
-                                   : Color(nsColor: .controlColor)))
-                .overlay(RoundedRectangle(cornerRadius: 7)
-                    .stroke(Color(nsColor: .separatorColor),
-                            lineWidth: selected ? 0 : 1))
-        }
-        .buttonStyle(.plain)
-        .help("Show the \(family.rawValue) family")
-    }
-}
-
-// MARK: - Effect toggle (the 演出 master switch in the header)
-
-/// The bench-wide effect master toggle. Neutral app chrome like `FamilyTab`
-/// (it spans every theme), styled as a pill: ON fills with the system accent +
+/// The bench-wide effect master toggle. Neutral app chrome (it spans every
+/// theme), styled as a pill: ON fills with the system accent +
 /// a `sparkles` glyph (派手); OFF rests neutral and dimmed with a `moon.zzz`
 /// glyph (静か). Flipping it drives prism's `showEffects` — the live mirror of
 /// the library's `effectsEnabled` — so the animated widget accents, the cycling
