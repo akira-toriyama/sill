@@ -61,6 +61,21 @@ func appCaption(_ tab: KitFamily, p: ResolvedPalette) -> AnyView {
     .padding(.bottom, 2))   // fidelity: matches the retired ThemeCard.appCaption gap
 }
 
+/// One app's signature chrome mock in a given palette (file-level so both this
+/// page and Gallery's all-themes app tiling render it from ONE source). perch/halo
+/// take the theme name + `showEffects` so their rims animate live when effects are on.
+@MainActor @ViewBuilder
+func appMockView(_ a: KitFamily, p: ResolvedPalette, themeName: String, showEffects: Bool) -> some View {
+    switch a {
+    case .facet:  MockTree(p: p)
+    case .wand:   MockWandLauncher(p: p)
+    case .perch:  MockPerchOverlay(p: p, themeName: themeName, showEffects: showEffects)
+    case .halo:   MockHalo(p: p, themeName: themeName, showEffects: showEffects)
+    case .glance: MockGlancePopover(p: p)
+    default:      EmptyView()
+    }
+}
+
 // MARK: - Foundation / App page
 
 /// The detail pane for a `.foundation` or `.app` sidebar selection. Resolves the
@@ -75,6 +90,9 @@ struct FoundationAppPage: View {
     let item: SidebarItem        // .foundation or .app only
     let themeName: String
     let showEffects: Bool
+    let onPickTheme: (String) -> Void   // a chip click switches the shell's theme
+
+    private var isAll: Bool { themeName == "all" }
 
     var body: some View {
         let name = themeName == "all" ? "dracula" : themeName
@@ -87,14 +105,16 @@ struct FoundationAppPage: View {
                     Text("Theme palette preview")
                         .font(sysFont(12, weight: .semibold))
                         .foregroundColor(Color(nsColor: p.foreground))
-                    themeChipGrid   // the retired shell header's 36-chip swatch wall, preserved
+                    allThemeHint(p, "All → \(name) tokens · click a chip to switch theme")
+                    themeChipGrid   // 36-chip wall — now the INTERACTIVE theme switcher
                     paletteFoundations(spec: spec, p: p, name: name,
                                        scale: 1.0, showEffects: showEffects)
                 case .foundation(.icons):
+                    allThemeHint(p, "All → showing \(name)")
                     MockIcons(p: p)
                 case .app(let a):
                     appCaption(a, p: p)
-                    appMock(a, p: p, name: name)
+                    appMockView(a, p: p, themeName: name, showEffects: showEffects)
                 default:
                     EmptyView()
                 }
@@ -104,28 +124,24 @@ struct FoundationAppPage: View {
         }
     }
 
-    /// Every catalog theme tinted in its OWN colours — the colour-preview wall the
-    /// retired shell header carried, now anchoring the palette foundation page.
-    /// Non-interactive here (`selected: false`, empty action): a swatch grid.
+    /// Every catalog theme tinted in its OWN colours — the retired shell header's
+    /// swatch wall, now the palette page's INTERACTIVE theme switcher: clicking a
+    /// chip switches the shell's theme, and the current theme's chip is ringed.
     private var themeChipGrid: some View {
         FlowLayout(spacing: 6, lineSpacing: 6) {
             ForEach(Gallery.switchable, id: \.self) { n in
-                ThemeChip(name: n, label: n, selected: false) {}
+                ThemeChip(name: n, label: n, selected: n == themeName) { onPickTheme(n) }
             }
         }
     }
 
-    /// One app's signature chrome mock. perch/halo take the theme name +
-    /// `showEffects` so their rims animate live when effects are on.
-    @ViewBuilder
-    private func appMock(_ a: KitFamily, p: ResolvedPalette, name: String) -> some View {
-        switch a {
-        case .facet:  MockTree(p: p)
-        case .wand:   MockWandLauncher(p: p)
-        case .perch:  MockPerchOverlay(p: p, themeName: name, showEffects: showEffects)
-        case .halo:   MockHalo(p: p, themeName: name, showEffects: showEffects)
-        case .glance: MockGlancePopover(p: p)
-        default:      EmptyView()
+    /// Shown only under "All": foundations resolve to one representative theme
+    /// (they can't tile), so name it and point at the chips as the way to pick one.
+    @ViewBuilder private func allThemeHint(_ p: ResolvedPalette, _ message: String) -> some View {
+        if isAll {
+            Text(message)
+                .font(sysFont(9, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
         }
     }
 }

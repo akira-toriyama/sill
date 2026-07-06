@@ -68,6 +68,9 @@ struct Gallery: View {
     /// animation; the body simply drops the sidebar + its divider when false.
     @State private var sidebarVisible = true
 
+    /// Whether the top-bar theme control's colour-chip popover is open.
+    @State private var showThemePicker = false
+
     /// The live effect 演出 master toggle (派手 ON / 静か OFF). Seeded from the
     /// config's `show-effects`, then driven by the top-bar toggle at runtime — it
     /// flips the animated widget accents, the cycling card rim, and the effect
@@ -119,7 +122,7 @@ struct Gallery: View {
         }
     }
 
-    // MARK: top bar — sidebar toggle · theme Picker · effect master toggle
+    // MARK: top bar — sidebar toggle · theme switcher · effect master toggle
 
     private var topBar: some View {
         HStack(spacing: 12) {
@@ -129,17 +132,61 @@ struct Gallery: View {
             .buttonStyle(.plain)
             .help("Toggle the sidebar")
 
-            Picker("Theme", selection: $selectedTheme) {
-                Text("All").tag("all")
-                ForEach(Gallery.switchable, id: \.self) { Text($0).tag($0) }
-            }
-            .labelsHidden()
-            .frame(maxWidth: 220 * uiScale)
+            themeControl
 
             Spacer()
             EffectToggle(on: showEffects) { showEffects.toggle() }
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
+    }
+
+    /// Colour-rich theme switcher: the current theme's swatch + name, opening a
+    /// popover of every theme's coloured chip (the old text `Picker` carried no
+    /// colour — the chips do). Clicking a chip switches + closes.
+    private var themeControl: some View {
+        Button { showThemePicker.toggle() } label: {
+            HStack(spacing: 6) {
+                themeSwatch(selectedTheme)
+                Text(selectedTheme == "all" ? "All themes" : selectedTheme)
+                    .font(sysFont(11, weight: .medium, design: .monospaced))
+                    .foregroundColor(.primary)
+                phosphorIcon("caret-down", 9)
+            }
+            .padding(.horizontal, 9).padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 7).fill(Color(nsColor: .controlColor)))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color(nsColor: .separatorColor), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .help("Switch theme")
+        .popover(isPresented: $showThemePicker, arrowEdge: .bottom) {
+            FlowLayout(spacing: 6, lineSpacing: 6) {
+                ThemeChip(name: "all", label: "All", selected: selectedTheme == "all") {
+                    selectedTheme = "all"; showThemePicker = false
+                }
+                ForEach(Gallery.switchable, id: \.self) { n in
+                    ThemeChip(name: n, label: n, selected: selectedTheme == n) {
+                        selectedTheme = n; showThemePicker = false
+                    }
+                }
+            }
+            .padding(14)
+            .frame(width: 540 * uiScale)
+        }
+    }
+
+    /// A tiny swatch for the current theme (its background + an accent dot), or a
+    /// neutral accent dot for "All".
+    @ViewBuilder private func themeSwatch(_ name: String) -> some View {
+        if name == "all" {
+            Circle().fill(Color(nsColor: .controlAccentColor)).frame(width: 9, height: 9)
+        } else {
+            let p = resolve(paletteFor(name))
+            RoundedRectangle(cornerRadius: 3)
+                .fill(p.background.map { Color(nsColor: $0) } ?? Color(nsColor: .controlColor))
+                .frame(width: 13, height: 13)
+                .overlay(Circle().fill(Color(nsColor: p.primary)).frame(width: 5, height: 5))
+                .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color(nsColor: p.border), lineWidth: 0.5))
+        }
     }
 
     // MARK: sidebar — a search field over the selectable widget List
@@ -189,29 +236,10 @@ struct Gallery: View {
             switch selection {
             case .widget(let name) where selectedTheme == "all":
                 // "All" tiles the ONE selected widget's live mock across every
-                // switchable theme — a comparison grid, and the deterministic
-                // capture target for `theme="all"` deep-links. One mock per
-                // theme (not the decomposed cell grid) keeps live-animation load
-                // no worse than the prior single-theme "all" fallback.
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 320 * uiScale), spacing: 16)], spacing: 16) {
-                        ForEach(Gallery.switchable, id: \.self) { theme in
-                            let base = resolve(paletteFor(theme))
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(theme).font(sysFont(9, weight: .semibold, design: .monospaced))
-                                    .foregroundColor(Color(nsColor: base.muted))
-                                if showEffects, isAnimatableTheme(theme) {
-                                    TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { t in
-                                        mock(for: name, p: base.animated(forTheme: theme,
-                                            at: CGFloat(t.date.timeIntervalSinceReferenceDate / effectCycleSeconds)),
-                                            themeName: theme, showEffects: showEffects)
-                                    }
-                                } else {
-                                    mock(for: name, p: base, themeName: theme, showEffects: showEffects)
-                                }
-                            }
-                        }
-                    }.padding(18)
+                // switchable theme — a comparison grid + the deterministic capture
+                // target for `theme="all"`. One mock per theme (not the cell grid).
+                themeTiles(minWidth: 320 * uiScale, showEffects: showEffects) { theme, p in
+                    mock(for: name, p: p, themeName: theme, showEffects: showEffects)
                 }
             case .widget(let name):
                 // `ThemedListView` supplies decomposed `cells` (its 12 specimens)
@@ -229,14 +257,52 @@ struct Gallery: View {
                     cells: name == "ThemedListView" ? { p in MockList.cellViews(p: p) } : nil,
                     section: config.showAll ? .specimens
                         : (PageSection.allCases.first { $0.rawValue.lowercased() == config.section } ?? .overview))
+            case .app(let a) where selectedTheme == "all":
+                // Apps tile across themes the same way widgets do — see an app's
+                // signature chrome in every theme at once (foundations don't tile:
+                // Palette's chip wall already IS the all-themes view).
+                themeTiles(minWidth: 360 * uiScale, showEffects: showEffects) { theme, p in
+                    appMockView(a, p: p, themeName: theme, showEffects: showEffects)
+                }
             case .foundation, .app:
                 FoundationAppPage(item: selection,
                                   themeName: selectedTheme,
-                                  showEffects: showEffects)
+                                  showEffects: showEffects,
+                                  onPickTheme: { selectedTheme = $0 })
             }
         } else {
             Text("Select a widget").foregroundColor(.secondary)
         }
+    }
+}
+
+// MARK: - All-themes tiling (shared by the widget + app "All" comparison grids)
+
+/// A scrolling adaptive grid with one tile per switchable theme: a theme-name
+/// caption over `content` rendered in that theme's palette (live-animated at 30 Hz
+/// when effects are on and the theme animates, else static). The single source for
+/// both the widget-`All` and app-`All` comparison grids.
+@MainActor @ViewBuilder
+func themeTiles<Content: View>(minWidth: CGFloat, showEffects: Bool,
+                               @ViewBuilder content: @escaping (String, ResolvedPalette) -> Content) -> some View {
+    ScrollView {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth), spacing: 16)], spacing: 16) {
+            ForEach(Gallery.switchable, id: \.self) { theme in
+                let base = resolve(paletteFor(theme))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(theme).font(sysFont(9, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Color(nsColor: base.muted))
+                    if showEffects, isAnimatableTheme(theme) {
+                        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { t in
+                            content(theme, base.animated(forTheme: theme,
+                                at: CGFloat(t.date.timeIntervalSinceReferenceDate / effectCycleSeconds)))
+                        }
+                    } else {
+                        content(theme, base)
+                    }
+                }
+            }
+        }.padding(18)
     }
 }
 
