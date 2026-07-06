@@ -57,9 +57,13 @@ func sidebarItem(forFamily raw: String) -> SidebarItem? {
     return nil
 }
 
-/// Hand-maintained: the widget names Gallery.mock(for:) actually renders. Kept in
-/// sync with the mock(for:) switch (Task 6 Step 1) — the completeness test asserts
-/// this set exactly equals the .widget sidebar rows, catching drift in either direction.
+/// Hand-kept mirror of the `mock(for:)` / `mockHandles` case list in Gallery.swift
+/// (Task 6 Step 1) — NOT itself checked against that switch by the compiler, so
+/// two tests pin the three pieces together: `testRenderMapExactlyMatchesWidgetRows`
+/// (PrismLogicTests) asserts this set exactly equals the catalog-derived `.widget`
+/// sidebar rows, and `testEveryWiredMockNameIsRendered` asserts every name here is
+/// actually handled by `mockHandles` (i.e. `mock(for:)` has a real case, not the
+/// `default: EmptyView()` blank-page fallback).
 let wiredMockNames: [String] = [
     "ThemedTextField", "ThemedComboBox",
     "ThemedButton", "ThemedButtonGroup", "ThemedToolBar", "ThemedChip", "ThemedPill", "ThemedCheckbox", "ThemedFAB",

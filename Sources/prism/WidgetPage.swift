@@ -32,7 +32,6 @@ struct WidgetPage: View {
     let mock: (ResolvedPalette) -> AnyView                     // whole-mock renderer (Gallery supplies)
     let cells: ((ResolvedPalette) -> [(String, AnyView)])?     // set by Task 8 for decomposed mocks; else nil
     @State var section: PageSection
-    @State var showAll: Bool
 
     var body: some View {
         let base = resolve(paletteFor(themeName))

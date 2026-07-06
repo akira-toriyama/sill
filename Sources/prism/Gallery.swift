@@ -228,8 +228,7 @@ struct Gallery: View {
                         themeName: selectedTheme, showEffects: showEffects)) },
                     cells: name == "ThemedListView" ? { p in MockList.cellViews(p: p) } : nil,
                     section: config.showAll ? .specimens
-                        : (PageSection.allCases.first { $0.rawValue.lowercased() == config.section } ?? .overview),
-                    showAll: config.showAll)
+                        : (PageSection.allCases.first { $0.rawValue.lowercased() == config.section } ?? .overview))
             case .foundation, .app:
                 FoundationAppPage(item: selection,
                                   themeName: selectedTheme,
@@ -246,10 +245,15 @@ struct Gallery: View {
 /// The single widget's live mock for `WidgetPage` — the SOLE widget-mock map now
 /// that the retired `ThemeCard.widgetFamily(p:)` is gone (its cases were folded
 /// here). Every case renders a `Mock…(p:)`; `themeName` is threaded to the two
-/// that need it (`MockThemedPill`, `MockBorder`). The switch cases MUST equal
-/// `wiredMockNames` exactly — a widget that fell to `default:` would render a
-/// blank page (the Task-4 render-map test guards that equality). App mocks
-/// (MockTree/…/MockGlancePopover) are NOT here — they belong to the app page.
+/// that need it (`MockThemedPill`, `MockBorder`). App mocks (MockTree/…/
+/// MockGlancePopover) are NOT here — they belong to the app page.
+///
+/// MUST be kept in sync with `mockHandles` below (same case list) — that
+/// twin function is what makes this render map itself testable
+/// (`testEveryWiredMockNameIsRendered` in PrismLogicTests). `wiredMockNames`
+/// (SidebarModel.swift) is a hand-kept mirror of this case list; see that
+/// file's doc comment for how the three pieces (catalog rows →
+/// `wiredMockNames` → this switch) are pinned together.
 @MainActor @ViewBuilder func mock(for name: String, p: ResolvedPalette, themeName: String, showEffects: Bool) -> some View {
     switch name {
     case "ThemedTextField":    MockField(p: p)
@@ -276,6 +280,25 @@ struct Gallery: View {
     case "TrailGeometry":      MockTrail(p: p)
     case "PixelSprite":        MockPixelArt(p: p)
     default:                   EmptyView()
+    }
+}
+
+/// Whether `mock(for:)` above has a real case for `name` (vs. falling to its
+/// `default: EmptyView()` — a blank page, the CLAUDE.md #17f failure mode).
+/// MUST be kept in sync with `mock(for:)` (same case list) — this twin function
+/// exists solely so the render map is testable without instantiating SwiftUI
+/// views (`testEveryWiredMockNameIsRendered` in PrismLogicTests).
+func mockHandles(_ name: String) -> Bool {
+    switch name {
+    case "ThemedTextField", "ThemedComboBox",
+         "ThemedButton", "ThemedButtonGroup", "ThemedToolBar", "ThemedChip", "ThemedPill", "ThemedCheckbox", "ThemedFAB",
+         "ThemedDivider", "AnimatedBorderView", "ThemedSkeleton", "ThemedTooltip", "ThemedBackdrop", "WindowShell",
+         "ThemedListView", "ThemedMenu", "ThemedGrid",
+         "ThemedTransition",
+         "ParticleBurst", "SplatterShape", "TrailGeometry", "PixelSprite":
+        return true
+    default:
+        return false
     }
 }
 

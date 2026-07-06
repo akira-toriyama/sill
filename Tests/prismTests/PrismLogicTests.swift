@@ -18,8 +18,8 @@ final class PrismConfigTests: XCTestCase {
         XCTAssertEqual(c.widget, "")
     }
     func testDeepLinkKeysParse() {
-        let c = loadTOML("widget = \"ThemedList\"\ntheme = \"nord\"\nsection = \"Specimens\"\nshow-all = true")
-        XCTAssertEqual(c.widget, "ThemedList")
+        let c = loadTOML("widget = \"ThemedListView\"\ntheme = \"nord\"\nsection = \"Specimens\"\nshow-all = true")
+        XCTAssertEqual(c.widget, "ThemedListView")
         XCTAssertEqual(c.theme, "nord")
         XCTAssertEqual(c.section, "specimens")
         XCTAssertTrue(c.showAll)
@@ -46,6 +46,10 @@ final class CopyRefTests: XCTestCase {
                 XCTAssertFalse(c.defaultType.isEmpty, "\(c.name) (widget) missing SwiftUI defaultType")
             }
         }
+        // Pin the atom set itself — a widget mistakenly flagged isAtom: true would
+        // silently skip the defaultType check above.
+        XCTAssertEqual(Set(kitCatalog.filter { $0.isAtom }.map { $0.name }),
+                       ["WindowShell", "ThemedTransition", "TrailGeometry"])
     }
 }
 
@@ -61,6 +65,16 @@ final class SidebarRegistryTests: XCTestCase {
     func testRenderMapExactlyMatchesWidgetRows() {
         // Drift guard: a widget row with no render case, or a render case with no row.
         XCTAssertEqual(Set(wiredMockNames), widgetRows, "wiredMockNames must equal the .widget sidebar rows")
+    }
+    func testEveryWiredMockNameIsRendered() {
+        // Links wiredMockNames to the ACTUAL render switch (mock(for:) in
+        // Gallery.swift, probed here via its mockHandles twin) — combined with
+        // testRenderMapExactlyMatchesWidgetRows above, this pins catalog rows →
+        // wiredMockNames → the render switch, closing the gap the #17f blank-page
+        // failure mode exploited (a name could be in wiredMockNames/widgetRows
+        // without a real mock(for:) case, silently falling to `default: EmptyView()`).
+        for n in wiredMockNames { XCTAssertTrue(mockHandles(n), "\(n) is in wiredMockNames but mock(for:) has no case → blank page") }
+        XCTAssertFalse(mockHandles("NoSuchWidget"))
     }
     func testThemedGridCatalogued() { XCTAssertFalse(kitComponent("ThemedGrid").kind.isEmpty) }
     func testLookups() {
