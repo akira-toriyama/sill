@@ -106,6 +106,18 @@ final class ThemedMenuTests: XCTestCase {
         XCTAssertTrue(rows[4].image === rows[0].image, "the checkmark wins — both checked rows share the same glyph")
     }
 
+    func testProviderRowAutoSetsChevron() {
+        // A provider-only row (no static submenu, hasSubmenu not passed) is still a folder.
+        let mi = ThemedMenu.MenuItem(id: "branch", title: "Switch Branch",
+                                     submenuProvider: { [.init("main")] })
+        XCTAssertTrue(mi.hasSubmenu, "a submenuProvider auto-sets hasSubmenu")
+
+        let m = ThemedMenu(palette: theme())
+        m.items = [mi]
+        XCTAssertEqual(m._controller.items[0].trailing, .chevron,
+                       "a provider-only row maps to a trailing chevron")
+    }
+
     func testCheckedRowAXLabelCarriesMarker() {
         let m = ThemedMenu(palette: theme())
         m.items = [.init(id: "on", title: "Show Sidebar", isChecked: true),

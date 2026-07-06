@@ -82,30 +82,46 @@ public final class ThemedMenu: NSObject {
         /// cascade further (N-level, arbitrary depth). A submenu row's own `action`
         /// is ignored — opening the child IS its activation.
         public var submenu: [MenuItem]
+        /// Deferred children. When set (and `submenu` is empty), opening this row
+        /// presents the child with a disabled `Loading…` row, then fills it with the
+        /// closure's result. Re-invoked on every open (cache-free). `@MainActor`,
+        /// non-throwing. Static `submenu` wins if both are present. Consumer: wand's
+        /// real launcher (an async PanelTree walk).
+        public var submenuProvider: (@MainActor () async -> [MenuItem])?
         public var kind: Kind
 
         public enum Kind: Equatable { case item, separator, header }
 
+        // NOTE: `submenuProvider` is declared AFTER `action` so the ubiquitous
+        // `MenuItem("X") { action }` trailing-closure idiom keeps binding to `action`
+        // (a single trailing closure forward-scans to the FIRST function-typed param).
+        // A provider is therefore always passed with its explicit `submenuProvider:` label.
         public init(id: String, title: String, icon: NSImage? = nil, shortcut: String? = nil,
                     hasSubmenu: Bool = false, isChecked: Bool = false, isEnabled: Bool = true,
-                    isDestructive: Bool = false, submenu: [MenuItem] = [], action: (() -> Void)? = nil) {
+                    isDestructive: Bool = false, submenu: [MenuItem] = [],
+                    action: (() -> Void)? = nil,
+                    submenuProvider: (@MainActor () async -> [MenuItem])? = nil) {
             self.id = id; self.title = title; self.icon = icon; self.shortcut = shortcut
-            self.hasSubmenu = hasSubmenu || !submenu.isEmpty
+            self.hasSubmenu = hasSubmenu || !submenu.isEmpty || submenuProvider != nil
             self.isChecked = isChecked; self.isEnabled = isEnabled
-            self.isDestructive = isDestructive; self.submenu = submenu; self.action = action; self.kind = .item
+            self.isDestructive = isDestructive; self.submenu = submenu
+            self.submenuProvider = submenuProvider; self.action = action; self.kind = .item
         }
         public init(_ title: String, icon: NSImage? = nil, shortcut: String? = nil,
                     isEnabled: Bool = true, isDestructive: Bool = false,
-                    submenu: [MenuItem] = [], action: (() -> Void)? = nil) {
+                    submenu: [MenuItem] = [],
+                    action: (() -> Void)? = nil,
+                    submenuProvider: (@MainActor () async -> [MenuItem])? = nil) {
             self.init(id: title, title: title, icon: icon, shortcut: shortcut,
-                      isEnabled: isEnabled, isDestructive: isDestructive, submenu: submenu, action: action)
+                      isEnabled: isEnabled, isDestructive: isDestructive, submenu: submenu,
+                      action: action, submenuProvider: submenuProvider)
         }
 
         private init(id: String, title: String, kind: Kind) {
             self.id = id; self.title = title; self.kind = kind
             self.icon = nil; self.shortcut = nil; self.hasSubmenu = false
             self.isChecked = false; self.isEnabled = false; self.isDestructive = false
-            self.submenu = []; self.action = nil
+            self.submenu = []; self.submenuProvider = nil; self.action = nil
         }
         /// A non-interactive divider between groups. `id` only needs to be unique.
         public static func separator(id: String = "—") -> MenuItem { MenuItem(id: id, title: "", kind: .separator) }
