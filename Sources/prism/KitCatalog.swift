@@ -691,6 +691,7 @@ ThemedBackdropView(
                  "palette: ResolvedPalette — assign to (re)theme; repaints list + panel surface/edge",
                  "items: [MenuItem] — rows; each MenuItem carries title/icon/shortcut/isChecked/isDestructive/isEnabled + its own action closure (実処理). .separator(id:)/.header(_:id:) statics build non-interactive rows",
                  "MenuItem.submenu: [MenuItem] — non-empty ⇒ a cascade: the row opens a child menu beside it (hover-intent / → / click); auto-sets hasSubmenu; the row's own action is ignored (opening the child IS its activation); the child's submenu rows cascade further (N-level, arbitrary depth)",
+                 "MenuItem.submenuProvider: (@MainActor () async -> [MenuItem])? — DEFERRED children: opening the row shows a disabled Loading… row, then fills from the awaited closure (No items on []); re-invoked per open (cache-free); static submenu wins if both are set; the in-flight fetch is cancelled on close. Consumer: wand's real launcher (async PanelTree walk)",
                  "present(from: NSView, gap:) — open as a drop-down below an anchor (flips up on underflow)",
                  "present(at: CGPoint, in: NSWindow) — open as a context menu at a point (e.g. event.locationInWindow)",
                  "dismiss(animated:) — close (idempotent); invalidate() — deterministic teardown",
@@ -725,7 +726,7 @@ let items: [ThemedMenu.MenuItem] = [
 ThemedMenuTriggerView(palette: resolve(themeSpec), title: "Actions", items: items)
 """,
         cellType: "ThemedMenu.MenuItem",
-        cellInit: "MenuItem(_:icon:shortcut:isEnabled:isDestructive:submenu:action:) — MenuItem(\"Title\") { } — only the title is required (icon/shortcut/isEnabled/isDestructive/submenu/action all default; `.separator(id:)`/`.header(_:id:)` build non-interactive rows).",
+        cellInit: "MenuItem(_:icon:shortcut:isEnabled:isDestructive:submenu:action:submenuProvider:) — MenuItem(\"Title\") { } — only the title is required (icon/shortcut/isEnabled/isDestructive/submenu/action/submenuProvider all default; a submenuProvider makes the row a deferred folder; `.separator(id:)`/`.header(_:id:)` build non-interactive rows).",
         sourcePath: "ThemeKitUI/ThemedMenuTriggerView.swift",
         appkitEscape: "ThemedButton (NSView, module ThemeKit) — the trigger button ThemedMenuTriggerView hosts. ThemedMenu ITSELF (module ThemeKitUI, Sources/ThemeKitUI/ThemedMenu.swift) is an NSObject CONTROLLER — not an NSView — that owns a borderless non-key ThemeKit PopupPanel; only reach for it directly (skipping the trigger view) if you need the controller API (ThemedMenu.make(palette:items:) + present(from:)/present(at:in:)/dismiss()/onOpenChange) outside a SwiftUI tree, e.g. a context menu opened from a raw NSEvent."),
     KitComponent(
