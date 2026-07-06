@@ -26,3 +26,16 @@ final class PrismConfigTests: XCTestCase {
     }
     func testExplicitAllHonored() { XCTAssertEqual(loadTOML("theme = \"all\"").theme, "all") }
 }
+
+final class CopyRefTests: XCTestCase {
+    func testThemedListViewCoreIsCompilableShape() {
+        let ref = kitComponent("ThemedListView").pasteReadyCore
+        XCTAssertTrue(ref.contains("TYPE TO USE (SwiftUI): ThemedListView"))
+        XCTAssertTrue(ref.contains("import ThemeKitUI"))
+        XCTAssertTrue(ref.contains("ThemedListView("))
+        XCTAssertTrue(ref.contains("onActivate: { id in open(id) }"))
+        XCTAssertTrue(ref.contains("SOURCE: ThemeKitUI/ThemedListView.swift"))
+        XCTAssertFalse(ref.contains("list.items ="))   // not the old non-existent builder shape
+        XCTAssertFalse(ref.contains("{ list in"))
+    }
+}

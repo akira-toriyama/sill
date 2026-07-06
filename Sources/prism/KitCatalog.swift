@@ -34,16 +34,48 @@ enum KitFamily: String, CaseIterable, Identifiable {
     static var appCases: [KitFamily] { allCases.filter { $0.group == .app } }
 }
 
-/// One ThemeKit component's identifying info — NOT its source. `referenceText`
+/// One ThemeKit component's identifying info — NOT its source. `pasteReadyCore`
 /// is the paste-ready block the "copy ref" button puts on the clipboard.
 struct KitComponent: Identifiable {
     let name, module, kind, summary, consumes: String
     let keyAPI, variants: [String]
     let family: KitFamily
+
+    // Structured recipe fields (Task 3) — all defaulted so existing entries
+    // compile unchanged; only a worked-example entry (ThemedListView) fills them.
+    // NOTE: `var`, not `let` — a `let` property with an inline default is FIXED
+    // (Swift's memberwise init omits it as a settable parameter entirely), which
+    // would make it impossible to override per-entry.
+    var defaultType: String = ""
+    var imports: [String] = []
+    var initSnippet: String = ""
+    var cellType: String = ""
+    var cellInit: String = ""
+    var sourcePath: String = ""
+    var appkitEscape: String = ""
+    var isAtom: Bool = false
+
     var id: String { name }
 
-    var referenceText: String {
-        var s = "\(name) · \(module) (sill)\n\(kind)\n\n\(summary)\n\nUSE: \(consumes)\n\nKEY API:\n"
+    /// The paste-ready CORE: type-to-use + imports + a minimal compilable-shape
+    /// init — what an agent needs to DROP the component into code. Falls back to
+    /// gracefully omitting any section whose recipe field is empty (most entries,
+    /// until they get their own recipe).
+    var pasteReadyCore: String {
+        var s = "\(name) — \(kind) (sill · \(module) widget)\n"
+        if !defaultType.isEmpty { s += "TYPE TO USE (SwiftUI): \(defaultType)\n" }
+        if !imports.isEmpty { s += "IMPORTS:\n" + imports.map { "  \($0)" }.joined(separator: "\n") + "\n" }
+        if !initSnippet.isEmpty { s += (isAtom ? "USE:\n" : "MINIMAL:\n") + initSnippet + "\n" }
+        if !cellInit.isEmpty { s += "CELL: \(cellInit)\n" }
+        if !appkitEscape.isEmpty { s += "ESCAPE HATCH (AppKit only): \(appkitEscape)\n" }
+        if !sourcePath.isEmpty { s += "SOURCE: \(sourcePath)  ·  ADVANCED (opt-in) → full API." }
+        return s
+    }
+
+    /// The full descriptive reference (name/module/kind/summary/key API/variants) —
+    /// the ADVANCED, opt-in dump behind `pasteReadyCore`'s "SOURCE" pointer.
+    var fullAPI: String {
+        var s = "\(name) · \(module) (sill)\n\(kind)\n\n\(summary)\n\nKEY API:\n"
         s += keyAPI.map { "  • \($0)" }.joined(separator: "\n")
         s += "\n\nVARIANTS:\n" + variants.map { "  • \($0)" }.joined(separator: "\n")
         return s
@@ -421,7 +453,28 @@ let kitCatalog: [KitComponent] = [
                  "drag affordance: .onto lights the target row (2pt primary ring + faint fill); .between draws a 2pt primary insertion line + leading dot in the gap; the lifted source row dims. A CHUNK lift dims EVERY member row and draws a THICKER full-bleed section insertion bar; the overlay ghost is the members' capped (60%) union with an 'N items' badge. grid/rail/real-window drag stay app-side (not in sill)",
                  "capture seams: preview: ListPreview(selection:highlight:scrollX:scrollY:dragSource:dropTarget:dragChunk:) — one frozen value pins every interactive state for a deterministic prism shot",
              ],
-        family: .collection),
+        family: .collection,
+        // Structured recipe (Task 3 worked example) — verified against the real
+        // ThemedListView.swift / ListStyle.swift / ListItem.swift init signatures.
+        defaultType: "ThemedListView<ID>",
+        imports: [
+            "import ThemeKitUI   // ThemedListView, ListItem, ThemedListStyle, Badge/TrailingAccessory/ListTint",
+            "import PaletteKit   // ResolvedPalette + resolve(_:)",
+        ],
+        initSnippet: """
+          let palette = resolve(themeSpec)              // @MainActor; themeSpec: ThemeSpec
+          var style = ThemedListStyle()                 // selectionMode defaults to .single
+          ThemedListView(
+              items: [ ListItem(id: "inbox",   primary: "Inbox"),
+                       ListItem(id: "starred", primary: "Starred", secondary: "3 unread") ],
+              style: style,
+              palette: palette,
+              onActivate: { id in open(id) })           // id IS the ListItem.id
+        """,
+        cellType: "ListItem",
+        cellInit: "ListItem(id:primary:) — only id + primary required (image/secondary/badges/trailing/tint/kind default).",
+        sourcePath: "ThemeKitUI/ThemedListView.swift",
+        appkitEscape: ""),
     KitComponent(
         name: "ThemedMenu", module: "ThemeKitUI",
         kind: "MUI <Menu> — a themed floating pop-up menu of action rows with N-level submenu cascade + horizontal (menu-bar) presentation",

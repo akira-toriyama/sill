@@ -450,9 +450,10 @@ struct WidgetSection<Content: View>: View {
     }
 }
 
-/// Copies a component's `referenceText` (name · module · kind · key API · variants)
-/// to the clipboard — so the user can paste it into ANOTHER Claude Code session
-/// that then FINDS + uses the part. Flashes a check on copy.
+/// Copies a component's `pasteReadyCore` (type-to-use · imports · a minimal
+/// compilable-shape init) to the clipboard — so the user can paste it into
+/// ANOTHER Claude Code session that then DROPS the part straight into code.
+/// Flashes a check on copy.
 struct CopyRefButton: View {
     let component: KitComponent
     let p: ResolvedPalette
@@ -462,7 +463,7 @@ struct CopyRefButton: View {
         Button {
             let pb = NSPasteboard.general
             pb.clearContents()
-            pb.setString(component.referenceText, forType: .string)
+            pb.setString(component.pasteReadyCore, forType: .string)
             copied = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) { copied = false }
         } label: {
