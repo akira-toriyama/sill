@@ -125,16 +125,25 @@ public enum ConfigSchema {
         public let kind: SectionKind
         public var fields: [Field<Root>]
         public var doc: String?
+        /// For a `.dynamicTable` section: the open-map value schema its dynamic
+        /// keys map to (e.g. facet's `[desktop.<N>]` → a `{ section[], tab[] }`
+        /// shape keyed by an ordinal pattern). Carried here — NOT as a
+        /// `SectionKind` associated value — so `SectionKind` stays `Equatable`
+        /// (and `Section` is already non-`Equatable` via `Field`). Ignored for
+        /// non-`.dynamicTable` kinds; `nil` keeps the bare-permissive behaviour.
+        public var dynamicValue: DynamicValue?
         public init(
             _ header: String,
             kind: SectionKind = .table,
             doc: String? = nil,
-            fields: [Field<Root>] = []
+            fields: [Field<Root>] = [],
+            dynamicValue: DynamicValue? = nil
         ) {
             self.header = header
             self.kind = kind
             self.doc = doc
             self.fields = fields
+            self.dynamicValue = dynamicValue
         }
     }
 
@@ -186,6 +195,7 @@ private final class SchemaNode {
     var children: [String: SchemaNode] = [:]                // nested object sub-tables
     var description: String?
     var permissive = false
+    var dynamicValue: DynamicValue?                         // typed open map (wins over permissive)
 
     /// Fold this node into the shared `ObjectShape` vocabulary. Child sub-tables
     /// become nested objects and array-of-tables become nested tables; both
@@ -197,7 +207,8 @@ private final class SchemaNode {
             nested: arrays.map { NestedTable(key: $0.key, item: $0.item) },
             objects: children.map { NestedObject(key: $0.key, shape: $0.value.toObjectShape()) },
             doc: description ?? "",
-            permissive: permissive)
+            permissive: permissive,
+            dynamicValue: dynamicValue)
     }
 }
 
@@ -274,9 +285,16 @@ public extension ConfigSchema.Spec {
                     if let doc = section.doc { node.description = doc }
                 } else {
                     // A named dynamic sub-table (`overlay.themes`,
-                    // `search.synonyms`, facet's `desktop`): permissive object.
+                    // `search.synonyms`, facet's `desktop`). A carried
+                    // `dynamicValue` gives its keys a TYPED value schema (facet's
+                    // `[desktop.<N>]`); otherwise it stays a bare permissive
+                    // object (byte-identical to before).
                     let node = Self.descend(root, Self.pathComponents(section.header))
-                    node.permissive = true
+                    if let dv = section.dynamicValue {
+                        node.dynamicValue = dv
+                    } else {
+                        node.permissive = true
+                    }
                     node.description = section.doc ?? node.description
                 }
             }

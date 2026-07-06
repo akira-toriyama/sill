@@ -118,6 +118,38 @@ public enum ExclusionRule: Sendable, Equatable {
     case dependency(key: String, needs: String)
 }
 
+// MARK: - Dynamic (open-map) value
+
+/// An OPEN map of dynamic keys → a typed value shape, for a table whose key
+/// NAMES can't be enumerated but whose VALUES all share one object schema
+/// (facet's `[desktop.<N>]`: ordinal keys, each a `{ section[], tab[] }`).
+/// Additive over [ObjectShape.permissive]: when an object carries a
+/// `dynamicValue` it WINS over `permissive` — the emitter lowers the value
+/// `shape` (not a bare `true`) and the validator recurses into it.
+///
+/// - `keyPattern`: a JSON-Schema regex the keys must match → `patternProperties`
+///   keyed by it, with `additionalProperties: false` (so a key that does NOT
+///   match is rejected, e.g. `[desktop.foo]`). `nil` = accept any key name →
+///   `additionalProperties: <value schema>` (typed values, unconstrained keys).
+public struct DynamicValue: Sendable {
+    public let keyPattern: String?
+    /// Boxed so the `ObjectShape` ⇄ `DynamicValue` value-type recursion has a
+    /// finite size (a Swift struct can't be `indirect`; the rest of this family
+    /// breaks the same cycle with array-backed `nested` / `objects`).
+    private let _shape: ShapeBox
+    public var shape: ObjectShape { _shape.shape }
+    public init(keyPattern: String? = nil, shape: ObjectShape) {
+        self.keyPattern = keyPattern
+        self._shape = ShapeBox(shape)
+    }
+}
+
+/// Heap box breaking the recursive value-type size of [DynamicValue.shape].
+private final class ShapeBox: Sendable {
+    let shape: ObjectShape
+    init(_ shape: ObjectShape) { self.shape = shape }
+}
+
 // MARK: - Object / table shapes
 
 /// A table (or array-of-tables item) shape: its fields, what is required,
@@ -149,16 +181,22 @@ public struct ObjectShape: Sendable {
     /// hover. DISCOVERABILITY only — the app's validator remains the
     /// enforcement authority.
     public let constraints: [String]
+    /// An open-map value schema for dynamic key names (see [DynamicValue]).
+    /// When non-nil it OVERRIDES `permissive`: the emitter lowers the value
+    /// `shape` under `patternProperties` / `additionalProperties` and the
+    /// validator recurses into it instead of accepting any value.
+    public let dynamicValue: DynamicValue?
 
     public init(fields: [SchemaField], required: [String] = [],
                 exclusions: [ExclusionRule] = [], nested: [NestedTable] = [],
                 objects: [NestedObject] = [], doc: String = "",
                 permissive: Bool = false, initKeys: [String] = [],
-                constraints: [String] = []) {
+                constraints: [String] = [], dynamicValue: DynamicValue? = nil) {
         self.fields = fields; self.required = required
         self.exclusions = exclusions; self.nested = nested
         self.objects = objects; self.doc = doc; self.permissive = permissive
         self.initKeys = initKeys; self.constraints = constraints
+        self.dynamicValue = dynamicValue
     }
 
     /// Every key this object accepts (own fields + nested-table + nested-object

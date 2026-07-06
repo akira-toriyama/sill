@@ -99,8 +99,9 @@ public extension SchemaDescriptor {
         _ shape: ObjectShape, table: [String: Toml.Value], path: [String],
         into errors: inout [ValidationError]
     ) {
-        // 1. unknown-key (strict tables only).
-        if !shape.permissive {
+        // 1. unknown-key (strict tables only). Keys handled by an open-map
+        //    `dynamicValue` are checked in step 7 instead (pattern + recurse).
+        if !shape.permissive && shape.dynamicValue == nil {
             let known = shape.keySet
             for key in table.keys where !known.contains(key) {
                 errors.append(ValidationError(
@@ -158,6 +159,43 @@ public extension SchemaDescriptor {
             for (i, row) in rows.enumerated() {
                 validateObject(nested.item, table: row.fields,
                                path: path + [nested.key, "[\(i)]"], into: &errors)
+            }
+        }
+        // 7. open-map dynamic keys (facet's `[desktop.<N>]`): each key that is
+        //    NOT a declared key must match the value's `keyPattern` (else it is
+        //    an unknown key, mirroring the emitted `additionalProperties: false`),
+        //    then its value recurses into the shared value shape.
+        if let dv = shape.dynamicValue {
+            // Precompile the key pattern into a matcher. `nil` keyPattern = accept
+            // any key name (the `additionalProperties: <schema>` open map). A
+            // provided-but-uncompilable pattern is a BROKEN schema: match nothing
+            // (fail-closed), mirroring the emitted never-matching `patternProperties`
+            // + `additionalProperties: false` — never silently accept every key.
+            let matcher: (String) -> Bool
+            if let pattern = dv.keyPattern {
+                let re = try? NSRegularExpression(pattern: pattern)
+                matcher = { key in
+                    guard let re else { return false }
+                    let range = NSRange(key.startIndex..<key.endIndex, in: key)
+                    return re.firstMatch(in: key, options: [], range: range) != nil
+                }
+            } else {
+                matcher = { _ in true }
+            }
+            let known = shape.keySet
+            for (key, value) in table where !known.contains(key) {
+                guard matcher(key) else {
+                    errors.append(ValidationError(
+                        path: path + [key], rule: .unknownKey(key: key),
+                        message: "\(joined(path + [key])): key '\(key)' does not match "
+                               + "the required pattern '\(dv.keyPattern ?? "")'"))
+                    continue
+                }
+                guard let childTable = value.asTable else {
+                    errors.append(typeError(path: path + [key], key: key, expected: "table"))
+                    continue
+                }
+                validateObject(dv.shape, table: childTable, path: path + [key], into: &errors)
             }
         }
     }

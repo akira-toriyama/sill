@@ -104,12 +104,24 @@ enum SchemaEmit {
 
     static func emitObject(_ shape: ObjectShape, sectionDoc: String,
                            _ options: EmitOptions) -> [String: Any] {
-        var obj: [String: Any] = [
-            "type": "object",
+        var obj: [String: Any] = ["type": "object"]
+        if let dv = shape.dynamicValue {
+            // Open map of dynamic keys → a typed value schema (wins over
+            // `permissive`). A key pattern → `patternProperties` keyed by it with
+            // `additionalProperties: false` (non-matching keys rejected); no
+            // pattern → the value schema IS `additionalProperties` (any key).
+            let valueSchema = emitObject(dv.shape, sectionDoc: dv.shape.doc, options)
+            if let pattern = dv.keyPattern {
+                obj["patternProperties"] = [pattern: valueSchema]
+                obj["additionalProperties"] = false
+            } else {
+                obj["additionalProperties"] = valueSchema
+            }
+        } else {
             // false = strict (reject typo'd keys); true = permissive (dynamic
             // key names the schema can't enumerate).
-            "additionalProperties": shape.permissive,
-        ]
+            obj["additionalProperties"] = shape.permissive
+        }
         if !sectionDoc.isEmpty { obj["description"] = sectionDoc }
 
         var props: [String: Any] = [:]
