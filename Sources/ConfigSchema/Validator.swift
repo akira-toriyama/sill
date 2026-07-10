@@ -191,6 +191,14 @@ public extension SchemaDescriptor {
                                + "the required pattern '\(dv.keyPattern ?? "")'"))
                     continue
                 }
+                if let leaf = dv.leaf {
+                    // Leaf-valued map (word → [String]): run the field check with
+                    // the dynamic key substituted so paths/messages name the
+                    // actual entry (`search.synonyms.close[1]`).
+                    validateField(renamed(leaf, to: key), value: value,
+                                  path: path, into: &errors)
+                    continue
+                }
                 guard let childTable = value.asTable else {
                     errors.append(typeError(path: path + [key], key: key, expected: "table"))
                     continue
@@ -356,6 +364,20 @@ public extension SchemaDescriptor {
     }
 
     // MARK: - helpers
+
+    /// A copy of `field` under a different key — how a leaf `DynamicValue`
+    /// reuses the field checks for each dynamic entry.
+    private func renamed(_ f: SchemaField, to key: String) -> SchemaField {
+        SchemaField(key, f.shape, doc: f.doc,
+                    enumDomain: f.enumDomain, enumDocs: f.enumDocs,
+                    arrayItemEnum: f.arrayItemEnum,
+                    defaultBool: f.defaultBool, defaultInt: f.defaultInt,
+                    defaultString: f.defaultString, defaultNumber: f.defaultNumber,
+                    defaultStringArray: f.defaultStringArray,
+                    exclusiveMinimum: f.exclusiveMinimum,
+                    minimum: f.minimum, maximum: f.maximum,
+                    rejected: f.rejected)
+    }
 
     private func numeric(_ v: Toml.Value) -> Double? {
         if case .int(let i) = v { return Double(i) }
