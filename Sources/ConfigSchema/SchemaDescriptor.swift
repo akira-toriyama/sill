@@ -121,16 +121,18 @@ public enum ExclusionRule: Sendable, Equatable {
 // MARK: - Dynamic (open-map) value
 
 /// An OPEN map of dynamic keys → a typed value shape, for a table whose key
-/// NAMES can't be enumerated but whose VALUES all share one object schema
-/// (facet's `[desktop.<N>]`: ordinal keys, each a `{ section[], tab[] }`).
+/// NAMES can't be enumerated but whose VALUES all share one schema
+/// (facet's `[desktop.<N>]`: ordinal keys, each a `{ section[], tab[] }`;
+/// perch's `[search.synonyms]`: word keys, each an array of strings).
 /// Additive over [ObjectShape.permissive]: when an object carries a
 /// `dynamicValue` it WINS over `permissive` — the emitter lowers the value
-/// `shape` (not a bare `true`) and the validator recurses into it.
+/// schema (not a bare `true`) and the validator recurses into it.
 ///
 /// - `keyPattern`: a JSON-Schema regex the keys must match → `patternProperties`
 ///   keyed by it, with `additionalProperties: false` (so a key that does NOT
 ///   match is rejected, e.g. `[desktop.foo]`). `nil` = accept any key name →
 ///   `additionalProperties: <value schema>` (typed values, unconstrained keys).
+/// - values are sub-tables (`shape`) or one LEAF field (`leaf`) — see the inits.
 public struct DynamicValue: Sendable {
     public let keyPattern: String?
     /// Boxed so the `ObjectShape` ⇄ `DynamicValue` value-type recursion has a
@@ -138,9 +140,29 @@ public struct DynamicValue: Sendable {
     /// breaks the same cycle with array-backed `nested` / `objects`).
     private let _shape: ShapeBox
     public var shape: ObjectShape { _shape.shape }
+    /// When non-nil the map's values are one LEAF field (scalar / array), not
+    /// sub-tables: the emitter lowers the FIELD schema as the value schema and
+    /// the validator runs the field check with each dynamic key substituted as
+    /// the field's key (so paths read `search.synonyms.close[1]`). `shape` then
+    /// holds an empty placeholder — kept non-optional so existing object-valued
+    /// call sites stay source-compatible.
+    public let leaf: SchemaField?
+
+    /// An open map whose values are sub-tables sharing one object schema.
     public init(keyPattern: String? = nil, shape: ObjectShape) {
         self.keyPattern = keyPattern
         self._shape = ShapeBox(shape)
+        self.leaf = nil
+    }
+
+    /// An open map whose values are one LEAF field shape — e.g. perch's
+    /// `[search.synonyms]` word → array-of-strings. The field's own `key` is a
+    /// placeholder (pick a doc-friendly one like `"<word>"`); its `doc` becomes
+    /// the value schema's `description`.
+    public init(keyPattern: String? = nil, leaf: SchemaField) {
+        self.keyPattern = keyPattern
+        self._shape = ShapeBox(ObjectShape(fields: []))
+        self.leaf = leaf
     }
 }
 

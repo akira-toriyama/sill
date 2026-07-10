@@ -278,11 +278,21 @@ public extension ConfigSchema.Spec {
                 if section.header.contains("\"") {
                     // A literal-quote header (`behavior."<bundle-id>"`) marks
                     // its PARENT table as accepting arbitrary sub-tables —
-                    // fold permissive onto the parent, not a `"<id>"` child.
+                    // fold onto the parent, not a `"<id>"` child. A carried
+                    // `dynamicValue` gives those sub-tables a TYPED value
+                    // schema alongside the parent's own static fields; the
+                    // surfaced doc is then the value shape's `doc` and the
+                    // parent keeps its OWN description. Without one, the
+                    // pre-existing bare-permissive fold (parent doc
+                    // overwritten) is unchanged.
                     let parent = String(section.header.prefix { $0 != "." })
                     let node = Self.descend(root, parent.isEmpty ? [] : [parent])
-                    node.permissive = true
-                    if let doc = section.doc { node.description = doc }
+                    if let dv = section.dynamicValue {
+                        node.dynamicValue = dv
+                    } else {
+                        node.permissive = true
+                        if let doc = section.doc { node.description = doc }
+                    }
                 } else {
                     // A named dynamic sub-table (`overlay.themes`,
                     // `search.synonyms`, facet's `desktop`). A carried

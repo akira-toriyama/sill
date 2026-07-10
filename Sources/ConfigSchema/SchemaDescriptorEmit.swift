@@ -110,7 +110,9 @@ enum SchemaEmit {
             // `permissive`). A key pattern → `patternProperties` keyed by it with
             // `additionalProperties: false` (non-matching keys rejected); no
             // pattern → the value schema IS `additionalProperties` (any key).
-            let valueSchema = emitObject(dv.shape, sectionDoc: dv.shape.doc, options)
+            // A `leaf` value lowers the FIELD schema; otherwise the object shape.
+            let valueSchema = dv.leaf.map { emitField($0) }
+                ?? emitObject(dv.shape, sectionDoc: dv.shape.doc, options)
             if let pattern = dv.keyPattern {
                 obj["patternProperties"] = [pattern: valueSchema]
                 obj["additionalProperties"] = false
