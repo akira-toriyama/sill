@@ -569,7 +569,7 @@ ThemedTooltipAnchorView(palette: resolve(themeSpec), text: "A live themed toolti
     KitComponent(
         name: "ThemedBackdrop", module: "ThemeKitUI",
         kind: "SwiftUI-native themed backdrop surface — what panels/pills/cards sit on (solid or alpha scrim, any Shape; NO blur)",
-        summary: "Pure-SwiftUI surface: a Shape filled with the theme's background (opaque, or a translucent scrim via backgroundAlpha) + optional hairline; re-themes by reassigning ResolvedPalette. Replaces each app's behind-window NSVisualEffectView blur (床2個 kept — blur was cosmetic, #17c).",
+        summary: "Pure-SwiftUI surface: a Shape filled with the theme's background (opaque, or a translucent scrim via backgroundAlpha) + optional hairline; re-themes by reassigning ResolvedPalette. Replaces each app's behind-window NSVisualEffectView blur (床3個 kept — blur was cosmetic, #17c).",
         consumes: "A SwiftUI View: `ThemedBackdropView(palette:in:fill:bordered:)`, or the `.themedBackdrop(_:in:fill:bordered:)` modifier to put it behind any view; host it (NSHostingView) at the back of a panel/pill/card.",
         keyAPI: [
                  "palette: ResolvedPalette — theme; reassigning re-themes the surface",
