@@ -60,4 +60,24 @@ final class ListDnDTests: XCTestCase {
         XCTAssertEqual(cands, [.between(beforeID: "C"), .between(beforeID: nil)],
                        "a chunk lift aims at section gaps + the end gap, excluding its own no-move slot")
     }
+    func testFlatCandidatesPerModeCoverAllBranches() {
+        // chunkIDs empty ⇒ the flat-list path: onto/between per row (all three switch
+        // arms) plus the trailing end gap that ONLY the non-.dropOnto modes append.
+        // source "a": its own onto and the two gaps touching it are trivial self-drops.
+        XCTAssertEqual(dragCandidates(source: "a", rows: rows, mode: .dropOnto,
+                                      chunkIDs: [], validate: yes).map(\.placement),
+                       [.onto(id: "b"), .onto(id: "c"), .onto(id: "d")],
+                       ".dropOnto: onto every other row, no end gap")
+        XCTAssertEqual(dragCandidates(source: "a", rows: rows, mode: .reorderBetween,
+                                      chunkIDs: [], validate: yes).map(\.placement),
+                       [.between(beforeID: "c"), .between(beforeID: "d"), .between(beforeID: nil)],
+                       ".reorderBetween: non-trivial gaps + the end gap")
+        XCTAssertEqual(dragCandidates(source: "a", rows: rows, mode: .both,
+                                      chunkIDs: [], validate: yes).map(\.placement),
+                       [.onto(id: "b"),
+                        .between(beforeID: "c"), .onto(id: "c"),
+                        .between(beforeID: "d"), .onto(id: "d"),
+                        .between(beforeID: nil)],
+                       ".both: between+onto per row (self-gaps trivial), end gap appended")
+    }
 }
