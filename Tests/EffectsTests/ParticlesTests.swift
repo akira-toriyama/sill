@@ -200,4 +200,23 @@ final class ParticlesTests: XCTestCase {
         drawParticles(fw, now: 5)   // settled → draws nothing, must not crash
         img.unlockFocus()
     }
+
+    // MARK: - Seeded determinism (flicker-free f(now) render contract)
+
+    func testRollBurstSeedIsDeterministic() {
+        // The seeded variant is the flicker-free-render contract: the SAME seed
+        // + inputs must roll byte-identical particles on every rerender
+        // (ParticleBurstView rolls f(now) with a stable per-cadence seed — no
+        // @State write during render), while a DIFFERENT seed rolls a distinct
+        // burst. Particle is Hashable, so [Particle] compares by value.
+        func burst(_ seed: UInt64) -> ParticleBurst {
+            rollBurst(seed: seed, emission: .fireworks, from: [(x: 0.0, y: 0.0)],
+                      colors: [0xFF0000, 0x00FF00], now: 0)
+        }
+        XCTAssertFalse(burst(0xC0FFEE).particles.isEmpty)
+        XCTAssertEqual(burst(0xC0FFEE).particles, burst(0xC0FFEE).particles,
+                       "same seed ⇒ identical burst (else f(now) flickers)")
+        XCTAssertNotEqual(burst(0xC0FFEE).particles, burst(0xBADF00D).particles,
+                          "distinct seeds ⇒ distinct bursts")
+    }
 }

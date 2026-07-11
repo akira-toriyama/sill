@@ -176,9 +176,29 @@ final class EffectsTests: XCTestCase {
     }
 
     func testAnimatedCyclesEffectIsHueRotation() {
-        // rainbow cycles ⇒ full-saturation hue at the phase.
-        let f = animatedPalette(theme: "rainbow", at: 0.0)
-        XCTAssertNotNil(f)
+        // A cycling theme (rainbow) walks a FULL-SATURATION hue that ROTATES
+        // with the phase — primary hue == frac(phase), secondary the opposite
+        // half-turn, both at saturation 0.95 / brightness 1 (animatedPalette's
+        // `fx.cycles` branch). Pins the actual HSB, not just non-nil: a swapped
+        // rotation, a dropped phase-wrap, or a desaturated path now fails.
+        func primaryHSB(_ p: CGFloat) -> (h: CGFloat, s: CGFloat, b: CGFloat) {
+            let c = animatedPalette(theme: "rainbow", at: p)!.primary
+                .usingColorSpace(.sRGB)!
+            return (c.hueComponent, c.saturationComponent, c.brightnessComponent)
+        }
+        // Hue TRACKS the phase (this is the rotation) — not a constant.
+        XCTAssertEqual(primaryHSB(0.25).h, 0.25, accuracy: 0.02)
+        XCTAssertEqual(primaryHSB(0.5).h,  0.5,  accuracy: 0.02)
+        XCTAssertEqual(primaryHSB(0.75).h, 0.75, accuracy: 0.02)
+        // Full-saturation, full-brightness (the "full-saturation hue" claim).
+        XCTAssertEqual(primaryHSB(0.25).s, 0.95, accuracy: 0.03)
+        XCTAssertEqual(primaryHSB(0.25).b, 1.0,  accuracy: 0.02)
+        // Secondary sits a half-turn opposite on the wheel (h + 0.5 mod 1).
+        let sec = animatedPalette(theme: "rainbow", at: 0.0)!.secondary
+            .usingColorSpace(.sRGB)!
+        XCTAssertEqual(sec.hueComponent, 0.5, accuracy: 0.02)
+        // Phase wraps: 1.25 ≡ 0.25.
+        XCTAssertEqual(primaryHSB(1.25).h, primaryHSB(0.25).h, accuracy: 0.001)
     }
 
     func testAnimatedReturnsNilForStaticTheme() {
@@ -215,5 +235,33 @@ final class EffectsTests: XCTestCase {
     func testCanonicalLinePetNames() {
         XCTAssertEqual(canonicalLinePetNames, ["chomp", "ghost"])
         XCTAssertEqual(LinePet.allCases.count, 2)
+    }
+
+    func testLinePetPositionWalksPerimeter() {
+        // linePetPosition walks the rect perimeter top → right → bottom → left,
+        // returning centre + travel-direction rotation. Pinned on a NON-origin
+        // rect (10,20,100,40 ⇒ perim 280) so minX/minY handling is exercised.
+        // rot per edge: top 0, right -π/2, bottom π, left π/2.
+        let r = CGRect(x: 10, y: 20, width: 100, height: 40)
+        func at(_ t: CGFloat) -> (x: CGFloat, y: CGFloat, rot: CGFloat) {
+            linePetPosition(on: r, distance: t)
+        }
+        let acc: CGFloat = 1e-9
+        // Top edge — y = maxY, moving +x, rot 0.
+        XCTAssertEqual(at(0).x,  10, accuracy: acc); XCTAssertEqual(at(0).y,  60, accuracy: acc)
+        XCTAssertEqual(at(0).rot, 0, accuracy: acc)
+        XCTAssertEqual(at(50).x, 60, accuracy: acc); XCTAssertEqual(at(50).y, 60, accuracy: acc)
+        // Right edge — x = maxX, moving -y, rot -π/2.
+        XCTAssertEqual(at(100).x, 110, accuracy: acc); XCTAssertEqual(at(100).y, 60, accuracy: acc)
+        XCTAssertEqual(at(100).rot, -.pi / 2, accuracy: acc)
+        XCTAssertEqual(at(120).y, 40, accuracy: acc)
+        // Bottom edge — y = minY, moving -x, rot π.
+        XCTAssertEqual(at(140).x, 110, accuracy: acc); XCTAssertEqual(at(140).y, 20, accuracy: acc)
+        XCTAssertEqual(at(140).rot, .pi, accuracy: acc)
+        XCTAssertEqual(at(190).x, 60, accuracy: acc)
+        // Left edge — x = minX, moving +y, rot π/2.
+        XCTAssertEqual(at(240).x, 10, accuracy: acc); XCTAssertEqual(at(240).y, 20, accuracy: acc)
+        XCTAssertEqual(at(240).rot, .pi / 2, accuracy: acc)
+        XCTAssertEqual(at(260).y, 40, accuracy: acc)
     }
 }
