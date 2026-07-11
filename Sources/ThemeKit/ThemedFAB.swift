@@ -136,9 +136,7 @@ public final class ThemedFAB: ThemedControl {
         let s = themeBackingScale
 
         // Shadow (bottom) — never clipped, explicit rounded/circular silhouette.
-        shadowLayer.masksToBounds = false
-        shadowLayer.shadowColor = NSColor.black.cgColor
-        shadowLayer.contentsScale = s
+        shadowLayer.configureShadowLayer(scale: s)
         layer?.addSublayer(shadowLayer)
 
         // Fill clips the overlay child to the round / pill rect.
@@ -154,10 +152,7 @@ public final class ThemedFAB: ThemedControl {
         layer?.addSublayer(iconLayer)
 
         titleLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        titleLayer.contentsScale = s
-        titleLayer.alignmentMode = .center
-        titleLayer.truncationMode = .end
-        titleLayer.isWrapped = false
+        titleLayer.configureThemedLabel(scale: s, alignment: .center)
         titleLayer.isHidden = true
         layer?.addSublayer(titleLayer)
 
@@ -242,9 +237,7 @@ public final class ThemedFAB: ThemedControl {
     override func applyInteractionState() {
         overlayLayer.backgroundColor = overlayColor.cgColor
         let e = elevation
-        shadowLayer.shadowOpacity = e.opacity
-        shadowLayer.shadowRadius  = e.radius
-        shadowLayer.shadowOffset  = CGSize(width: 0, height: e.offsetY)
+        shadowLayer.applyShadowSpec(e)
     }
 
     /// Push the uppercased, tracked label into the text layer — extended only;

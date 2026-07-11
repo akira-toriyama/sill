@@ -119,10 +119,7 @@ public final class ThemedDivider: NSView {
         layer?.addSublayer(gapLayer)
 
         labelLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        labelLayer.contentsScale = s
-        labelLayer.alignmentMode = .center
-        labelLayer.truncationMode = .end
-        labelLayer.isWrapped = false
+        labelLayer.configureThemedLabel(scale: s, alignment: .center)
         layer?.addSublayer(labelLayer)         // top, over the gap
 
         setAccessibilityElement(false)         // decorative — AX-ignored

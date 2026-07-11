@@ -108,9 +108,7 @@ public final class ThemedButtonGroup: NSView {
 
     /// The uniform per-member extent along the cross axis (the button height) —
     /// mirrors ThemedButton's per-size height.
-    private var sizeExtent: CGFloat {
-        switch size { case .small: return 30; case .medium: return 36; case .large: return 42 }
-    }
+    private var sizeExtent: CGFloat { size.controlHeight }
     /// Outlined members overlap 1pt so two abutting borders collapse to one.
     private var overlap: CGFloat { variant == .outlined ? 1 : 0 }
     private var effectiveSelected: Int? { previewSelectedIndex ?? selectedIndex }
@@ -228,9 +226,7 @@ public final class ThemedButtonGroup: NSView {
             self.groupShadowLayer.isHidden = !self.groupShadowVisible
             if self.groupShadowVisible {
                 let e = self.palette.shadow(.dp2)   // MUI contained group = static dp2
-                self.groupShadowLayer.shadowOpacity = e.opacity
-                self.groupShadowLayer.shadowRadius  = e.radius
-                self.groupShadowLayer.shadowOffset  = CGSize(width: 0, height: e.offsetY)
+                self.groupShadowLayer.applyShadowSpec(e)
             }
         }
     }
