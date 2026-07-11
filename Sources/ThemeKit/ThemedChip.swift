@@ -157,12 +157,11 @@ public final class ThemedChip: ThemedControl {
         let leadW  = leadingImageSize?.width ?? 0
         let delW   = deleteImageSize?.width ?? 0
         let titleW = title.isEmpty ? 0 : titleLayer.bounds.width
-        let present = [leadW > 0, titleW > 0, delW > 0].filter { $0 }.count
-        let gaps = CGFloat(max(0, present - 1)) * m.gap
         let leftPad  = m.hpad + (leadingImageSize != nil ? m.outerAdj : 0)
         let rightPad = m.hpad + (deleteImageSize  != nil ? m.outerAdj : 0)
-        let content = leftPad + leadW + titleW + delW + gaps + rightPad
-        return NSSize(width: max(m.minWidth, ceil(content)), height: m.height)
+        let width = centeredRowWidth([leadW, titleW, delW], gap: m.gap,
+                                     leadingPad: leftPad, trailingPad: rightPad, minWidth: m.minWidth)
+        return NSSize(width: width, height: m.height)
     }
 
     // MARK: - Init
@@ -419,24 +418,13 @@ public final class ThemedChip: ThemedControl {
         if !title.isEmpty            { segs.append((titleLayer, titleLayer.bounds.size, true)) }
         if let sz = deleteImageSize  { segs.append((deleteIconLayer, sz, false)) }
 
-        let total = segs.reduce(0) { $0 + $1.1.width }
-                  + CGFloat(max(0, segs.count - 1)) * m.gap
-        var x = (b.width - total) / 2
-        let cy = b.midY
         deleteHitRect = .null
-        for (lyr, sz, isTitle) in segs {
-            if isTitle {
-                titleLayer.position = CGPoint(x: x + sz.width / 2, y: cy)
-            } else {
-                let frame = CGRect(x: x, y: cy - sz.height / 2, width: sz.width, height: sz.height)
-                lyr.frame = frame
-                if lyr === deleteIconLayer {
-                    // Expand the × hit-target for easy clicking (full chip height).
-                    deleteHitRect = CGRect(x: frame.minX - m.gap / 2, y: 0,
-                                           width: frame.width + m.gap, height: b.height)
-                }
-            }
-            x += sz.width + m.gap
+        let frames = layoutCenteredRow(segs, in: b, gap: m.gap)
+        for (i, seg) in segs.enumerated() where seg.0 === deleteIconLayer {
+            // Expand the × hit-target for easy clicking (full chip height).
+            let frame = frames[i]
+            deleteHitRect = CGRect(x: frame.minX - m.gap / 2, y: 0,
+                                   width: frame.width + m.gap, height: b.height)
         }
     }
 

@@ -121,10 +121,9 @@ public final class ThemedFAB: ThemedControl {
         case .extended:
             let iconW  = iconSize?.width ?? 0
             let labelW = label.isEmpty ? 0 : titleLayer.bounds.width
-            let present = [iconW > 0, labelW > 0].filter { $0 }.count
-            let gaps = CGFloat(max(0, present - 1)) * m.gap
-            let content = m.hpad + iconW + labelW + gaps + m.hpad
-            return NSSize(width: max(m.height, ceil(content)), height: m.height)
+            let width = centeredRowWidth([iconW, labelW], gap: m.gap,
+                                         leadingPad: m.hpad, trailingPad: m.hpad, minWidth: m.height)
+            return NSSize(width: width, height: m.height)
         }
     }
 
@@ -291,18 +290,7 @@ public final class ThemedFAB: ThemedControl {
         if variant == .extended, !label.isEmpty {
             segs.append((titleLayer, titleLayer.bounds.size, true))
         }
-        let total = segs.reduce(0) { $0 + $1.1.width }
-                  + CGFloat(max(0, segs.count - 1)) * m.gap
-        var x = (b.width - total) / 2
-        let cy = b.midY
-        for (lyr, sz, isTitle) in segs {
-            if isTitle {
-                titleLayer.position = CGPoint(x: x + sz.width / 2, y: cy)
-            } else {
-                lyr.frame = CGRect(x: x, y: cy - sz.height / 2, width: sz.width, height: sz.height)
-            }
-            x += sz.width + m.gap
-        }
+        layoutCenteredRow(segs, in: b, gap: m.gap)
     }
 
     override func updateContentsScale(_ s: CGFloat) {
