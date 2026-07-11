@@ -342,38 +342,10 @@ public final class ThemedButton: ThemedControl {
 
     private func rebuildIcons() {
         let scale = themeBackingScale, pt = metrics.iconPt, tint = titleColor
-        leadingImageSize  = applyIcon(leadingIconLayer,  symbol: leadingSymbol,
-                                      image: leadingImage,  pt: pt, tint: tint, scale: scale)
-        trailingImageSize = applyIcon(trailingIconLayer, symbol: trailingSymbol,
-                                      image: trailingImage, pt: pt, tint: tint, scale: scale)
-    }
-
-    /// Resolve the icon slot: a pre-resolved `image` (wins) renders via
-    /// `renderedIcon`; otherwise `symbol` is a Phosphor slug loaded via
-    /// `phosphorImage` and template-tinted through the same `renderedIcon` recipe
-    /// (one tint path for the image and slug channels). Returns the POINT size for
-    /// layout, or nil when empty.
-    @discardableResult
-    private func applyIcon(_ iconLayer: CALayer, symbol: String?, image: NSImage?,
-                           pt: CGFloat, tint: NSColor, scale: CGFloat) -> CGSize? {
-        let resolved: (CGImage, CGSize)?
-        if let image {
-            resolved = renderedIcon(image, pt: pt, tint: tint, scale: scale)
-        } else if let name = symbol, let base = phosphorImage(name, pt: pt) {
-            resolved = renderedIcon(base, pt: pt, tint: tint, scale: scale)
-        } else {
-            resolved = nil
-        }
-        guard let (img, sz) = resolved else {
-            layerTxn(animated: false) { iconLayer.contents = nil; iconLayer.isHidden = true }
-            return nil
-        }
-        layerTxn(animated: false) {
-            iconLayer.contents = img
-            iconLayer.contentsScale = scale
-            iconLayer.isHidden = false
-        }
-        return sz
+        leadingImageSize  = applyIconSlot(leadingIconLayer,  symbol: leadingSymbol,
+                                          image: leadingImage,  pt: pt, tint: tint, scale: scale)
+        trailingImageSize = applyIconSlot(trailingIconLayer, symbol: trailingSymbol,
+                                          image: trailingImage, pt: pt, tint: tint, scale: scale)
     }
 
     // MARK: - Corner-aware paths (standalone = a plain rounded rect; a grouped
