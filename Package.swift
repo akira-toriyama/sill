@@ -208,6 +208,7 @@ let package = Package(
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit", "Effects"]),
         .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", "PaletteKit", "Palette", "Effects"]),
         .testTarget(name: "ThemeKitUITests", dependencies: ["ThemeKitUI", "PaletteKit", "Palette", "ThemeKit", "ListCore"]),
+        .testTarget(name: "MarkdownKitUITests", dependencies: ["MarkdownKitUI", "PaletteKit", "Palette"]),
         .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette", "PixelArt"]),
         .testTarget(name: "MotionTests", dependencies: ["Motion"]),
         .testTarget(name: "ConfigSchemaTests",
