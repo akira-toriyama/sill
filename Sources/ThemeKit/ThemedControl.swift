@@ -396,6 +396,36 @@ public class ThemedControl: NSControl {
         sendActionToTarget()
     }
 
+    // MARK: - Icon slot (shared by ThemedButton / ThemedChip / ThemedFAB)
+
+    /// Resolve an icon slot into `iconLayer`: a pre-resolved `image` (wins) renders
+    /// via `renderedIcon`; otherwise `symbol` is a Phosphor slug loaded via
+    /// `phosphorImage` and template-tinted through the same `renderedIcon` recipe
+    /// (one tint path for the image and slug channels). Hides the layer when empty.
+    /// Returns the POINT size for layout, or nil when empty.
+    @discardableResult
+    func applyIconSlot(_ iconLayer: CALayer, symbol: String?, image: NSImage?,
+                       pt: CGFloat, tint: NSColor, scale: CGFloat) -> CGSize? {
+        let resolved: (CGImage, CGSize)?
+        if let image {
+            resolved = renderedIcon(image, pt: pt, tint: tint, scale: scale)
+        } else if let name = symbol, let base = phosphorImage(name, pt: pt) {
+            resolved = renderedIcon(base, pt: pt, tint: tint, scale: scale)
+        } else {
+            resolved = nil
+        }
+        guard let (img, sz) = resolved else {
+            layerTxn(animated: false) { iconLayer.contents = nil; iconLayer.isHidden = true }
+            return nil
+        }
+        layerTxn(animated: false) {
+            iconLayer.contents = img
+            iconLayer.contentsScale = scale
+            iconLayer.isHidden = false
+        }
+        return sz
+    }
+
     // MARK: - Init
 
     /// Designated initializer. Stores the palette, becomes layer-backed, opts out

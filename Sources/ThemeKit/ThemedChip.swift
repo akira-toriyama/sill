@@ -370,8 +370,8 @@ public final class ThemedChip: ThemedControl {
 
     private func rebuildIcons() {
         let scale = backingScale, pt = metrics.iconPt
-        leadingImageSize = applyIcon(leadingIconLayer, symbol: leadingSymbol,
-                                     image: leadingImage, pt: pt, tint: inkColor, scale: scale)
+        leadingImageSize = applyIconSlot(leadingIconLayer, symbol: leadingSymbol,
+                                         image: leadingImage, pt: pt, tint: inkColor, scale: scale)
         // The × is resolved here for sizing; its tint re-renders per state in applyState.
         if isDeletable, let base = phosphorImage("x-circle", pt: pt),
            let (img, sz) = renderedIcon(base, pt: pt, tint: deleteColor, scale: scale) {
@@ -396,29 +396,6 @@ public final class ThemedChip: ThemedControl {
                                           tint: deleteColor, scale: backingScale)
         else { return nil }
         return img
-    }
-
-    @discardableResult
-    private func applyIcon(_ iconLayer: CALayer, symbol: String?, image: NSImage?,
-                           pt: CGFloat, tint: NSColor, scale: CGFloat) -> CGSize? {
-        let resolved: (CGImage, CGSize)?
-        if let image {
-            resolved = renderedIcon(image, pt: pt, tint: tint, scale: scale)
-        } else if let name = symbol, let base = phosphorImage(name, pt: pt) {
-            resolved = renderedIcon(base, pt: pt, tint: tint, scale: scale)
-        } else {
-            resolved = nil
-        }
-        guard let (img, sz) = resolved else {
-            layerTxn(animated: false) { iconLayer.contents = nil; iconLayer.isHidden = true }
-            return nil
-        }
-        layerTxn(animated: false) {
-            iconLayer.contents = img
-            iconLayer.contentsScale = scale
-            iconLayer.isHidden = false
-        }
-        return sz
     }
 
     // MARK: - Layout

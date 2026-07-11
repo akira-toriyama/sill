@@ -266,26 +266,8 @@ public final class ThemedFAB: ThemedControl {
     }
 
     private func rebuildIcon() {
-        let scale = themeBackingScale, pt = metrics.iconPt, tint = inkColor
-        let resolved: (CGImage, CGSize)?
-        if let leadingImage {
-            resolved = renderedIcon(leadingImage, pt: pt, tint: tint, scale: scale)
-        } else if let name = leadingSymbol, let base = phosphorImage(name, pt: pt) {
-            resolved = renderedIcon(base, pt: pt, tint: tint, scale: scale)
-        } else {
-            resolved = nil
-        }
-        guard let (img, sz) = resolved else {
-            iconSize = nil
-            layerTxn(animated: false) { self.iconLayer.contents = nil; self.iconLayer.isHidden = true }
-            return
-        }
-        iconSize = sz
-        layerTxn(animated: false) {
-            self.iconLayer.contents = img
-            self.iconLayer.contentsScale = scale
-            self.iconLayer.isHidden = false
-        }
+        iconSize = applyIconSlot(iconLayer, symbol: leadingSymbol, image: leadingImage,
+                                 pt: metrics.iconPt, tint: inkColor, scale: themeBackingScale)
     }
 
     // MARK: - Layout
