@@ -185,9 +185,7 @@ public final class ThemedToolBar: NSView {
         switch variant { case .regular: return .medium; case .dense, .compact: return .small }
     }
     /// The composed-button height for the current size (mirrors ThemedButton).
-    private var controlHeight: CGFloat {
-        switch resolvedControlSize { case .small: return 30; case .medium: return 36; case .large: return 42 }
-    }
+    private var controlHeight: CGFloat { resolvedControlSize.controlHeight }
     private var cornerRadius: CGFloat { corners == .rounded ? CGFloat(Radius.lg) : 0 }
     private var dividerHeight: CGFloat { max(16, minHeight * 0.5) }
     private var hairlineThickness: CGFloat { 1.0 / backingScale }
@@ -203,9 +201,7 @@ public final class ThemedToolBar: NSView {
         layer?.masksToBounds = false        // the shadow lives outside bounds
 
         let s = backingScale
-        shadowLayer.masksToBounds = false
-        shadowLayer.shadowColor = NSColor.black.cgColor
-        shadowLayer.contentsScale = s
+        shadowLayer.configureShadowLayer(scale: s)
         shadowLayer.isHidden = true
         layer?.addSublayer(shadowLayer)
 
@@ -333,9 +329,7 @@ public final class ThemedToolBar: NSView {
         layerTxn(animated: false) {
             self.backdropLayer.backgroundColor = (self.surfaceFill ?? .clear).cgColor
             let e = self.elevationSpec
-            self.shadowLayer.shadowOpacity = e.opacity
-            self.shadowLayer.shadowRadius  = e.radius
-            self.shadowLayer.shadowOffset  = CGSize(width: 0, height: e.offsetY)
+            self.shadowLayer.applyShadowSpec(e)
             self.shadowLayer.isHidden = self.elevation <= 0
             self.hairlineLayer.backgroundColor = self.palette.border.cgColor
             self.hairlineLayer.isHidden = !self.showsHairline

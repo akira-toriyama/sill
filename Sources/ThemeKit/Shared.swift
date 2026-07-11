@@ -70,3 +70,58 @@ func removeMonitorSafely(_ token: Any?) {
         DispatchQueue.main.async { MainActor.assumeIsolated { NSEvent.removeMonitor(t) } }
     }
 }
+
+// MARK: - Control-height ladder
+
+extension ThemedButton.Size {
+    /// The composed-control height for this size — the MUI-derived ladder
+    /// (small 30 / medium 36 / large 42) that `ThemedButton`, `ThemedButtonGroup`,
+    /// and `ThemedToolBar` each had inlined verbatim (the group/toolbar copies were
+    /// even commented "mirrors ThemedButton"). One source so the three can't drift.
+    var controlHeight: CGFloat {
+        switch self {
+        case .small:  return 30
+        case .medium: return 36
+        case .large:  return 42
+        }
+    }
+}
+
+// MARK: - Shadow layer
+
+@MainActor
+extension CALayer {
+    /// Push a resolved MUI elevation spec onto this layer's drop shadow. Four
+    /// widgets pushed these same three properties by hand; the tuple shape is the
+    /// one `ResolvedPalette.shadow(_:)` returns. (ThemedButton overrides `opacity`
+    /// inline for its grouped-flat case before handing the tuple in.)
+    func applyShadowSpec(_ e: (opacity: Float, radius: CGFloat, offsetY: CGFloat)) {
+        shadowOpacity = e.opacity
+        shadowRadius  = e.radius
+        shadowOffset  = CGSize(width: 0, height: e.offsetY)
+    }
+
+    /// Seed a drop-shadow layer's fixed setup: never clip (the silhouette lives
+    /// outside bounds), an opaque black shadow colour, device-pixel `scale`.
+    /// Callers still add the layer and toggle `isHidden` themselves.
+    func configureShadowLayer(scale: CGFloat) {
+        masksToBounds = false
+        shadowColor = NSColor.black.cgColor
+        contentsScale = scale
+    }
+}
+
+// MARK: - Themed text layer
+
+@MainActor
+extension CATextLayer {
+    /// The four-property config every themed label layer shares: device-pixel
+    /// `scale`, horizontal `alignment`, tail truncation, single line. Callers set
+    /// `anchorPoint` and add the sublayer separately (those differ per widget).
+    func configureThemedLabel(scale: CGFloat, alignment: CATextLayerAlignmentMode) {
+        contentsScale = scale
+        alignmentMode = alignment
+        truncationMode = .end
+        isWrapped = false
+    }
+}

@@ -113,10 +113,7 @@ public final class ThemedCheckbox: ThemedControl {
         layer?.addSublayer(glyphLayer)
 
         labelLayer.anchorPoint = CGPoint(x: 0, y: 0.5)
-        labelLayer.contentsScale = s
-        labelLayer.alignmentMode = .left
-        labelLayer.truncationMode = .end
-        labelLayer.isWrapped = false
+        labelLayer.configureThemedLabel(scale: s, alignment: .left)
         layer?.addSublayer(labelLayer)
 
         setAccessibilityRole(.checkBox)

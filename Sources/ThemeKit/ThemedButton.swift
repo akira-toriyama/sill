@@ -144,7 +144,7 @@ public final class ThemedButton: ThemedControl {
         let height, hpad, radius, font, minWidth, border, iconPt, gap, outerAdj: CGFloat
     }
     private var metrics: Metrics {
-        let h:      CGFloat = size == .small ? 30 : size == .medium ? 36 : 42
+        let h:      CGFloat = size.controlHeight
         let font:   CGFloat = size == .small ? 13 : size == .medium ? 14 : 15
         let iconPt: CGFloat = size == .small ? 18 : size == .medium ? 20 : 22
         // MUI's negative outer icon margin (−2 small / −4 otherwise) tucks an
@@ -188,9 +188,7 @@ public final class ThemedButton: ThemedControl {
         let s = themeBackingScale
 
         // Shadow (bottom) — never clipped, explicit rounded silhouette.
-        shadowLayer.masksToBounds = false
-        shadowLayer.shadowColor = NSColor.black.cgColor
-        shadowLayer.contentsScale = s
+        shadowLayer.configureShadowLayer(scale: s)
         layer?.addSublayer(shadowLayer)
 
         // Fill clips the overlay child to the rounded rect.
@@ -212,10 +210,7 @@ public final class ThemedButton: ThemedControl {
         }
 
         titleLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        titleLayer.contentsScale = s
-        titleLayer.alignmentMode = .center
-        titleLayer.truncationMode = .end
-        titleLayer.isWrapped = false
+        titleLayer.configureThemedLabel(scale: s, alignment: .center)
         layer?.addSublayer(titleLayer)
 
         setAccessibilityRole(.button)
@@ -318,9 +313,7 @@ public final class ThemedButton: ThemedControl {
         overlayLayer.backgroundColor = overlayColor.cgColor
         borderLayer.strokeColor = borderColor.cgColor
         let e = elevation
-        shadowLayer.shadowOpacity = groupedShadow ? 0 : e.opacity
-        shadowLayer.shadowRadius  = e.radius
-        shadowLayer.shadowOffset  = CGSize(width: 0, height: e.offsetY)
+        shadowLayer.applyShadowSpec((opacity: groupedShadow ? 0 : e.opacity, radius: e.radius, offsetY: e.offsetY))
     }
 
     /// Push the uppercased, tracked title into the text layer (snapped, sized to

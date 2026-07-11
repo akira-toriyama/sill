@@ -186,10 +186,7 @@ public final class ThemedChip: ThemedControl {
         }
 
         titleLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        titleLayer.contentsScale = s
-        titleLayer.alignmentMode = .center
-        titleLayer.truncationMode = .end
-        titleLayer.isWrapped = false
+        titleLayer.configureThemedLabel(scale: s, alignment: .center)
         layer?.addSublayer(titleLayer)
 
         applyTheme()
