@@ -43,8 +43,14 @@ tests passed while the body rows rendered blank, caught only in prism). So still
 | `Effects` | `EffectSpec` · animated themes — color-only dynamic atom | AppKit (animator) |
 | `ConfigSchema` | one `Spec<Root>` decodes config.toml + emits its JSON Schema | pure |
 | `CLIKit` | arity-driven argv tokenizer | pure |
+| `ListCore` | Foundation-only pure logic behind the stateful list widgets (rows · selection · collapse · DnD geometry); List/ComboBox/Menu wrap it | pure |
+| `GridCore` | Foundation-only pure grid math (adaptive column count) behind `ThemedGridView` (#17e) | pure |
+| `Motion` | easing curves — pure `Easing` `f(t)→value`, sampled per frame by the app | pure |
+| `Gesture` | `L U R D` 4-way stroke-direction recognition (wand parity) | pure |
+| `PixelArt` | pure arcade BONUS score-ladder data + deterministic per-cell picker (chomp #12) | pure |
 | `ThemeKit` | shared themed **AppKit widgets** (`ThemedTextField`, …) — the AppKit *draw* layer the SwiftUI bridges wrap | AppKit / `@MainActor` |
 | `ThemeKitUI` | public **SwiftUI** widgets (`ThemedTextFieldView`, …) — the DEFAULT UI layer; AppKit only for the 3 floors (IME edit-core + window shell + selectable rich-text/markdown, see **AppKit 使用可ポリシー**) | SwiftUI / `@MainActor` |
+| `MarkdownKitUI` | selectable **markdown/rich-text** render core (`NSLayoutManager` inline-code pill) — the AppKit floor-3 the SwiftUI front keeps (#17f) | SwiftUI / `@MainActor` |
 | `prism` (exe) | the visual bench — renders every catalog theme + the real widgets | AppKit + SwiftUI |
 
 **The pure / AppKit split is enforced by the DEPENDENCY GRAPH, not a flag.**
@@ -53,8 +59,9 @@ links zero AppKit. AppKit widget modules (`PaletteKit`, `Effects`, `ThemeKit`)
 must NEVER be a dependency of a pure `*Core`; apps consume them from their
 *View* layer only. Module name ≠ its primary public type (module `ThemeKit`,
 type `ThemedTextField` — avoids a Module.Module collision). The public SwiftUI
-front is **`ThemeKitUI`** (each widget an `NSViewRepresentable` wrapping its
-`ThemeKit` AppKit widget); apps consume *that* from their View layer. Standing
+front is **`ThemeKitUI`** (most widgets an `NSViewRepresentable` wrapping their
+`ThemeKit` AppKit widget, but the backdrop/pill/grid parts and effect renderers
+are SwiftUI-native); apps consume *that* from their View layer. Standing
 direction: confine AppKit to the 3 essential floors (IME field-editor core + the
 nonactivating-panel window shell + the selectable rich-text/markdown render core) and
 make everything else SwiftUI-native — a migration in progress, not a finished state

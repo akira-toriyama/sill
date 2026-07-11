@@ -24,8 +24,9 @@ decisions and **§4c for the Phase V rename + catalog**.
 > **Since #16/#17 (2026-06):** the kit's public front is now the **SwiftUI**
 > module **`ThemeKitUI`** (shipped `v1.23.0`). Per the **AppKit 使用可ポリシー**
 > (CLAUDE.md, 確定 2026-06-23) AppKit is **原則禁止** in that layer — confined to
-> two floors (the IME field-editor edit-core + a non-activating window/popup
-> shell); `ThemeKit` is the AppKit *draw* tier those SwiftUI bridges wrap. See **§5**.
+> three floors (the IME field-editor edit-core, a non-activating window/popup
+> shell, and the selectable rich-text/markdown render core); `ThemeKit` is the
+> AppKit *draw* tier those SwiftUI bridges wrap. See **§5**.
 
 ---
 
@@ -368,7 +369,7 @@ held until rule-of-three — **shipped in #8** as the fixed internal `TypeRole`,
 the ten copy-pasted `themedFont` helpers being the trigger; see §5.)*
 
 **Post-Phase-V growth (0.24–0.25):** the blessed-12 set above is the Phase-V
-*base*; the catalog has since grown to **32 themes + `system`** (33 entries).
+*base*; the catalog has since grown to **34 themes + `system`** (35 entries).
 Added — the **animated-neon family** `voltage` · `toxic` · `ember` ·
 `solar-veil` · `molten-vein` · `coin-op` · `arcane` (0.24.0), each a `ThemeSpec`
 preset PAIRED with an animatable `EffectSpec` (these — with `rainbow` / `chomp` —
@@ -397,12 +398,14 @@ pure `*Core`. The module is `ThemeKit`; its primary types are `ThemedTextField`,
 `Palette` / `ThemeSpec`).
 
 **(#16/#17 update.)** The View layer now consumes the SwiftUI module
-**`ThemeKitUI`** (each widget an `NSViewRepresentable` wrapping these `ThemeKit`
-widgets); `ThemeKit` is the AppKit *draw* layer beneath it. Per the **AppKit
-使用可ポリシー** (確定 2026-06-23) AppKit is **原則禁止** — permitted only for two
-floors: the IME field-editor edit-core and the `.nonactivatingPanel` window/popup
-shell; everything else is SwiftUI-native, and anything beyond the two floors is
-要相談.
+**`ThemeKitUI`** (most widgets an `NSViewRepresentable` wrapping a `ThemeKit`
+widget, but the backdrop / pill / grid parts and the effect renderers are
+SwiftUI-native); `ThemeKit` is the AppKit *draw* layer beneath the wrapped ones.
+Per the **AppKit 使用可ポリシー** (確定 2026-06-23, 更新 2026-06-30) AppKit is
+**原則禁止** — permitted only for three floors: the IME field-editor edit-core, the
+`.nonactivatingPanel` window/popup shell, and the selectable rich-text/markdown
+render core (NSTextView); everything else is SwiftUI-native, and anything beyond
+the three floors is 要相談.
 
 ### The contract (one rule, enforced by shape)
 
@@ -433,19 +436,19 @@ targets.
 The child-window popups share **one factory** (the 0.28 `PopupPanel` refactor):
 a borderless **non-key** panel so the host window keeps key + IME focus, instead
 of ComboBox / Menu / Tooltip each reinventing that seam. This non-key panel is
-**floor (2)** of the **AppKit 使用可ポリシー** (2026-06-23) — one of the only two
+**floor (2)** of the **AppKit 使用可ポリシー** (床3個; 2026-06-30) — one of the three
 sanctioned AppKit uses (the window shell that floats without stealing key/IME
 focus and can exceed the parent window). The shell is the sanctioned part; per
 policy the panel's *contents* migrate to SwiftUI via `NSHostingView` (today they
 are AppKit views — `ThemedList` / the tooltip bubble).
 
-### The catalog — 12 widgets, 4 families
+### The catalog — 4 families (the headline parts; `KitCatalog.swift` lists the full ~24)
 
-`prism`'s `KitCatalog.swift` is the **single source of truth**: each entry
-carries the part's MUI analog, embed/controller shape, key API, and variants.
-The gallery's per-widget **"copy ref"** button serialises one entry to the
-clipboard (so another agent can FIND + USE the part), and this section reads the
-same array. The families are the gallery's tabs:
+`prism`'s `KitCatalog.swift` is the **single source of truth** (~24 entries and
+growing): each carries the part's MUI analog, embed/controller shape, key API,
+and variants. The gallery's per-widget **"copy ref"** button serialises one entry
+to the clipboard (so another agent can FIND + USE the part). The table below groups
+the **headline** parts by gallery family; the live/complete set is `KitCatalog.swift`:
 
 | family | widgets (MUI analog) |
 |---|---|
@@ -524,10 +527,11 @@ width, *not* a text size; the helper line was decoupled onto `.secondaryBody`.
 ### Adding a widget (rule-of-three + the prism mandate)
 
 A part earns its place in sill once **≥2 apps would otherwise hand-draw it**.
-Every widget MUST ship a `prism` showcase — a `<Widget>View: NSViewRepresentable`
-bridge hosting the REAL widget plus a `Mock<Widget>` grid wired into the family
+Every widget MUST ship a `prism` showcase — a `<Widget>View` bridge (an
+`NSViewRepresentable` hosting the REAL AppKit widget, or a SwiftUI-native view for
+the pure-SwiftUI parts) plus a `Mock<Widget>` grid wired into the family
 gallery, so it renders live across every catalog theme (the full
-`Palette.themeCatalog` — 32 + `system`, see §4c). `prism` **never imports
+`Palette.themeCatalog` — 34 + `system`, see §4c). `prism` **never imports
 an app's View**, so the bench can't drift toward one app's needs. And because the
 maintainer's machine is **CommandLineTools-only (no XCTest)**, logic is
 unit-tested but **UI behaviour is proven live in `prism`** — every widget exposes
@@ -551,8 +555,9 @@ A new widget MUST also satisfy:
   with XCTest, and keep the AppKit widget a thin wrapper — both today's AppKit widget
   and tomorrow's SwiftUI view (#16/#17) share one tested core. Note: SwiftUI is
   now the DEFAULT front (the `ThemeKitUI` module, #16); a new widget adds AppKit
-  only for the two essential floors — the IME field-editor edit-core and the
-  non-activating window/popup shell — and flags anything beyond those as **要相談**
+  only for the three essential floors — the IME field-editor edit-core, the
+  non-activating window/popup shell, and the selectable rich-text/markdown render
+  core — and flags anything beyond those as **要相談**
   (see CLAUDE.md **AppKit 使用可ポリシー** / docs/ROADMAP.md #16.5/#17).
 
 ### Versioning at 1.0
@@ -643,5 +648,6 @@ v2 (Phase T) residual risks — carried, not blocking:
   theme, since the CLT-only machine has no XCTest (see §5). Each widget ships
   `preview…` seams so a static screenshot captures a deterministic state. The
   `ThemeKitUI` bridges are byte-equivalent SwiftUI wraps proven live in prism,
-  with AppKit confined to the two essential floors (IME field-editor core + the
-  non-activating panel/popup shell) per the **AppKit 使用可ポリシー**.
+  with AppKit confined to the three essential floors (IME field-editor core, the
+  non-activating panel/popup shell, and the selectable rich-text/markdown render
+  core) per the **AppKit 使用可ポリシー**.

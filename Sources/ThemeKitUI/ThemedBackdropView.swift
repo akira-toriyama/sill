@@ -4,7 +4,7 @@
 // (opaque, or a translucent scrim driven by the palette's `backgroundAlpha`),
 // with an optional hairline border. NO blur.
 //
-// Why no blur: sill's AppKit policy keeps the widget layer SwiftUI-only (床2個).
+// Why no blur: sill's AppKit policy keeps the widget layer SwiftUI-only (床3個).
 // SwiftUI `Material` can't do behind-window blur, and a #17c investigation found
 // every consumer's behind-window `NSVisualEffectView` blur (wand/perch/facet) was
 // a toggleable cosmetic knob with an existing solid fallback — legibility never
