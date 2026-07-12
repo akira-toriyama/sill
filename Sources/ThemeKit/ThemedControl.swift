@@ -426,6 +426,49 @@ public class ThemedControl: NSControl {
         return sz
     }
 
+    // MARK: - Centered content row (shared by ThemedButton / ThemedFAB / ThemedChip)
+
+    /// Place `segs` (each `(layer, size, isTitle)`) as one horizontally-centred row
+    /// in `b`: sum the widths + inter-segment `gap`, centre the block, then walk left
+    /// to right vertically centring each. The title segment gets `.position` (its
+    /// layer is centre-anchored); icon segments get `.frame`. Returns each segment's
+    /// frame in order so a caller can read one back (Chip sizes its × hit-target from
+    /// the delete layer's frame). Button / FAB / Chip each had this exact loop inline.
+    @discardableResult
+    func layoutCenteredRow(_ segs: [(CALayer, CGSize, Bool)], in b: CGRect, gap: CGFloat) -> [CGRect] {
+        let total = segs.reduce(0) { $0 + $1.1.width }
+                  + CGFloat(max(0, segs.count - 1)) * gap
+        var x = (b.width - total) / 2
+        let cy = b.midY
+        var frames: [CGRect] = []
+        for (lyr, sz, isTitle) in segs {
+            let frame = CGRect(x: x, y: cy - sz.height / 2, width: sz.width, height: sz.height)
+            if isTitle {
+                lyr.position = CGPoint(x: x + sz.width / 2, y: cy)
+            } else {
+                lyr.frame = frame
+            }
+            frames.append(frame)
+            x += sz.width + gap
+        }
+        return frames
+    }
+
+    /// The intrinsic width of a centred row: `leadingPad + Σ widths + gaps + trailingPad`,
+    /// floored at `minWidth` then `ceil`-ed. `gaps` counts only the PRESENT (width > 0)
+    /// segments, matching the layout loop. The addition order is kept identical to the
+    /// per-widget copies so the `ceil` result is bit-for-bit unchanged.
+    func centeredRowWidth(_ widths: [CGFloat], gap: CGFloat,
+                          leadingPad: CGFloat, trailingPad: CGFloat, minWidth: CGFloat) -> CGFloat {
+        let present = widths.filter { $0 > 0 }.count
+        let gaps = CGFloat(max(0, present - 1)) * gap
+        var content = leadingPad
+        for w in widths { content += w }
+        content += gaps
+        content += trailingPad
+        return max(minWidth, ceil(content))
+    }
+
     // MARK: - Init
 
     /// Designated initializer. Stores the palette, becomes layer-backed, opts out

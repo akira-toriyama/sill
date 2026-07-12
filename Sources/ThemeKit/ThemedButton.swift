@@ -173,12 +173,11 @@ public final class ThemedButton: ThemedControl {
         let leadW  = leadingImageSize?.width ?? 0
         let trailW = trailingImageSize?.width ?? 0
         let titleW = title.isEmpty ? 0 : titleLayer.bounds.width
-        let present = [leadW > 0, titleW > 0, trailW > 0].filter { $0 }.count
-        let gaps = CGFloat(max(0, present - 1)) * m.gap
         let leftPad  = m.hpad + (leadingImageSize  != nil ? m.outerAdj : 0)
         let rightPad = m.hpad + (trailingImageSize != nil ? m.outerAdj : 0)
-        let content = leftPad + leadW + titleW + trailW + gaps + rightPad
-        return NSSize(width: max(m.minWidth, ceil(content)), height: m.height)
+        let width = centeredRowWidth([leadW, titleW, trailW], gap: m.gap,
+                                     leadingPad: leftPad, trailingPad: rightPad, minWidth: m.minWidth)
+        return NSSize(width: width, height: m.height)
     }
 
     // MARK: - Init
@@ -429,18 +428,7 @@ public final class ThemedButton: ThemedControl {
         if !title.isEmpty             { segs.append((titleLayer, titleLayer.bounds.size, true)) }
         if let sz = trailingImageSize { segs.append((trailingIconLayer, sz, false)) }
 
-        let total = segs.reduce(0) { $0 + $1.1.width }
-                  + CGFloat(max(0, segs.count - 1)) * m.gap
-        var x = (b.width - total) / 2
-        let cy = b.midY
-        for (lyr, sz, isTitle) in segs {
-            if isTitle {
-                titleLayer.position = CGPoint(x: x + sz.width / 2, y: cy)
-            } else {
-                lyr.frame = CGRect(x: x, y: cy - sz.height / 2, width: sz.width, height: sz.height)
-            }
-            x += sz.width + m.gap
-        }
+        layoutCenteredRow(segs, in: b, gap: m.gap)
     }
 
     override func updateContentsScale(_ s: CGFloat) {
