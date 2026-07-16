@@ -55,6 +55,18 @@ public func polylineLength(_ points: [(x: Double, y: Double)]) -> Double {
     return total
 }
 
+/// Unit tangent of the FIRST non-zero segment — the shared leading-tangent rule
+/// both walkers orient a polyline's start by (`(1, 0)` when every segment is
+/// degenerate).
+private func leadingUnitTangent(_ points: [(x: Double, y: Double)]) -> (x: Double, y: Double) {
+    for i in points.indices.dropFirst() {
+        let dx = points[i].x - points[i - 1].x, dy = points[i].y - points[i - 1].y
+        let len = hypot(dx, dy)
+        if len > 0 { return (x: dx / len, y: dy / len) }
+    }
+    return (x: 1.0, y: 0.0)
+}
+
 /// March `points` and return a mark every `interval` points of ARC LENGTH,
 /// each carrying the local unit-tangent. The first point is always emitted
 /// (oriented along the first non-zero segment, or `(1,0)` if none); the LAST
@@ -83,14 +95,7 @@ public func resampleAlongPolyline(
         cutoff = nil
     }
 
-    // Leading tangent: peek forward to the first non-zero segment.
-    var lastTangent = (x: 1.0, y: 0.0)
-    for i in 1..<points.count {
-        let dx = points[i].x - points[i - 1].x, dy = points[i].y - points[i - 1].y
-        let len = hypot(dx, dy)
-        if len > 0 { lastTangent = (x: dx / len, y: dy / len); break }
-    }
-
+    var lastTangent = leadingUnitTangent(points)
     var marks = [TrailMark(point: first, tangent: lastTangent)]
     var carry = 0.0      // distance already consumed into the next interval
     var traveled = 0.0   // total arc length walked so far
@@ -141,13 +146,7 @@ public func markAtArcLength(
     guard let first = points.first else { return nil }
     if points.count == 1 { return TrailMark(point: first, tangent: (1, 0)) }
 
-    // Leading tangent: peek to the first non-zero segment (resampler's rule).
-    var leadTangent = (x: 1.0, y: 0.0)
-    for i in 1..<points.count {
-        let dx = points[i].x - points[i - 1].x, dy = points[i].y - points[i - 1].y
-        let len = hypot(dx, dy)
-        if len > 0 { leadTangent = (x: dx / len, y: dy / len); break }
-    }
+    let leadTangent = leadingUnitTangent(points)   // resampler's leading-tangent rule
     if distance <= 0 { return TrailMark(point: first, tangent: leadTangent) }
 
     var traveled = 0.0
