@@ -68,4 +68,15 @@ public struct ListItem<ID: Hashable & Sendable> {
     public static func selectableIDs(_ items: [ListItem<ID>]) -> [ID] {
         items.filter { $0.asRow.isSelectable }.map(\.id)
     }
+
+    /// The row's laid-out height under `metrics` — the ONE M2 height rule, shared by
+    /// the SwiftUI row (`ThemedListRow.body`) and the synchronous measurer
+    /// (`ListController.contentHeight` / row rects).
+    func laidOutHeight(_ metrics: ListMetrics) -> CGFloat {
+        switch kind {
+        case .separator:                       return metrics.separatorBand
+        case let .sectionHeader(subtitle, _):  return subtitle == nil ? metrics.header1 : metrics.header2
+        case .row:                             return secondary == nil ? metrics.singleRow : metrics.twoLineRow
+        }
+    }
 }
