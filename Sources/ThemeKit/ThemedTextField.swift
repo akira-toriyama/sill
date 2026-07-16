@@ -342,6 +342,13 @@ public final class ThemedTextField: NSView {
         return false
     }
 
+    /// The public window into `isFieldFirstResponder` — `ThemedTextFieldView`'s
+    /// controlled mode reads it (model→field pushes never over live typing;
+    /// focus-binding reconcile), and ThemedComboBox's DEBUG probe asserts on it.
+    /// (T1 promoted this out of the DEBUG-only probe extension: production
+    /// bridge code needs it, so it must exist in release builds.)
+    public var isFirstResponderNow: Bool { isFieldFirstResponder }
+
     /// Re-derive focus from the settled responder state on the NEXT runloop
     /// tick. Multiple edges in one turn (become → spurious end on a bare click)
     /// coalesce into a single correct result instead of a visible flicker.
@@ -704,11 +711,6 @@ extension ThemedTextField {
                              secondTrailingIcon: g.secondTrailingIcon,
                              labelStartX: g.labelStartX)
     }
-
-    /// The GROUND-TRUTH first-responder state (field or its field editor), for an
-    /// embedding ThemedComboBox to assert the popup never stole focus. `public` since
-    /// #17b M3 moved `ThemedComboBox` to ThemeKitUI (it reads this across the module edge).
-    public var isFirstResponderNow: Bool { isFieldFirstResponder }
 
     /// The supporting/helper-line font — `.secondaryBody` (11pt medium),
     /// the #8 readability fix. Distinct code path from the floated label.
