@@ -52,6 +52,11 @@ struct MockField: View {
                                     error: "no matches", surface: p.background)
                 }
             }
+            HStack(alignment: .top, spacing: 16) {
+                ex("controlled · binding + key seams (T1)", h: 72, w: 480) {
+                    ControlledFieldDemo(p: p)
+                }
+            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -62,13 +67,41 @@ struct MockField: View {
     }
 
     @ViewBuilder
-    private func ex<V: View>(_ caption: String, h: CGFloat,
+    private func ex<V: View>(_ caption: String, h: CGFloat, w: CGFloat = 230,
                              @ViewBuilder _ field: () -> V) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(caption)
                 .font(sysFont(8, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.tertiary))
-            field().frame(width: 230, height: h)
+            field().frame(width: w, height: h)
+        }
+    }
+}
+
+/// The T1 controlled surface, live: the bound model + last key seam are echoed
+/// below the field, so typing / Return / Esc(clear) / ↑↓ visibly round-trip
+/// through the `Binding<String>` (the facet-3 live-filter wiring).
+private struct ControlledFieldDemo: View {
+    let p: ResolvedPalette
+    @State private var query = "ker"
+    @State private var focused = false
+    @State private var lastKey = "—"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ThemedTextFieldView(palette: p, label: "Search",
+                            placeholder: "live filter…",
+                            text: $query, focused: $focused,
+                            leading: "magnifying-glass", trailing: "x-circle",
+                            surface: p.background,
+                            onReturn: { lastKey = "⏎"; return true },
+                            onEscape: { query = ""; lastKey = "esc·cleared"; return true },
+                            onMoveUp: { lastKey = "↑"; return true },
+                            onMoveDown: { lastKey = "↓"; return true })
+                .frame(height: 46)
+            Text("bound: \"\(query)\" · key: \(lastKey) · focus: \(focused ? "on" : "off")")
+                .font(sysFont(8, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
         }
     }
 }
