@@ -9,6 +9,7 @@ import XCTest
 import AppKit
 import Palette
 import PaletteKit
+import TestSupport
 @testable import ThemeKitUI   // for the DEBUG `tooltipProbe` + the internal `Side`
 
 @MainActor
@@ -16,20 +17,6 @@ final class ThemedTooltipTests: XCTestCase {
 
     private func theme(_ name: String = "terminal") -> ResolvedPalette {
         resolve(paletteFor(name))
-    }
-
-    /// CGColor identity is fragile across resolve()/colour-space conversions —
-    /// compare resolved sRGB components (incl. alpha) within tolerance.
-    private func sameColor(_ a: CGColor?, _ b: NSColor, accuracy: CGFloat = 0.01,
-                           _ msg: String = "", file: StaticString = #filePath, line: UInt = #line) {
-        guard let a, let an = NSColor(cgColor: a)?.usingColorSpace(.sRGB),
-              let bn = b.usingColorSpace(.sRGB) else {
-            return XCTFail("colour unconvertible: \(msg)", file: file, line: line)
-        }
-        XCTAssertEqual(an.redComponent,   bn.redComponent,   accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.greenComponent, bn.greenComponent, accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.blueComponent,  bn.blueComponent,  accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.alphaComponent, bn.alphaComponent, accuracy: accuracy, msg, file: file, line: line)
     }
 
     /// Best-contrast ink on a fill — mirrors the widget's local helper via the

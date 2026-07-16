@@ -204,10 +204,14 @@ let package = Package(
         // no drift debt). The visual verification bench for the catalog.
         .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "Motion", "ThemeKit", "ThemeKitUI", "PixelArt", "MarkdownKitUI"]),
 
+        // Shared XCTest helpers (sameColor …). A plain target because SwiftPM
+        // forbids test→test deps; canImport-guarded so CLT `swift build` stays green.
+        .target(name: "TestSupport"),
+
         .testTarget(name: "PaletteTests", dependencies: ["Palette"]),
         .testTarget(name: "PaletteKitTests", dependencies: ["PaletteKit", "Effects"]),
-        .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", "PaletteKit", "Palette", "Effects"]),
-        .testTarget(name: "ThemeKitUITests", dependencies: ["ThemeKitUI", "PaletteKit", "Palette", "ThemeKit", "ListCore"]),
+        .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", "PaletteKit", "Palette", "Effects", "TestSupport"]),
+        .testTarget(name: "ThemeKitUITests", dependencies: ["ThemeKitUI", "PaletteKit", "Palette", "ThemeKit", "ListCore", "TestSupport"]),
         .testTarget(name: "MarkdownKitUITests", dependencies: ["MarkdownKitUI", "PaletteKit", "Palette"]),
         .testTarget(name: "EffectsTests", dependencies: ["Effects", "Palette", "PixelArt"]),
         .testTarget(name: "MotionTests", dependencies: ["Motion"]),

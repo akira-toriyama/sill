@@ -11,27 +11,13 @@ import XCTest
 import AppKit
 import Palette
 import PaletteKit
+import TestSupport
 @testable import ThemeKit   // for the DEBUG `skeletonProbe`
 
 @MainActor
 final class ThemedSkeletonTests: XCTestCase {
 
     private func palette() -> ResolvedPalette { resolve(.terminal) }
-
-    /// CGColor identity is fragile across `resolve()` calls / colour-space
-    /// conversions, so compare resolved sRGB components (incl. alpha) within tol.
-    private func sameColor(_ a: CGColor?, _ b: NSColor, accuracy: CGFloat = 0.002,
-                           _ msg: String = "", file: StaticString = #filePath,
-                           line: UInt = #line) {
-        guard let a, let an = NSColor(cgColor: a)?.usingColorSpace(.sRGB),
-              let bn = b.usingColorSpace(.sRGB) else {
-            return XCTFail("colour unconvertible: \(msg)", file: file, line: line)
-        }
-        XCTAssertEqual(an.redComponent,   bn.redComponent,   accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.greenComponent, bn.greenComponent, accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.blueComponent,  bn.blueComponent,  accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.alphaComponent, bn.alphaComponent, accuracy: accuracy, msg, file: file, line: line)
-    }
 
     private func laidOut(_ configure: (ThemedSkeleton) -> Void = { _ in },
                          width: CGFloat = 180, height: CGFloat = 40) -> ThemedSkeleton {
@@ -72,7 +58,7 @@ final class ThemedSkeletonTests: XCTestCase {
     func testTintIsMutedSubtleTier() {
         let p = palette()
         let s = ThemedSkeleton(palette: p)
-        sameColor(s.skeletonProbe.tintColor, p.ink(.subtle, of: .muted),
+        sameColor(s.skeletonProbe.tintColor, p.ink(.subtle, of: .muted), accuracy: 0.002,
                   "fill is muted @ .subtle alpha")
     }
 
@@ -82,7 +68,7 @@ final class ThemedSkeletonTests: XCTestCase {
         let s = laidOut()
         let dracula = resolve(.dracula)
         s.palette = dracula
-        sameColor(s.skeletonProbe.tintColor, dracula.ink(.subtle, of: .muted),
+        sameColor(s.skeletonProbe.tintColor, dracula.ink(.subtle, of: .muted), accuracy: 0.002,
                   "fill re-tints to the new theme on palette assign")
     }
 
