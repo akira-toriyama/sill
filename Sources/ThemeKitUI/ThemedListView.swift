@@ -113,40 +113,21 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     private var effectiveSurface: NSColor? { style.surfaceColor ?? palette.background }
     private var surfaceIsOpaque: Bool { (effectiveSurface?.alphaComponent ?? 0) >= 1 }
 
-    /// Zebra parity per row id: ordinal among `.row`s, RESETTING to 0 at each header
-    /// (mirror ThemedList recomputeLayout :670-682). Headers/separators get `false`.
+    /// Zebra parity per row id — the pure `ListCore.zebraParity` rule over the
+    /// visible rows (ordinal among `.row`s, resetting at each header).
     private var zebraParity: [ID: Bool] {
-        var map: [ID: Bool] = [:]
-        var ordinal = 0
-        for item in visible {
-            switch item.kind {
-            case .row:            map[item.id] = (ordinal % 2 == 1); ordinal += 1
-            case .sectionHeader:  ordinal = 0
-            case .separator:      break
-            }
-        }
-        return map
+        ListCore.zebraParity(rows: visible.map(\.asRow))
     }
 
-    /// Per-row divider leading x, keyed by id. Only after a `.row` (not headers /
-    /// separators), suppressed above a separator; full-bleed (0) above a header, else
-    /// inset to the row's text x (mirror drawRow :1211-1220).
+    /// Per-row divider leading x, keyed by id — the pure `ListCore.dividerInsets`
+    /// rule (only after a `.row`, suppressed above a separator, full-bleed above
+    /// a header, else text-x + indent), gated on `style.showsDividers`.
     private var dividerMap: [ID: CGFloat] {
         guard style.showsDividers else { return [:] }
-        var map: [ID: CGFloat] = [:]
-        let rows = visible
-        for i in rows.indices where i < rows.count - 1 {
-            let cur = rows[i]
-            guard case .row = cur.kind else { continue }
-            let next = rows[i + 1]
-            if case .separator = next.kind { continue }
-            var nextIsHeader = false
-            if case .sectionHeader = next.kind { nextIsHeader = true }
-            let indent = CGFloat(max(0, cur.indentLevel)) * metrics.indentStep
-            map[cur.id] = nextIsHeader ? 0
-                : (style.reservesLeadingImageColumn ? metrics.textXOrigin : metrics.leadingInset) + indent
-        }
-        return map
+        return dividerInsets(rows: visible.map(\.asRow),
+                             textXBase: style.reservesLeadingImageColumn ? metrics.textXOrigin
+                                                                         : metrics.leadingInset,
+                             indentStep: metrics.indentStep)
     }
 
     private struct RowSection { let header: ListItem<ID>?; let rows: [ListItem<ID>] }
