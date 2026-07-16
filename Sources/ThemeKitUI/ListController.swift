@@ -92,20 +92,11 @@ public final class ListController<ID: Hashable & Sendable> {
     private var metrics: ListMetrics { .forDensity(style.density) }
     private static var headerKern: CGFloat { 0.5 }          // matches ThemedListRow's `.tracking(0.5)`
 
-    /// A row's laid-out height (the M2 rule — mirror `ThemedListRow.rowHeight`).
-    private func rowHeight(_ item: ListItem<ID>) -> CGFloat {
-        switch item.kind {
-        case .separator:                       return metrics.separatorBand
-        case let .sectionHeader(subtitle, _):  return subtitle == nil ? metrics.header1 : metrics.header2
-        case .row:                             return item.secondary == nil ? metrics.singleRow : metrics.twoLineRow
-        }
-    }
-
     /// Total content height — the sum of every row's height. An empty list keeps one
     /// synthetic row (matching the AppKit widget). The host adds its own border / vpad.
     public func contentHeight() -> CGFloat {
         guard !items.isEmpty else { return metrics.singleRow }
-        return items.reduce(0) { $0 + rowHeight($1) }
+        return items.reduce(0) { $0 + $1.laidOutHeight(metrics) }
     }
 
     /// The content width that fits every row's text without truncation, capped at
@@ -204,7 +195,7 @@ public final class ListController<ID: Hashable & Sendable> {
     private func pureRowRect(_ id: ID) -> CGRect? {
         guard let host = hostView, let idx = items.firstIndex(where: { $0.id == id }) else { return nil }
         var y: CGFloat = 0
-        for i in 0..<idx { y += rowHeight(items[i]) }
-        return CGRect(x: 0, y: y, width: host.bounds.width, height: rowHeight(items[idx]))
+        for i in 0..<idx { y += items[i].laidOutHeight(metrics) }
+        return CGRect(x: 0, y: y, width: host.bounds.width, height: items[idx].laidOutHeight(metrics))
     }
 }

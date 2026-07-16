@@ -73,6 +73,15 @@ final class ListControllerTests: XCTestCase {
         XCTAssertEqual(c.contentHeight(), 52, accuracy: 0.5)
     }
 
+    func testContentHeightCoversSubtitledHeaderAndTwoLineRow() {
+        let c = ListController<String>()          // .comfortable: header2 40, twoLineRow 46
+        c.items = [ListItem(id: "H", primary: "Head", kind: .sectionHeader(subtitle: "sub")),
+                   ListItem(id: "a", primary: "a", secondary: "detail")]
+        XCTAssertEqual(c.contentHeight(), 40 + 46, accuracy: 0.5)
+        c.style.density = .compact                // header2 NOT shrunk in compact; twoLineRow 40
+        XCTAssertEqual(c.contentHeight(), 40 + 40, accuracy: 0.5)
+    }
+
     func testFittingWidthGrowsWithLabelAndClampsToMax() {
         let c = ListController<String>()
         c.style.reservesLeadingImageColumn = false

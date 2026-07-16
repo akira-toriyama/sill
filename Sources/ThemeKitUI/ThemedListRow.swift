@@ -49,16 +49,7 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
 
     private var indentWidth: CGFloat { CGFloat(max(0, item.indentLevel)) * metrics.indentStep }
 
-    private var rowHeight: CGFloat {
-        switch item.kind {
-        case .separator:
-            return metrics.separatorBand
-        case let .sectionHeader(subtitle, _):
-            return subtitle == nil ? metrics.header1 : metrics.header2
-        case .row:
-            return item.secondary == nil ? metrics.singleRow : metrics.twoLineRow
-        }
-    }
+    private var rowHeight: CGFloat { item.laidOutHeight(metrics) }
 
     private var isCollapsibleHeader: Bool {
         if case let .sectionHeader(_, collapsed) = item.kind { return !item.isDisabled && collapsed != nil }
