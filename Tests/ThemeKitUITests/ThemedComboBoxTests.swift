@@ -12,6 +12,7 @@ import AppKit
 import Palette
 import PaletteKit
 @testable import ThemeKitUI   // ThemedComboBox moved here (#17b M3); for the DEBUG `comboProbe`
+import TestSupport
 
 @MainActor
 final class ThemedComboBoxTests: XCTestCase {
@@ -45,18 +46,6 @@ final class ThemedComboBoxTests: XCTestCase {
     private func type(_ combo: ThemedComboBox, _ q: String) {
         combo.field.stringValue = q
         combo.field.onChange?(q)
-    }
-
-    private func sameColor(_ a: CGColor?, _ b: NSColor, accuracy: CGFloat = 0.01,
-                           _ msg: String = "", file: StaticString = #filePath, line: UInt = #line) {
-        guard let a, let an = NSColor(cgColor: a)?.usingColorSpace(.sRGB),
-              let bn = b.usingColorSpace(.sRGB) else {
-            return XCTFail("colour unconvertible: \(msg)", file: file, line: line)
-        }
-        XCTAssertEqual(an.redComponent,   bn.redComponent,   accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.greenComponent, bn.greenComponent, accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.blueComponent,  bn.blueComponent,  accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.alphaComponent, bn.alphaComponent, accuracy: accuracy, msg, file: file, line: line)
     }
 
     // MARK: - Filtering (pure)

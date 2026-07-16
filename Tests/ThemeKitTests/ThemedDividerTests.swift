@@ -10,26 +10,12 @@ import AppKit
 import Palette
 import PaletteKit
 @testable import ThemeKit   // for the DEBUG `dividerProbe`
+import TestSupport
 
 @MainActor
 final class ThemedDividerTests: XCTestCase {
 
     private func palette() -> ResolvedPalette { resolve(.terminal) }
-
-    /// CGColor identity is fragile (two `resolve()` calls, colour-space
-    /// conversions), so compare the resolved sRGB components within tolerance.
-    private func sameColor(_ a: CGColor?, _ b: NSColor, accuracy: CGFloat = 0.002,
-                           _ msg: String = "", file: StaticString = #filePath,
-                           line: UInt = #line) {
-        guard let a, let an = NSColor(cgColor: a)?.usingColorSpace(.sRGB),
-              let bn = b.usingColorSpace(.sRGB) else {
-            return XCTFail("colour unconvertible: \(msg)", file: file, line: line)
-        }
-        XCTAssertEqual(an.redComponent,   bn.redComponent,   accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.greenComponent, bn.greenComponent, accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.blueComponent,  bn.blueComponent,  accuracy: accuracy, msg, file: file, line: line)
-        XCTAssertEqual(an.alphaComponent, bn.alphaComponent, accuracy: accuracy, msg, file: file, line: line)
-    }
 
     private func laidOut(width: CGFloat = 200, height: CGFloat = 14) -> ThemedDivider {
         let d = ThemedDivider(palette: palette())
@@ -44,7 +30,7 @@ final class ThemedDividerTests: XCTestCase {
         let d = ThemedDivider(palette: p)
         d.frame = NSRect(x: 0, y: 0, width: 200, height: 14)
         d.layoutSubtreeIfNeeded()
-        sameColor(d.dividerProbe.strokeColor, p.border, "rule uses palette.border")
+        sameColor(d.dividerProbe.strokeColor, p.border, accuracy: 0.002, "rule uses palette.border")
         XCTAssertFalse(d.dividerProbe.isVertical)
     }
 
@@ -71,7 +57,7 @@ final class ThemedDividerTests: XCTestCase {
         let d = laidOut()
         let dracula = resolve(.dracula)
         d.palette = dracula
-        sameColor(d.dividerProbe.strokeColor, dracula.border,
+        sameColor(d.dividerProbe.strokeColor, dracula.border, accuracy: 0.002,
                   "rule re-tints to the new theme's border on palette assign")
     }
 
