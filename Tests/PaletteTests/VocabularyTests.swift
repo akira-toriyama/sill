@@ -1,7 +1,11 @@
 // Vocabulary drift guards — the 0.6.0 promise that name lists and the
-// catalog can't fall out of sync (the table-driven rewrite of
-// `canonicalThemeNames` / `paletteFor`, and the effect / pet name lists
-// that moved here from Effects so a no-AppKit Core can validate).
+// catalog can't fall out of sync (the enum-driven `canonicalThemeNames` /
+// `paletteFor`, and the effect / pet name lists that moved here from
+// Effects so a no-AppKit Core can validate).
+//
+// Division of labour since the catalog became a type: CI's api-guard owns
+// the DECLARATION channel (a cut case is a reported API breakage), these
+// tests own the STRING channel (rawValues, which an API diff cannot see).
 import XCTest
 import Palette
 
@@ -25,8 +29,22 @@ final class VocabularyTests: XCTestCase {
         }
     }
 
-    /// The catalog members the family ships against. An addition extends
-    /// this list deliberately; a silent disappearance is drift.
+    /// Pins the catalog's rawValue STRINGS — the channel an API diff
+    /// cannot see, and the only reason this fixture still earns its keep.
+    ///
+    /// `Theme` is an enum, so `swift package diagnose-api-breaking-changes`
+    /// now reports a cut case as `enumelement Theme.x has been removed` —
+    /// this test is no longer the guard against a member disappearing.
+    /// What that diff is blind to is the rawValue: renaming
+    /// `case catppuccinMocha = "…-RENAMED"` keeps the declaration and
+    /// reports NO breakage (measured), while breaking every user config and
+    /// every app that passes the string. This test is that channel's only
+    /// guard, which is why it stays.
+    ///
+    /// Editing this Set green is correct for an ADDITION. For a rename or a
+    /// cut it is correct only alongside `:boom:`/major — silencing it was
+    /// how `catppuccin-latte` shipped minor in v1.36.0 (0a16df9 deleted the
+    /// name from this very Set) and broke wand at its next pin bump.
     func testCanonicalThemeNamesMembership() {
         let expected: Set<String> = [
             "terminal", "chomp", "rainbow",
