@@ -236,6 +236,22 @@ public enum CanonicalSprite {
 
 #if canImport(AppKit)
 
+/// Run `body` with the CURRENT context's antialiasing OFF, restoring whatever it
+/// was afterwards — the spec's "sprites are not anti-aliased" rule in one place.
+/// The blitters below fill cell rects on integral-ish edges, so AA would smear a
+/// half-covered pixel into a grey seam between neighbouring cells.
+///
+/// Nil-context safe: with no current context the save reads the `true` default
+/// and both writes no-op, exactly as the two inline copies this replaces did.
+@MainActor
+private func withAntialiasOff(_ body: () -> Void) {
+    let ctx = NSGraphicsContext.current
+    let savedAA = ctx?.shouldAntialias ?? true
+    ctx?.shouldAntialias = false
+    defer { ctx?.shouldAntialias = savedAA }
+    body()
+}
+
 /// Blit a `PixelSprite` into the CURRENT `NSGraphicsContext`: each opaque cell
 /// is a filled `cell × cell` rect with ANTIALIAS OFF (crisp pixel edges). The
 /// sprite's top-left sits at `at`, and row 0 grows DOWNWARD — host in an
@@ -245,15 +261,13 @@ public enum CanonicalSprite {
 @MainActor
 public func drawPixelSprite(_ sprite: PixelSprite, cell: CGFloat,
                             at origin: CGPoint, color: UInt32? = nil) {
-    let ctx = NSGraphicsContext.current
-    let savedAA = ctx?.shouldAntialias ?? true
-    ctx?.shouldAntialias = false
-    defer { ctx?.shouldAntialias = savedAA }
-    for c in sprite.cells() {
-        NSColor(HexColor(color ?? c.color)).setFill()
-        NSRect(x: origin.x + CGFloat(c.col) * cell,
-               y: origin.y + CGFloat(c.row) * cell,
-               width: cell, height: cell).fill()
+    withAntialiasOff {
+        for c in sprite.cells() {
+            NSColor(HexColor(color ?? c.color)).setFill()
+            NSRect(x: origin.x + CGFloat(c.col) * cell,
+                   y: origin.y + CGFloat(c.row) * cell,
+                   width: cell, height: cell).fill()
+        }
     }
 }
 
@@ -266,15 +280,13 @@ public func drawPixelSprite(_ sprite: PixelSprite, cell: CGFloat,
 public func drawPacMan(diameterCells d: Int, mouthHalfRad: Double,
                        cell: CGFloat, at origin: CGPoint,
                        color: UInt32 = SpriteColor.pacYellow) {
-    let ctx = NSGraphicsContext.current
-    let savedAA = ctx?.shouldAntialias ?? true
-    ctx?.shouldAntialias = false
-    defer { ctx?.shouldAntialias = savedAA }
-    NSColor(HexColor(color)).setFill()
-    for p in pacManCells(diameterCells: d, mouthHalfRad: mouthHalfRad) {
-        NSRect(x: origin.x + CGFloat(p.col) * cell,
-               y: origin.y + CGFloat(p.row) * cell,
-               width: cell, height: cell).fill()
+    withAntialiasOff {
+        NSColor(HexColor(color)).setFill()
+        for p in pacManCells(diameterCells: d, mouthHalfRad: mouthHalfRad) {
+            NSRect(x: origin.x + CGFloat(p.col) * cell,
+                   y: origin.y + CGFloat(p.row) * cell,
+                   width: cell, height: cell).fill()
+        }
     }
 }
 
