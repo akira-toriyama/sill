@@ -78,6 +78,42 @@ final class MarkdownRendererTests: XCTestCase {
         XCTAssertTrue(s.contains("☐  todo"))
     }
 
+    // MARK: - Block separator (the one block-join policy)
+
+    func testSiblingBlocksJoinedByOneBodyAttributedNewlineWithNoTrailer() {
+        let a = render("- alpha\n- beta")
+        // ONE "\n" between the items and NOTHING after the last: dropping the
+        // `index < count - 1` guard would trail a separator, which the panel
+        // renders as a stray blank line.
+        XCTAssertEqual(a.string, "•  alpha\n•  beta")
+
+        // The separator is body-ATTRIBUTED, not a bare "\n" — the blank line has to
+        // carry body metrics. A regression to `NSAttributedString(string: "\n")`
+        // leaves these nil.
+        let sep = (a.string as NSString).range(of: "\n").location
+        XCTAssertNotNil(a.attribute(.font, at: sep, effectiveRange: nil))
+        XCTAssertNotNil(a.attribute(.foregroundColor, at: sep, effectiveRange: nil))
+        let ps = a.attribute(.paragraphStyle, at: sep, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertEqual(ps?.lineSpacing, MarkdownStyle.default.bodyLineSpacing)
+    }
+
+    func testBlockSeparatorIsAttributedButCellTerminatorStaysBare() {
+        // Guards the classification the block-join helper is built on: the "\n"
+        // BETWEEN two blockquote paragraphs is a block separator (body-attributed),
+        // while the trailing "\n" is the NSTextTable CELL TERMINATOR — deliberately
+        // bare, because the cell's own paragraph style is stamped over the whole
+        // range afterwards. They look alike but are different operations; routing
+        // the terminator through appendBlockSeparator would give it a font and
+        // fail this test.
+        let a = render("> alpha\n>\n> beta")
+        XCTAssertEqual(a.string, "alpha\nbeta\n")
+        let sep = (a.string as NSString).range(of: "\n").location
+        XCTAssertNotNil(a.attribute(.font, at: sep, effectiveRange: nil),
+                        "separator between blockquote paragraphs must be body-attributed")
+        XCTAssertNil(a.attribute(.font, at: a.length - 1, effectiveRange: nil),
+                     "cell terminator must stay bare — it is not a block separator")
+    }
+
     // MARK: - GFM table (floor-3 NSTextTable path)
 
     func testGFMTableParsesIntoCellsNotLiteralPipes() {
