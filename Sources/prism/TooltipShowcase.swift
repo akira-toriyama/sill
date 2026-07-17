@@ -132,12 +132,7 @@ struct MockTooltip: View {
                            placement: .bottom)
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10)
-            .fill(Color(nsColor: p.background ?? .underPageBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .stroke(Color(nsColor: panelStroke(p)), lineWidth: 1))
+        .showcasePanel(p)
     }
 
     @ViewBuilder

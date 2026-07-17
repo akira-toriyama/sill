@@ -12,7 +12,7 @@ import ThemeKitUI
 
 // MARK: - Showcase
 
-struct MockButtonGroup: View {
+struct MockButtonGroup: View, ShowcaseBench {
     let p: ResolvedPalette
     @State private var taps = 0
     @State private var selected: Int? = 0
@@ -82,20 +82,6 @@ struct MockButtonGroup: View {
                     .frame(height: 36)
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10)
-            .fill(Color(nsColor: p.background ?? .underPageBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .stroke(Color(nsColor: panelStroke(p)), lineWidth: 1))
-    }
-
-    @ViewBuilder
-    private func cell<V: View>(_ caption: String, @ViewBuilder _ content: () -> V) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(caption).font(sysFont(8, design: .monospaced))
-                .foregroundColor(Color(nsColor: p.tertiary))
-            content()
-        }
+        .showcasePanel(p)
     }
 }

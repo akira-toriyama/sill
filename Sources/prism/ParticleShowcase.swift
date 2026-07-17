@@ -63,12 +63,7 @@ struct MockParticles: View {
             }
             legend
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10)
-            .fill(Color(nsColor: p.background ?? .underPageBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .stroke(Color(nsColor: p.border), lineWidth: 1))
+        .showcasePanel(p, stroke: p.border)
     }
 
     /// One labelled live stage — a contained dark-or-theme panel the burst

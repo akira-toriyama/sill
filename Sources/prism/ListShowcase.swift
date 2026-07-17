@@ -175,7 +175,8 @@ private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedLi
 
 // MARK: - Showcase
 
-struct MockList: View {
+struct MockList: View, ShowcaseBench {
+    var cellSpacing: CGFloat { 6 }
     let p: ResolvedPalette
     // Live collapse state for the tree cell — clicking a header animates via this binding.
     @State private var treeCollapsed: Set<String> = ["build", "archive"]
@@ -342,21 +343,7 @@ struct MockList: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10)
-            .fill(Color(nsColor: p.background ?? .underPageBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .stroke(Color(nsColor: panelStroke(p)), lineWidth: 1))
-    }
-
-    @ViewBuilder
-    private func cell<V: View>(_ caption: String, @ViewBuilder _ content: () -> V) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(caption).font(sysFont(8, design: .monospaced))
-                .foregroundColor(Color(nsColor: p.tertiary))
-            content()
-        }
+        .showcasePanel(p)
     }
 
     // MARK: Decomposed cells — the same 12 specimens as `body`, WITHOUT the caption

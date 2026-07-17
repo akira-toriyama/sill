@@ -49,12 +49,7 @@ struct MockTrail: View {
                     .font(sysFont(7.5, design: .monospaced))
                     .foregroundColor(Color(nsColor: p.muted))
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: p.background ?? .underPageBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(nsColor: p.border), lineWidth: 1))
+            .showcasePanel(p, stroke: p.border)
         }
     }
 

@@ -17,7 +17,9 @@ import ThemeKitUI
 
 // MARK: - Showcase
 
-struct MockToolBar: View {
+struct MockToolBar: View, ShowcaseBench {
+    var cellSpacing: CGFloat { 4 }
+    var cellCaptionSize: CGFloat { 7.5 }
     let p: ResolvedPalette
     @State private var taps = 0
 
@@ -106,12 +108,7 @@ struct MockToolBar: View {
                 }
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10)
-            .fill(Color(nsColor: p.background ?? .underPageBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .stroke(Color(nsColor: panelStroke(p)), lineWidth: 1))
+        .showcasePanel(p)
     }
 
     @ViewBuilder
@@ -120,15 +117,6 @@ struct MockToolBar: View {
             Text(caption).font(sysFont(8, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
             HStack(alignment: .top, spacing: 16) { content(); Spacer(minLength: 0) }
-        }
-    }
-
-    @ViewBuilder
-    private func cell<V: View>(_ caption: String, @ViewBuilder _ content: () -> V) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(caption).font(sysFont(7.5, design: .monospaced))
-                .foregroundColor(Color(nsColor: p.tertiary))
-            content()
         }
     }
 }

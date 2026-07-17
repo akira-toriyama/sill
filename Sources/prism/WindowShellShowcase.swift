@@ -188,7 +188,8 @@ private struct ShellOverlayContent: View {
 
 // MARK: - Showcase card
 
-struct MockWindowShell: View {
+struct MockWindowShell: View, ShowcaseBench {
+    var cellSpacing: CGFloat { 6 }
     let p: ResolvedPalette
     @StateObject private var demo = ShellDemo()
 
@@ -230,15 +231,6 @@ struct MockWindowShell: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 10).fill(surface))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(nsColor: panelStroke(p)), lineWidth: 1))
-    }
-
-    @ViewBuilder
-    private func cell<V: View>(_ caption: String, @ViewBuilder _ content: () -> V) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(caption).font(sysFont(8, design: .monospaced))
-                .foregroundColor(Color(nsColor: p.tertiary))
-            content()
-        }
     }
 
     @ViewBuilder
