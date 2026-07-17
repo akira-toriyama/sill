@@ -614,9 +614,11 @@ public let pathPetPanicHz: Double = 1.5
 
 // MARK: - Neon corridor (#12 Ph4) — the composite arcade maze scene
 
-/// Blit a `PixelSprite` CENTRED at `c` and FLIPPED so row 0 is the TOP — the
-/// corridor pellets share the upright sprites' NON-flipped (y-up) frame, so a
-/// bonus decal needs the `drawGhostPet` y-flip to stand the right way up.
+/// Blit a `PixelSprite` CENTRED at `c` and FLIPPED so row 0 is the TOP — callers
+/// host it in a NON-flipped (y-up) frame (the corridor pellets and the upright
+/// line-pets both do), where the row-0-at-bottom `drawPixelSprite` blitter needs
+/// this manual y-flip to stand the sprite the right way up. Shared by the corridor
+/// bonus decals and `drawGhostPet` (which centres on the origin, `at: .zero`).
 @MainActor
 private func drawCenteredSprite(_ sprite: PixelSprite, cell: CGFloat, at c: CGPoint) {
     let w = CGFloat(sprite.width) * cell, h = CGFloat(sprite.height) * cell
@@ -857,7 +859,8 @@ private func drawChompPetSmooth(now: CFTimeInterval, scale: CGFloat) {
 /// NOT tumble with the lap — the caller leaves the context UNROTATED and passes
 /// `look` (the travel cardinal), so the body stays vertical and only the pupils
 /// swivel (`ghostFrames(look:)`). The sprite is FLIPPED so row 0 (the dome) sits
-/// at the TOP of the local y-up line-pet frame, then centred on the origin.
+/// at the TOP of the local y-up line-pet frame, then centred on the origin — i.e.
+/// exactly `drawCenteredSprite`'s job, centred at `.zero`.
 /// `@MainActor` (it calls the `@MainActor` `drawPixelSprite` blitter; only caller
 /// is `drawLinePets`).
 @MainActor
@@ -865,15 +868,7 @@ private func drawGhostPet(now: CFTimeInterval, scale: CGFloat, look: GhostLook) 
     let sprite = ThemedTransition.frameStep(now: Double(now), hz: CanonicalSprite.waddleHz,
                                             frames: CanonicalSprite.ghostFrames(look: look))
     let cell = scale * ghostFootprint / CGFloat(sprite.height)
-    let w = CGFloat(sprite.width) * cell
-    let h = CGFloat(sprite.height) * cell
-    NSGraphicsContext.saveGraphicsState()
-    let t = NSAffineTransform()
-    t.translateX(by: -w / 2, yBy: h / 2)   // top-left of the centred sprite (y-up)
-    t.scaleX(by: 1, yBy: -1)               // row 0 → top: rows now grow DOWNWARD
-    t.concat()
-    drawPixelSprite(sprite, cell: cell, at: .zero)
-    NSGraphicsContext.restoreGraphicsState()
+    drawCenteredSprite(sprite, cell: cell, at: .zero)
 }
 
 /// The pre-#12-Ph2 SMOOTH Blinky ghost (bezier dome + 3-wave skirt + eyes along
