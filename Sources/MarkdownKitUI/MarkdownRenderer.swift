@@ -103,6 +103,23 @@ private struct Visitor: MarkupVisitor {
         [.font: bodyFont, .foregroundColor: style.foreground, .paragraphStyle: bodyParagraph()]
     }
 
+    // MARK: block join
+
+    /// The block-join policy, in one place: sibling blocks are separated by ONE
+    /// body-attributed newline (each block carries its own paragraphSpacing, so
+    /// "\n\n" would double the gap), and nothing follows the last sibling.
+    ///
+    /// This is the block SEPARATOR only. The other bare `"\n"`s in this file are a
+    /// different operation and must NOT be routed through here: the code-block /
+    /// blockquote / table-cell terminators are unconditional, and the cell's own
+    /// paragraph style is stamped over them afterwards — they are deliberately
+    /// unattributed.
+    private func appendBlockSeparator(to out: NSMutableAttributedString,
+                                      after index: Int, of count: Int) {
+        guard index < count - 1 else { return }
+        out.append(NSAttributedString(string: "\n", attributes: bodyAttrs()))
+    }
+
     // MARK: default / unknown
 
     mutating func defaultVisit(_ markup: Markup) -> NSAttributedString {
@@ -291,9 +308,7 @@ private struct Visitor: MarkupVisitor {
         let children = Array(blockQuote.children)
         for (index, child) in children.enumerated() {
             inner.append(visit(child))
-            if index < children.count - 1 {
-                inner.append(NSAttributedString(string: "\n", attributes: bodyAttrs()))
-            }
+            appendBlockSeparator(to: inner, after: index, of: children.count)
         }
 
         // GitHub-style left bar: 1-cell NSTextTable, only the left border thick+colored.
@@ -329,9 +344,7 @@ private struct Visitor: MarkupVisitor {
         for (index, item) in items.enumerated() {
             let prefix = listItemPrefix(item) ?? "•  "
             out.append(renderListItem(item, prefix: prefix))
-            if index < items.count - 1 {
-                out.append(NSAttributedString(string: "\n", attributes: bodyAttrs()))
-            }
+            appendBlockSeparator(to: out, after: index, of: items.count)
         }
         return out
     }
@@ -342,9 +355,7 @@ private struct Visitor: MarkupVisitor {
         let start = Int(list.startIndex)
         for (index, item) in items.enumerated() {
             out.append(renderListItem(item, prefix: "\(start + index).  "))
-            if index < items.count - 1 {
-                out.append(NSAttributedString(string: "\n", attributes: bodyAttrs()))
-            }
+            appendBlockSeparator(to: out, after: index, of: items.count)
         }
         return out
     }
@@ -368,9 +379,7 @@ private struct Visitor: MarkupVisitor {
         let children = Array(item.children)
         for (index, child) in children.enumerated() {
             out.append(visit(child))
-            if index < children.count - 1 {
-                out.append(NSAttributedString(string: "\n", attributes: bodyAttrs()))
-            }
+            appendBlockSeparator(to: out, after: index, of: children.count)
         }
         // apply headIndent across every paragraph in the item (nesting); first line
         // starts flush so the prefix isn't indented.

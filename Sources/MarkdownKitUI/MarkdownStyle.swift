@@ -31,10 +31,4 @@ public struct MarkdownStyle: Sendable {
     }
 
     public static let `default` = MarkdownStyle()
-
-    /// Point size for an h1...h6 heading.
-    public func headingSize(_ level: Int) -> CGFloat {
-        let i = min(max(level, 1), headingScales.count) - 1
-        return baseFontSize * headingScales[i]
-    }
 }
