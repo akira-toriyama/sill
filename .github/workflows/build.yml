@@ -26,6 +26,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Build-only: swift-build compiles and tests locally, never pushes —
+          # drop the persisted checkout token. t-yaxa
+          persist-credentials: false
 
       # Shared Swift build (setup-xcode + SPM cache + build + test). sill is
       # LIBRARY-ONLY (no .app) so — unlike facet — there is no ./package.sh
