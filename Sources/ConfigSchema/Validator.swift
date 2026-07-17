@@ -195,7 +195,7 @@ public extension SchemaDescriptor {
                     // Leaf-valued map (word → [String]): run the field check with
                     // the dynamic key substituted so paths/messages name the
                     // actual entry (`search.synonyms.close[1]`).
-                    validateField(renamed(leaf, to: key), value: value,
+                    validateField(leaf.renamed(to: key), value: value,
                                   path: path, into: &errors)
                     continue
                 }
@@ -365,20 +365,6 @@ public extension SchemaDescriptor {
 
     // MARK: - helpers
 
-    /// A copy of `field` under a different key — how a leaf `DynamicValue`
-    /// reuses the field checks for each dynamic entry.
-    private func renamed(_ f: SchemaField, to key: String) -> SchemaField {
-        SchemaField(key, f.shape, doc: f.doc,
-                    enumDomain: f.enumDomain, enumDocs: f.enumDocs,
-                    arrayItemEnum: f.arrayItemEnum,
-                    defaultBool: f.defaultBool, defaultInt: f.defaultInt,
-                    defaultString: f.defaultString, defaultNumber: f.defaultNumber,
-                    defaultStringArray: f.defaultStringArray,
-                    exclusiveMinimum: f.exclusiveMinimum,
-                    minimum: f.minimum, maximum: f.maximum,
-                    rejected: f.rejected)
-    }
-
     private func numeric(_ v: Toml.Value) -> Double? {
         if case .int(let i) = v { return Double(i) }
         if case .double(let d) = v { return d }
@@ -395,15 +381,10 @@ public extension SchemaDescriptor {
                         message: "\(joined(path)): \(detail)")
     }
 
-    private func joined(_ path: [String]) -> String {
-        var out = ""
-        for seg in path {
-            if seg.hasPrefix("[") { out += seg }
-            else if out.isEmpty { out = seg }
-            else { out += "." + seg }
-        }
-        return out
-    }
+    /// The path prefix every message carries — the SAME renderer behind
+    /// `ValidationError.pathString`, so a message and the error's own rendered
+    /// path always agree.
+    private func joined(_ path: [String]) -> String { ValidationError.render(path) }
 
     /// Trim a whole-valued Double to an integer string for messages (`20` not `20.0`).
     private func trim(_ d: Double) -> String {

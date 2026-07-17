@@ -65,7 +65,12 @@ public struct ValidationError: Sendable, Equatable {
 
     /// `path` joined for display: `bindings[0].input` (array indices fold onto
     /// the preceding segment; dotted otherwise).
-    public var pathString: String {
+    public var pathString: String { Self.render(path) }
+
+    /// The ONE path renderer. `pathString` and the validator's `message` builder
+    /// both read it, so the path a consumer renders itself and the path baked
+    /// into the message it sits next to cannot drift apart.
+    static func render(_ path: [String]) -> String {
         var out = ""
         for seg in path {
             if seg.hasPrefix("[") {
