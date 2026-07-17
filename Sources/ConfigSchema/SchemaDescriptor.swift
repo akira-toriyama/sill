@@ -51,7 +51,9 @@ public struct SchemaField: Sendable, Equatable {
         case stringMap              // open map of name → string (additionalProperties: string)
     }
 
-    public let key: String
+    /// `private(set)` only so [renamed(to:)] can rebind it on a COPY (see there);
+    /// a field is immutable to every reader, exactly as when this was a `let`.
+    public private(set) var key: String
     public let shape: Shape
     /// Finite value set → JSON `enum`. nil for free-form / DSL strings.
     public let enumDomain: [String]?
@@ -100,6 +102,16 @@ public struct SchemaField: Sendable, Equatable {
         self.exclusiveMinimum = exclusiveMinimum
         self.minimum = minimum; self.maximum = maximum
         self.rejected = rejected
+    }
+
+    /// This field under a different `key` — how a leaf [DynamicValue] reuses the
+    /// field checks for each dynamic entry (so paths read `search.synonyms.close[1]`).
+    /// A copy-of-self, NOT a hand-rolled re-init: a property added above rides
+    /// along instead of being silently dropped here.
+    func renamed(to key: String) -> SchemaField {
+        var copy = self
+        copy.key = key
+        return copy
     }
 }
 
