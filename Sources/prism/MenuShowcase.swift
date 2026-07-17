@@ -85,7 +85,8 @@ private let mockMenuContentHeight: CGFloat = 196
 
 // MARK: - Showcase
 
-struct MockMenu: View {
+struct MockMenu: View, ShowcaseBench {
+    var cellSpacing: CGFloat { 6 }
     let p: ResolvedPalette
 
     private var surface: Color { Color(nsColor: p.background ?? .windowBackgroundColor) }
@@ -119,20 +120,6 @@ struct MockMenu: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10)
-            .fill(Color(nsColor: p.background ?? .underPageBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .stroke(Color(nsColor: panelStroke(p)), lineWidth: 1))
-    }
-
-    @ViewBuilder
-    private func cell<V: View>(_ caption: String, @ViewBuilder _ content: () -> V) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(caption).font(sysFont(8, design: .monospaced))
-                .foregroundColor(Color(nsColor: p.tertiary))
-            content()
-        }
+        .showcasePanel(p)
     }
 }

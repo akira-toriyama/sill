@@ -11,7 +11,7 @@ import ThemeKitUI
 
 // MARK: - Showcase
 
-struct MockCheckbox: View {
+struct MockCheckbox: View, ShowcaseBench {
     let p: ResolvedPalette
     @State private var on = true
 
@@ -54,21 +54,7 @@ struct MockCheckbox: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10)
-            .fill(Color(nsColor: p.background ?? .underPageBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .stroke(Color(nsColor: panelStroke(p)), lineWidth: 1))
-    }
-
-    @ViewBuilder
-    private func cell<V: View>(_ caption: String, @ViewBuilder _ content: () -> V) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(caption).font(sysFont(8, design: .monospaced))
-                .foregroundColor(Color(nsColor: p.tertiary))
-            content()
-        }
+        .showcasePanel(p)
     }
     @ViewBuilder
     private func tagged<V: View>(_ tag: String, @ViewBuilder _ content: () -> V) -> some View {

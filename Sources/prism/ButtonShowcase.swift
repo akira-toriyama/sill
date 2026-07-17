@@ -12,7 +12,7 @@ import ThemeKitUI
 
 // MARK: - Showcase: variants (live) + every state / role / size in the theme
 
-struct MockButton: View {
+struct MockButton: View, ShowcaseBench {
     let p: ResolvedPalette
     @State private var taps = 0
 
@@ -59,12 +59,7 @@ struct MockButton: View {
                     .frame(height: 36)
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10)
-            .fill(Color(nsColor: p.background ?? .underPageBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .stroke(Color(nsColor: panelStroke(p)), lineWidth: 1))
+        .showcasePanel(p)
     }
 
     /// One row of the same variant in each forced state.
@@ -81,26 +76,6 @@ struct MockButton: View {
                 tagged("disabled") { ThemedButtonView(palette: p, variant: variant, title: "Button", enabled: false) }
                 Spacer(minLength: 0)
             }
-        }
-    }
-
-    /// A small sub-caption above a forced-state specimen.
-    @ViewBuilder
-    private func tagged<V: View>(_ tag: String, @ViewBuilder _ content: () -> V) -> some View {
-        VStack(spacing: 3) {
-            content()
-            Text(tag).font(sysFont(7.5, design: .monospaced))
-                .foregroundColor(Color(nsColor: p.tertiary))
-        }
-    }
-
-    /// A captioned cell holding an intrinsically-sized button, left-aligned.
-    @ViewBuilder
-    private func cell<V: View>(_ caption: String, @ViewBuilder _ content: () -> V) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(caption).font(sysFont(8, design: .monospaced))
-                .foregroundColor(Color(nsColor: p.tertiary))
-            content()
         }
     }
 }
