@@ -21,10 +21,12 @@
 // Scope (the family's flat-section dialect): a `.table` section is one
 // `[header]` whose fields are scalars or string arrays; `.arrayOfTables`
 // is `[[header]]` (schema: an array of objects); `.dynamicTable` is a
-// permissive object for dynamic section names (e.g. facet's `[desktop.N]`).
+// permissive object for dynamic section names (e.g. facet's `[desktop.N]`);
+// `.openStringMap` is an open name→string map (facet's `[alias]`) whose
+// VALUES the schema types and `validate` checks.
 // `decode` drives ONLY `.table` sections (the uniform bulk) — an app keeps
-// its own bespoke decode for arrays-of-tables / dynamic sections, which
-// the spec still DESCRIBES for the schema.
+// its own bespoke decode for arrays-of-tables / dynamic / open-map sections,
+// which the spec still DESCRIBES for the schema.
 //
 // A SECOND, decode-free type family lives alongside `Spec<Root>` in this
 // module (SchemaDescriptor.swift): `SchemaDescriptor` / `SchemaSection` /
@@ -118,6 +120,13 @@ public enum ConfigSchema {
         /// Dynamic section names under `header` (e.g. `[desktop.1]`,
         /// `[desktop.2]`). Schema is a permissive object; NOT decoded here.
         case dynamicTable
+        /// An open name→string map (`[alias]`: NAME = 'expr'): arbitrary keys,
+        /// every value typed `string` — the descriptor layer's
+        /// `SchemaSection.Kind.openStringMap` capability on the Spec bridge.
+        /// `valueDoc` describes the VALUES (the section's own `doc` describes
+        /// the map). Emitted as `additionalProperties: {type: string}`;
+        /// `validate` rejects non-string values; NOT decoded here.
+        case openStringMap(valueDoc: String)
     }
 
     public struct Section<Root> {
@@ -307,6 +316,16 @@ public extension ConfigSchema.Spec {
                     }
                     node.description = section.doc ?? node.description
                 }
+            case .openStringMap(let valueDoc):
+                // Folded as a leaf-valued open map so the SHARED emit
+                // (`additionalProperties: {type: string, description:
+                // valueDoc}`) and validate (per-key string check) machinery
+                // apply unchanged — same subtree the descriptor layer's
+                // `.openStringMap` section emits.
+                let node = Self.descend(root, Self.pathComponents(section.header))
+                node.dynamicValue = DynamicValue(
+                    leaf: SchemaField("<name>", .string, doc: valueDoc))
+                node.description = section.doc ?? node.description
             }
         }
         return root
