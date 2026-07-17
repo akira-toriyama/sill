@@ -553,45 +553,110 @@ extension ThemeSpec {
 
 // MARK: - Name resolution
 
-/// Single source of truth for the catalog: ordered (name, spec) pairs.
-/// `canonicalThemeNames` and `paletteFor` both derive from this table, so
-/// adding a theme is ONE edit (the old layout needed the static, the
-/// `paletteFor` switch, AND the name array kept in sync by hand — sill's
-/// own little hand-copy, now retired). Order is the user-facing catalog
-/// order (favorites → reference → popular → light → structural).
-private let themeCatalog: [(name: String, spec: ThemeSpec)] = [
-    ("terminal", .terminal), ("chomp", .chomp), ("rainbow", .rainbow),
-    ("aurora-flux", .auroraFlux), ("acidwave", .acidwave),
-    ("neon-noir", .neonNoir), ("outrun", .outrun), ("blacklight", .blacklight),
-    ("synthwave", .synthwave), ("ghostwire", .ghostwire),
-    ("cyberpunk", .cyberpunk), ("tron", .tron),
-    ("biolume", .biolume), ("midas", .midas), ("spectre", .spectre),
-    ("voltage", .voltage), ("toxic", .toxic), ("ember", .ember),
-    ("solar-veil", .solarVeil), ("molten-vein", .moltenVein),
-    ("coin-op", .coinOp), ("arcane", .arcane),
-    ("dusk", .dusk), ("clay", .clay), ("gemstone", .gemstone), ("graphite", .graphite),
-    ("cobalt2", .cobalt2), ("shades-of-purple", .shadesOfPurple),
-    ("tokyo-hack", .tokyoHack),
-    ("github-dark", .githubDark), ("dracula", .dracula),
-    ("catppuccin-mocha", .catppuccinMocha), ("gruvbox", .gruvbox),
-    ("github-light", .githubLight),
-    ("system", .system),
-]
+/// The catalog as a TYPE: each case is one member, its `rawValue` the
+/// user-facing name and `spec` the palette behind it. `canonicalThemeNames`
+/// and `paletteFor` both derive from it. Declaration order IS the
+/// user-facing catalog order (favorites → reference → popular → light →
+/// structural); `allCases` preserves it.
+///
+/// Why an enum and not the `(name, spec)` tuple table it replaces: that
+/// table was `private`, so a member's only public trace was its string
+/// inside `canonicalThemeNames: [String]` — an array whose SIGNATURE never
+/// changes no matter which names are in it. A cut was therefore invisible
+/// to an API diff, and `catppuccin-latte` shipped as a MINOR in v1.36.0 and
+/// broke wand at its next pin bump (see `retiredThemeNames`). As cases,
+/// members are DECLARATIONS: `swift package diagnose-api-breaking-changes`
+/// reports a cut as `EnumElement Theme.x has been removed`, so the version
+/// has to tell the truth. Same shape as `LinePet` below — the pattern this
+/// file already treats as its best.
+public enum Theme: String, Sendable, Hashable, CaseIterable {
+    case terminal, chomp, rainbow
+    case auroraFlux = "aurora-flux"
+    case acidwave
+    case neonNoir = "neon-noir"
+    case outrun, blacklight
+    case synthwave, ghostwire, cyberpunk, tron
+    case biolume, midas, spectre
+    case voltage, toxic, ember
+    case solarVeil = "solar-veil"
+    case moltenVein = "molten-vein"
+    case coinOp = "coin-op"
+    case arcane
+    case dusk, clay, gemstone, graphite
+    case cobalt2
+    case shadesOfPurple = "shades-of-purple"
+    case tokyoHack = "tokyo-hack"
+    case githubDark = "github-dark"
+    case dracula
+    case catppuccinMocha = "catppuccin-mocha"
+    case gruvbox
+    case githubLight = "github-light"
+    case system
+
+    /// The palette behind this member. Exhaustive by construction — a new
+    /// case does not COMPILE until it has an arm here, so a name and its
+    /// spec cannot drift apart (the pre-0.6.0 hand-copy's failure mode,
+    /// now enforced by the type checker rather than by a test).
+    public var spec: ThemeSpec {
+        switch self {
+        case .terminal:        return .terminal
+        case .chomp:           return .chomp
+        case .rainbow:         return .rainbow
+        case .auroraFlux:      return .auroraFlux
+        case .acidwave:        return .acidwave
+        case .neonNoir:        return .neonNoir
+        case .outrun:          return .outrun
+        case .blacklight:      return .blacklight
+        case .synthwave:       return .synthwave
+        case .ghostwire:       return .ghostwire
+        case .cyberpunk:       return .cyberpunk
+        case .tron:            return .tron
+        case .biolume:         return .biolume
+        case .midas:           return .midas
+        case .spectre:         return .spectre
+        case .voltage:         return .voltage
+        case .toxic:           return .toxic
+        case .ember:           return .ember
+        case .solarVeil:       return .solarVeil
+        case .moltenVein:      return .moltenVein
+        case .coinOp:          return .coinOp
+        case .arcane:          return .arcane
+        case .dusk:            return .dusk
+        case .clay:            return .clay
+        case .gemstone:        return .gemstone
+        case .graphite:        return .graphite
+        case .cobalt2:         return .cobalt2
+        case .shadesOfPurple:  return .shadesOfPurple
+        case .tokyoHack:       return .tokyoHack
+        case .githubDark:      return .githubDark
+        case .dracula:         return .dracula
+        case .catppuccinMocha: return .catppuccinMocha
+        case .gruvbox:         return .gruvbox
+        case .githubLight:     return .githubLight
+        case .system:          return .system
+        }
+    }
+}
 
 /// Canonical theme names accepted by `--theme=`. Single source of truth
 /// so a CLI can reject typos. Includes the `random` meta-name.
-public let canonicalThemeNames: [String] = themeCatalog.map(\.name) + ["random"]
+public let canonicalThemeNames: [String] = Theme.allCases.map(\.rawValue) + ["random"]
 
 /// Map a raw `--theme=…` value to a `ThemeSpec`. Case-insensitive;
 /// unknown names fall through to `terminal`. `random` picks a concrete
 /// non-system theme each call. Pure — no AppKit.
+///
+/// Prefer `Theme.x.spec` when the theme is a compile-time identity rather
+/// than user input: this function is TOTAL over an untyped domain, so an
+/// unknown name gets `terminal` instead of an error (see
+/// `retiredThemeNames` for what that costs when a member is cut).
 public func paletteFor(_ raw: String) -> ThemeSpec {
     let s = raw.lowercased()
     if s == "random" {
-        let pool = themeCatalog.map(\.name).filter { $0 != "system" }
-        return paletteFor(pool.randomElement() ?? "terminal")
+        let pool = Theme.allCases.filter { $0 != .system }
+        return (pool.randomElement() ?? .terminal).spec
     }
-    return themeCatalog.first { $0.name == s }?.spec ?? .terminal
+    return Theme(rawValue: s)?.spec ?? .terminal
 }
 
 // MARK: - Pure effect / pet vocabulary
