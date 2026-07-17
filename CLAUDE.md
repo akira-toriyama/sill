@@ -132,9 +132,31 @@ also prints that pointer in DEBUG).
 - Commits: **gitmoji + Conventional Commits** (enforced by `commit-lint`), e.g.
   `:sparkles: feat(ThemeKit): …`. Squash-merge; the PR number `(#N)` is appended
   by GitHub on merge.
-- A library change ⇒ **minor version bump + a matching git tag**, `v`-prefixed to
-  match the app family (facet ships `v6.0.0`, …): **`v0.33.0`**. SwiftPM strips the
-  optional `v`, so `.upToNextMinor` pins resolve unchanged. Pre-1.0, a minor can
-  break; consumers pin `.upToNextMinor`. (Tags `0.17.0`…`0.32.0` predate this and
-  stay bare — the `v` prefix begins at `v0.33.0`; don't rewrite published tags.)
+- An ADDITIVE library change ⇒ **minor version bump + a matching git tag**,
+  `v`-prefixed to match the app family (facet ships `v6.0.0`, …). SwiftPM strips
+  the optional `v`, so `.upToNextMinor` pins resolve unchanged. (Tags
+  `0.17.0`…`0.32.0` predate this and stay bare — the `v` prefix begins at
+  `v0.33.0`; don't rewrite published tags.)
+- **Removing or renaming ANY public name ⇒ `:boom:` (or a trailing `!`) ⇒ MAJOR.**
+  A type, a function, a `.library` product, a `Theme` case OR its rawValue, an
+  effect / pet name, a vendored icon slug. **Do NOT reach for `:fire:` /
+  `:truck:` / `:coffin:`** — glyph rates all three **bump = none** *and* keeps
+  them out of the release notes, so a truthful removal gitmoji ships a break
+  invisibly. That is exactly how `catppuccin-latte` left the catalog in v1.36.0
+  and broke wand at its next pin bump. Those three stay for internal / dead /
+  non-public code.
+- Check a removal MECHANICALLY rather than by eye — the catalog is a type
+  (`Theme`) precisely so an API diff can see a cut:
+  `swift package diagnose-api-breaking-changes "$(git merge-base origin/main HEAD)"`
+  ⇒ `💔 enumelement Theme.x has been removed`. Baseline on the **merge-base**, not
+  a tag: sill batches tags, so a tag baseline inherits other PRs' removals.
+  Blind spot: it sees case IDENTIFIERS, not rawValue STRINGS — a rawValue rename
+  reports clean (measured), and `VocabularyTests` is that channel's only guard.
+  (Not yet a CI gate — it needs `glyph bump` on macOS to read the declared level,
+  and glyph ships no install action. Tracked in `projects`.)
+- Why major matters even though **consumers pin `.upToNextMinor`**: that pin
+  excludes a new minor AND a new major alike, so the bump level buys no automatic
+  protection — the pin is the safety mechanism. Major's whole job is to be the
+  signal a human reads when they hand-bump a pin. That is why a mis-rated removal
+  is so expensive: it is invisible at exactly the moment someone is looking.
 - TOML is taplo-linted in CI.
