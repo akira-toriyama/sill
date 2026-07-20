@@ -35,4 +35,4 @@ jobs:
       # LIBRARY-ONLY (no .app) so — unlike facet — there is no ./package.sh
       # step. XCTest also runs LOCALLY now via `scripts/test.sh` (an installed
       # Xcode over the CLT-default shell); CI is the canonical required gate.
-      - uses: akira-toriyama/.github/actions/swift-build@main
+      - uses: akira-toriyama/.github/actions/swift-build@v2
