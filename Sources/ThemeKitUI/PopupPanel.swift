@@ -48,6 +48,32 @@ final class PopupPanel: NSPanel {
 ///   - `role`: the panel's accessibility role (tooltip `.unknown` to stay out of
 ///     AX; combo `.list`; menu `.menu`).
 /// The caller assigns `contentView` and (if interactive) marks it an AX element.
+///
+/// `hidesOnDeactivate` is the one line that can't be a constant — see
+/// `popupHidesOnDeactivate`.
+
+/// Should a popup panel hide when its host app deactivates?
+///
+/// A borderless panel gets no free hide-on-deactivate, so a `.regular` app
+/// wants it: switch away from facet and its combo dropdown should not stay
+/// floating over the app you switched TO.
+///
+/// An `.accessory` (LSUIElement) host is the opposite case, and `true` there is
+/// not "slightly wrong" — it is fatal. Such an app NEVER becomes active, so
+/// AppKit orders the panel out the instant it is shown: the popup simply never
+/// appears, with no error and no warning. wand (a menu-bar-less daemon whose
+/// whole UI is a non-activating panel) hit exactly this when it became the
+/// family's first `ThemedMenu` adopter — its own "presented the menu" log line
+/// fired while the screen stayed empty.
+///
+/// This is the same trap as the `.activeInActiveApp` NSTrackingArea default,
+/// which resolves to "never" under an accessory host: any AppKit default keyed
+/// on "is the app active" needs this gate.
+@MainActor
+func popupHidesOnDeactivate(_ policy: NSApplication.ActivationPolicy) -> Bool {
+    policy != .accessory
+}
+
 @MainActor
 func themedPopupPanel(interactive: Bool, role: NSAccessibility.Role) -> PopupPanel {
     let p = PopupPanel(contentRect: .zero,
@@ -55,7 +81,12 @@ func themedPopupPanel(interactive: Bool, role: NSAccessibility.Role) -> PopupPan
                        backing: .buffered, defer: false)
     p.isFloatingPanel = true
     p.becomesKeyOnlyIfNeeded = true
-    p.hidesOnDeactivate = true          // a borderless panel gets no free hide-on-deactivate
+    // `NSApplication.shared`, not `NSApp`: the latter is an implicitly
+    // unwrapped global that stays nil until the singleton is first touched,
+    // so reading it here would trap in any host that builds a popup before
+    // that (a headless test bundle does exactly this). `.shared` vends the
+    // instance instead.
+    p.hidesOnDeactivate = popupHidesOnDeactivate(NSApplication.shared.activationPolicy())
     p.level = .popUpMenu                 // above .floating
     p.ignoresMouseEvents = !interactive  // tooltip click-through; combo/menu live
     p.hasShadow = true
