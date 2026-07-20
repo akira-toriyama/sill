@@ -76,7 +76,7 @@ let package = Package(
         // 0.24.0 predates SVGView and gives the same `SVG(fileURL:)` / `rasterize`
         // / `NSImage(_:)` API. Bump only if a CLT-buildable newer release lands.
         .package(url: "https://github.com/swhitty/SwiftDraw.git",
-                 .upToNextMinor(from: "0.24.0")),
+                 .upToNextMinor(from: "0.28.0")),
         .package(url: "https://github.com/apple/swift-markdown.git", from: "0.4.0"),
     ],
     targets: [
