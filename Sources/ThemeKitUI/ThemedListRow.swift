@@ -63,13 +63,32 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
             ? .system(size: 11, weight: .medium, design: .monospaced)
             : Font(palette.uiFont(.secondaryBody) as CTFont)
     }
+    /// NB `disabledInk` (== `muted`), NOT `tertiary`. This row used to resolve
+    /// disabled to `tertiary` while every themed CONTROL resolved it to
+    /// `muted` — two greys for one state, visible the moment a disabled button
+    /// and a disabled row shared a surface. `tertiary` means the third
+    /// EMPHASIS tier, which is a different concept from unavailable.
     private var primaryColor: Color {
         onAccent ? Color(nsColor: palette.onPrimary(1))
-                 : Color(nsColor: item.isDisabled ? palette.tertiary : palette.foreground)
+                 : Color(nsColor: item.isDisabled ? palette.disabledInk : palette.foreground)
     }
+    /// A row that draws a selection/highlight WASH has to re-check its
+    /// secondary line against the wash, not against the background: `muted` on
+    /// a flattened `selection` lands under the 3:1 supplementary-text floor on
+    /// 16 of the 34 fixed presets (dracula worst, 2.18). `secondaryInk(on:)`
+    /// returns `muted` unchanged wherever it is already legible, so themes that
+    /// were fine are untouched.
     private var secondaryColor: Color {
-        onAccent ? Color(nsColor: palette.onPrimary(0.65))
-                 : Color(nsColor: item.isDisabled ? palette.tertiary : palette.muted)
+        if onAccent { return Color(nsColor: palette.onPrimary(0.65)) }
+        if item.isDisabled { return Color(nsColor: palette.disabledInk) }
+        if drawsFill { return Color(nsColor: palette.secondaryInk(on: flattenedSelection)) }
+        return Color(nsColor: palette.muted)
+    }
+
+    /// The opaque colour a selection/highlight wash actually resolves to on
+    /// this row's surface — what the secondary line is really drawn on.
+    private var flattenedSelection: NSColor {
+        palette.flatten(palette.selection, over: rowSurface ?? .textBackgroundColor)
     }
     private var tintColor: Color {
         switch item.tint {

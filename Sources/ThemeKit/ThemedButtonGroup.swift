@@ -205,9 +205,9 @@ public final class ThemedButtonGroup: NSView {
 
     private var roleColor: NSColor { palette.color(for: role.control) }
     private var dividerColor: NSColor {
-        guard isEnabled else { return palette.muted }
+        guard isEnabled else { return palette.disabledInk }
         switch variant {
-        case .text:      return roleColor.withAlphaComponent(0.5)
+        case .text:      return palette.restingStroke(of: roleColor)
         case .contained: return palette.bestContrast(on: roleColor).withAlphaComponent(0.25)
         case .outlined:  return .clear   // the overlapped border IS the seam
         }

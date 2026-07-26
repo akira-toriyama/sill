@@ -197,6 +197,114 @@ public extension ResolvedPalette {
         }
     }
 
+    /// Which surface an interaction overlay is being laid onto. The two arms
+    /// need DIFFERENT alphas, which is why one `StateLayer` alpha table would
+    /// be wrong: an overlay on an opaque role fill is the contrast ink (white
+    /// on a blue button), while an overlay on a transparent control is the
+    /// role's own tint (a blue wash on nothing).
+    enum StateBase {
+        /// An opaque role FILL — the overlay is `bestContrast(on:)` of it.
+        case contrastInk(on: NSColor)
+        /// A transparent / surface-coloured control — the overlay is a wash of
+        /// this role colour.
+        case roleTint(NSColor)
+    }
+
+    /// The interaction state an overlay expresses.
+    enum StateLayer: Sendable, Hashable, CaseIterable { case hover, pressed, focus }
+
+    /// The hover / pressed / focus overlay for a control — the ONE place the
+    /// kit's interaction alphas live.
+    ///
+    /// This was a rule-of-three violation INSIDE sill, needing no app to
+    /// justify it: the contained pair (pressed 0.12 / hover 0.08) was written
+    /// out verbatim in `ThemedButton`, `ThemedChip` and `ThemedFAB`, and the
+    /// transparent pair (pressed 0.16 / hover-or-focus 0.06) in `ThemedButton`
+    /// and `ThemedChip` — where the author's own comments already read
+    /// "≈ subtle tier" and "≈ faint tier / MUI hover", i.e. had noticed these
+    /// ARE `InkTier`'s 0.16 / 0.06 without anywhere to put the observation.
+    ///
+    /// `.focus` on a contained fill is deliberately `.clear`: a focused
+    /// contained control shows focus through its RING and its elevation, not
+    /// by tinting its fill (the behaviour the widgets already had).
+    ///
+    /// DERIVED, not themable — it costs zero per-theme authoring across all 35
+    /// presets, where a themable state role would cost 35 authorings for a
+    /// trigger no app has fired.
+    func stateOverlay(_ layer: StateLayer, on base: StateBase) -> NSColor {
+        switch base {
+        case let .contrastInk(fill):
+            let ink = bestContrast(on: fill)
+            switch layer {
+            case .hover:   return ink.withAlphaComponent(0.08)
+            case .pressed: return ink.withAlphaComponent(0.12)
+            case .focus:   return .clear
+            }
+        case let .roleTint(tint):
+            switch layer {
+            case .hover:   return tint.withAlphaComponent(0.06)
+            case .pressed: return tint.withAlphaComponent(0.16)
+            case .focus:   return tint.withAlphaComponent(0.06)
+            }
+        }
+    }
+
+    /// The resting outline of an OUTLINED control — the role colour at half
+    /// strength. Was written out identically in `ThemedButton`, `ThemedChip`
+    /// and `ThemedButtonGroup`.
+    func restingStroke(of role: NSColor) -> NSColor { role.withAlphaComponent(0.5) }
+
+    // MARK: disabled — ONE answer, not two
+
+    /// Ink for a DISABLED control or row.
+    ///
+    /// sill contradicted itself here: `ThemedButton` / `ThemedChip` /
+    /// `ThemedFAB` / `ThemedCheckbox` / `ThemedButtonGroup` all resolved
+    /// disabled to `muted`, while `ThemedListRow` resolved it to `tertiary` —
+    /// two different greys for ONE state, visible the moment a themed button
+    /// and a themed list row share a surface. `muted` wins because it is what
+    /// five of the six already used and because `tertiary` carries its own
+    /// meaning (the third EMPHASIS tier), which disabled is not.
+    ///
+    /// Derived rather than themable for the same reason as `stateOverlay`.
+    var disabledInk: NSColor { muted }
+
+    /// Fill for a disabled CONTAINED control — a neutral wash where the role
+    /// tint would otherwise read as active.
+    var disabledFill: NSColor { ink(.subtle, of: .muted) }
+
+    /// Outline for a disabled OUTLINED control.
+    var disabledStroke: NSColor { border }
+
+    // MARK: secondary text on a wash
+
+    /// Secondary/supporting ink that is legible on `opaqueFill` — `muted` when
+    /// it already clears the 3:1 supplementary-text floor there, else the
+    /// theme-robust contrast ink at a muted-equivalent weight.
+    ///
+    /// WHY THIS IS AT THE WIDGET AND NOT IN THE DERIVE RECIPE: a selected list
+    /// row paints a `selection` WASH (primary@0.18) and then draws its second
+    /// line in `muted` ON that wash — and measured across the catalog, 16 of
+    /// the 34 fixed presets land UNDER 3:1 that way (dracula worst at 2.18).
+    /// Retuning the selection alpha does not fix it: sweeping α 0.18→0.08 still
+    /// leaves 16→5 themes failing while making selection itself harder to see
+    /// against the background. The cause is that `muted` is a deliberately
+    /// low-contrast tier, so the repair belongs where the wash is known.
+    ///
+    /// The 0.70 fallback weight is conservative on purpose. 0.55 already clears
+    /// the floor on every catalog theme (worst 4.37, measured), but a row can
+    /// also be drawn over an app-supplied `surfaceColor` this sweep cannot see,
+    /// so the extra margin is deliberate — at 0.70 the catalog's worst case is
+    /// 5.99.
+    ///
+    /// Pass an OPAQUE fill: flatten the wash with `flatten(_:over:)` first, or
+    /// the answer describes a colour nobody sees.
+    func secondaryInk(on opaqueFill: NSColor) -> NSColor {
+        contrast(muted, on: opaqueFill) >= 3.0
+            ? muted
+            : bestContrast(on: opaqueFill).withAlphaComponent(0.70)
+    }
+
     /// Foreground (black/white) that best contrasts the OPAQUE primary —
     /// for text / icons drawn ON a primary fill. Rooted on the opaque
     /// primary, NOT the selection wash. Opt-in.

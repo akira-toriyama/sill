@@ -257,13 +257,12 @@ public final class ThemedButton: ThemedControl {
         guard isEnabled else { return .clear }
         switch variant {
         case .contained:
-            let on = palette.bestContrast(on: roleColor)
-            if fxPressed { return on.withAlphaComponent(0.12) }
-            if fxHovered { return on.withAlphaComponent(0.08) }
+            if fxPressed { return palette.stateOverlay(.pressed, on: .contrastInk(on: roleColor)) }
+            if fxHovered { return palette.stateOverlay(.hover, on: .contrastInk(on: roleColor)) }
             return .clear
         case .text, .outlined:
-            if fxPressed            { return roleColor.withAlphaComponent(0.16) }   // ≈ subtle tier
-            if fxHovered || fxFocused { return roleColor.withAlphaComponent(0.06) } // ≈ faint tier / MUI hover
+            if fxPressed              { return palette.stateOverlay(.pressed, on: .roleTint(roleColor)) }
+            if fxHovered || fxFocused { return palette.stateOverlay(.hover, on: .roleTint(roleColor)) }
             return .clear
         }
     }
@@ -272,9 +271,9 @@ public final class ThemedButton: ThemedControl {
     /// neutral `border` when disabled.
     private var borderColor: NSColor {
         guard variant == .outlined else { return .clear }
-        if !isEnabled { return palette.border }
+        if !isEnabled { return palette.disabledStroke }
         if fxHovered || fxPressed || fxFocused { return roleColor }
-        return roleColor.withAlphaComponent(0.5)
+        return palette.restingStroke(of: roleColor)
     }
 
     /// Contained elevation per state (the #13 dp ladder: rest dp2 → hover dp4 →

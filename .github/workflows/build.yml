@@ -50,6 +50,8 @@ jobs:
         with:
           persist-credentials: false
       - run: scripts/appkit-floor.sh
+      # Interaction alphas live in PaletteKit, not inline in each widget.
+      - run: scripts/interaction-alphas.sh
 
   # api-guard — a removal from the public surface must be RATED major.
   #
