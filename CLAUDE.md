@@ -8,9 +8,21 @@ per-app migration plan: [docs/DESIGN.md](docs/DESIGN.md).
 ## Build / test (READ THIS FIRST)
 
 ```sh
-swift build          # fast compile check — works on CommandLineTools
-scripts/test.sh      # full XCTest suite — runs LOCALLY via an installed Xcode
+swift build              # fast compile check — works on CommandLineTools
+scripts/test.sh          # full XCTest suite — needs an INSTALLED Xcode
+scripts/appkit-floor.sh  # the 3-floor AppKit policy — CLT-safe, seconds
+scripts/api-guard.sh     # a public removal must be rated major — CLT-safe, ~2 min
 ```
+
+The bottom two are pure gates and run anywhere; the top two need a toolchain.
+**On a machine with no Xcode at all** (`ls /Applications/Xcode*.app` empty),
+`scripts/test.sh` and `swift test` BOTH fail and there is no local test gate —
+CLT ships neither XCTest nor swift-testing, and adding swift-testing as a package
+dependency does not rescue it (the generated runner links `_TestingInterop`, which
+is toolchain-only; measured 2026-07-26). In that state CI is the FIRST execution
+of any test you write — say so rather than implying a test passed. `swift build`
+plus the two script gates still hold, and pure value logic can be exercised by
+building a temporary `.executableTarget` that asserts and exits non-zero.
 
 **Both are local gates now — run them before every commit.** `swift build` is the
 quick CLT compile bar; `scripts/test.sh` runs the whole XCTest suite by pointing
@@ -110,6 +122,14 @@ View → no drift).
 
 この3点を超えて AppKit を足したくなったら必ず**要相談**。帰結: `ThemeKitUI` に残る AppKit は**床3個**（IME 編集コア＋窓の殻＋選択可能リッチテキスト描画）だけ。設計の全文＝[`docs/ROADMAP.md`](docs/ROADMAP.md) #16.5/#17。
 
+**このポリシーは機械強制されている** — `scripts/appkit-floor.sh`（CI: `build.yml` の
+`appkit-floor` job）。allow-list を**集合として等価比較**するので双方向のラチェット:
+未登録の AppKit 構造が増えても落ち、コードが消えた stale entry が残っていても落ちる
+（＝移行 PR は自分の行を消すことになり、リストは縮む一方）。**green の意味を誤読しない
+こと** —— 「負債が増えなかった」だけで「ポリシーを満たした」ではない。現況は
+**16 個中 14 個が DEBT**（床で正当化されるのは `ThemedTextFieldView` の IME 編集コアと
+`MarkdownTextView` の描画コアの 2 個だけ）で、残りは SwiftUI 化待ち。
+
 ## Icons (SVG, since v1.8.0)
 
 All icons are SVG, rendered by **SwiftDraw** (a ThemeKit-only dep, pinned
@@ -145,15 +165,16 @@ also prints that pointer in DEBUG).
   invisibly. That is exactly how `catppuccin-latte` left the catalog in v1.36.0
   and broke wand at its next pin bump. Those three stay for internal / dead /
   non-public code.
-- Check a removal MECHANICALLY rather than by eye — the catalog is a type
-  (`Theme`) precisely so an API diff can see a cut:
-  `swift package diagnose-api-breaking-changes "$(git merge-base origin/main HEAD)"`
-  ⇒ `💔 enumelement Theme.x has been removed`. Baseline on the **merge-base**, not
-  a tag: sill batches tags, so a tag baseline inherits other PRs' removals.
-  Blind spot: it sees case IDENTIFIERS, not rawValue STRINGS — a rawValue rename
-  reports clean (measured), and `VocabularyTests` is that channel's only guard.
-  (Not yet a CI gate — it needs `glyph bump` on macOS to read the declared level,
-  and glyph ships no install action. Tracked in `projects`.)
+- Removals are checked MECHANICALLY, not by eye — **`scripts/api-guard.sh`** is
+  the gate, and it runs in CI on every PR (`build.yml`, job `api-guard`). It
+  diffs the Swift API surface AND the `.library` product set against the
+  merge-base, reads the declared level from `glyph`, and fails iff a removal
+  ships rated below major. Run it locally before pushing a removal.
+  Baseline is the **merge-base**, not a tag: sill batches tags, so a tag baseline
+  would inherit other PRs' removals. Blind spot: the differ sees case
+  IDENTIFIERS, not rawValue STRINGS — a rawValue rename reports clean
+  (measured), and `VocabularyTests` is that channel's only guard.
+  A genuine non-break goes in `.api/breakage-allowlist.txt` with a stated reason.
 - Why major matters even though **consumers pin `.upToNextMinor`**: that pin
   excludes a new minor AND a new major alike, so the bump level buys no automatic
   protection — the pin is the safety mechanism. Major's whole job is to be the

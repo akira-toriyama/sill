@@ -1,0 +1,13 @@
+# sill — api-guard breakage allow-list.
+#
+# Each line is a REGEX matched against a `swift package
+# diagnose-api-breaking-changes` breakage description. An entry here means "this
+# removal is not a break for consumers" — it does NOT mean "we decided to ship a
+# break quietly". If a consumer could notice, rate the commit :boom: instead.
+#
+# rationale: (required marker — api-guard.sh refuses to run without it, so an
+# allow-list can never silently become a rubber stamp.) Every entry below must
+# carry its own `# why:` line directly above it.
+#
+# Empty today. That is the correct starting state: sill has removed nothing that
+# consumers cannot see.

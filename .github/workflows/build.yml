@@ -36,3 +36,52 @@ jobs:
       # step. XCTest also runs LOCALLY now via `scripts/test.sh` (an installed
       # Xcode over the CLT-default shell); CI is the canonical required gate.
       - uses: akira-toriyama/.github/actions/swift-build@v2
+
+  # appkit-floor — the 3-floor AppKit policy, machine-enforced.
+  #
+  # A pure source scan: no toolchain, no checkout depth, seconds on the cheapest
+  # runner. Split from `build` so a policy drift is reported as its own red
+  # check rather than buried in a 20-minute compile.
+  appkit-floor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: scripts/appkit-floor.sh
+
+  # api-guard — a removal from the public surface must be RATED major.
+  #
+  # Separate job, not a step of `build`: it checks out the FULL history (the
+  # baseline is a second revision) and installs glyph, neither of which the
+  # build job should carry. It also builds both revisions, so folding it into
+  # `build` would roughly triple that job's wall clock for every PR.
+  #
+  # PR-only. On a push to main the baseline would be the previous commit, which
+  # re-litigates a decision already made at merge time.
+  api-guard:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The gate diffs HEAD against the PR base, so it needs both revisions
+          # — a shallow checkout has only one.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # glyph is the ONLY reader of the declared bump level, so the gate and the
+      # release can never disagree about what a commit means. Pinned to a
+      # concrete release; the action verifies checksum + build provenance.
+      - uses: akira-toriyama/glyph/.github/actions/install@v0.11.1
+        with:
+          version: v0.11.1
+          token: ${{ github.token }}
+
+      # `github.event.pull_request.base.sha` is the merge-base GitHub itself
+      # computed for this PR — passed explicitly rather than recomputed, so the
+      # gate blames this branch for its OWN removals only.
+      - name: api-guard
+        run: scripts/api-guard.sh "${{ github.event.pull_request.base.sha }}"

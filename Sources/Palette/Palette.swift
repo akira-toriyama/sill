@@ -803,6 +803,75 @@ public extension HexColor {
     }
 }
 
+// MARK: - Compositing + hue (pure)
+
+/// Flatten a translucent ink onto an opaque base — straight source-over alpha
+/// compositing per sRGB channel, returning an OPAQUE colour.
+///
+/// This is the missing half of `contrastRatio`, which ignores alpha by design
+/// (see its doc): every DERIVED role in this kit carries alpha — `border` is
+/// neutral@0.10, `hover` neutral@0.05, `selection` primary@0.18, `tertiary`
+/// foreground@0.55, and every `ink(_:of:)` / `surface(_:)` tier is an alpha
+/// wash. None of them can be contrast-checked without first being flattened
+/// against what they actually sit on, which is why they have never been swept
+/// and why legibility defects in that set stayed invisible.
+///
+/// Compositing in gamma-encoded sRGB (not linear light) is deliberate: it
+/// matches what CoreGraphics/AppKit actually paint when a translucent layer is
+/// drawn over an opaque one, so the value here equals the pixel on screen.
+/// Blending in linear light would be more physically correct and would NOT
+/// match the widget, which is the only thing this needs to predict.
+///
+/// `base`'s own alpha is ignored — a base is a surface, and a surface is
+/// opaque. Flatten it first if it isn't.
+///
+/// The result is QUANTIZED to 8 bits per channel, because `HexColor` is an
+/// 8-bit type and because that is the value that reaches the framebuffer. It
+/// therefore differs slightly from the float-precision `PaletteKit`
+/// `flatten(_:over:)` mirror: dracula's `selection` over its background scores
+/// 2.1763 against `muted` here and 2.1796 there. Both are right; when a sweep
+/// asserts a WCAG floor, prefer THIS one — a threshold should be judged on the
+/// pixel a user actually sees, not on an intermediate that is rounded away.
+public func composite(_ ink: HexColor, over base: HexColor) -> HexColor {
+    let a = min(max(ink.alpha, 0), 1)
+    func mix(_ i: Double, _ b: Double) -> UInt32 {
+        UInt32((i * a + b * (1 - a)) * 255 + 0.5)
+    }
+    let r = mix(ink.r, base.r), g = mix(ink.g, base.g), b = mix(ink.b, base.b)
+    return HexColor((r << 16) | (g << 8) | b)
+}
+
+/// HSV hue angle in `0..<360`, or `0` for any greyscale colour (where hue is
+/// undefined rather than zero — callers wanting to distinguish the two should
+/// test saturation themselves).
+public func hueAngle(_ c: HexColor) -> Double {
+    let mx = max(c.r, c.g, c.b), mn = min(c.r, c.g, c.b)
+    let d = mx - mn
+    guard d > 0 else { return 0 }
+    let h: Double
+    if mx == c.r {
+        h = 60 * (((c.g - c.b) / d).truncatingRemainder(dividingBy: 6))
+    } else if mx == c.g {
+        h = 60 * (((c.b - c.r) / d) + 2)
+    } else {
+        h = 60 * (((c.r - c.g) / d) + 4)
+    }
+    return h < 0 ? h + 360 : h
+}
+
+/// The shorter way round the colour wheel between two hues, `0...180`.
+///
+/// Exists because contrast CANNOT express hue collision, and the two failure
+/// modes are independent. `solar-veil`'s primary (#FF5C7A) and error (#FF2D55)
+/// sit 0.39° apart — indistinguishable as a signal pair — yet score 1.23 on
+/// contrast, which a WCAG-based check would read as "these are similar" for the
+/// wrong reason while happily passing genuinely distinct pairs that happen to
+/// differ in luminance. A separation gate needs this axis, not that one.
+public func hueDistance(_ a: HexColor, _ b: HexColor) -> Double {
+    let d = abs(hueAngle(a) - hueAngle(b))
+    return min(d, 360 - d)
+}
+
 // MARK: - Color-token parsing (pure, opt-in)
 
 /// Parse a config-edge color token into a `HexColor`, or `nil` if it
