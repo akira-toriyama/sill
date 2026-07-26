@@ -221,6 +221,46 @@ public extension ResolvedPalette {
     /// for outlines on a secondary fill. Mirrors `onPrimaryStroke`.
     var onSecondaryStroke: NSColor { onSecondary(0.4) }
 
+    /// Flatten a translucent colour onto an opaque base — the `NSColor` mirror
+    /// of the pure `composite(_:over:)`.
+    ///
+    /// A widget needs this because the thing it draws ink ON is frequently a
+    /// WASH, not a surface: a selected list row paints `selection`
+    /// (primary@0.18) over the background, and the row's text then has to be
+    /// legible against the RESULT, not against either input. Both colours are
+    /// converted to sRGB first — `NSColor` arithmetic across colour spaces is
+    /// meaningless, and `controlAccentColor` arrives in a device space.
+    ///
+    /// Dynamic system colours resolve against the CURRENT appearance, which is
+    /// correct for a widget asking "what am I about to draw on".
+    func flatten(_ ink: NSColor, over base: NSColor) -> NSColor {
+        guard let i = ink.usingColorSpace(.sRGB),
+              let b = base.usingColorSpace(.sRGB) else { return ink }
+        let a = i.alphaComponent
+        return NSColor(srgbRed: i.redComponent   * a + b.redComponent   * (1 - a),
+                       green:   i.greenComponent * a + b.greenComponent * (1 - a),
+                       blue:    i.blueComponent  * a + b.blueComponent  * (1 - a),
+                       alpha: 1)
+    }
+
+    /// WCAG contrast ratio between two resolved colours, `1...21` — the
+    /// `NSColor` mirror of the pure `contrastRatio`, sharing
+    /// `wcagRelativeLuminance` so the two can't drift.
+    ///
+    /// ALPHA IS IGNORED here exactly as it is in the pure function: flatten
+    /// first with `flatten(_:over:)` if either side is translucent, or the
+    /// answer describes a colour nobody will see.
+    func contrast(_ a: NSColor, on b: NSColor) -> Double {
+        guard let x = a.usingColorSpace(.sRGB), let y = b.usingColorSpace(.sRGB) else { return 1 }
+        let la = wcagRelativeLuminance(r: Double(x.redComponent),
+                                       g: Double(x.greenComponent),
+                                       b: Double(x.blueComponent))
+        let lb = wcagRelativeLuminance(r: Double(y.redComponent),
+                                       g: Double(y.greenComponent),
+                                       b: Double(y.blueComponent))
+        return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+    }
+
     /// Black or white, whichever best contrasts `c` used as a fill. Reuses
     /// the pure `prefersBlackForeground` (WCAG contrast-ratio crossover) so
     /// the resolved-`NSColor` path (incl. OS controlAccent, whose hex the
