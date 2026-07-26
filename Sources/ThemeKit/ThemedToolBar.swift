@@ -306,12 +306,7 @@ public final class ThemedToolBar: NSView {
     private func buttonPalette() -> ResolvedPalette {
         guard surface == .primary || surface == .secondary else { return palette }
         let ink = barInk
-        return ResolvedPalette(
-            background: palette.background, foreground: ink, muted: palette.muted,
-            tertiary: palette.tertiary, primary: ink, secondary: ink, border: ink,
-            hover: palette.hover, selection: palette.selection, error: palette.error,
-            font: palette.font, backgroundAlpha: palette.backgroundAlpha,
-            vibrancyMaterial: palette.vibrancyMaterial, forceDarkAqua: palette.forceDarkAqua)
+        return palette.with(foreground: ink, primary: ink, secondary: ink, border: ink)
     }
     /// A flat (elevation 0) square bar reads with a bottom hairline instead of a
     /// shadow — sill's idiom for separating a flat surface. Rounded panels and

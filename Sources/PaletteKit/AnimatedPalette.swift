@@ -33,13 +33,9 @@ public extension ResolvedPalette {
     /// so the selected-row wash tracks the cycling accent without jumping the
     /// instant animation engages.
     func applying(_ frame: AnimatedFrame) -> ResolvedPalette {
-        ResolvedPalette(
-            background: background, foreground: foreground, muted: muted,
-            tertiary: tertiary,
-            primary: frame.primary, secondary: frame.secondary,
-            border: border, hover: hover, selection: frame.selection,
-            error: error, font: font, backgroundAlpha: backgroundAlpha,
-            vibrancyMaterial: vibrancyMaterial, forceDarkAqua: forceDarkAqua)
+        with(primary: frame.primary,
+             secondary: frame.secondary,
+             selection: frame.selection)
     }
 
     /// Cycle this palette's THEME to `phase` (0…1, wrapping) and graft the

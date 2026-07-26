@@ -77,6 +77,73 @@ public struct ResolvedPalette {
     }
 }
 
+// MARK: - Copy-with-override
+
+/// `ResolvedPalette` compares field-by-field. Two things need this.
+///
+/// SwiftUI diffing: an animated theme reallocates the whole struct every frame
+/// (`applying(_:)` below), and a consumer drives that at up to 30 Hz. Without
+/// `Equatable`, a struct of `NSColor` REFERENCES gives SwiftUI nothing cheap to
+/// compare, so every frame looks like a change to every view that reads it.
+///
+/// Tests: it makes `with(...)` assertable at all.
+///
+/// `NSColor` is `Equatable`, and `FontKind` / `NSVisualEffectView.Material` are
+/// `Hashable`, so the synthesized conformance is exact. NB `NSColor` equality is
+/// COLOURSPACE-SENSITIVE — the same colour in sRGB and in deviceRGB is not
+/// `==`. That is the right behaviour here (both sides come from one `resolve`),
+/// but do not read `!=` as "a different colour to the eye".
+extension ResolvedPalette: Equatable {}
+
+public extension ResolvedPalette {
+    /// A copy with only the named roles replaced.
+    ///
+    /// The memberwise `init` takes 14 arguments with no defaults, so changing
+    /// three roles meant restating all fourteen — which is why `applying(_:)`
+    /// and `ThemedToolBar.buttonPalette()` both existed as hand-written
+    /// 14-field copies. It is also a structural tax on the vocabulary: adding a
+    /// role breaks every construction site at once, which is exactly the cost
+    /// that has kept the palette from growing.
+    ///
+    /// DOUBLE OPTIONALS on the three already-optional fields are deliberate and
+    /// are the only subtle part of the signature: `nil` means "leave alone",
+    /// `.some(nil)` means "set it to nil". So `p.with(background: nil)` is a
+    /// no-op, and `p.with(background: .some(nil))` clears the background to
+    /// vibrancy. The single-optional fields have no such ambiguity.
+    func with(
+        background: NSColor?? = nil,
+        foreground: NSColor? = nil,
+        muted: NSColor? = nil,
+        tertiary: NSColor? = nil,
+        primary: NSColor? = nil,
+        secondary: NSColor? = nil,
+        border: NSColor? = nil,
+        hover: NSColor? = nil,
+        selection: NSColor? = nil,
+        error: NSColor? = nil,
+        font: FontKind? = nil,
+        backgroundAlpha: CGFloat?? = nil,
+        vibrancyMaterial: NSVisualEffectView.Material?? = nil,
+        forceDarkAqua: Bool? = nil
+    ) -> ResolvedPalette {
+        ResolvedPalette(
+            background: background ?? self.background,
+            foreground: foreground ?? self.foreground,
+            muted: muted ?? self.muted,
+            tertiary: tertiary ?? self.tertiary,
+            primary: primary ?? self.primary,
+            secondary: secondary ?? self.secondary,
+            border: border ?? self.border,
+            hover: hover ?? self.hover,
+            selection: selection ?? self.selection,
+            error: error ?? self.error,
+            font: font ?? self.font,
+            backgroundAlpha: backgroundAlpha ?? self.backgroundAlpha,
+            vibrancyMaterial: vibrancyMaterial ?? self.vibrancyMaterial,
+            forceDarkAqua: forceDarkAqua ?? self.forceDarkAqua)
+    }
+}
+
 // MARK: - Derived accessors (shared defaults; apps override per surface)
 
 public extension ResolvedPalette {
