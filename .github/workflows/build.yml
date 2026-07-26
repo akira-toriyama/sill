@@ -37,6 +37,20 @@ jobs:
       # Xcode over the CLT-default shell); CI is the canonical required gate.
       - uses: akira-toriyama/.github/actions/swift-build@v2
 
+  # appkit-floor — the 3-floor AppKit policy, machine-enforced.
+  #
+  # A pure source scan: no toolchain, no checkout depth, seconds on the cheapest
+  # runner. Split from `build` so a policy drift is reported as its own red
+  # check rather than buried in a 20-minute compile.
+  appkit-floor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: scripts/appkit-floor.sh
+
   # api-guard — a removal from the public surface must be RATED major.
   #
   # Separate job, not a step of `build`: it checks out the FULL history (the
