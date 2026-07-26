@@ -12,7 +12,10 @@ import PaletteKit
 import ThemeKit
 
 public struct ThemedComboBoxView: NSViewRepresentable {
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var options: [String]
     var label: String?
     var placeholder: String
@@ -22,10 +25,10 @@ public struct ThemedComboBoxView: NSViewRepresentable {
     /// no-match, offer a "Create …" row that, when committed, appends + selects it.
     var createOnEmpty: Bool
 
-    public init(palette: ResolvedPalette, options: [String], label: String? = nil,
+    public init(palette: ResolvedPalette? = nil, options: [String], label: String? = nil,
                 placeholder: String = "", leading: String? = "magnifying-glass",
                 freeText: Bool = false, createOnEmpty: Bool = false) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.options = options
         self.label = label
         self.placeholder = placeholder

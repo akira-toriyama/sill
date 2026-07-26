@@ -50,7 +50,10 @@ public struct ThemedPillView: View {
     public enum Shape: Equatable, Sendable { case pill, square, circle, underline, tag }
     public enum State: Equatable, Sendable { case idle, matched, miss }
 
-    public var palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    public var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     public var label: String
     public var shape: Shape
     public var state: State
@@ -79,7 +82,7 @@ public struct ThemedPillView: View {
     /// The phase held when `previewFrozen`.
     public var previewPhase: CGFloat
 
-    public init(palette: ResolvedPalette,
+    public init(palette: ResolvedPalette? = nil,
                 label: String,
                 shape: Shape = .pill,
                 state: State = .idle,
@@ -97,7 +100,7 @@ public struct ThemedPillView: View {
                 flashToken: Int = 0,
                 previewFrozen: Bool = false,
                 previewPhase: CGFloat = 0.35) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.label = label
         self.shape = shape
         self.state = state

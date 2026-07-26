@@ -10,12 +10,15 @@ import PaletteKit
 public struct HostedThemedList<ID: Hashable & Sendable>: View {
     @Bindable var controller: ListController<ID>
     let style: ThemedListStyle
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
 
-    public init(controller: ListController<ID>, style: ThemedListStyle, palette: ResolvedPalette) {
+    public init(controller: ListController<ID>, style: ThemedListStyle, palette: ResolvedPalette? = nil) {
         self._controller = Bindable(controller)
         self.style = style
-        self.palette = palette
+        self.explicitPalette = palette
     }
 
     public var body: some View {

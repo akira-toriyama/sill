@@ -10,13 +10,16 @@ import PaletteKit
 import ThemeKit
 
 public struct ThemedTooltipAnchorView: NSViewRepresentable {
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     let text: String
     let placement: ThemedTooltip.Placement
 
-    public init(palette: ResolvedPalette, text: String,
+    public init(palette: ResolvedPalette? = nil, text: String,
                 placement: ThemedTooltip.Placement) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.text = text
         self.placement = placement
     }

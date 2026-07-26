@@ -20,7 +20,10 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     private let layout: GridLayout
     private let axis: Axis
     private let aspectRatio: CGFloat?
-    private let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     private let onActivate: ((ID) -> Void)?
     private let cellBuilder: (Data.Element, GridCellState) -> Cell
     private let selectionBinding: Binding<Set<ID>>?
@@ -44,7 +47,7 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
                 layout: GridLayout = .adaptive(minCellWidth: 160),
                 axis: Axis = .vertical,
                 aspectRatio: CGFloat? = nil,
-                palette: ResolvedPalette,
+                palette: ResolvedPalette? = nil,
                 onActivate: ((ID) -> Void)? = nil,
                 allowsMultiSelect: Bool = true,
                 @ViewBuilder cell: @escaping (Data.Element, GridCellState) -> Cell) {
@@ -54,7 +57,7 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
         self.layout = layout
         self.axis = axis
         self.aspectRatio = aspectRatio
-        self.palette = palette
+        self.explicitPalette = palette
         self.onActivate = onActivate
         self.allowsMultiSelect = allowsMultiSelect
         self.cellBuilder = cell

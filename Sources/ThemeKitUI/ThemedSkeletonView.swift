@@ -7,17 +7,20 @@ import PaletteKit
 import ThemeKit
 
 public struct ThemedSkeletonView: NSViewRepresentable {
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var variant: ThemedSkeleton.Variant
     var animation: ThemedSkeleton.Animation
     var width: CGFloat?
     var height: CGFloat?
     var previewFrozen: Bool
 
-    public init(palette: ResolvedPalette, variant: ThemedSkeleton.Variant = .text,
+    public init(palette: ResolvedPalette? = nil, variant: ThemedSkeleton.Variant = .text,
                 animation: ThemedSkeleton.Animation = .pulse, width: CGFloat? = nil,
                 height: CGFloat? = nil, previewFrozen: Bool = false) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.variant = variant
         self.animation = animation
         self.width = width
