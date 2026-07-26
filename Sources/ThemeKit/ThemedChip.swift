@@ -296,14 +296,13 @@ public final class ThemedChip: ThemedControl {
     private var overlayColor: NSColor {
         guard isClickable else { return .clear }
         if hasOpaqueRoleFill {
-            let on = palette.bestContrast(on: roleColor)
-            if fxPressed { return on.withAlphaComponent(0.12) }
-            if fxHovered { return on.withAlphaComponent(0.08) }
+            if fxPressed { return palette.stateOverlay(.pressed, on: .contrastInk(on: roleColor)) }
+            if fxHovered { return palette.stateOverlay(.hover, on: .contrastInk(on: roleColor)) }
             return .clear
         }
         let tint = role == .neutral ? palette.foreground : roleColor
-        if fxPressed              { return tint.withAlphaComponent(0.16) }
-        if fxHovered || fxFocused { return tint.withAlphaComponent(0.06) }
+        if fxPressed              { return palette.stateOverlay(.pressed, on: .roleTint(tint)) }
+        if fxHovered || fxFocused { return palette.stateOverlay(.hover, on: .roleTint(tint)) }
         return .clear
     }
 
@@ -314,10 +313,10 @@ public final class ThemedChip: ThemedControl {
         case .filled:  return .clear
         case .keycap:  return palette.border
         case .outlined:
-            if !isEnabled { return palette.border }
+            if !isEnabled { return palette.disabledStroke }
             if role == .neutral { return palette.border }
             if isSelected || fxHovered || fxPressed || fxFocused { return roleColor }
-            return roleColor.withAlphaComponent(0.5)
+            return palette.restingStroke(of: roleColor)
         }
     }
 

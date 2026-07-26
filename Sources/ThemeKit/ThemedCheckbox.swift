@@ -136,24 +136,24 @@ public final class ThemedCheckbox: ThemedControl {
 
     private var boxFillColor: NSColor {
         guard eff else { return .clear }
-        return isEnabled ? palette.primary : palette.muted
+        return isEnabled ? palette.primary : palette.disabledInk
     }
     private var boxStrokeColor: NSColor {
-        isEnabled ? palette.ink(.strong, of: .foreground) : palette.muted
+        isEnabled ? palette.ink(.strong, of: .foreground) : palette.disabledInk
     }
     private var glyphColor: NSColor {
-        palette.bestContrast(on: isEnabled ? palette.primary : palette.muted)
+        palette.bestContrast(on: isEnabled ? palette.primary : palette.disabledInk)
     }
     /// The circular state layer tint (hover/press/focus), rooted on `primary`
     /// when the box is set, else `foreground` — MUI's checked-vs-unchecked ripple.
     private var hoverCircleColor: NSColor {
         guard isEnabled else { return .clear }
-        let root: ResolvedPalette.InkRoot = eff ? .primary : .foreground
-        if fxPressed { return palette.ink(.subtle, of: root) }      // 0.16
-        if fxHovered || fxFocused { return palette.ink(.faint, of: root) }  // 0.06
+        let tint = eff ? palette.primary : palette.foreground
+        if fxPressed              { return palette.stateOverlay(.pressed, on: .roleTint(tint)) }
+        if fxHovered || fxFocused { return palette.stateOverlay(.hover, on: .roleTint(tint)) }
         return .clear
     }
-    private var labelColor: NSColor { isEnabled ? palette.foreground : palette.muted }
+    private var labelColor: NSColor { isEnabled ? palette.foreground : palette.disabledInk }
 
     // MARK: - Theming
 

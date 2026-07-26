@@ -185,13 +185,13 @@ public final class ThemedFAB: ThemedControl {
     }
 
     /// Icon + extended-label ink for the current state (role contrast / muted).
-    private var inkColor: NSColor { isEnabled ? roleInk : palette.muted }
+    private var inkColor: NSColor { isEnabled ? roleInk : palette.disabledInk }
 
     /// The stable fill (snapped; never animated on hover — the darken is the
     /// overlay). Role fill when enabled; a neutral muted wash when disabled
     /// (matches ThemedButton's contained disabled fill).
     private var baseFillColor: NSColor {
-        isEnabled ? roleColor : palette.ink(.subtle, of: .muted)
+        isEnabled ? roleColor : palette.disabledFill
     }
 
     /// The hover / press state layer (animated): the contrast ink on the role
@@ -200,9 +200,8 @@ public final class ThemedFAB: ThemedControl {
     /// contained button.
     private var overlayColor: NSColor {
         guard isEnabled else { return .clear }
-        let on = palette.bestContrast(on: roleColor)
-        if fxPressed { return on.withAlphaComponent(0.12) }
-        if fxHovered { return on.withAlphaComponent(0.08) }
+        if fxPressed { return palette.stateOverlay(.pressed, on: .contrastInk(on: roleColor)) }
+        if fxHovered { return palette.stateOverlay(.hover, on: .contrastInk(on: roleColor)) }
         return .clear
     }
 
