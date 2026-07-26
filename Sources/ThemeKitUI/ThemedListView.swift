@@ -41,7 +41,10 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     @Binding var collapsed: Set<ID>          // collapsed-section set: id ∈ set ⇒ that header is collapsed
     @Binding var highlight: ID?
     let style: ThemedListStyle
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var onActivate: (ID) -> Void
     var onSelectionChange: (Set<ID>) -> Void
     var onToggleSection: (ID) -> Void
@@ -59,7 +62,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                 collapsed: Binding<Set<ID>> = .constant([]),
                 highlight: Binding<ID?> = .constant(nil),
                 style: ThemedListStyle = ThemedListStyle(),
-                palette: ResolvedPalette,
+                palette: ResolvedPalette? = nil,
                 onActivate: @escaping (ID) -> Void = { _ in },
                 onSelectionChange: @escaping (Set<ID>) -> Void = { _ in },
                 onToggleSection: @escaping (ID) -> Void = { _ in },
@@ -76,7 +79,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         self._collapsed = collapsed
         self._highlight = highlight
         self.style = style
-        self.palette = palette
+        self.explicitPalette = palette
         self.onActivate = onActivate
         self.onSelectionChange = onSelectionChange
         self.onToggleSection = onToggleSection

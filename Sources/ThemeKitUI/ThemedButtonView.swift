@@ -11,7 +11,10 @@ import PaletteKit
 import ThemeKit
 
 public struct ThemedButtonView: NSViewRepresentable {
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var variant: ThemedButton.Variant
     var size: ThemedButton.Size
     var role: ThemedButton.Role
@@ -27,14 +30,14 @@ public struct ThemedButtonView: NSViewRepresentable {
     var previewFocused: Bool
     var onTap: (() -> Void)?
 
-    public init(palette: ResolvedPalette, variant: ThemedButton.Variant = .text,
+    public init(palette: ResolvedPalette? = nil, variant: ThemedButton.Variant = .text,
                 size: ThemedButton.Size = .medium, role: ThemedButton.Role = .primary,
                 title: String = "Button", leading: String? = nil, trailing: String? = nil,
                 leadingImage: NSImage? = nil, trailingImage: NSImage? = nil,
                 fullWidth: Bool = false, enabled: Bool = true,
                 previewHovered: Bool = false, previewPressed: Bool = false,
                 previewFocused: Bool = false, onTap: (() -> Void)? = nil) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.variant = variant
         self.size = size
         self.role = role

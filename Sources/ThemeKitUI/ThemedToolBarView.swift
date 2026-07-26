@@ -39,7 +39,10 @@ public struct ThemedToolBarView: NSViewRepresentable {
         }
     }
 
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var items: [Item]
     var surface: ThemedToolBar.Surface
     var variant: ThemedToolBar.Variant
@@ -49,13 +52,13 @@ public struct ThemedToolBarView: NSViewRepresentable {
     var previewHoveredItem: Int?
     var onItemClick: ((Int) -> Void)?
 
-    public init(palette: ResolvedPalette, items: [Item],
+    public init(palette: ResolvedPalette? = nil, items: [Item],
                 surface: ThemedToolBar.Surface = .surface,
                 variant: ThemedToolBar.Variant = .regular,
                 corners: ThemedToolBar.Corners = .square, elevation: Int = 0,
                 trackingMode: ThemedToolBar.TrackingMode = .standard,
                 previewHoveredItem: Int? = nil, onItemClick: ((Int) -> Void)? = nil) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.items = items
         self.surface = surface
         self.variant = variant

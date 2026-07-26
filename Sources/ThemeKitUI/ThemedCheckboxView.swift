@@ -8,7 +8,10 @@ import PaletteKit
 import ThemeKit
 
 public struct ThemedCheckboxView: NSViewRepresentable {
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var size: ThemedCheckbox.Size
     var label: String?
     var isChecked: Bool
@@ -21,13 +24,13 @@ public struct ThemedCheckboxView: NSViewRepresentable {
     var previewIndeterminate: Bool?
     var onChange: ((Bool) -> Void)?
 
-    public init(palette: ResolvedPalette, size: ThemedCheckbox.Size = .medium,
+    public init(palette: ResolvedPalette? = nil, size: ThemedCheckbox.Size = .medium,
                 label: String? = nil, isChecked: Bool = false,
                 isIndeterminate: Bool = false, enabled: Bool = true,
                 previewHovered: Bool = false, previewPressed: Bool = false,
                 previewFocused: Bool = false, previewChecked: Bool? = nil,
                 previewIndeterminate: Bool? = nil, onChange: ((Bool) -> Void)? = nil) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.size = size
         self.label = label
         self.isChecked = isChecked

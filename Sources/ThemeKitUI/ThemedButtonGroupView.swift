@@ -8,7 +8,10 @@ import PaletteKit
 import ThemeKit
 
 public struct ThemedButtonGroupView: NSViewRepresentable {
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var titles: [String]
     var orientation: ThemedButtonGroup.Orientation
     var variant: ThemedButton.Variant
@@ -25,7 +28,7 @@ public struct ThemedButtonGroupView: NSViewRepresentable {
     var onTap: ((Int) -> Void)?
     var onSelect: ((Int) -> Void)?
 
-    public init(palette: ResolvedPalette, titles: [String],
+    public init(palette: ResolvedPalette? = nil, titles: [String],
                 orientation: ThemedButtonGroup.Orientation = .horizontal,
                 variant: ThemedButton.Variant = .outlined,
                 size: ThemedButton.Size = .medium, role: ThemedButton.Role = .primary,
@@ -34,7 +37,7 @@ public struct ThemedButtonGroupView: NSViewRepresentable {
                 previewSelectedIndex: Int? = nil, previewHoveredIndex: Int? = nil,
                 previewFocusedIndex: Int? = nil, onTap: ((Int) -> Void)? = nil,
                 onSelect: ((Int) -> Void)? = nil) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.titles = titles
         self.orientation = orientation
         self.variant = variant

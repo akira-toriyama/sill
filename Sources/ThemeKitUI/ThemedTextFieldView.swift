@@ -22,7 +22,10 @@ import PaletteKit
 import ThemeKit
 
 public struct ThemedTextFieldView: NSViewRepresentable {
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var variant: ThemedTextField.Variant
     var label: String?
     var placeholder: String
@@ -46,12 +49,12 @@ public struct ThemedTextFieldView: NSViewRepresentable {
     var onMoveUp: (() -> Bool)?
     var onMoveDown: (() -> Bool)?
 
-    public init(palette: ResolvedPalette, variant: ThemedTextField.Variant = .outlined,
+    public init(palette: ResolvedPalette? = nil, variant: ThemedTextField.Variant = .outlined,
                 label: String? = nil, placeholder: String = "", text: String = "",
                 leading: String? = nil, trailing: String? = nil, helper: String? = nil,
                 error: String? = nil, surface: NSColor? = nil,
                 previewFocused: Bool = false) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.variant = variant
         self.label = label
         self.placeholder = placeholder

@@ -40,18 +40,21 @@ public enum BackdropFill: Sendable, Equatable {
 /// A themed backdrop surface: a `Shape` filled per ``BackdropFill`` with an
 /// optional hairline. The general surface panels/pills/cards sit on.
 public struct ThemedBackdropView<S: Shape>: View {
-    public var palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    public var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     /// The mask. Default = a continuous rounded rect (r = 10).
     public var shape: S
     public var fill: BackdropFill
     /// Draw a 1pt hairline in `palette.border` around the shape.
     public var bordered: Bool
 
-    public init(palette: ResolvedPalette,
+    public init(palette: ResolvedPalette? = nil,
                 in shape: S = RoundedRectangle(cornerRadius: 10, style: .continuous),
                 fill: BackdropFill = .auto,
                 bordered: Bool = false) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.shape = shape
         self.fill = fill
         self.bordered = bordered

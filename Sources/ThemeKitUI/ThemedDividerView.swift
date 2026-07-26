@@ -8,17 +8,20 @@ import PaletteKit
 import ThemeKit
 
 public struct ThemedDividerView: NSViewRepresentable {
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var orientation: ThemedDivider.Orientation
     var variant: ThemedDivider.Variant
     var label: String?
     var surface: NSColor?
 
-    public init(palette: ResolvedPalette,
+    public init(palette: ResolvedPalette? = nil,
                 orientation: ThemedDivider.Orientation = .horizontal,
                 variant: ThemedDivider.Variant = .fullWidth,
                 label: String? = nil, surface: NSColor? = nil) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.orientation = orientation
         self.variant = variant
         self.label = label

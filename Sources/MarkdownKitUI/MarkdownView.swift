@@ -7,16 +7,19 @@ import PaletteKit
 /// `NSTextTable` rules, and selection/find work natively. Re-themes by reassigning
 /// `palette`. Content-sized — wrap in a `ScrollView` for a clamped/scrolling popover.
 public struct MarkdownView: View {
-    public var palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    public var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     public var source: String
     public var style: MarkdownStyle
     public var highlighter: MarkdownHighlighter?
 
-    public init(palette: ResolvedPalette,
+    public init(palette: ResolvedPalette? = nil,
                 source: String,
                 style: MarkdownStyle = .default,
                 highlighter: MarkdownHighlighter? = nil) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.source = source
         self.style = style
         self.highlighter = highlighter

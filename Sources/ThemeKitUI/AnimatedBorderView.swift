@@ -42,7 +42,10 @@ public enum AnimatedBorderGlow: Sendable { case none, bloom }
 /// A themed surface border: a `Shape` stroked in `palette.primary` (static) or
 /// lit by an `EffectSpec` as a glowing / breathing / cycling rim.
 public struct AnimatedBorderView<S: Shape>: View {
-    public var palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    public var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     /// The effect to animate, or `nil` for a static `primary` stroke. Resolve it
     /// from a theme name via `borderEffectFor(_:)` (Effects).
     public var effect: EffectSpec?
@@ -72,7 +75,7 @@ public struct AnimatedBorderView<S: Shape>: View {
     /// The phase held when `previewFrozen` (a recognizable mid-cycle colour).
     public var previewPhase: CGFloat
 
-    public init(palette: ResolvedPalette,
+    public init(palette: ResolvedPalette? = nil,
                 effect: EffectSpec? = nil,
                 effectsEnabled: Bool = true,
                 in shape: S = RoundedRectangle(cornerRadius: 10, style: .continuous),
@@ -83,7 +86,7 @@ public struct AnimatedBorderView<S: Shape>: View {
                 flashToken: Int = 0,
                 previewFrozen: Bool = false,
                 previewPhase: CGFloat = 0.35) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.effect = effect
         self.effectsEnabled = effectsEnabled
         self.shape = shape

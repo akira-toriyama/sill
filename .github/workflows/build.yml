@@ -52,6 +52,8 @@ jobs:
       - run: scripts/appkit-floor.sh
       # Interaction alphas live in PaletteKit, not inline in each widget.
       - run: scripts/interaction-alphas.sh
+      # A public themed widget must accept the ambient theme, not only a prop.
+      - run: scripts/theme-env.sh
 
   # api-guard — a removal from the public surface must be RATED major.
   #

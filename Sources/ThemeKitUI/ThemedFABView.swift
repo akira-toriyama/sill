@@ -11,7 +11,10 @@ import PaletteKit
 import ThemeKit
 
 public struct ThemedFABView: NSViewRepresentable {
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var variant: ThemedFAB.Variant
     var size: ThemedFAB.Size
     var role: ThemedFAB.Role
@@ -24,13 +27,13 @@ public struct ThemedFABView: NSViewRepresentable {
     var previewFocused: Bool
     var onTap: (() -> Void)?
 
-    public init(palette: ResolvedPalette, variant: ThemedFAB.Variant = .circular,
+    public init(palette: ResolvedPalette? = nil, variant: ThemedFAB.Variant = .circular,
                 size: ThemedFAB.Size = .large, role: ThemedFAB.Role = .primary,
                 symbol: String? = "plus", image: NSImage? = nil, label: String = "",
                 enabled: Bool = true, previewHovered: Bool = false,
                 previewPressed: Bool = false, previewFocused: Bool = false,
                 onTap: (() -> Void)? = nil) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.variant = variant
         self.size = size
         self.role = role

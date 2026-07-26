@@ -23,7 +23,10 @@ public struct ThemedThumbnailGridView: View {
     private let layout: GridLayout
     private let axis: Axis
     private let aspectRatio: CGFloat?
-    private let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     private let onActivate: ((String) -> Void)?
     private let allowsMultiSelect: Bool
 
@@ -33,7 +36,7 @@ public struct ThemedThumbnailGridView: View {
                 layout: GridLayout = .adaptive(minCellWidth: 160),
                 axis: Axis = .vertical,
                 aspectRatio: CGFloat? = nil,
-                palette: ResolvedPalette,
+                palette: ResolvedPalette? = nil,
                 onActivate: ((String) -> Void)? = nil) {
         self.init(items, selection: selection, layout: layout, axis: axis,
                   aspectRatio: aspectRatio, palette: palette, onActivate: onActivate,
@@ -46,7 +49,7 @@ public struct ThemedThumbnailGridView: View {
                 layout: GridLayout = .adaptive(minCellWidth: 160),
                 axis: Axis = .vertical,
                 aspectRatio: CGFloat? = nil,
-                palette: ResolvedPalette,
+                palette: ResolvedPalette? = nil,
                 onActivate: ((String) -> Void)? = nil) {
         let bridged = Binding<Set<String>>(
             get: { single.wrappedValue.map { [$0] } ?? [] },
@@ -64,7 +67,7 @@ public struct ThemedThumbnailGridView: View {
                  layout: GridLayout,
                  axis: Axis,
                  aspectRatio: CGFloat?,
-                 palette: ResolvedPalette,
+                 palette: ResolvedPalette? = nil,
                  onActivate: ((String) -> Void)?,
                  allowsMultiSelect: Bool) {
         self.items = items
@@ -72,7 +75,7 @@ public struct ThemedThumbnailGridView: View {
         self.layout = layout
         self.axis = axis
         self.aspectRatio = aspectRatio
-        self.palette = palette
+        self.explicitPalette = palette
         self.onActivate = onActivate
         self.allowsMultiSelect = allowsMultiSelect
     }

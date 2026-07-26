@@ -11,12 +11,15 @@ import Palette
 public struct ThemedThumbnailCell: View {
     private let image: NSImage?
     private let label: String?
-    private let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
 
-    public init(image: NSImage?, label: String? = nil, palette: ResolvedPalette) {
+    public init(image: NSImage?, label: String? = nil, palette: ResolvedPalette? = nil) {
         self.image = image
         self.label = label
-        self.palette = palette
+        self.explicitPalette = palette
     }
 
     public var body: some View {
@@ -52,6 +55,8 @@ public struct ThemedThumbnailCell: View {
 /// highlight band sweeping across — replaces the AppKit-backed ThemedSkeletonView
 /// so the grid stays AppKit-zero (#17e AppKit policy).
 struct ShimmerPlaceholder: View {
+    // Internal, and only ever built by ThemedThumbnailCell, which has already
+    // resolved the three tiers — so this takes the answer, not the question.
     let palette: ResolvedPalette
     @State private var travel: CGFloat = -1
 

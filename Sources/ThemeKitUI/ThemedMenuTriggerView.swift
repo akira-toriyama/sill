@@ -11,17 +11,20 @@ import PaletteKit
 import ThemeKit
 
 public struct ThemedMenuTriggerView: NSViewRepresentable {
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var title: String
     var trailingSymbol: String?
     var items: [ThemedMenu.MenuItem]
     var presentation: ThemedMenu.Presentation
 
-    public init(palette: ResolvedPalette, title: String = "Actions",
+    public init(palette: ResolvedPalette? = nil, title: String = "Actions",
                 trailingSymbol: String? = "caret-down",
                 presentation: ThemedMenu.Presentation = .vertical,
                 items: [ThemedMenu.MenuItem]) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.title = title
         self.trailingSymbol = trailingSymbol
         self.presentation = presentation

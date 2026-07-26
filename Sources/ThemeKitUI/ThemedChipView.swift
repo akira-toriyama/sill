@@ -9,7 +9,10 @@ import PaletteKit
 import ThemeKit
 
 public struct ThemedChipView: NSViewRepresentable {
-    let palette: ResolvedPalette
+    @Environment(\.sillPalette) private var ambientPalette
+    private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     var variant: ThemedChip.Variant
     var size: ThemedChip.Size
     var role: ThemedChip.Role
@@ -25,14 +28,14 @@ public struct ThemedChipView: NSViewRepresentable {
     var onTap: (() -> Void)?
     var onDelete: (() -> Void)?
 
-    public init(palette: ResolvedPalette, variant: ThemedChip.Variant = .filled,
+    public init(palette: ResolvedPalette? = nil, variant: ThemedChip.Variant = .filled,
                 size: ThemedChip.Size = .medium, role: ThemedChip.Role = .neutral,
                 title: String = "Tag", leading: String? = nil, selected: Bool = false,
                 enabled: Bool = true, previewHovered: Bool = false,
                 previewPressed: Bool = false, previewFocused: Bool = false,
                 clickable: Bool = false, deletable: Bool = false,
                 onTap: (() -> Void)? = nil, onDelete: (() -> Void)? = nil) {
-        self.palette = palette
+        self.explicitPalette = palette
         self.variant = variant
         self.size = size
         self.role = role
