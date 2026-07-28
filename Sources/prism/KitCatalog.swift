@@ -351,7 +351,7 @@ ThemedToolBarView(palette: palette, items: items) { index in
         name: "ThemedCheckbox", module: "ThemeKit",
         kind: "MUI <Checkbox> (basic, tri-state) — outline-box ↔ primary-filled box with a draw-in checkmark/dash",
         summary: "Themed tri-state AppKit checkbox; styled by assigning a ResolvedPalette.",
-        consumes: "Embed directly as an NSView (a self-contained NSControl, no child window/controller): `let c = ThemedCheckbox(palette:)`, set isChecked/label/size + onChange, add to your view; in SwiftUI host via ThemeKitUI's `ThemedCheckboxView: NSViewRepresentable`.",
+        consumes: "Embed directly as an NSView (a self-contained NSControl, no child window/controller): `let c = ThemedCheckbox(palette:)`, set isChecked/label/size + onChange, add to your view. SwiftUI hosts use ThemeKitUI's `ThemedCheckboxView`, a native view drawing the same anatomy.",
         keyAPI: [
                  "palette: ResolvedPalette — assign to (re)theme; repaints via didSet",
                  "isChecked: Bool — bound on/off; assigning animates glyph but does NOT fire onChange",
@@ -373,7 +373,7 @@ ThemedToolBarView(palette: palette, items: items) { index in
         family: .action,
         defaultType: "ThemedCheckboxView",
         imports: [
-            "import ThemeKitUI   // ThemedCheckboxView — SwiftUI front (NSViewRepresentable)",
+            "import ThemeKitUI   // ThemedCheckboxView — the SwiftUI-native front",
             "import ThemeKit     // ThemedCheckbox.Size (the .small/.medium enum used by the view)",
             "import PaletteKit   // ResolvedPalette + resolve(_:)",
         ],
@@ -386,7 +386,7 @@ ThemedCheckboxView(
 )
 """,
         sourcePath: "ThemeKitUI/ThemedCheckboxView.swift",
-        appkitEscape: "ThemedCheckbox (NSControl, module ThemeKit) — only if NOT usable via SwiftUI; ThemedCheckboxView already wraps it as makeNSView/updateNSView."),
+        appkitEscape: "ThemedCheckbox (NSControl, module ThemeKit) — only if NOT in SwiftUI; ThemedCheckboxView is SwiftUI-native and draws the same anatomy."),
     KitComponent(
         name: "ThemedFAB", module: "ThemeKit",
         kind: "MUI <Fab> (basic) — circular icon FAB + extended icon+label pill, accent-only",

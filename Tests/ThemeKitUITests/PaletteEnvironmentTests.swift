@@ -94,8 +94,8 @@ final class PaletteEnvironmentTests: XCTestCase {
             firstSubview(host(ThemedButtonView(title: "OK").sillTheme(dracula)), of: ThemedButton.self)?.palette,
             dracula, "ThemedButtonView")
         XCTAssertEqual(
-            firstSubview(host(ThemedCheckboxView(label: "x").sillTheme(dracula)), of: ThemedCheckbox.self)?.palette,
-            dracula, "ThemedCheckboxView")
+            firstSubview(host(ThemedFABView().sillTheme(dracula)), of: ThemedFAB.self)?.palette,
+            dracula, "ThemedFABView")
         XCTAssertEqual(
             firstSubview(host(ThemedTextFieldView().sillTheme(dracula)), of: ThemedTextField.self)?.palette,
             dracula, "ThemedTextFieldView")
@@ -107,9 +107,9 @@ final class PaletteEnvironmentTests: XCTestCase {
                          of: ThemedButton.self)?.palette,
             gruvbox, "ThemedButtonView")
         XCTAssertEqual(
-            firstSubview(host(ThemedCheckboxView(palette: gruvbox, label: "x").sillTheme(dracula)),
-                         of: ThemedCheckbox.self)?.palette,
-            gruvbox, "ThemedCheckboxView")
+            firstSubview(host(ThemedFABView(palette: gruvbox).sillTheme(dracula)),
+                         of: ThemedFAB.self)?.palette,
+            gruvbox, "ThemedFABView")
         XCTAssertEqual(
             firstSubview(host(ThemedTextFieldView(palette: gruvbox).sillTheme(dracula)),
                          of: ThemedTextField.self)?.palette,

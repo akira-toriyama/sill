@@ -51,7 +51,6 @@ read -r -d '' ALLOWED <<'EOF' || true
 MarkdownKitUI/MarkdownTextView.swift:NSViewRepresentable        # floor 3 — the selectable rich-text draw core
 ThemeKitUI/ThemedButtonGroupView.swift:NSViewRepresentable      # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedButtonView.swift:NSViewRepresentable           # DEBT — should be SwiftUI-native
-ThemeKitUI/ThemedCheckboxView.swift:NSViewRepresentable         # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedChipView.swift:NSViewRepresentable             # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedComboBoxView.swift:NSViewRepresentable         # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedFABView.swift:NSViewRepresentable              # DEBT — should be SwiftUI-native
