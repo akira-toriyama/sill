@@ -184,11 +184,17 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         return false
     }
 
+    /// Reduce Motion collapses sections without animating the row diff.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private func handleTap(_ item: ListItem<ID>) {
         switch item.kind {
         case let .sectionHeader(_, kindCollapsed):
             guard kindCollapsed != nil, !item.isDisabled else { return }   // collapsible only
-            withAnimation(.easeInOut(duration: 0.2)) {
+            // Reduce Motion applies the same state change with no row-diff
+            // animation: the rows appear/disappear rather than sliding. A nil
+            // animation is how SwiftUI spells "do it, don't animate it".
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                 collapsed = toggleSection(item.id, in: collapsed)          // ListCore — animates the row diff + caret
             }
             onToggleSection(item.id)

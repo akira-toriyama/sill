@@ -52,6 +52,19 @@ public struct PixelSpriteView: View {
     // stable for the lifetime of this view identity.
     @State private var start = Date()
 
+
+    /// Reduce Motion rests the effect on a still frame instead of running the
+    /// clock — the same substitution `AnimatedBorderView` makes for its rim.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The frame to hold, if any. An explicit `frozen:` still wins: an app that
+    /// asked for a specific frame gets it, and Reduce Motion only supplies one
+    /// when the caller supplied none.
+    private var stillFrame: Double? {
+        // This view's `frozen:` is an ABSOLUTE clock value in seconds.
+        frozen ?? (reduceMotion ? ReduceMotionStill.clock : nil)
+    }
+
     public var body: some View {
         if frames.isEmpty {
             // Defensive: no frames → zero-size transparent placeholder.
@@ -59,7 +72,7 @@ public struct PixelSpriteView: View {
         } else if frames.count == 1 {
             // ── Branch 1: single frame — pure static Image, no clock needed. ──
             spriteImage(frames[0])
-        } else if let f = frozen {
+        } else if let f = stillFrame {
             // ── Branch 2: frozen — static Image at the given absolute `now`. ──
             spriteImage(ThemedTransition.frameStep(now: f, hz: hz, frames: frames))
         } else {

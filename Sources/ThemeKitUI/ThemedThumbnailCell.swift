@@ -59,21 +59,37 @@ struct ShimmerPlaceholder: View {
     // resolved the three tiers — so this takes the answer, not the question.
     let palette: ResolvedPalette
     @State private var travel: CGFloat = -1
+    /// A band sweeping across the cell FOREVER is the strongest motion in this
+    /// module, so Reduce Motion drops the sweep entirely and leaves the muted
+    /// fill — the same resting state `ThemedSkeleton` falls back to, so the two
+    /// loading affordances agree.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { geo in
             Rectangle()
                 .fill(Color(nsColor: palette.muted).opacity(0.18))
-                .overlay(
-                    LinearGradient(
-                        colors: [.clear,
-                                 Color(nsColor: palette.foreground).opacity(0.12),
-                                 .clear],
-                        startPoint: .leading, endPoint: .trailing)
-                    .frame(width: geo.size.width * 0.6)
-                    .offset(x: travel * geo.size.width)
-                )
+                .overlay(sweep(geo))
                 .clipped()
+        }
+    }
+
+    /// The travelling highlight band — nothing at all under Reduce Motion.
+    ///
+    /// Absent rather than parked: a highlight frozen mid-cell reads as a
+    /// rendering artefact, while the muted fill alone still says "loading".
+    /// `.onAppear` lives inside this branch too, so the repeating animation is
+    /// never STARTED under Reduce Motion — hiding a running animation would
+    /// keep the timer alive for nothing.
+    @ViewBuilder private func sweep(_ geo: GeometryProxy) -> some View {
+        if !reduceMotion {
+            LinearGradient(
+                colors: [.clear,
+                         Color(nsColor: palette.foreground).opacity(0.12),
+                         .clear],
+                startPoint: .leading, endPoint: .trailing)
+                .frame(width: geo.size.width * 0.6)
+                .offset(x: travel * geo.size.width)
                 .onAppear {
                     withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) {
                         travel = 1.3

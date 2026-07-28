@@ -55,8 +55,21 @@ public struct InkSplatterView: View {
         self.size = size
     }
 
+
+    /// Reduce Motion rests the effect on a still frame instead of running the
+    /// clock — the same substitution `AnimatedBorderView` makes for its rim.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The frame to hold, if any. An explicit `frozen:` still wins: an app that
+    /// asked for a specific frame gets it, and Reduce Motion only supplies one
+    /// when the caller supplied none.
+    private var stillFrame: Double? {
+        // This view's `frozen:` is a FRACTION (0…1) of `duration`.
+        frozen ?? (reduceMotion ? ReduceMotionStill.fraction : nil)
+    }
+
     public var body: some View {
-        if let f = frozen {
+        if let f = stillFrame {
             // Static frozen frame — no animation clock needed.
             Canvas { ctx, size in
                 let bounds = CGRect(origin: .zero, size: size)
