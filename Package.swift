@@ -77,7 +77,11 @@ let package = Package(
         // / `NSImage(_:)` API. Bump only if a CLT-buildable newer release lands.
         .package(url: "https://github.com/swhitty/SwiftDraw.git",
                  .upToNextMinor(from: "0.24.0")),
-        .package(url: "https://github.com/apple/swift-markdown.git", from: "0.4.0"),
+        // swiftlang/, NOT apple/ — the repo moved and `apple/` is the stale
+        // redirect. SwiftPM derives the package identity from the URL, so a
+        // consumer that pulls both (glance does) hits "Conflicting identity for
+        // swift-markdown", a warning SwiftPM says it will escalate to an error.
+        .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.4.0"),
     ],
     targets: [
         // Pure, Sendable, AppKit-free. The shared base.
