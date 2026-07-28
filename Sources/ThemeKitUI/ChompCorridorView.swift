@@ -77,8 +77,21 @@ public struct ChompCorridorView: View {
     /// clock is birth-relative (matching the old `CACurrentMediaTime()` start).
     @State private var start = Date()
 
+
+    /// Reduce Motion rests the effect on a still frame instead of running the
+    /// clock — the same substitution `AnimatedBorderView` makes for its rim.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The frame to hold, if any. An explicit `frozen:` still wins: an app that
+    /// asked for a specific frame gets it, and Reduce Motion only supplies one
+    /// when the caller supplied none.
+    private var stillFrame: Double? {
+        // This view's `frozen:` is an ABSOLUTE clock value in seconds.
+        frozen ?? (reduceMotion ? ReduceMotionStill.clock : nil)
+    }
+
     public var body: some View {
-        if let f = frozen {
+        if let f = stillFrame {
             // Static frozen frame — `now` is the ABSOLUTE frozen seconds.
             Canvas { ctx, size in
                 paint(into: &ctx, size: size, now: f)

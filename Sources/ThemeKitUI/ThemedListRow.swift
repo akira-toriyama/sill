@@ -270,12 +270,18 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
         }
     }
 
+    /// Reduce Motion snaps the caret rather than rotating it (see below).
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     /// A single caret-down glyph that ROTATES to ▸ when collapsed (the M2 improvement
     /// over the AppKit widget's static two-glyph swap).
     private var disclosureCaret: some View {
         templateGlyph("caret-down", pt: metrics.disclosurePt, color: Color(nsColor: palette.muted))
             .rotationEffect(.degrees(isCollapsed ? -90 : 0))
-            .animation(.easeInOut(duration: 0.2), value: isCollapsed)
+            // Reduce Motion snaps the caret instead of rotating it. The glyph
+            // still ENDS in the right orientation — the state is conveyed, the
+            // travel between the two states is not.
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isCollapsed)
     }
 
     // MARK: leading image (template tint via .template render == AppKit .sourceAtop; colour favicon as-is)
