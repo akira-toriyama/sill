@@ -79,9 +79,9 @@ jobs:
       # glyph is the ONLY reader of the declared bump level, so the gate and the
       # release can never disagree about what a commit means. Pinned to a
       # concrete release; the action verifies checksum + build provenance.
-      - uses: akira-toriyama/glyph/.github/actions/install@v0.11.2
+      - uses: akira-toriyama/glyph/.github/actions/install@v0.12.0
         with:
-          version: v0.11.2
+          version: v0.12.0
           token: ${{ github.token }}
 
       # `github.event.pull_request.base.sha` is the merge-base GitHub itself
