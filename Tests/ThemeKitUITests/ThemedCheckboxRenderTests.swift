@@ -85,6 +85,20 @@ final class ThemedCheckboxRenderTests: XCTestCase {
         XCTAssertEqual(got.b, e.b, accuracy: tolerance, "\(message) (b)", file: file, line: line)
     }
 
+    /// Composite over an opaque surface and hand-blend the expectation — the
+    /// unpremultiplied hue of a LOW-alpha pixel (the ~0.08 hover circle) is
+    /// dominated by 8-bit rounding over a transparent backdrop (one byte is
+    /// ~12% of the channel), so state-circle hues are asserted this way.
+    private func renderOn<V: View>(_ bg: NSColor, _ view: V) -> Raster {
+        render(ZStack { Color(nsColor: bg); view })
+    }
+    private func blend(_ over: NSColor, on bg: NSColor) -> NSColor {
+        let o = sRGB(over), b = sRGB(bg)
+        return NSColor(srgbRed: o.r * o.a + b.r * (1 - o.a),
+                       green: o.g * o.a + b.g * (1 - o.a),
+                       blue: o.b * o.a + b.b * (1 - o.a), alpha: 1)
+    }
+
     // MARK: - geometry probes (medium metrics: target 42, box 20 — box at
     // (11…31) pt inside the target square; device px = pt × 2)
 
@@ -143,14 +157,20 @@ final class ThemedCheckboxRenderTests: XCTestCase {
     // MARK: - interaction states (forced via the preview overrides)
 
     func testHoverPaintsTheStateCircle() {
-        let r = render(ThemedCheckboxView(palette: dracula, previewHovered: true,
-                                          previewChecked: false))
-        // The circle spans the whole 42 pt target; probe near its top, clear of
-        // the box. Unchecked roots the overlay on `foreground`.
-        let got = r.at(dpx(21), dpx(3))
         let e = dracula.stateOverlay(.hover, on: .roleTint(dracula.foreground))
-        assertHue(got, is: e, "hover circle hue")
-        XCTAssertEqual(got.a, sRGB(e).a, accuracy: 0.02, "hover circle alpha")
+        // Alpha, over a transparent backdrop.
+        let bare = render(ThemedCheckboxView(palette: dracula, previewHovered: true,
+                                             previewChecked: false))
+        XCTAssertEqual(bare.at(dpx(21), dpx(3)).a, sRGB(e).a, accuracy: 0.02,
+                       "hover circle alpha")
+        // Hue, composited over the theme surface (see renderOn). The circle
+        // spans the whole 42 pt target; probe near its top, clear of the box.
+        // Unchecked roots the overlay on `foreground`.
+        let r = renderOn(dracula.background!,
+                         ThemedCheckboxView(palette: dracula, previewHovered: true,
+                                            previewChecked: false))
+        assertHue(r.at(dpx(21), dpx(3)), is: blend(e, on: dracula.background!),
+                  "hover circle hue over the surface")
     }
 
     func testPressedIsStrongerThanHoverAndRootsOnPrimaryWhenSet() {
@@ -162,8 +182,11 @@ final class ThemedCheckboxRenderTests: XCTestCase {
         let pressedA = pressed.at(dpx(21), dpx(3)).a
         XCTAssertGreaterThan(pressedA, hoverA + 0.01,
                              "the pressed overlay is the stronger tier")
-        assertHue(pressed.at(dpx(21), dpx(3)),
-                  is: dracula.stateOverlay(.pressed, on: .roleTint(dracula.primary)),
+        let e = dracula.stateOverlay(.pressed, on: .roleTint(dracula.primary))
+        let composited = renderOn(dracula.background!,
+                                  ThemedCheckboxView(palette: dracula, previewPressed: true,
+                                                     previewChecked: true))
+        assertHue(composited.at(dpx(21), dpx(3)), is: blend(e, on: dracula.background!),
                   "a set box roots the circle on primary")
     }
 
