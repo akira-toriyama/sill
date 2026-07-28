@@ -19,7 +19,7 @@ import PaletteKit
 @MainActor
 final class ThemedMenuTests: XCTestCase {
 
-    private func theme(_ name: String = "terminal") -> ResolvedPalette { resolve(paletteFor(name)) }
+    private func theme(_ name: String = "terminal") -> ResolvedPalette { resolve(paletteFor(name)!) }
 
     /// Host windows kept alive for the duration of a test method (an anchor needs a
     /// live `.window` to present against; without this they'd deallocate).

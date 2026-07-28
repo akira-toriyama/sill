@@ -86,33 +86,32 @@ final class PaletteTests: XCTestCase {
         XCTAssertEqual(ThemeSpec.dracula.secondary?.rgb,    0xFF79C6) // brand pink
     }
 
-    func testPaletteForCaseInsensitiveAndFallback() {
-        XCTAssertEqual(paletteFor("dracula").primary.rgb, 0xBD93F9)
-        XCTAssertEqual(paletteFor("DRACULA").primary.rgb, 0xBD93F9)
-        XCTAssertEqual(paletteFor("no-such-theme").primary.rgb,
-                       ThemeSpec.terminal.primary.rgb)
+    func testPaletteForCaseInsensitiveAndFailable() {
+        XCTAssertEqual(paletteFor("dracula")?.primary.rgb, 0xBD93F9)
+        XCTAssertEqual(paletteFor("DRACULA")?.primary.rgb, 0xBD93F9)
+        // v2: no silent terminal fallback — an unknown name is nil.
+        XCTAssertNil(paletteFor("no-such-theme"))
     }
 
     /// Hyphenated canonical names map to their concrete spec.
     func testHyphenatedNamesResolve() {
-        XCTAssertEqual(paletteFor("shades-of-purple").primary.rgb, 0xFAD000)
-        XCTAssertEqual(paletteFor("tokyo-hack").primary.rgb,       0xE84B3C)
-        XCTAssertEqual(paletteFor("github-dark").primary.rgb,      0x2F81F7)
-        XCTAssertEqual(paletteFor("catppuccin-mocha").primary.rgb, 0xCBA6F7)
+        XCTAssertEqual(paletteFor("shades-of-purple")?.primary.rgb, 0xFAD000)
+        XCTAssertEqual(paletteFor("tokyo-hack")?.primary.rgb,       0xE84B3C)
+        XCTAssertEqual(paletteFor("github-dark")?.primary.rgb,      0x2F81F7)
+        XCTAssertEqual(paletteFor("catppuccin-mocha")?.primary.rgb, 0xCBA6F7)
     }
 
     func testEveryCanonicalNameResolves() {
         for n in canonicalThemeNames where n != "random" {
-            // Must map to a concrete spec (no trap / no crash).
-            _ = paletteFor(n)
+            XCTAssertNotNil(paletteFor(n), "canonical name '\(n)' must resolve")
         }
     }
 
     func testChompIsCanonicalCrossAppTheme() {
         XCTAssertTrue(canonicalThemeNames.contains("chomp"))
-        XCTAssertEqual(paletteFor("chomp").background?.rgb, 0x000000)
-        XCTAssertEqual(paletteFor("chomp").primary.rgb, 0xFFEA00)
-        XCTAssertEqual(paletteFor("chomp").error.rgb, 0xFF0000)
+        XCTAssertEqual(paletteFor("chomp")?.background?.rgb, 0x000000)
+        XCTAssertEqual(paletteFor("chomp")?.primary.rgb, 0xFFEA00)
+        XCTAssertEqual(paletteFor("chomp")?.error.rgb, 0xFF0000)
     }
 
     // MARK: - backgroundMode
@@ -138,7 +137,7 @@ final class PaletteTests: XCTestCase {
     /// tertiary is nil on every catalog preset (derive is the default).
     func testTertiaryUnsetOnPresets() {
         for n in canonicalThemeNames where n != "random" {
-            XCTAssertNil(paletteFor(n).tertiary, "\(n) should not author tertiary")
+            XCTAssertNil(paletteFor(n)?.tertiary, "\(n) should not author tertiary")
         }
     }
 

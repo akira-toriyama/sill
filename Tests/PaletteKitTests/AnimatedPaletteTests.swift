@@ -31,7 +31,7 @@ final class AnimatedPaletteTests: XCTestCase {
     /// NSColor objects — a reference type) and holds every other role
     /// identity-stable.
     func testApplyingSwapsOnlyAccentTrio() {
-        let base = resolve(paletteFor("dracula"))
+        let base = resolve(paletteFor("dracula")!)
         let frame = animatedPalette(theme: "rainbow", at: 0.3)!
         let lit = base.applying(frame)
 
@@ -61,7 +61,7 @@ final class AnimatedPaletteTests: XCTestCase {
     /// A theme with no effect entry is a no-op: `animated` returns `self`, so a
     /// caller can drive it every frame without branching on animatability.
     func testAnimatedNonAnimatableReturnsSelf() {
-        let base = resolve(paletteFor("dracula"))
+        let base = resolve(paletteFor("dracula")!)
         let still = base.animated(forTheme: "dracula", at: 0.42)
         XCTAssertTrue(still.primary === base.primary)
         XCTAssertTrue(still.secondary === base.secondary)
@@ -72,7 +72,7 @@ final class AnimatedPaletteTests: XCTestCase {
     /// For an animatable theme, `animated` == `applying(animatedPalette(…))`,
     /// and the non-accent roles stay steady.
     func testAnimatedComposesFrame() {
-        let base = resolve(paletteFor("github-light"))   // a light theme
+        let base = resolve(paletteFor("github-light")!)   // a light theme
         let phase: CGFloat = 0.42
         let lit = base.animated(forTheme: "rainbow", at: phase)
         let frame = animatedPalette(theme: "rainbow", at: phase)!
@@ -87,14 +87,14 @@ final class AnimatedPaletteTests: XCTestCase {
         // The animated selection alpha tracks the EFFECT theme's authored value
         // (rainbow = 0.22), matching its static resolve — so the selected-row
         // wash doesn't jump alpha the instant animation engages.
-        let staticRainbowSelection = resolve(paletteFor("rainbow")).selection
+        let staticRainbowSelection = resolve(paletteFor("rainbow")!).selection
         XCTAssertEqual(comps(lit.selection).a, comps(staticRainbowSelection).a, accuracy: 0.001)
     }
 
     /// Phase is taken modulo 1, so a whole-turn offset gives the same accent —
     /// what a wall-clock-driven caller relies on for no jump at the wrap.
     func testPhaseWrapsModuloOne() {
-        let base = resolve(paletteFor("dracula"))
+        let base = resolve(paletteFor("dracula")!)
         let a = base.animated(forTheme: "chomp", at: 0.3)    // flash effect
         let b = base.animated(forTheme: "chomp", at: 1.3)
         XCTAssertTrue(sameColor(a.primary, b.primary))
@@ -105,7 +105,7 @@ final class AnimatedPaletteTests: XCTestCase {
     /// The master switch: `enabled: false` rests STATIC even on an animatable
     /// theme (the 静か-OFF path), while `true` still cycles.
     func testEnabledGateMastersTheCycle() {
-        let base = resolve(paletteFor("rainbow"))
+        let base = resolve(paletteFor("rainbow")!)
         let off = base.animated(forTheme: "rainbow", at: 0.3, enabled: false)
         XCTAssertTrue(off.primary === base.primary)        // self — no cycle
         XCTAssertTrue(off.selection === base.selection)

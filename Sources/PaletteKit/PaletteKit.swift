@@ -569,10 +569,17 @@ public var pal: ResolvedPalette = resolve(.terminal)
 @MainActor
 public func setPalette(_ p: ResolvedPalette) { pal = p }
 
-/// Convenience: resolve a name + optional background override and install it.
+/// Convenience: resolve a name + optional background override and install
+/// it. Returns `false` — leaving `pal` UNTOUCHED — when the name is not in
+/// the catalog (`paletteFor` is failable since v2; no silent `terminal`).
+/// Check the result where the name is user input; ignore it only where the
+/// name is a canonical constant.
 @MainActor
-public func setPalette(named name: String, bgOverride: HexColor? = nil) {
-    pal = resolve(paletteFor(name), bgOverride: bgOverride)
+@discardableResult
+public func setPalette(named name: String, bgOverride: HexColor? = nil) -> Bool {
+    guard let spec = paletteFor(name) else { return false }
+    pal = resolve(spec, bgOverride: bgOverride)
+    return true
 }
 
 // MARK: - Fonts

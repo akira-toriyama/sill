@@ -26,6 +26,16 @@ func sysFont(_ size: CGFloat, weight: Font.Weight = .regular,
 
 // MARK: - Gallery
 
+/// prism-internal unwrap of the failable `paletteFor`: every name reaching
+/// here comes from `canonicalThemeNames` (chips, tiles, the Picker), so a
+/// miss is a prism bug — crash loud rather than paint a wrong theme.
+func specFor(_ name: String) -> ThemeSpec {
+    guard let spec = paletteFor(name) else {
+        preconditionFailure("prism: unknown theme name '\(name)'")
+    }
+    return spec
+}
+
 struct Gallery: View {
     let config: PrismConfig
 
@@ -180,7 +190,7 @@ struct Gallery: View {
         if name == "all" {
             Circle().fill(Color(nsColor: .controlAccentColor)).frame(width: 9, height: 9)
         } else {
-            let p = resolve(paletteFor(name))
+            let p = resolve(specFor(name))
             RoundedRectangle(cornerRadius: 3)
                 .fill(p.background.map { Color(nsColor: $0) } ?? Color(nsColor: .controlColor))
                 .frame(width: 13, height: 13)
@@ -288,7 +298,7 @@ func themeTiles<Content: View>(minWidth: CGFloat, showEffects: Bool,
     ScrollView {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth), spacing: 16)], spacing: 16) {
             ForEach(Gallery.switchable, id: \.self) { theme in
-                let base = resolve(paletteFor(theme))
+                let base = resolve(specFor(theme))
                 VStack(alignment: .leading, spacing: 6) {
                     Text(theme).font(sysFont(9, weight: .semibold, design: .monospaced))
                         .foregroundColor(Color(nsColor: base.muted))
@@ -385,7 +395,7 @@ struct ThemeChip: View {
 
     var body: some View {
         let isAll = (name == "all")
-        let p = isAll ? nil : resolve(paletteFor(name))
+        let p = isAll ? nil : resolve(specFor(name))
         let bg = p?.background.map { Color(nsColor: $0) }
             ?? Color(nsColor: .controlColor)
         let fg = p.map { Color(nsColor: $0.foreground) }

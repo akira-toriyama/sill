@@ -188,10 +188,20 @@ final class PaletteKitTests: XCTestCase {
     }
 
     func testPalInstallAndRead() {
-        setPalette(named: "dracula")
+        XCTAssertTrue(setPalette(named: "dracula"))
         XCTAssertEqual(comps(pal.primary).r, CGFloat(0xBD) / 255, accuracy: 0.01)
         setPalette(resolve(.terminal))
         XCTAssertEqual(comps(pal.primary).g, 1, accuracy: 0.01)   // 0x33FF66
+    }
+
+    /// An unknown name reports `false` and leaves `pal` untouched — the
+    /// failable v2 contract (no silent repaint in `terminal`).
+    func testSetPaletteNamedUnknownIsRejected() {
+        setPalette(named: "dracula")
+        let before = pal
+        XCTAssertFalse(setPalette(named: "no-such-theme"))
+        XCTAssertEqual(comps(pal.primary).r, comps(before.primary).r, accuracy: 0.001)
+        setPalette(resolve(.terminal))
     }
 
     func testNSColorHexInit() {

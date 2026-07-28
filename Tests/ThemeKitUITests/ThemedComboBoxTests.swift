@@ -18,7 +18,7 @@ import TestSupport
 final class ThemedComboBoxTests: XCTestCase {
 
     private func theme(_ name: String = "terminal") -> ResolvedPalette {
-        resolve(paletteFor(name))
+        resolve(paletteFor(name)!)
     }
 
     private func items(_ s: [String]) -> [ThemedComboBox.Item] {

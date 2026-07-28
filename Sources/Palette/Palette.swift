@@ -642,22 +642,26 @@ public enum Theme: String, Sendable, Hashable, CaseIterable {
 /// so a CLI can reject typos. Includes the `random` meta-name.
 public let canonicalThemeNames: [String] = Theme.allCases.map(\.rawValue) + ["random"]
 
-/// Map a raw `--theme=…` value to a `ThemeSpec`. Case-insensitive;
-/// unknown names fall through to `terminal`. `random` picks a concrete
+/// Map a raw `--theme=…` value to a `ThemeSpec`, or `nil` when the name is
+/// not in the catalog. Case-insensitive; `random` picks a concrete
 /// non-system theme each call. Pure — no AppKit.
 ///
+/// FAILABLE by design (v2 removed the old `?? .terminal` fallback): every
+/// consumer app had hand-written its own loud reject around the total
+/// version, because a made-up `terminal` answer masks both a user typo and
+/// a retired catalog member. On `nil`, apps choose the policy: clamp
+/// (`?? Theme.terminal.spec`), or reject loudly with `suggest(_:)` /
+/// `retiredTheme(_:)` for the hint.
+///
 /// Prefer `Theme.x.spec` when the theme is a compile-time identity rather
-/// than user input: this function is TOTAL over an untyped domain, so an
-/// unknown name gets `terminal` instead of an error — which is what a cut
-/// member costs at RUNTIME, on top of being invisible to the API diff (the
-/// `catppuccin-latte` story on `Theme` above).
-public func paletteFor(_ raw: String) -> ThemeSpec {
+/// than user input — the typed member can't rot when the catalog changes.
+public func paletteFor(_ raw: String) -> ThemeSpec? {
     let s = raw.lowercased()
     if s == "random" {
         let pool = Theme.allCases.filter { $0 != .system }
         return (pool.randomElement() ?? .terminal).spec
     }
-    return Theme(rawValue: s)?.spec ?? .terminal
+    return Theme(rawValue: s)?.spec
 }
 
 // MARK: - Pure effect / pet vocabulary
@@ -712,12 +716,59 @@ public func canonical(_ raw: String) -> String? {
     return canonicalThemeNames.contains(s) ? s : nil
 }
 
+// MARK: Retired names (tombstones)
+
+/// A theme name the catalog CUT, kept as a death certificate — not an
+/// alias. `tryInstead` is a HINT for an error message, never auto-resolved:
+/// a member retired for a quality reason (latte failed the WCAG contrast
+/// sweep) has no successor that "means the same thing", so silently
+/// handing back a different palette under the asked-for name would be the
+/// exact `?? .terminal` mistake this vocabulary exists to end.
+public struct RetiredTheme: Sendable, Hashable {
+    /// The rawValue string the cut member answered to (e.g. `"catppuccin-latte"`).
+    public let name: String
+    /// The release that cut it (e.g. `"v1.36.0"`).
+    public let retiredIn: String
+    /// Why it was cut — surfaced verbatim in a reject message.
+    public let reason: String
+    /// A plausible alternative to mention, or `nil` when none reads close.
+    public let tryInstead: String?
+
+    public init(name: String, retiredIn: String, reason: String, tryInstead: String? = nil) {
+        self.name = name
+        self.retiredIn = retiredIn
+        self.reason = reason
+        self.tryInstead = tryInstead
+    }
+}
+
+/// Every name the catalog has retired, in cut order. Append-only: a member
+/// that later RETURNS (dracula, gruvbox, rainbow and system all did) is
+/// removed from here — a tombstone must never shadow a live name.
+public let retiredThemeNames: [RetiredTheme] = [
+    RetiredTheme(name: "catppuccin-latte", retiredIn: "v1.36.0",
+                 reason: "failed the WCAG contrast sweep (illegible muted ink on the pale base)",
+                 tryInstead: "github-light"),
+]
+
+/// The tombstone behind a raw `--theme=` value, or `nil` when the name was
+/// never retired (case-insensitive, trimmed — same normalization as
+/// `canonical`). Lets a CLI say "retired in v1.36.0 (reason) — try X"
+/// instead of the Levenshtein guess `suggest` would fabricate.
+public func retiredTheme(_ raw: String) -> RetiredTheme? {
+    let s = raw.trimmingCharacters(in: .whitespaces).lowercased()
+    return retiredThemeNames.first { $0.name == s }
+}
+
 /// Nearest canonical theme name to a typo'd `raw` (Levenshtein), or `nil`
 /// when nothing is plausibly close — a did-you-mean hint for a loud CLI
-/// reject. Excludes the `random` meta-name.
+/// reject. Excludes the `random` meta-name. A RETIRED name short-circuits
+/// to its tombstone's `tryInstead` (edit distance from a dead name is
+/// noise); call `retiredTheme(_:)` first when you want the full story.
 public func suggest(_ raw: String) -> String? {
     let s = raw.trimmingCharacters(in: .whitespaces).lowercased()
     guard !s.isEmpty else { return nil }
+    if let tomb = retiredTheme(s) { return tomb.tryInstead }
     var best: String?
     var bestDist = Int.max
     for name in canonicalThemeNames where name != "random" {

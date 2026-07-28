@@ -33,7 +33,7 @@ missing entry, because it is the one place a reader trusts not to be stale.
 2. [The theming contract](#2-the-theming-contract) — spec, resolved palette, resolve, derive recipe, role, canonical role field, sentinel, background mode, vibrancy, systemDynamic, process default, ambient theming, prop-drilling, precedence
 3. [Derived vocabulary](#3-derived-vocabulary-not-themable) — derived accessor, ink tier, surface tier, state layer, state base, contrast ink, role tint, resting stroke, disabled ink, secondary ink, on-primary, control role
 4. [Tokens](#4-tokens) — token, scale, ramp, elevation, type role, transition duration
-5. [The catalog](#5-the-catalog) — catalog, preset, fixed preset, member, rawValue, random, effect name, pet, effect spec
+5. [The catalog](#5-the-catalog) — catalog, preset, fixed preset, member, rawValue, random, paletteFor, tombstone, effect name, pet, effect spec
 6. [The AppKit floors](#6-the-appkit-floors) — floor, floor 1/2/3, edit core, window shell, draw core, debt, 要相談
 7. [Gates](#7-gates) — gate, ratchet, set equality, allow-list, both directions, baseline, blind spot, green means
 8. [Release and consumers](#8-release-and-consumers) — rule of three, consumer, pin, flag day, on main vs released, rolling draft, publish, fleet
@@ -329,12 +329,24 @@ changes the name in every user config with **no compile error anywhere**, and
 existence is why `canonicalThemeNames` is not simply `Theme.allCases`.
 `Sources/Palette/Palette.swift`, *canonicalThemeNames*.
 
-**`paletteFor` vs `Theme.x.spec`** — `paletteFor(_:)` is TOTAL over an untyped
-domain: an unknown name silently falls through to `terminal`. That is right for
-user input and wrong for a compile-time identity, where `Theme.dracula.spec`
-should be used instead — the fallthrough is precisely what made the latte cut
-invisible at runtime as well as at the API diff. `Sources/Palette/Palette.swift`,
-*paletteFor(_:)*.
+**`paletteFor` vs `Theme.x.spec`** — `paletteFor(_:)` maps an untyped name to a
+spec and is FAILABLE (v2): an unknown name returns `nil`, never a made-up
+`terminal`. The old total version's fallthrough is what made the latte cut
+invisible at runtime, and all three consumer apps had hand-written a loud reject
+around it (the rule-of-three that pulled the fix into sill). On `nil` the app
+picks the policy — clamp or reject with `suggest` / `retiredTheme`. For a
+compile-time identity, skip strings entirely: `Theme.dracula.spec`.
+`Sources/Palette/Palette.swift`, *paletteFor(_:)*.
+
+**tombstone** — a `RetiredTheme` in `retiredThemeNames`: the death certificate of
+a cut catalog name (`name`, `retiredIn`, `reason`, `tryInstead`). NOT an alias —
+`tryInstead` is a hint for an error message and is never auto-resolved, because a
+member cut for a quality reason (latte failed the WCAG sweep) has no successor
+that means the same thing. A tombstone must never shadow a live name: a member
+that returns to the catalog leaves the list (dracula, gruvbox, rainbow and
+system all did, so only latte is buried). `suggest(_:)` short-circuits a retired
+name to its `tryInstead` instead of a Levenshtein guess.
+`Sources/Palette/Palette.swift`, *RetiredTheme*.
 
 **effect name** — a member of `canonicalEffectNames`, the vocabulary accepted by
 `[border] effect`. The NAME lists live in pure `Palette`, not in `Effects`,

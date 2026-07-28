@@ -16,7 +16,7 @@ import TestSupport
 final class ThemedTooltipTests: XCTestCase {
 
     private func theme(_ name: String = "terminal") -> ResolvedPalette {
-        resolve(paletteFor(name))
+        resolve(paletteFor(name)!)
     }
 
     /// Best-contrast ink on a fill — mirrors the widget's local helper via the

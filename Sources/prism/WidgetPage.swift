@@ -34,7 +34,7 @@ struct WidgetPage: View {
     @State var section: PageSection
 
     var body: some View {
-        let base = resolve(paletteFor(themeName))
+        let base = resolve(specFor(themeName))
         // Header + segmented control are PINNED above the scroll region so the widget
         // name, copy-ref, and the Overview|Specimens|API tabs stay visible while the
         // section blocks scroll under them (MUI-docs layout). Only the blocks scroll.
