@@ -89,21 +89,30 @@ jobs:
           # A library's footer is how to DEPEND on it, not how to install it.
           # Passed as an env var and written with printf '%s' so the shell
           # never expands its backticks — the markdown is data, not script.
+          #
+          # It does NOT open with `---`: glyph appends the footer after exactly
+          # one separator of its own (`--footer-file`, documented in `glyph
+          # release --help`), so a leading rule here renders as two.
+          # It also names no version: the footer is composed BEFORE the walk
+          # that decides the tag, and re-walking just to interpolate it would
+          # let a merge landing between the two walks version one range and
+          # describe another — the exact split `glyph release` exists to
+          # prevent. The release's own tag is right above this block.
           FOOTER: |
-            ---
-
             ## Use
+
+            sill is consumed by SwiftPM **by git tag** — there is no binary
+            artifact attached to this release. Pin this release's tag (SwiftPM
+            strips the leading `v`):
 
             ```swift
             .package(url: "https://github.com/akira-toriyama/sill.git",
-                     .upToNextMinor(from: "<this version>")),
+                     .upToNextMinor(from: "X.Y.Z")),
             ```
 
-            sill is consumed by SwiftPM **by git tag** — there is no binary
-            artifact attached to this release. The family pins
-            `.upToNextMinor` deliberately: a sill minor can still change how a
-            widget looks, so consumers step versions on purpose rather than
-            drifting into one.
+            The family pins `.upToNextMinor` deliberately: a sill minor can
+            still change how a widget looks, so consumers step versions on
+            purpose rather than drifting into one.
         run: |
           set -euo pipefail
           printf '%s' "$FOOTER" > "$RUNNER_TEMP/footer.md"
