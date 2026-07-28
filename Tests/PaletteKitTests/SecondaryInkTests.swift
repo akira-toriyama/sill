@@ -9,9 +9,11 @@
 // floor, dracula worst at 2.18.
 //
 // NOTE the flatten-before-measuring in every assertion below. The fallback ink
-// carries 0.70 alpha, and `contrast` ignores alpha — measuring it unflattened
+// carries 0.55 alpha, and `contrast` ignores alpha — measuring it unflattened
 // would report a number ~2x better than what is actually on screen and the gate
-// would pass while the text stayed illegible.
+// would pass while the text stayed illegible. (That mistake is not theoretical:
+// it was made again while investigating this file, and the unflattened numbers
+// looked like the hierarchy had INVERTED — the opposite of the truth.)
 //
 // (CI-only: XCTest needs a full Xcode.)
 import XCTest
@@ -82,6 +84,44 @@ final class SecondaryInkTests: XCTestCase {
         let ink = p.secondaryInk(on: wash)
         XCTAssertNotEqual(ink, p.muted, "dracula must take the corrected path")
         XCTAssertGreaterThanOrEqual(p.contrast(p.flatten(ink, over: wash), on: wash), floor)
+    }
+
+    /// The floor's twin, and the half this accessor originally shipped without:
+    /// a second line must stay BELOW the first. Legibility and hierarchy are
+    /// different properties, and only one of them had a guard — so the repair
+    /// was free to overshoot, and it did.
+    ///
+    /// The bar is calibrated on the catalog itself rather than invented. Every
+    /// preset where `muted` already clears the floor is a preset the author was
+    /// happy with, and those sit at 0.19…0.45 of the foreground's contrast. A
+    /// repaired preset is allowed to run brighter than that band (it is a
+    /// SELECTED row, and some extra presence is wanted) but not to approach the
+    /// primary line.
+    ///
+    /// 0.65 is that ceiling: the shipping α 0.55 tops out at 0.60, and the
+    /// previous α 0.70 topped out at 0.83 — so this test FAILS on the value it
+    /// was written to retire, which is the only reason to trust it.
+    func testSecondaryLineStaysBelowPrimary() {
+        let ceiling = 0.65
+        var worst = (theme: "", ratio: 0.0)
+        for theme in fixedThemes {
+            let p = resolve(theme.spec)
+            guard let wash = flattenedSelection(p) else { continue }
+            let ink = p.secondaryInk(on: wash)
+            let secondary = p.contrast(p.flatten(ink, over: wash), on: wash)
+            let primary = p.contrast(p.flatten(p.foreground, over: wash), on: wash)
+            let ratio = secondary / primary
+            if ratio > worst.ratio { worst = (theme.rawValue, ratio) }
+            XCTAssertLessThanOrEqual(
+                ratio, ceiling,
+                "\(theme.rawValue): the second line is \(ratio) of the first line's contrast — "
+                + "legible, but no longer reading as secondary")
+        }
+        // A vacuous pass would be worse than a failure: if the sweep stopped
+        // seeing the repaired presets this would still be green.
+        XCTAssertGreaterThan(worst.ratio, 0.45,
+                             "no preset came close to the ceiling — is the sweep still reaching "
+                             + "the corrected path? (worst was \(worst.theme))")
     }
 
     /// Guards the flatten-before-measuring discipline itself. A translucent ink
