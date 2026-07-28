@@ -56,7 +56,6 @@ ThemeKitUI/ThemedChipView.swift:NSViewRepresentable             # DEBT — shoul
 ThemeKitUI/ThemedComboBoxView.swift:NSViewRepresentable         # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedFABView.swift:NSViewRepresentable              # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedMenuTriggerView.swift:NSViewRepresentable      # DEBT — should be SwiftUI-native
-ThemeKitUI/ThemedSkeletonView.swift:NSViewRepresentable         # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedTextFieldView.swift:NSViewRepresentable        # floor 1 — the IME field-editor core
 ThemeKitUI/ThemedToolBarView.swift:NSViewRepresentable          # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedTooltipAnchorView.swift:NSViewRepresentable    # DEBT — should be SwiftUI-native

@@ -502,7 +502,7 @@ AnimatedBorderView(
         name: "ThemedSkeleton", module: "ThemeKit",
         kind: "MUI <Skeleton> (low-alpha loading placeholder with pulse/wave ambient animation)",
         summary: "Themed grey-wash loading placeholder; themed by assigning a ResolvedPalette.",
-        consumes: "Embed directly: a host instantiates ThemedSkeleton(palette:) — a plain NSView — sets variant/animation/optional width/height, and adds it as a subview (or bridges it via NSViewRepresentable as ThemeKitUI's ThemedSkeletonView does). No controller or child window.",
+        consumes: "Embed directly: a host instantiates ThemedSkeleton(palette:) — a plain NSView — sets variant/animation/optional width/height, and adds it as a subview. SwiftUI hosts use ThemeKitUI's ThemedSkeletonView, a native view drawing the same wash. No controller or child window.",
         keyAPI: [
                  "palette: ResolvedPalette — theme; init-required and didSet re-tints the wash (muted .subtle ink) live without disturbing a running animation",
                  "variant: Variant — .text/.circular/.rectangular/.rounded shape (default .text)",
@@ -532,7 +532,7 @@ AnimatedBorderView(
                       width: 120, height: nil)
 """,
         sourcePath: "ThemeKitUI/ThemedSkeletonView.swift",
-        appkitEscape: "ThemedSkeleton (NSView, module ThemeKit) — the real AppKit loading placeholder ThemedSkeletonView wraps via NSViewRepresentable; drop to it only if ThemedSkeletonView can't be hosted (e.g. non-SwiftUI AppKit call site)"),
+        appkitEscape: "ThemedSkeleton (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedSkeletonView is SwiftUI-native and draws the same wash"),
     KitComponent(
         name: "ThemedTooltip", module: "ThemeKitUI",
         kind: "MUI <Tooltip> (basic) — passive pointer-driven hint bubble",
