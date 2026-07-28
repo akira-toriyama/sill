@@ -291,18 +291,38 @@ public extension ResolvedPalette {
     /// against the background. The cause is that `muted` is a deliberately
     /// low-contrast tier, so the repair belongs where the wash is known.
     ///
-    /// The 0.70 fallback weight is conservative on purpose. 0.55 already clears
-    /// the floor on every catalog theme (worst 4.37, measured), but a row can
-    /// also be drawn over an app-supplied `surfaceColor` this sweep cannot see,
-    /// so the extra margin is deliberate — at 0.70 the catalog's worst case is
-    /// 5.99.
+    /// The fallback weight is 0.55, and picking it is a two-sided problem: too
+    /// weak and the line is illegible, too strong and it stops reading as
+    /// SECONDARY. Legibility alone would allow anything from 0.40 up; the upper
+    /// bound comes from hierarchy.
+    ///
+    /// Measured across the 16 repaired presets, as
+    /// `contrast(secondary) / contrast(foreground)` on the same wash — how
+    /// close the second line comes to the first:
+    ///
+    ///   * the 18 presets that keep `muted` sit at 0.19…0.45 (median 0.27).
+    ///     That band IS what "secondary" looks like in this catalog.
+    ///   * at α 0.70 the repaired presets sat at 0.57…0.83 — a band that does
+    ///     not even OVERLAP the untouched one, and at the top of it
+    ///     (catppuccin-mocha 0.83) the two lines read as one weight in prism.
+    ///   * at α 0.55 they sit at 0.38…0.60, worst contrast 4.37 — still a 1.46×
+    ///     margin over the floor, and the hierarchy is legible again (verified
+    ///     in prism on catppuccin-mocha and graphite, the two flattest).
+    ///
+    /// Going further (0.45 lands the whole band inside the untouched one) was
+    /// rejected: worst-case contrast falls to 3.47, and a row can also be drawn
+    /// over an app-supplied `surfaceColor` this sweep cannot see, so some margin
+    /// over 3.0 has to survive for surfaces nobody measured.
+    ///
+    /// `secondaryLineStaysBelowPrimary` in `SecondaryInkTests` is the gate that
+    /// keeps the upper bound honest — the α-0.70 shipping value fails it.
     ///
     /// Pass an OPAQUE fill: flatten the wash with `flatten(_:over:)` first, or
     /// the answer describes a colour nobody sees.
     func secondaryInk(on opaqueFill: NSColor) -> NSColor {
         contrast(muted, on: opaqueFill) >= 3.0
             ? muted
-            : bestContrast(on: opaqueFill).withAlphaComponent(0.70)
+            : bestContrast(on: opaqueFill).withAlphaComponent(0.55)
     }
 
     /// Foreground (black/white) that best contrasts the OPAQUE primary —
