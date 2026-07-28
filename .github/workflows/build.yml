@@ -54,6 +54,8 @@ jobs:
       - run: scripts/interaction-alphas.sh
       # A public themed widget must accept the ambient theme, not only a prop.
       - run: scripts/theme-env.sh
+      # A file that drives an animation must honour Reduce Motion.
+      - run: scripts/reduce-motion.sh
 
   # api-guard — a removal from the public surface must be RATED major.
   #
