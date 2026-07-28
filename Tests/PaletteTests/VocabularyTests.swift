@@ -21,7 +21,9 @@ final class VocabularyTests: XCTestCase {
         XCTAssertFalse(names.isEmpty)
         var seen: [ThemeSpec] = []
         for name in names {
-            let spec = paletteFor(name)
+            guard let spec = paletteFor(name) else {
+                XCTFail("canonical name '\(name)' failed to resolve"); continue
+            }
             XCTAssertFalse(
                 seen.contains(spec),
                 "duplicate spec for theme name '\(name)' — catalog drift")
@@ -64,20 +66,59 @@ final class VocabularyTests: XCTestCase {
     }
 
     /// Spot-check that table lookup matches the statics (the old switch's
-    /// behavior), unknown falls back to terminal, and lookups are
-    /// case-insensitive.
+    /// behavior), unknown is nil (v2 removed the silent terminal fallback),
+    /// and lookups are case-insensitive.
     func testPaletteForLookup() {
         XCTAssertEqual(paletteFor("chomp"), .chomp)
         XCTAssertEqual(paletteFor("CATPPUCCIN-MOCHA"), .catppuccinMocha)
-        XCTAssertEqual(paletteFor("definitely-not-a-theme"), .terminal)
+        XCTAssertNil(paletteFor("definitely-not-a-theme"))
     }
 
     /// `random` resolves to a concrete non-system catalog member.
     func testRandomPicksConcreteNonSystemTheme() {
         for _ in 0..<20 {
             let spec = paletteFor("random")
+            XCTAssertNotNil(spec)
             XCTAssertNotEqual(spec, .system)
         }
+    }
+
+    // MARK: Retired names (tombstones)
+
+    /// A tombstone must never shadow a live name — a member that returns
+    /// to the catalog must be removed from `retiredThemeNames`.
+    func testRetiredNamesNeverShadowCanonical() {
+        for tomb in retiredThemeNames {
+            XCTAssertFalse(canonicalThemeNames.contains(tomb.name),
+                           "'\(tomb.name)' is both canonical and retired")
+        }
+    }
+
+    /// `tryInstead` is a hint into the LIVE catalog — a dead hint would
+    /// re-create the drift the tombstone exists to end.
+    func testRetiredTryInsteadIsCanonical() {
+        for tomb in retiredThemeNames {
+            guard let hint = tomb.tryInstead else { continue }
+            XCTAssertTrue(canonicalThemeNames.contains(hint),
+                          "'\(tomb.name)'.tryInstead '\(hint)' is not canonical")
+        }
+    }
+
+    /// The latte cut (v1.36.0, the WCAG sweep) is the backfilled tombstone;
+    /// lookup normalizes like `canonical` and never resolves to a palette.
+    func testCatppuccinLatteTombstone() {
+        let tomb = retiredTheme("  Catppuccin-Latte ")
+        XCTAssertEqual(tomb?.name, "catppuccin-latte")
+        XCTAssertEqual(tomb?.retiredIn, "v1.36.0")
+        XCTAssertEqual(tomb?.tryInstead, "github-light")
+        XCTAssertNil(retiredTheme("dracula"))
+        XCTAssertNil(paletteFor("catppuccin-latte"), "a tombstone must not resolve")
+    }
+
+    /// A retired name short-circuits `suggest` to the tombstone's hint —
+    /// not to a Levenshtein neighbour like `catppuccin-mocha`.
+    func testSuggestUsesTombstoneHint() {
+        XCTAssertEqual(suggest("catppuccin-latte"), "github-light")
     }
 
     // MARK: Effect / pet vocabulary (moved from Effects in 0.6.0)

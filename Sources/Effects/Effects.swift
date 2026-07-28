@@ -459,7 +459,7 @@ public func animatedPalette(theme name: String, at phase: CGFloat) -> AnimatedFr
     // 0.22); otherwise the family default 0.18 — same value PaletteKit's
     // static resolve derives, so the wash doesn't shift 0.18→0.22 the
     // instant the animator engages.
-    let selAlpha = paletteFor(name).selection.map { CGFloat($0.alpha) } ?? 0.18
+    let selAlpha = paletteFor(name)?.selection.map { CGFloat($0.alpha) } ?? 0.18
     return AnimatedFrame(primary: primary, secondary: secondary,
                          selection: primary.withAlphaComponent(selAlpha))
 }

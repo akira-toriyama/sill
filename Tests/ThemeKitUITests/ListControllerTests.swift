@@ -8,7 +8,7 @@ import ListCore
 @MainActor
 final class ListControllerTests: XCTestCase {
     private func opt(_ id: String) -> ListItem<String> { ListItem(id: id, primary: id) }
-    private func theme(_ name: String = "terminal") -> ResolvedPalette { resolve(paletteFor(name)) }
+    private func theme(_ name: String = "terminal") -> ResolvedPalette { resolve(paletteFor(name)!) }
 
     func testMoveHighlightWrapsAndSkipsHeaders() {
         let c = ListController<String>()

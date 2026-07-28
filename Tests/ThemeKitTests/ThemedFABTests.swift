@@ -14,7 +14,7 @@ import TestSupport
 final class ThemedFABTests: XCTestCase {
 
     private func theme(_ name: String = "terminal") -> ResolvedPalette {
-        resolve(paletteFor(name))
+        resolve(paletteFor(name)!)
     }
     private func alpha(_ c: CGColor?) -> CGFloat {
         guard let c, let n = NSColor(cgColor: c)?.usingColorSpace(.sRGB) else { return -1 }

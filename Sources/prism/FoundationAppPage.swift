@@ -96,7 +96,7 @@ struct FoundationAppPage: View {
 
     var body: some View {
         let name = themeName == "all" ? "dracula" : themeName
-        let spec = paletteFor(name)
+        let spec = specFor(name)
         let p = resolve(spec)
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {

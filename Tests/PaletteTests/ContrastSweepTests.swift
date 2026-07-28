@@ -68,7 +68,9 @@ final class ContrastSweepTests: XCTestCase {
         var unexpected: [String] = []
 
         for name in canonicalThemeNames where name != "random" {
-            let spec = paletteFor(name)
+            guard let spec = paletteFor(name) else {
+                XCTFail("canonical name '\(name)' failed to resolve"); continue
+            }
             // `.fixed` is the only mode whose hexes are concrete & complete.
             guard spec.backgroundMode == .fixed, let bg = spec.background else {
                 skipped.append(name)
