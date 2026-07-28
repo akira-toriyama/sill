@@ -90,8 +90,12 @@ public var palette: ResolvedPalette { didSet { applyTheme() } }
 Resolve happens on the AppKit side (`@MainActor`, because `NSColor` isn't
 Sendable). Use the canonical role fields only — do NOT invent role names:
 `background · foreground · muted · tertiary · primary · secondary · border ·
-hover · selection · error` (+ `backgroundAlpha`, `backgroundMode`). Accent
-convention: focus/active affordances go `primary`.
+hover · selection · error` (+ `backgroundAlpha`). Accent
+convention: focus/active affordances go `primary`. `backgroundMode` is NOT one of
+them — it is a `ThemeSpec` field, an INPUT to `resolve`, and has no counterpart on
+`ResolvedPalette` (whose other three stored fields are `font`, `vibrancyMaterial`
+and `forceDarkAqua`). Spec-vs-resolved is the easiest pair here to collapse; the
+rest of the vocabulary is in [docs/glossary.md](docs/glossary.md).
 
 `ThemeKit` is the AppKit widget kit (PaletteKit resolves the theme; ThemeKit
 draws in it) — and **`ThemeKitUI`** wraps it as the public **SwiftUI** front (the
@@ -101,9 +105,11 @@ rich-text/markdown render core — see **AppKit 使用可ポリシー**).
 A widget belongs in sill once ≥2 apps would otherwise hand-draw it
 (rule-of-three). Every widget MUST add a `prism` showcase — a `Themed<Widget>View`
 SwiftUI bridge in `ThemeKitUI` (today an `NSViewRepresentable` hosting the REAL
-AppKit widget) that prism imports + a `Mock<Widget>(p:)` grid wired into
-`ThemeCard`, so it appears live across all themes (prism never imports an app's
-View → no drift).
+AppKit widget) that prism imports + a `Mock<Widget>` view taking the palette as
+`p` (conform it to `ShowcaseBench` for the shared captioned-cell chrome, and give
+its tab a `KitFamily` case), so it appears live across all themes (prism never
+imports an app's View → no drift). `ThemeCard` is RETIRED — earlier notes that
+say mocks are "wired into `ThemeCard`" predate its removal.
 
 ## AppKit 使用可ポリシー（確定 2026-06-23・更新 2026-06-30〔床2個→床3個〕 — sill widget kit）
 

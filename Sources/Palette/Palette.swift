@@ -564,7 +564,7 @@ extension ThemeSpec {
 /// inside `canonicalThemeNames: [String]` — an array whose SIGNATURE never
 /// changes no matter which names are in it. A cut was therefore invisible
 /// to an API diff, and `catppuccin-latte` shipped as a MINOR in v1.36.0 and
-/// broke wand at its next pin bump (see `retiredThemeNames`). As cases,
+/// broke wand at its next pin bump. As cases,
 /// members are DECLARATIONS: `swift package diagnose-api-breaking-changes`
 /// reports a cut as `EnumElement Theme.x has been removed`, so the version
 /// has to tell the truth. Same shape as `LinePet` below — the pattern this
@@ -648,8 +648,9 @@ public let canonicalThemeNames: [String] = Theme.allCases.map(\.rawValue) + ["ra
 ///
 /// Prefer `Theme.x.spec` when the theme is a compile-time identity rather
 /// than user input: this function is TOTAL over an untyped domain, so an
-/// unknown name gets `terminal` instead of an error (see
-/// `retiredThemeNames` for what that costs when a member is cut).
+/// unknown name gets `terminal` instead of an error — which is what a cut
+/// member costs at RUNTIME, on top of being invisible to the API diff (the
+/// `catppuccin-latte` story on `Theme` above).
 public func paletteFor(_ raw: String) -> ThemeSpec {
     let s = raw.lowercased()
     if s == "random" {
