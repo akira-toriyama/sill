@@ -458,7 +458,7 @@ ThemedDividerView(
 )
 """,
         sourcePath: "ThemeKitUI/ThemedDividerView.swift",
-        appkitEscape: "ThemedDivider (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedDividerView is an NSViewRepresentable hosting it"),
+        appkitEscape: "ThemedDivider (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedDividerView is SwiftUI-native and draws the same geometry"),
     KitComponent(
         name: "AnimatedBorderView", module: "ThemeKitUI",
         kind: "Themed surface border — universal: static primary stroke ↔ live effect rim (glow/breathe/cycle), SwiftUI-native (#17d)",

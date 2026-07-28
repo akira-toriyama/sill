@@ -1,7 +1,8 @@
-// prism — ThemeKit divider bench. Hosts the REAL shared `ThemedDivider`
-// (ThemeKit) inside the SwiftUI gallery, one cell per orientation / variant,
-// so the hairline can be evaluated live in every theme — crispness, the
-// `border` tint, and the text-in-divider gap.
+// prism — divider bench. Shows the REAL shared `ThemedDividerView`
+// (ThemeKitUI, SwiftUI-native) one cell per orientation / variant, so the
+// hairline can be evaluated live in every theme — crispness, the `border`
+// tint, and the text-in-divider gap. The heavier-rule cell hosts the AppKit
+// `ThemedDivider` directly (its thickness knobs are AppKit-only).
 
 import SwiftUI
 import PaletteKit
@@ -15,7 +16,7 @@ struct MockDivider: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("ThemeKit · divider — the real shared hairline (live, device-pixel)")
+            Text("ThemeKitUI · divider — the real shared hairline (live, device-pixel)")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
