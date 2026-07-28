@@ -1,0 +1,141 @@
+name: Release
+
+# Rolling-DRAFT release for sill, driven by glyph — the same verdict engine
+# every app in the family releases through, minus the artifact.
+#
+# WHY THIS IS NOT A CALLER OF glyph's RELEASE REUSABLE.
+# `akira-toriyama/glyph/.github/workflows/release.yml` validates its inputs with
+# "exactly one of `app` (package.sh → <App>.zip) or `binary` (build.sh →
+# bin/<name>)" and then BUILDS that artifact on a macOS runner. sill is
+# library-only: SwiftPM consumes it purely by git tag, so there is no .app and
+# no bare binary to attach, and there is nothing for that reusable to build.
+# Rather than invent a fake artifact to satisfy the arity check, sill calls the
+# same `glyph release` the reusable calls, directly. The consequence is that the
+# soft no-release contract (exit 1 = "nothing version-worthy since the last
+# tag") is handled HERE — the reusable folds it into a success no-op once on
+# behalf of its callers, and sill is not one of them.
+# If a second library ever needs this, that is the rule-of-three trigger to add
+# a `library` (artifact-less) mode to the reusable and retire this file.
+#
+# WHAT A RELEASE MEANS HERE.
+# A push to main makes glyph walk main's squash commits since the highest v*
+# tag, resolve each to its merged pull request over the API and classify that
+# PR's individual (pre-squash) commits — so a squash-merge can never lose the
+# per-commit gitmoji types. From that ONE walk it derives both the next version
+# and the notes, and upserts the single glyph-managed DRAFT release. No git tag
+# is created: GitHub tags the target commit when a human clicks Publish. That
+# human step is the intended gate — sill is a flag day for six consumers, and
+# the tag is what actually reaches them.
+#
+# WHY THIS FILE HAD TO EXIST (t-vq7x).
+# sill was the only repo in the family with no release workflow, so tags were
+# cut by hand — and then were not. Between v4.1.0 and this file, main carried a
+# shipped :bug: fix (#138) that no consumer could reach for eight days, which
+# in turn kept wand#182 structurally blocked. "The fix is on main" and "the fix
+# is released" were silently different states, and nothing in the repo said so.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview only (compute the verdict, write nothing to GitHub)"
+        type: boolean
+        default: false
+
+concurrency:
+  # Never two upserts of the same rolling draft at once, and never cancel one
+  # mid-flight: a cancelled write could leave the draft naming a version the
+  # notes do not describe.
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # ubuntu, not macos: this job compiles nothing. It resolves a verdict from
+    # git history plus the GitHub API and writes a release — none of which
+    # needs Xcode or a macOS-26 host. (glyph's install action detects the
+    # runner's OS/arch, so the Linux tarball is what lands here.)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # glyph walks tags and a commit range out of LOCAL git, so the full
+          # history must be present — a shallow checkout has no tags to walk
+          # from and would re-release the world.
+          fetch-depth: 0
+          # The release is written through the gh API with GH_TOKEN, never git
+          # push, so the checkout token has no job to do. t-yaxa / zizmor
+          # artipacked.
+          persist-credentials: false
+
+      # Same pin as build.yml's api-guard job: one glyph revision decides what
+      # a commit MEANS for both the gate and the release, so the two can never
+      # disagree. The action verifies the download's checksum and its build
+      # provenance (fail-closed).
+      - uses: akira-toriyama/glyph/.github/actions/install@v0.11.2
+        with:
+          version: v0.11.2
+          token: ${{ github.token }}
+
+      - name: Compose the verdict and upsert the rolling DRAFT
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          # A library's footer is how to DEPEND on it, not how to install it.
+          # Passed as an env var and written with printf '%s' so the shell
+          # never expands its backticks — the markdown is data, not script.
+          FOOTER: |
+            ---
+
+            ## Use
+
+            ```swift
+            .package(url: "https://github.com/akira-toriyama/sill.git",
+                     .upToNextMinor(from: "<this version>")),
+            ```
+
+            sill is consumed by SwiftPM **by git tag** — there is no binary
+            artifact attached to this release. The family pins
+            `.upToNextMinor` deliberately: a sill minor can still change how a
+            widget looks, so consumers step versions on purpose rather than
+            drifting into one.
+        run: |
+          set -euo pipefail
+          printf '%s' "$FOOTER" > "$RUNNER_TEMP/footer.md"
+
+          args=(release --json --footer-file "$RUNNER_TEMP/footer.md")
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            args=(release --dry-run --json --footer-file "$RUNNER_TEMP/footer.md")
+          fi
+
+          status=0
+          glyph "${args[@]}" > "$RUNNER_TEMP/verdict.json" 2> "$RUNNER_TEMP/verdict.err" || status=$?
+          cat "$RUNNER_TEMP/verdict.err" >&2
+
+          # Exit 1 is glyph's SOFT no-release: nothing version-worthy since the
+          # last tag (sill's most frequent PR type is :recycle:, which bumps
+          # nothing). glyph has already converged the draft state by this
+          # point, so the run is complete — fold it into a success no-op. Any
+          # other non-zero status is a real failure and must stay red.
+          if [ "$status" -eq 1 ]; then
+            reason="$(jq -r '.reason // empty' "$RUNNER_TEMP/verdict.json" 2>/dev/null || true)"
+            echo "::notice::${reason:-no release-worthy changes since the last tag} — nothing to do."
+            exit 0
+          fi
+          [ "$status" -eq 0 ] || exit "$status"
+
+          tag="$(jq -r .tag "$RUNNER_TEMP/verdict.json")"
+          action="$(jq -r .action "$RUNNER_TEMP/verdict.json")"
+          url="$(jq -r '.url // empty' "$RUNNER_TEMP/verdict.json")"
+          echo "::notice::verdict: $tag (draft $action) ${url}"
+          {
+            echo "### Rolling draft: \`$tag\`"
+            echo
+            echo "Draft $action. **No tag exists until a human publishes it.**"
+            [ -n "$url" ] && echo "$url"
+          } >> "$GITHUB_STEP_SUMMARY"

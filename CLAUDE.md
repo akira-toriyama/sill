@@ -157,6 +157,17 @@ also prints that pointer in DEBUG).
   the optional `v`, so `.upToNextMinor` pins resolve unchanged. (Tags
   `0.17.0`…`0.32.0` predate this and stay bare — the `v` prefix begins at
   `v0.33.0`; don't rewrite published tags.)
+- **You do not compute that version, and you do not cut the tag by hand.**
+  `.github/workflows/release.yml` runs `glyph release` on every push to main:
+  one squash-safe walk since the highest `v*` tag derives BOTH the next version
+  and the notes, and upserts a single rolling **DRAFT** release. Publishing that
+  draft in the UI is what creates the tag — so cutting a release is a review of
+  glyph's verdict, not an act of arithmetic. Preview the verdict any time with
+  `glyph release --dry-run` (locally, needs `GH_TOKEN`) or by dispatching the
+  workflow with `dry_run: true`. sill batches tags on purpose: the draft simply
+  accumulates until someone decides the batch is worth a flag day for six
+  consumers. **A fix sitting on main is NOT released** — that distinction is
+  what made `#138` unreachable for eight days and kept wand#182 blocked (t-vq7x).
 - **Removing or renaming ANY public name ⇒ `:boom:` (or a trailing `!`) ⇒ MAJOR.**
   A type, a function, a `.library` product, a `Theme` case OR its rawValue, an
   effect / pet name, a vendored icon slug. **Do NOT reach for `:fire:` /
