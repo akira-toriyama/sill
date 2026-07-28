@@ -55,12 +55,12 @@ final class PaletteEnvironmentTests: XCTestCase {
     // MARK: - the three tiers
 
     func testFallsBackToTheProcessDefault() {
-        let d = firstSubview(host(ThemedDividerView()), of: ThemedDivider.self)
+        let d = firstSubview(host(ThemedChipView()), of: ThemedChip.self)
         XCTAssertEqual(d?.palette, cobalt, "no explicit argument and no ancestor theme ⇒ pal")
     }
 
     func testAmbientThemeBeatsTheProcessDefault() {
-        let d = firstSubview(host(ThemedDividerView().sillTheme(dracula)), of: ThemedDivider.self)
+        let d = firstSubview(host(ThemedChipView().sillTheme(dracula)), of: ThemedChip.self)
         XCTAssertEqual(d?.palette, dracula)
     }
 
@@ -68,18 +68,18 @@ final class PaletteEnvironmentTests: XCTestCase {
     /// and needs per-widget override. If this ever regresses, the bench silently
     /// starts painting one theme everywhere.
     func testExplicitArgumentBeatsTheAmbientTheme() {
-        let d = firstSubview(host(ThemedDividerView(palette: gruvbox).sillTheme(dracula)),
-                             of: ThemedDivider.self)
+        let d = firstSubview(host(ThemedChipView(palette: gruvbox).sillTheme(dracula)),
+                             of: ThemedChip.self)
         XCTAssertEqual(d?.palette, gruvbox)
     }
 
     func testInnerThemeOverridesOuterForItsSubtree() {
-        let v = VStack { ThemedDividerView().sillTheme(gruvbox) }.sillTheme(dracula)
-        XCTAssertEqual(firstSubview(host(v), of: ThemedDivider.self)?.palette, gruvbox)
+        let v = VStack { ThemedChipView().sillTheme(gruvbox) }.sillTheme(dracula)
+        XCTAssertEqual(firstSubview(host(v), of: ThemedChip.self)?.palette, gruvbox)
     }
 
     func testThemeOverloadMatchesTheResolvedOverload() {
-        let a = firstSubview(host(ThemedDividerView().sillTheme(Theme.dracula)), of: ThemedDivider.self)
+        let a = firstSubview(host(ThemedChipView().sillTheme(Theme.dracula)), of: ThemedChip.self)
         XCTAssertEqual(a?.palette, dracula)
     }
 
@@ -88,7 +88,7 @@ final class PaletteEnvironmentTests: XCTestCase {
     /// Spot-checks widgets that reach AppKit by different routes — a plain
     /// bridge, a control with its own `ThemedControl` base, and the floor-1 IME
     /// field editor — so a per-widget wiring slip cannot hide behind the
-    /// divider passing.
+    /// chip passing.
     func testEveryWidgetKindHonoursTheAmbientTheme() {
         XCTAssertEqual(
             firstSubview(host(ThemedButtonView(title: "OK").sillTheme(dracula)), of: ThemedButton.self)?.palette,
