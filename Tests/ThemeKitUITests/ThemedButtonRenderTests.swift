@@ -97,8 +97,6 @@ final class ThemedButtonRenderTests: XCTestCase {
                        blue: o.b * o.a + b.b * (1 - o.a), alpha: 1)
     }
 
-    // MARK: - geometry probes
-
     private func dpx(_ pt: CGFloat) -> Int { Int(pt * scale) }
 
     /// A fill probe clear of the title: 10 pt in from the left edge at
@@ -120,8 +118,6 @@ final class ThemedButtonRenderTests: XCTestCase {
         r.at(dpx(22), r.h / 2)
     }
 
-    // MARK: - intrinsic geometry
-
     func testHeightLadderAndMinWidth() {
         XCTAssertEqual(render(ThemedButtonView(palette: dracula, size: .small, title: "B")).h,
                        dpx(30), "small height = 30")
@@ -138,8 +134,6 @@ final class ThemedButtonRenderTests: XCTestCase {
                         .frame(width: 200))
         XCTAssertEqual(r.w, dpx(200), "fullWidth stretches to the host's width")
     }
-
-    // MARK: - contained
 
     func testContainedPaintsRoleFillAndBestContrastInk() {
         let r = render(ThemedButtonView(palette: dracula, variant: .contained,
@@ -175,8 +169,6 @@ final class ThemedButtonRenderTests: XCTestCase {
                   "the disabled fill is the neutral muted wash — the role drops out")
         assertHue(iconProbe(r), is: dracula.muted, "…and the ink greys to muted")
     }
-
-    // MARK: - outlined
 
     func testOutlinedStrokeRestsAtHalfRoleAndSharpensOnHover() {
         let rest = render(ThemedButtonView(palette: dracula, variant: .outlined, title: "Button"))
@@ -245,8 +237,6 @@ final class ThemedButtonRenderTests: XCTestCase {
         XCTAssertGreaterThan(pressed.at(pressed.w / 2, y).a, rest.at(rest.w / 2, y).a + 0.02,
                              "pressing deepens dp2 → dp8")
     }
-
-    // MARK: - focus ring
 
     func testFocusStrokesThePrimaryRingOutsideTheBox() {
         let pad: CGFloat = 16

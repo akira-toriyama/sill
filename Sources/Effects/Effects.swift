@@ -52,7 +52,6 @@ public struct EffectSpec: Sendable, Hashable {
     }
 }
 
-// MARK: - Canonical effect palettes
 //
 // Reconciled from facet's BorderEffect.swift (authoritative for the
 // flash sequences) and halo's BorderEffect. Where they diverged we keep
@@ -368,7 +367,6 @@ public func resolveBorder(
     let flashing = flashIdx != nil
     let phase = (now / max(1, cycleSeconds)).truncatingRemainder(dividingBy: 1)
 
-    // Width — breathing needs an active effect + both bounds with max > min.
     var width = baseWidth
     if spec != nil, let lo = minWidth, let hi = maxWidth, hi > lo {
         let pulse = (1 - cos(2 * Double.pi * phase)) / 2

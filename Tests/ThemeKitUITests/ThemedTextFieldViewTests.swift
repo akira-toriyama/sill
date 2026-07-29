@@ -37,8 +37,6 @@ final class ThemedTextFieldViewTests: XCTestCase {
         return win
     }
 
-    // MARK: - Controlled Binding<String>
-
     /// Field-side edits flow INTO the binding: a user keystroke (simulated via
     /// the notifying setText, the same path controlTextDidChange drives) lands
     /// in the bound model, and the optional onChange observer sees it too.

@@ -39,8 +39,6 @@ import ThemeKit          // PopupPanel/themedPopupPanel/placePopup/PopupFade/Pop
 @MainActor
 public final class ThemedComboBox: NSObject {
 
-    // MARK: - Item
-
     /// A single option. `id` is the stable identity surfaced in `onSelect`;
     /// `label` is the displayed + filtered text. `init(_:)` builds an item whose
     /// id == label (the common String case).
@@ -50,8 +48,6 @@ public final class ThemedComboBox: NSObject {
         public init(id: String, label: String) { self.id = id; self.label = label }
         public init(_ label: String) { self.id = label; self.label = label }
     }
-
-    // MARK: - Public configuration
 
     /// The visible control. The controller CREATES + OWNS it; the host adds it to
     /// a view tree exactly as it would a bare `ThemedTextField`.
@@ -137,8 +133,6 @@ public final class ThemedComboBox: NSObject {
     /// focused and may freely re-drive it (clear, set options, reopen).
     public var onEmptyAction: ((_ query: String) -> Void)?
 
-    // MARK: Callbacks
-
     /// Live typed text on every keystroke (mirrors `field.onChange`).
     public var onChange: ((String) -> Void)?
     /// A COMMITTED selection — a row click, Enter on the highlight, a clear (nil),
@@ -149,8 +143,6 @@ public final class ThemedComboBox: NSObject {
     public var onFocusChange: ((Bool) -> Void)?
     /// Popup open / close edge.
     public var onOpenChange: ((Bool) -> Void)?
-
-    // MARK: Preview / capture seam
 
     /// Force the popup OPEN inline — no dismiss monitors registered (an outside
     /// click must not tear down a forced capture), no fade — deterministic still
@@ -166,8 +158,6 @@ public final class ThemedComboBox: NSObject {
     /// Force a highlighted row (index into the FILTERED list) for capture/tests;
     /// nil = the live highlight. Clamped on read.
     public var previewHighlight: Int? { didSet { syncPreviewHighlight() } }
-
-    // MARK: - Internals
 
     private var _selectedIndex: Int?
     private var committedValue = ""             // last committed label; the blur-revert target
@@ -215,8 +205,6 @@ public final class ThemedComboBox: NSObject {
     // (the visible-frame margin now lives in the shared `popupScreenMargin`;
     //  row insets / fonts / accent-bar now live in ListMetrics `.comfortable`.)
 
-    // MARK: - Init
-
     public init(palette: ResolvedPalette) {
         self.palette = palette
         self.field = ThemedTextField(palette: palette)
@@ -250,16 +238,12 @@ public final class ThemedComboBox: NSObject {
         syncTrailingIcons()
     }
 
-    // MARK: - Default filter
-
     /// Localized "standard" contains — case-, diacritic- and width-insensitive
     /// substring, honouring the current locale (so "AP" finds "Grape", "café"
     /// finds "cafe"). Empty query ⇒ the full list.
     nonisolated static func defaultFilter(_ options: [Item], _ query: String) -> [Item] {
         comboFilter(options, query: query, label: { $0.label })
     }
-
-    // MARK: - Theming
 
     public func applyTheme() {
         field.palette = palette
@@ -272,7 +256,6 @@ public final class ThemedComboBox: NSObject {
         // container edge + surface are ALSO read back by `comboProbe` as the real
         // rendered state, so keep painting them here even though the hosted list
         // paints its own surface on top.
-        // Snap (no implicit cross-fade) — a theme switch must not smear the surface.
         layerTxn(animated: false) {
             container.layer?.backgroundColor = listSurface.cgColor
             container.layer?.borderColor = palette.border.cgColor
@@ -307,8 +290,6 @@ public final class ThemedComboBox: NSObject {
         controller.style = comboListStyle()
         hosting?.rootView = HostedThemedList(controller: controller, style: controller.style, palette: palette)
     }
-
-    // MARK: - Options / filter / selection
 
     private func optionsChanged() {
         let r = reconcileSelection(selectedIndex: _selectedIndex,
@@ -398,8 +379,6 @@ public final class ThemedComboBox: NSObject {
         }
     }
 
-    // MARK: - Field events
-
     private func fieldDidChange(_ text: String) {
         refilter()
         syncTrailingIcons()
@@ -466,8 +445,6 @@ public final class ThemedComboBox: NSObject {
 
     private func isDisabled(_ item: Item) -> Bool { isOptionDisabled?(item) ?? false }
 
-    // MARK: - Commit paths
-
     /// The SYNCHRONOUS commit (row click via the list's `onActivate`, or Enter via
     /// `activateHighlight`): set the value, close, re-assert first responder — all
     /// before the field's next-tick focus reconcile runs.
@@ -519,8 +496,6 @@ public final class ThemedComboBox: NSObject {
         onEmptyAction?(query)
     }
 
-    // MARK: - Open / close
-
     private func toggleOpen() {
         if isOpen { dismissPopup() }
         else { field.focus(); presentPopup(); controller.clearHighlight() }
@@ -570,8 +545,6 @@ public final class ThemedComboBox: NSObject {
         isOpen = false
     }
 
-    // MARK: - Panel + hosted list
-
     private func ensurePanel() {
         guard panel == nil else { return }
         // INTERACTIVE (receives row clicks) + a `.list` AX role — the key deltas vs
@@ -583,11 +556,6 @@ public final class ThemedComboBox: NSObject {
         container.layer?.masksToBounds = true        // rows clip to the rounded corners
         container.layer?.borderWidth = 1
 
-        // The hosted shared list — the dropdown engine. Configured to keep the
-        // FIELD first responder (managesFirstResponder = false), to only ever
-        // HIGHLIGHT (selectionMode = .none — the combo owns the committed pick),
-        // to wash + accent-bar the highlight (reads on neon), to wrap, and to let
-        // the pointer drive the same highlight the arrows do.
         // Route a row COMMIT (AppKit mouseUp → controller.fireActivate, or Enter →
         // activateHighlight): a sentinel id fires the actionable-empty action; the
         // inert "No options" row is a no-op; a real id commits.
@@ -719,8 +687,6 @@ public final class ThemedComboBox: NSObject {
         if field.visibleRect.isEmpty { dismissPopup(); return }   // scrolled out of a clip → close
         reframe()
     }
-
-    // MARK: - Helpers
 
     private var reduceMotion: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion

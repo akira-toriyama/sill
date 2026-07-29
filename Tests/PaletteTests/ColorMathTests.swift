@@ -19,8 +19,6 @@ import XCTest
 
 final class ColorMathTests: XCTestCase {
 
-    // MARK: - composite
-
     func testFullAlphaReturnsTheInkUnchanged() {
         XCTAssertEqual(composite(HexColor(0xBD93F9, 1.0), over: HexColor(0x282A36)).rgb, 0xBD93F9)
     }
@@ -56,8 +54,6 @@ final class ColorMathTests: XCTestCase {
         XCTAssertEqual(flattened.rgb, 0x433D59, "the wash flattens to #433D59")
         XCTAssertEqual(contrastRatio(flattened, HexColor(0x6272A4)), 2.1763, accuracy: 0.001)
     }
-
-    // MARK: - hue
 
     func testPrimaryHues() {
         XCTAssertEqual(hueAngle(HexColor(0xFF0000)), 0,   accuracy: 1e-9)

@@ -36,8 +36,6 @@ import QuartzCore
 @MainActor
 public class ThemedControl: NSControl {
 
-    // MARK: - Theme
-
     /// The theme. Assigning re-themes the whole control via `applyTheme()`,
     /// which the subclass specializes through the snap / content / a11y hooks.
     public var palette: ResolvedPalette { didSet { applyTheme() } }
@@ -76,15 +74,11 @@ public class ThemedControl: NSControl {
     public override var target: AnyObject? { get { _target } set { _target = newValue } }
     public override var action: Selector?  { get { _action } set { _action = newValue } }
 
-    // MARK: - Key activation config
-
     /// Optional key equivalent (AppKit dialogs want a default button). Set to
     /// `"\r"` to make this the Return-activated default button. Matched in
     /// `performKeyEquivalent` against `keyEquivalentModifierMask`.
     public var keyEquivalent: String = ""
     public var keyEquivalentModifierMask: NSEvent.ModifierFlags = []
-
-    // MARK: - Interaction state storage
 
     // Core (always-on): hover / focus / flash. `isPressed` is the DEFAULT of an
     // open press seam — Button / FAB / Checkbox inherit it unchanged; Chip
@@ -317,8 +311,6 @@ public class ThemedControl: NSControl {
         if inside { activate() }
     }
 
-    // MARK: - Keyboard + focus
-
     public override var acceptsFirstResponder: Bool { focusGate }
 
     public override func becomeFirstResponder() -> Bool {
@@ -468,8 +460,6 @@ public class ThemedControl: NSControl {
         content += trailingPad
         return max(minWidth, ceil(content))
     }
-
-    // MARK: - Init
 
     /// Designated initializer. Stores the palette, becomes layer-backed, opts out
     /// of clipping (the focus ring lives outside bounds) and AppKit's stock focus

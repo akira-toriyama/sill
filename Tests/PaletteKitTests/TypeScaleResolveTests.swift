@@ -54,8 +54,6 @@ final class TypeScaleResolveTests: XCTestCase {
         XCTAssertFalse(f.isFixedPitch)
     }
 
-    // MARK: - role tokens
-
     func testSecondaryBodyIsElevenMedium() {
         let f = palette(.system).uiFont(.secondaryBody)
         XCTAssertEqual(f.pointSize, 11, accuracy: 0.01)

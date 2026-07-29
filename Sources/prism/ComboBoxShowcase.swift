@@ -65,8 +65,6 @@ private struct DropdownMock: View {
     }
 }
 
-// MARK: - Showcase
-
 struct MockComboBox: View {
     let p: ResolvedPalette
 
@@ -100,7 +98,6 @@ struct MockComboBox: View {
                 Spacer(minLength: 0)
             }
 
-            // Static mock grid — the rendered open dropdown.
             HStack(alignment: .top, spacing: 28) {
                 mockCell("open · highlighted row 1") {
                     DropdownMock(p: p, rows: ["Apple", "Apricot", "Banana", "Grape", "Mango"],

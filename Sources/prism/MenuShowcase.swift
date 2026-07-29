@@ -83,8 +83,6 @@ private let mockMenuContentHeight: CGFloat = 196
     ]
 }
 
-// MARK: - Showcase
-
 struct MockMenu: View, ShowcaseBench {
     var cellSpacing: CGFloat { 6 }
     let p: ResolvedPalette

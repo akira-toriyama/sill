@@ -169,8 +169,6 @@ public struct ThemedButtonView: View {
         return Elevation.dp2.token
     }
 
-    // MARK: - Body
-
     public var body: some View {
         content
             .background {

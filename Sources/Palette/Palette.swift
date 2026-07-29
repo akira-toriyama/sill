@@ -20,8 +20,6 @@
 
 import Foundation   // for `Double`, `floor`; NO AppKit / CoreGraphics.
 
-// MARK: - Hex color
-
 /// An sRGB color stored as `0xRRGGBB` plus an alpha in `0...1`. Pure
 /// value type so the spec stays `Sendable` without AppKit. PaletteKit
 /// materializes it to an `NSColor`.
@@ -48,16 +46,12 @@ public struct HexColor: Sendable, Hashable {
     public func withAlpha(_ a: Double) -> HexColor { HexColor(rgb, a) }
 }
 
-// MARK: - FontKind
-
 /// Which font family a theme draws with. `.menu` is the system UI font
 /// at the standard control size — used by the `system` preset so it
 /// matches native menus.
 public enum FontKind: Sendable, Hashable, CaseIterable {
     case system, mono, rounded, menu
 }
-
-// MARK: - BackgroundMode
 
 /// How a theme's background + base inks are sourced. Replaces the old
 /// `background == nil && usesSystemPrimary` resolve gate with an explicit
@@ -77,8 +71,6 @@ public enum BackgroundMode: Sendable, Hashable, CaseIterable {
     case vibrancy, fixed, systemDynamic
 }
 
-// MARK: - System sentinels
-
 /// `primary == systemPrimarySentinel` (0) means "use the OS
 /// `controlAccentColor`" — resolved in PaletteKit, kept out of the pure
 /// spec. No real theme uses pure black as a primary accent, so 0 is safe
@@ -87,8 +79,6 @@ public let systemPrimarySentinel: UInt32 = 0
 
 /// Default error/destructive hue when a theme doesn't override it.
 public let defaultErrorHex: UInt32 = 0xEF4444
-
-// MARK: - ThemeSpec
 
 /// One theme, described purely. Theme authors set the FOUR required hues
 /// (background / foreground / muted / primary) + font plus optional
@@ -175,7 +165,6 @@ public struct ThemeSpec: Sendable, Hashable {
     public var isLight: Bool { (background?.luminance ?? 0) > 0.5 }
 }
 
-// MARK: - Canonical presets
 //
 // The Phase V curated catalog: a curated set of user-facing color themes
 // + the structural `system` preset. LEAN: a dark preset only stores border /
@@ -551,8 +540,6 @@ extension ThemeSpec {
         primary: HexColor(systemPrimarySentinel), font: .menu)
 }
 
-// MARK: - Name resolution
-
 /// The catalog as a TYPE: each case is one member, its `rawValue` the
 /// user-facing name and `spec` the palette behind it. `canonicalThemeNames`
 /// and `paletteFor` both derive from it. Declaration order IS the
@@ -664,7 +651,6 @@ public func paletteFor(_ raw: String) -> ThemeSpec? {
     return Theme(rawValue: s)?.spec
 }
 
-// MARK: - Pure effect / pet vocabulary
 //
 // The NAME lists for the dynamic-effect catalog live HERE — not in
 // `Effects` — because a no-AppKit Core (FacetCore, WandCore) must be able
@@ -1108,8 +1094,6 @@ public enum EffectIntensity: String, Sendable, Hashable, CaseIterable {
     }
 }
 
-// MARK: - TypeScale
-
 /// The weight tier a `TypeRole` paints at — a pure mirror of the three
 /// `NSFont.Weight`s sill actually uses. PaletteKit maps it to the AppKit
 /// weight at the resolve boundary, so this enum stays AppKit-free (a
@@ -1191,8 +1175,6 @@ public enum TypeRole: Sendable, Hashable, CaseIterable {
     }
 }
 
-// MARK: - Token-scale iteration
-
 /// One named step of a dimensional token ramp (a `name` + its `pt` value).
 /// The iterable form of the `Space`/`Radius` `static let` namespaces — for
 /// the prism specimen and the drift tests, where a `[ScaleStep]` is more
@@ -1206,8 +1188,6 @@ public struct ScaleStep: Sendable, Hashable {
         self.pt = pt
     }
 }
-
-// MARK: - Space
 
 /// sill's FIXED spacing ramp — the shared vocabulary for inter-element
 /// gaps, content padding, and popup anchor offsets, replacing the scattered
@@ -1246,8 +1226,6 @@ public enum Space {
          ScaleStep("md", md), ScaleStep("lg", lg), ScaleStep("xl", xl)]
 }
 
-// MARK: - Radius
-
 /// sill's FIXED corner-radius ramp — the shared vocabulary for rounded
 /// rects, replacing the scattered `radius: 4` / `cornerRadius: 8` literals
 /// across the widget kit.
@@ -1282,8 +1260,6 @@ public enum Radius {
         [ScaleStep("xs", xs), ScaleStep("sm", sm), ScaleStep("md", md),
          ScaleStep("lg", lg), ScaleStep("xl", xl)]
 }
-
-// MARK: - Elevation
 
 /// A resolved elevation token: the three knobs of a black drop shadow —
 /// `opacity` (0…1), `blur` radius, and `dy` vertical offset (POSITIVE =

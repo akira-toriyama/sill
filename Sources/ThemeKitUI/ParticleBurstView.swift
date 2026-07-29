@@ -6,20 +6,17 @@
 // wall-clock; no @State is written during render.
 //
 // CLOCK DESIGN
-// ─────────────
 // `@State private var start` is initialised once when the view appears and is
 // READ (never written) inside the Canvas/TimelineView closure. The absolute
 // reference-date epoch (`Date.timeIntervalSinceReferenceDate`) is used for
 // `now` so that `startedAt` math in `resolveParticles` is consistent.
 //
 // COORDINATE SYSTEM
-// ─────────────────
 // SwiftUI Canvas has +y DOWN (top-left origin), which matches the Effects sim
 // (`+y DOWN` gravity, matching the old `isFlipped = true` NSView). No flip is
 // needed — particles are drawn at `(rp.x, rp.y)` directly.
 //
 // GLOW ISOLATION
-// ──────────────
 // Each spark's glow is drawn inside `ctx.drawLayer { l in … }` so the
 // `.shadow` filter is scoped to that layer only — the hot-white core is then
 // painted in the base context (no shadow) for a sharp centre point.
@@ -83,7 +80,6 @@ public struct ParticleBurstView: View {
 
     public var body: some View {
         if let f = stillFrame {
-            // ── Frozen mode ─────────────────────────────────────────────────
             // Static single frame at fraction `f` of `duration`. A fixed seed
             // keeps the geometry deterministic for screenshots (prism's
             // `PRISM_PARTICLE_T` seam). `startedAt: 0` and `now: f*duration`
@@ -103,7 +99,6 @@ public struct ParticleBurstView: View {
                 drawBurst(burst, now: frozenNow, scale: scale, into: &ctx)
             }
         } else {
-            // ── Live mode ───────────────────────────────────────────────────
             // TimelineView drives the animation clock. The Canvas is a PURE
             // derivation of `now` — no @State writes inside the closure.
             // `start` is captured at launch (READ only) so that one-shot and
@@ -117,7 +112,6 @@ public struct ParticleBurstView: View {
 
                     let burst: ParticleBurst
                     if let period = loopPeriod, period > 0 {
-                        // ── Loop mode ──────────────────────────────────────
                         // Each cadence window rolls a distinct deterministic
                         // burst (golden-ratio seed mix) that is STABLE within
                         // the window — no flicker, no @State write.
@@ -134,7 +128,6 @@ public struct ParticleBurstView: View {
                                           duration: duration,
                                           radiusSpeed: radiusSpeed)
                     } else {
-                        // ── One-shot mode ──────────────────────────────────
                         // A single burst rolled at `startBaseline` with a fixed
                         // seed. It plays once; `resolveParticles` returns [] once
                         // the burst settles — nothing more to draw.
@@ -152,8 +145,6 @@ public struct ParticleBurstView: View {
             }
         }
     }
-
-    // MARK: - Render helpers
 
     /// Paint all live particles of `burst` at wall-clock `now` into `ctx`.
     private func drawBurst(_ burst: ParticleBurst, now: Double,
@@ -213,7 +204,6 @@ public struct ParticleBurstView: View {
         let h = CGFloat(rp.radius) * 1.4 * scale
         let flip = max(0.18, abs(cos(CGFloat(rp.rotation))))   // edge-on squash
 
-        // Decode 0xRRGGBB.
         let red   = Double((rp.color >> 16) & 0xFF) / 255
         let green = Double((rp.color >>  8) & 0xFF) / 255
         let blue  = Double( rp.color        & 0xFF) / 255

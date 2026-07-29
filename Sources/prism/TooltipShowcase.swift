@@ -95,8 +95,6 @@ private struct BubbleMock: View {
     }
 }
 
-// MARK: - Showcase
-
 struct MockTooltip: View {
     let p: ResolvedPalette
 
@@ -116,7 +114,6 @@ struct MockTooltip: View {
                 Spacer(minLength: 0)
             }
 
-            // Static mock grid — the rendered bubble per placement.
             HStack(alignment: .center, spacing: 28) {
                 mockCell("top")      { BubbleMock(p: p, text: "Add item", placement: .top) }
                 mockCell("bottom")   { BubbleMock(p: p, text: "Add item", placement: .bottom) }
@@ -125,7 +122,6 @@ struct MockTooltip: View {
                 Spacer(minLength: 0)
             }
 
-            // Wrapped (300 px) two-line variant.
             mockCell("wrapped · 300px max") {
                 BubbleMock(p: p,
                            text: "Tooltips wrap past 300 points so a longer hint stays readable.",

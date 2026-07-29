@@ -10,8 +10,6 @@ import PaletteKit
 import ThemeKit
 import ThemeKitUI
 
-// MARK: - Showcase
-
 struct MockButtonGroup: View, ShowcaseBench {
     let p: ResolvedPalette
     @State private var taps = 0
@@ -39,7 +37,6 @@ struct MockButtonGroup: View, ShowcaseBench {
                 Spacer(minLength: 0)
             }
 
-            // Variants (forced) — horizontal.
             HStack(spacing: 16) {
                 cell("text") { ThemedButtonGroupView(palette: p, titles: ["One", "Two", "Three"], variant: .text) }
                 cell("outlined") { ThemedButtonGroupView(palette: p, titles: ["One", "Two", "Three"], variant: .outlined) }
@@ -47,7 +44,6 @@ struct MockButtonGroup: View, ShowcaseBench {
                 Spacer(minLength: 0)
             }
 
-            // Orientation + states.
             HStack(alignment: .top, spacing: 16) {
                 cell("vertical · outlined") {
                     ThemedButtonGroupView(palette: p, titles: ["Top", "Mid", "End"],
@@ -72,7 +68,6 @@ struct MockButtonGroup: View, ShowcaseBench {
                 Spacer(minLength: 0)
             }
 
-            // fullWidth.
             VStack(alignment: .leading, spacing: 5) {
                 Text("fullWidth · segmented").font(sysFont(8, design: .monospaced))
                     .foregroundColor(Color(nsColor: p.tertiary))

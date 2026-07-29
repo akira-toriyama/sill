@@ -45,8 +45,6 @@ public final class ThemedButtonGroup: NSView {
     /// `segmented` = exclusive single-select (the ToggleButtonGroup analogue).
     public enum Mode { case actions, segmented }
 
-    // MARK: - Public configuration
-
     /// The theme. Assigning re-themes the group + every member.
     public var palette: ResolvedPalette { didSet { reconfigure() } }
 
@@ -77,15 +75,11 @@ public final class ThemedButtonGroup: NSView {
     public var previewHoveredIndex:  Int? { didSet { reconfigure() } }
     public var previewFocusedIndex:  Int? { didSet { reconfigure() } }
 
-    // MARK: - Internals
-
     private var children: [ThemedButton] = []
     private let groupShadowLayer = CALayer()   // ONE elevation for the contained group (unclipped)
     private var dividerLayers: [CALayer] = []  // text/contained seam hairlines
 
     public override var isFlipped: Bool { false }
-
-    // MARK: - Init
 
     public init(palette: ResolvedPalette) {
         self.palette = palette
@@ -201,8 +195,6 @@ public final class ThemedButtonGroup: NSView {
         }
     }
 
-    // MARK: - Group-owned layer colours
-
     private var roleColor: NSColor { palette.color(for: role.control) }
     private var dividerColor: NSColor {
         guard isEnabled else { return palette.disabledInk }
@@ -230,8 +222,6 @@ public final class ThemedButtonGroup: NSView {
             }
         }
     }
-
-    // MARK: - Layout
 
     private var maxChildWidth: CGFloat {
         children.map { $0.intrinsicContentSize.width }.max() ?? 0

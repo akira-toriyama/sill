@@ -121,8 +121,6 @@ final class WindowShellTests: XCTestCase {
         XCTAssertFalse(p.becomesKeyOnlyIfNeeded)
     }
 
-    // MARK: - Auto-size to content
-
     func testSizeShellToContentClampsAndPinsTopLeft() {
         let p = makeWindowShell(WindowShellSpec())
         p.setFrame(NSRect(x: 100, y: 200, width: 50, height: 40), display: false)
@@ -140,8 +138,6 @@ final class WindowShellTests: XCTestCase {
         XCTAssertLessThanOrEqual(p.contentView!.frame.width, 10.5)
         XCTAssertLessThanOrEqual(p.contentView!.frame.height, 8.5)
     }
-
-    // MARK: - Screen-reconfig observer wiring
 
     func testScreenReconfigGlueFiresOnScreenParameterChange() {
         let glue = ScreenReconfigGlue()

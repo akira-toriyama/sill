@@ -8,8 +8,6 @@ import AppKit
 import QuartzCore
 import Motion
 
-// MARK: - Layer transaction
-
 /// A snapped or eased CALayer mutation — the single `CATransaction` wrapper the
 /// themed widgets share. `animated: true` eases over `duration` (default = the
 /// standard enter step) with the system ease-out; `animated: false` disables
@@ -31,8 +29,6 @@ func layerTxn(animated: Bool,
     CATransaction.commit()
 }
 
-// MARK: - Backing scale
-
 @MainActor
 extension NSView {
     /// The device-pixel scale to seed a CALayer's `contentsScale` with: the
@@ -49,8 +45,6 @@ extension NSView {
     /// on every transient highlight, hover, or keystroke (that floods VoiceOver).
     func postAXValueChanged() { NSAccessibility.post(element: self, notification: .valueChanged) }
 }
-
-// MARK: - Outside-click monitor teardown
 
 /// Remove an `NSEvent` monitor token safely from ANY thread — inline on main,
 /// bounced to main otherwise. Used from a `nonisolated` `deinit` (`WindowShell`'s
@@ -71,8 +65,6 @@ func removeMonitorSafely(_ token: Any?) {
     }
 }
 
-// MARK: - Control-height ladder
-
 extension ThemedButton.Size {
     /// The composed-control height for this size — the MUI-derived ladder
     /// (small 30 / medium 36 / large 42) that `ThemedButton`, `ThemedButtonGroup`,
@@ -86,8 +78,6 @@ extension ThemedButton.Size {
         }
     }
 }
-
-// MARK: - Shadow layer
 
 @MainActor
 extension CALayer {
@@ -110,8 +100,6 @@ extension CALayer {
         contentsScale = scale
     }
 }
-
-// MARK: - Themed text layer
 
 @MainActor
 extension CATextLayer {

@@ -33,8 +33,6 @@ final class EffectsTests: XCTestCase {
         XCTAssertFalse(isAnimatableTheme("dracula"))  // static theme
     }
 
-    // --- Pure: blendThrough ---
-
     func testBlendThroughEndpoints() {
         let red = blendThrough([0xFF0000, 0x00FF00], at: 0.0)
         XCTAssertEqual(red.r, 1, accuracy: 0.001)
@@ -163,8 +161,6 @@ final class EffectsTests: XCTestCase {
         XCTAssertFalse(d.isActive(now: 11))
     }
 
-    // --- Animated palette ---
-
     func testAnimatedFlashEffect() {
         // chomp at phase 0 = flash[0] = pellet yellow 0xFFEA00.
         let f = animatedPalette(theme: "chomp", at: 0.0)
@@ -218,8 +214,6 @@ final class EffectsTests: XCTestCase {
         XCTAssertEqual(rainbow.selection.usingColorSpace(.sRGB)!.alphaComponent,
                        0.22, accuracy: 0.001)
     }
-
-    // --- Line-pets (pure identity) ---
 
     func testLinePetRawValues() {
         XCTAssertEqual(LinePet.chomp.rawValue, "chomp")

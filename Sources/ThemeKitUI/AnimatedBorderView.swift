@@ -131,15 +131,12 @@ public struct AnimatedBorderView<S: Shape>: View {
                 }
             }
         } else {
-            // Static: frozen → the chosen phase; else steady (phase 0).
             Canvas { ctx, size in
                 paint(into: &ctx, size: size,
                       now: previewFrozen ? Double(previewPhase) * cycleSeconds : 0)
             }
         }
     }
-
-    // MARK: - Flash
 
     /// Roll a fresh blink burst from the effect's flash palette, stamped on the
     /// view's own clock so the sample epoch matches.

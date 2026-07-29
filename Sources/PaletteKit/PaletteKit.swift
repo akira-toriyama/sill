@@ -11,8 +11,6 @@
 import AppKit
 import Palette
 
-// MARK: - NSColor from HexColor
-
 public extension NSColor {
     /// Build an sRGB `NSColor` from a `0xRRGGBB` hex + alpha.
     convenience init(hex: UInt32, _ a: CGFloat = 1) {
@@ -27,8 +25,6 @@ public extension NSColor {
         self.init(srgbRed: c.r, green: c.g, blue: c.b, alpha: c.alpha)
     }
 }
-
-// MARK: - ResolvedPalette
 
 /// A fully-resolved theme: every field is a concrete `NSColor` (or nil
 /// background for vibrancy). This is what views read via `pal`.
@@ -76,8 +72,6 @@ public struct ResolvedPalette {
         self.forceDarkAqua = forceDarkAqua
     }
 }
-
-// MARK: - Copy-with-override
 
 /// `ResolvedPalette` compares field-by-field. Two things need this.
 ///
@@ -276,8 +270,6 @@ public extension ResolvedPalette {
     /// Outline for a disabled OUTLINED control.
     var disabledStroke: NSColor { border }
 
-    // MARK: secondary text on a wash
-
     /// Secondary/supporting ink that is legible on `opaqueFill` — `muted` when
     /// it already clears the 3:1 supplementary-text floor there, else the
     /// theme-robust contrast ink at a muted-equivalent weight.
@@ -405,8 +397,6 @@ public extension ResolvedPalette {
     }
 }
 
-// MARK: - Control role
-
 /// The role a themed control is tinted by — the single vocabulary the widgets
 /// map their own public `Role` enums onto, so the role → colour selection lives
 /// in ONE place (`color(for:)`) instead of a byte-identical switch per widget.
@@ -429,8 +419,6 @@ public extension ResolvedPalette {
         }
     }
 }
-
-// MARK: - Derive recipe
 
 /// Resolve a pure `ThemeSpec` into `NSColor`s, deriving any nil field.
 ///
@@ -555,8 +543,6 @@ private func complement(of c: NSColor) -> NSColor {
                    saturation: sat, brightness: br, alpha: a)
 }
 
-// MARK: - Module-level `pal`
-
 /// Current resolved theme. facet's invariant: a short `@MainActor`
 /// module-level var read as `pal.foreground` etc. at hundreds of
 /// view-side call sites. PaletteKit owns it (the View layer no longer
@@ -582,8 +568,6 @@ public func setPalette(named name: String, bgOverride: HexColor? = nil) -> Bool 
     return true
 }
 
-// MARK: - Fonts
-
 /// Theme-aware font factory honoring the module-level `pal.font`. A thin
 /// shim over `ResolvedPalette.uiFont(_:_:)` kept for `pal`-based callers;
 /// widgets resolve against their own `palette` via that extension.
@@ -591,8 +575,6 @@ public func setPalette(named name: String, bgOverride: HexColor? = nil) -> Bool 
 public func uiFont(_ size: CGFloat, _ weight: NSFont.Weight = .regular) -> NSFont {
     pal.uiFont(size, weight)
 }
-
-// MARK: - Type scale resolution
 
 public extension TypeWeight {
     /// The AppKit weight this tier paints at.
@@ -640,8 +622,6 @@ public extension ResolvedPalette {
         uiFont(CGFloat(role.token.pt), role.token.weight.nsWeight)
     }
 }
-
-// MARK: - Elevation resolution
 
 public extension ResolvedPalette {
     /// CALayer drop-shadow parameters for an `Elevation` level — the AppKit

@@ -80,15 +80,11 @@ struct MarkdownRenderer {
     }
 }
 
-// MARK: - Visitor
-
 private struct Visitor: MarkupVisitor {
     typealias Result = NSAttributedString
 
     let style: MarkdownRenderer.Style
     let highlighter: MarkdownHighlighter?
-
-    // MARK: font helpers
 
     private var bodyFont: NSFont { .systemFont(ofSize: style.baseFontSize) }
     private var monoFont: NSFont { .monospacedSystemFont(ofSize: style.baseFontSize, weight: .regular) }
@@ -102,8 +98,6 @@ private struct Visitor: MarkupVisitor {
     private func bodyAttrs() -> [NSAttributedString.Key: Any] {
         [.font: bodyFont, .foregroundColor: style.foreground, .paragraphStyle: bodyParagraph()]
     }
-
-    // MARK: block join
 
     /// The block-join policy, in one place: sibling blocks are separated by ONE
     /// body-attributed newline (each block carries its own paragraphSpacing, so
@@ -120,15 +114,11 @@ private struct Visitor: MarkupVisitor {
         out.append(NSAttributedString(string: "\n", attributes: bodyAttrs()))
     }
 
-    // MARK: default / unknown
-
     mutating func defaultVisit(_ markup: Markup) -> NSAttributedString {
         let out = NSMutableAttributedString()
         for child in markup.children { out.append(visit(child)) }
         return out
     }
-
-    // MARK: inline
 
     mutating func visitText(_ text: Markdown.Text) -> NSAttributedString {
         NSAttributedString(string: text.plainText, attributes: bodyAttrs())
@@ -200,8 +190,6 @@ private struct Visitor: MarkupVisitor {
     mutating func visitInlineHTML(_ inline: InlineHTML) -> NSAttributedString {
         NSAttributedString(string: inline.rawHTML, attributes: bodyAttrs())   // raw passthrough
     }
-
-    // MARK: block
 
     mutating func visitParagraph(_ paragraph: Paragraph) -> NSAttributedString {
         let inner = NSMutableAttributedString()
@@ -403,8 +391,6 @@ private struct Visitor: MarkupVisitor {
             .font: bodyFont, .foregroundColor: style.tertiary, .paragraphStyle: p])
     }
 
-    // MARK: table
-
     /// GFM table via NSTextTable + NSTextTableBlock — real rules, CJK-safe columns.
     mutating func visitTable(_ table: Markdown.Table) -> NSAttributedString {
         let head = Array(table.head.cells)
@@ -480,8 +466,6 @@ private struct Visitor: MarkupVisitor {
         if isHeader { block.backgroundColor = style.tableHeaderBackground }
         return block
     }
-
-    // MARK: helpers
 
     private func applyTrait(_ trait: NSFontTraitMask, to s: NSMutableAttributedString) {
         let r = NSRange(location: 0, length: s.length)

@@ -137,8 +137,6 @@ final class ThemedToolBarTests: XCTestCase {
                        "a flexible space drops the intrinsic width so the host stretches the bar")
     }
 
-    // MARK: - Spacing / gutters
-
     func testItemSpacingBetweenAdjacentButtons() {
         let t = bar(icons("a", "b"), width: 400) { $0.gutter = 0; $0.itemSpacing = 20; $0.variant = .regular }
         XCTAssertEqual(t.frame(ofItem: 1)!.minX - t.frame(ofItem: 0)!.maxX, 20, accuracy: 0.5,
@@ -155,8 +153,6 @@ final class ThemedToolBarTests: XCTestCase {
         let t = bar(icons("a"), width: 400) { $0.gutter = 0 }
         XCTAssertEqual(t.frame(ofItem: 0)!.minX, 0, accuracy: 0.5, "gutter 0 = an edge-to-edge bar")
     }
-
-    // MARK: - Activation dispatch
 
     func testItemTapFiresOnItemClickWithIndex() {
         let t = bar(icons("a", "b", "c"))

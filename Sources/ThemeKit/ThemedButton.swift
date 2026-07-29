@@ -72,8 +72,6 @@ public final class ThemedButton: ThemedControl {
         public static let all: BorderEdges = [.top, .left, .bottom, .right]
     }
 
-    // MARK: - Public configuration
-
     public var variant: Variant = .text   { didSet { applyTheme(); relayout() } }
     public var size:    Size    = .medium { didSet { applyTheme(); relayout() } }
     public var role:    Role    = .primary { didSet { applyTheme() } }
@@ -122,8 +120,6 @@ public final class ThemedButton: ThemedControl {
     /// Forgo the button's own elevation so a GROUP can own one continuous shadow.
     /// Default false (a standalone contained button keeps its own shadow).
     public var groupedShadow = false { didSet { applyState(animated: false) } }
-
-    // MARK: - Internals
 
     private let shadowLayer  = CALayer()          // contained elevation — UNCLIPPED, explicit shadowPath
     private let fillLayer    = CALayer()          // rounded fill (clips the overlay child)
@@ -180,8 +176,6 @@ public final class ThemedButton: ThemedControl {
         return NSSize(width: width, height: m.height)
     }
 
-    // MARK: - Init
-
     public override init(palette: ResolvedPalette) {
         super.init(palette: palette)
         let s = themeBackingScale
@@ -223,8 +217,6 @@ public final class ThemedButton: ThemedControl {
         invalidateIntrinsicContentSize()
         needsLayout = true
     }
-
-    // MARK: - Theming
 
     // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
     // (honours .mono/.rounded/.menu; the old local helper dropped two).
@@ -287,8 +279,6 @@ public final class ThemedButton: ThemedControl {
         if fxHovered { return palette.shadow(.dp4) }
         return palette.shadow(.dp2)
     }
-
-    // MARK: - Base hook overrides
 
     override func applyThemeSnap() {
         fillLayer.backgroundColor = baseFillColor.cgColor
@@ -393,8 +383,6 @@ public final class ThemedButton: ThemedControl {
         return p
     }
 
-    // MARK: - Layout hooks
-
     override func positionLayers(in bounds: CGRect, local: CGRect) {
         let m = metrics
         let b = bounds
@@ -437,8 +425,6 @@ public final class ThemedButton: ThemedControl {
         rebuildIcons()
         needsLayout = true
     }
-
-    // MARK: - Activation
 
     override func activate() {
         guard isEnabled else { return }

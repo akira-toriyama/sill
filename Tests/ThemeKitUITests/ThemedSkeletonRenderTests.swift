@@ -100,8 +100,6 @@ final class ThemedSkeletonRenderTests: XCTestCase {
         XCTAssertEqual(got.a, e.a, accuracy: 0.02, "wash alpha = the .subtle ink tier")
     }
 
-    // MARK: - variant shapes
-
     func testRectangularFillsItsCorners() {
         let r = render(ThemedSkeletonView(palette: dracula, variant: .rectangular,
                                           animation: .none), width: 120, height: 40)

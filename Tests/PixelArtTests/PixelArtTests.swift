@@ -16,8 +16,6 @@ import XCTest
 import CoreGraphics
 #endif
 
-// MARK: - PixelSprite
-
 final class PixelSpriteTests: XCTestCase {
     /// Project labelled cells to a comparable `[String]` ("col,row,hexcolor").
     private func keys(_ cells: [(col: Int, row: Int, color: UInt32)]) -> [String] {
@@ -79,8 +77,6 @@ final class PixelSpriteTests: XCTestCase {
     #endif
 }
 
-// MARK: - pacManCells
-
 final class PacManCellsTests: XCTestCase {
     private let d = 13
     private var r: Double { Double(d) / 2 }
@@ -132,8 +128,6 @@ final class PacManCellsTests: XCTestCase {
     }
 }
 
-// MARK: - Chomp mouth animation data
-
 final class ChompMouthAnimTests: XCTestCase {
     func testFramesAreClosedHalfFullHalf() {
         // The 4-pose swap pattern: closed → half → full → half (opens + closes
@@ -155,8 +149,6 @@ final class ChompMouthAnimTests: XCTestCase {
         XCTAssertEqual(chompMouthHz, 5)
     }
 }
-
-// MARK: - positionHash01
 
 final class PositionHashTests: XCTestCase {
     func testDeterministic() {
@@ -193,8 +185,6 @@ final class PositionHashTests: XCTestCase {
         XCTAssertFalse(bins.contains(0), "an empty decile means a degenerate hash: \(bins)")
     }
 }
-
-// MARK: - ScaleTier
 
 final class ScaleTierTests: XCTestCase {
     func testMultipliers() {

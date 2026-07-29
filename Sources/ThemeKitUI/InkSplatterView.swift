@@ -70,7 +70,6 @@ public struct InkSplatterView: View {
 
     public var body: some View {
         if let f = stillFrame {
-            // Static frozen frame — no animation clock needed.
             Canvas { ctx, size in
                 let bounds = CGRect(origin: .zero, size: size)
                 let c = center(bounds)
@@ -127,8 +126,6 @@ public struct InkSplatterView: View {
         }
     }
 
-    // MARK: - Render helpers
-
     /// Paint one `SplatterShape` at wall-clock `now` into `ctx`.
     private func drawSplat(_ shape: SplatterShape, now: Double,
                            into ctx: inout GraphicsContext) {
@@ -143,10 +140,8 @@ public struct InkSplatterView: View {
             let rimColor = Color(.sRGB, red: inkR * 0.45, green: inkG * 0.45, blue: inkB * 0.45,
                                  opacity: 0.78 * a)
             ctx.fill(catmullRom(unit.rim), with: .color(rimColor))
-            // Body.
             let inkColor = Color(.sRGB, red: inkR, green: inkG, blue: inkB, opacity: 0.96 * a)
             ctx.fill(catmullRom(unit.body), with: .color(inkColor))
-            // Droplet specks.
             let dropColor = Color(.sRGB, red: inkR, green: inkG, blue: inkB, opacity: 0.88 * a)
             for speck in unit.droplets {
                 ctx.fill(catmullRom(speck), with: .color(dropColor))

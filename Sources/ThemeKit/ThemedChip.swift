@@ -60,8 +60,6 @@ public final class ThemedChip: ThemedControl {
     /// `primary`, `secondary`, or `error`. `keycap` ignores it.
     public enum Role { case neutral, primary, secondary, error }
 
-    // MARK: - Public configuration
-
     public var variant: Variant = .filled  { didSet { applyTheme(); relayout() } }
     public var size:    Size    = .medium  { didSet { applyTheme(); relayout() } }
     public var role:    Role    = .neutral { didSet { applyTheme() } }
@@ -96,8 +94,6 @@ public final class ThemedChip: ThemedControl {
             if !isInteractive, window?.firstResponder === self { window?.makeFirstResponder(nil) }
         }
     }
-
-    // MARK: - Internals
 
     private let fillLayer     = CALayer()       // rounded fill (clips the overlay child) + own border
     private let overlayLayer  = CALayer()       // hover / press state layer (child of fill)
@@ -164,8 +160,6 @@ public final class ThemedChip: ThemedControl {
         return NSSize(width: width, height: m.height)
     }
 
-    // MARK: - Init
-
     public override init(palette: ResolvedPalette) {
         super.init(palette: palette)
 
@@ -207,27 +201,19 @@ public final class ThemedChip: ThemedControl {
         applyState(animated: false)
     }
 
-    // MARK: - Disable hook
-
     override func didDisable() {
         isDeleteHovered = false
         pressTarget = .none
     }
 
-    // MARK: - Gates
-
     override var appearanceGate: Bool { isClickable }
     override var focusGate: Bool { isInteractive }
-
-    // MARK: - fx overrides
 
     override var fxPressed: Bool {
         ((pressTarget == .body && pressArmed) || previewPressed) && isClickable
     }
 
     override var showFocusRing: Bool { (isKeyFocused || previewFocused) && isInteractive }
-
-    // MARK: - Theming
 
     // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
     // (honours .mono/.rounded/.menu). The `.keycap` variant forces a
@@ -320,8 +306,6 @@ public final class ThemedChip: ThemedControl {
         }
     }
 
-    // MARK: - Theming hooks
-
     override func applyThemeSnap() {
         let m = metrics
         fillLayer.backgroundColor = baseFillColor.cgColor
@@ -392,8 +376,6 @@ public final class ThemedChip: ThemedControl {
         else { return nil }
         return img
     }
-
-    // MARK: - Layout
 
     private var backingScale: CGFloat { themeBackingScale }
 
@@ -475,8 +457,6 @@ public final class ThemedChip: ThemedControl {
         if changed { applyState(animated: animated) }
     }
 
-    // MARK: - Press / activate
-
     /// Is `p` over the armed target (× for `.delete`, the body for `.body`)?
     private func pointer(_ p: CGPoint, over target: PressTarget) -> Bool {
         switch target {
@@ -510,8 +490,6 @@ public final class ThemedChip: ThemedControl {
         }
         updateHover(at: p, animated: true)
     }
-
-    // MARK: - Keyboard + focus
 
     public override func keyDown(with event: NSEvent) {
         guard isEnabled else { super.keyDown(with: event); return }

@@ -38,8 +38,6 @@ public extension SchemaDescriptor {
         return errors
     }
 
-    // MARK: - sections
-
     private func validateSection(
         _ section: SchemaSection, value: Toml.Value, path: [String],
         into errors: inout [ValidationError]
@@ -92,8 +90,6 @@ public extension SchemaDescriptor {
             }
         }
     }
-
-    // MARK: - object / table
 
     private func validateObject(
         _ shape: ObjectShape, table: [String: Toml.Value], path: [String],
@@ -207,8 +203,6 @@ public extension SchemaDescriptor {
             }
         }
     }
-
-    // MARK: - field-level
 
     private func validateField(
         _ field: SchemaField, value: Toml.Value, path: [String],
@@ -327,8 +321,6 @@ public extension SchemaDescriptor {
         }
     }
 
-    // MARK: - cross-field
-
     private func validateExclusion(
         _ rule: ExclusionRule, table: [String: Toml.Value], path: [String],
         into errors: inout [ValidationError]
@@ -362,8 +354,6 @@ public extension SchemaDescriptor {
             }
         }
     }
-
-    // MARK: - helpers
 
     private func numeric(_ v: Toml.Value) -> Double? {
         if case .int(let i) = v { return Double(i) }

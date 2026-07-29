@@ -174,7 +174,6 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
         return Color(nsColor: palette.foreground).opacity(Double(sh.opacity))
     }
 
-    // MARK: selection
     private func selectOnly(_ id: ID) { selection.wrappedValue = [id] }
     private func toggle(_ id: ID) {
         if selection.wrappedValue.contains(id) { selection.wrappedValue.remove(id) }
@@ -193,7 +192,6 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
         return ExclusiveGesture(cmd, plain)
     }
 
-    // MARK: keyboard
     private func crossWidth(_ geo: GeometryProxy) -> CGFloat {
         (axis == .vertical ? geo.size.width : geo.size.height) - pad * 2
     }

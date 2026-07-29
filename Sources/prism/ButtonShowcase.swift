@@ -37,7 +37,6 @@ struct MockButton: View, ShowcaseBench {
             stateRow("contained · states", variant: .contained)
             stateRow("outlined · states", variant: .outlined)
 
-            // Roles (contained) + sizes + icons + fullWidth.
             HStack(spacing: 12) {
                 cell("primary")   { ThemedButtonView(palette: p, variant: .contained, role: .primary,   title: "Primary") }
                 cell("secondary") { ThemedButtonView(palette: p, variant: .contained, role: .secondary, title: "Secondary") }

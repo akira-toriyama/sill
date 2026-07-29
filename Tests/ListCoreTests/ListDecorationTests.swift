@@ -20,8 +20,6 @@ final class ListDecorationTests: XCTestCase {
         ListRow(id: id, kind: .separator)
     }
 
-    // MARK: - zebraParity
-
     func testZebraAlternatesAmongRows() {
         let parity = zebraParity(rows: [row("a"), row("b"), row("c"), row("d")])
         XCTAssertEqual(parity, ["a": false, "b": true, "c": false, "d": true])
@@ -41,8 +39,6 @@ final class ListDecorationTests: XCTestCase {
         XCTAssertNil(parity["s"], "separators carry no zebra flag")
         XCTAssertEqual(parity["b"], true, "the separator does not consume an ordinal")
     }
-
-    // MARK: - dividerInsets
 
     func testDividerOnlyAfterARowAndNeverOnLast() {
         let insets = dividerInsets(rows: [header("H"), row("a"), row("b")],

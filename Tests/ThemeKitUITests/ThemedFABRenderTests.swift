@@ -100,8 +100,6 @@ final class ThemedFABRenderTests: XCTestCase {
                        blue: o.b * o.a + b.b * (1 - o.a), alpha: 1)
     }
 
-    // MARK: - geometry probes
-
     private func dpx(_ pt: CGFloat) -> Int { Int(pt * scale) }
 
     /// A fill probe clear of the icon: centre-x, 6 pt from the top — inside a
@@ -110,8 +108,6 @@ final class ThemedFABRenderTests: XCTestCase {
     private func fillProbe(_ r: Raster) -> (r: Double, g: Double, b: Double, a: Double) {
         r.at(dpx(28), dpx(6))
     }
-
-    // MARK: - intrinsic geometry
 
     func testCircularIsItsFixedSquare() {
         let large = render(ThemedFABView(palette: dracula))
@@ -128,8 +124,6 @@ final class ThemedFABRenderTests: XCTestCase {
         let bare = render(ThemedFABView(palette: dracula, variant: .extended, label: ""))
         XCTAssertLessThan(bare.w, r.w, "the label extends the intrinsic width")
     }
-
-    // MARK: - role colours
 
     func testPrimaryRolePaintsPrimaryFillAndOnPrimaryGlyph() {
         let r = render(ThemedFABView(palette: dracula))

@@ -11,8 +11,6 @@ import PaletteKit
 import ThemeKit
 import ThemeKitUI
 
-// MARK: - Showcase
-
 struct MockFAB: View {
     let p: ResolvedPalette
     @State private var taps = 0
@@ -40,7 +38,6 @@ struct MockFAB: View {
                 Spacer(minLength: 0)
             }
 
-            // Circular — sizes × roles.
             HStack(alignment: .bottom, spacing: 16) {
                 tagged("small")     { circ(.small,  role: .primary,   symbol: "plus") }
                 tagged("medium")    { circ(.medium, role: .primary,   symbol: "plus") }
@@ -49,7 +46,6 @@ struct MockFAB: View {
                 Spacer(minLength: 0)
             }
 
-            // Circular — forced interaction states.
             HStack(alignment: .bottom, spacing: 16) {
                 tagged("rest")     { circ(.medium, role: .primary, symbol: "plus") }
                 tagged("hover")    { circ(.medium, role: .primary, symbol: "plus", h: true) }

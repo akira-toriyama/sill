@@ -199,8 +199,6 @@ public final class ScreenReconfigGlue {
     deinit { if let token { NotificationCenter.default.removeObserver(token) } }
 }
 
-// MARK: - Auto-size to content
-
 /// Resize a shell to fit its content view's fitting size, pinning the TOP-LEFT so
 /// growth flows down/right (a menu/popover grows from its anchored corner). Clamped
 /// to `max` when given. Invalidates the borderless panel's cached silhouette shadow
@@ -280,8 +278,6 @@ public struct ShellFade {
     }
 }
 
-// MARK: - Esc / outside-click dismiss
-
 /// Watches the dismissal gestures a long-lived shell wants — Escape and a mouse-down
 /// OUTSIDE the panel — and calls `dismiss`. Consolidates the local-`NSEvent`-monitor
 /// boilerplate the transient combo/menu each hand-wrote, for SHELL use:
@@ -290,7 +286,8 @@ public struct ShellFade {
 ///     window is NOT the shell (a click in another window of THIS app). Cross-app /
 ///     desktop clicks (which resign the window's key state) are the caller's to wire
 ///     (observe `didResignKey`, or reuse `PopupGlue`), exactly as the combo/menu split it.
-/// The monitor closures always RETURN the event (never swallow input). Teardown is
+/// Escape is SWALLOWED on dismiss (`return nil`); the outside-click monitor always
+/// returns the event so the click still lands in its target window. Teardown is
 /// safe from any thread: `stop()` on main, and a `deinit` backstop via `removeMonitorSafely`.
 @MainActor
 public final class ShellDismissMonitor {

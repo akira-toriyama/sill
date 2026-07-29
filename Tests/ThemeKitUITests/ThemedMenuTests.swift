@@ -127,8 +127,6 @@ final class ThemedMenuTests: XCTestCase {
         XCTAssertTrue(labels.contains("Show Toolbar"), "an unchecked item's label is unmarked")
     }
 
-    // MARK: - Activation routes to the item's action
-
     func testActivateRunsActionAndIgnoresNonItems() {
         var fired: [String] = []
         let m = ThemedMenu(palette: theme())
@@ -218,8 +216,6 @@ final class ThemedMenuTests: XCTestCase {
         XCTAssertFalse(m.menuProbe.isOpen)
     }
 
-    // MARK: - Initial highlight on open
-
     func testNoPreHighlightByDefault() {
         let (m, anchor) = anchoredMenu([.init("A"), .init("B")])
         m.present(from: anchor)
@@ -247,8 +243,6 @@ final class ThemedMenuTests: XCTestCase {
                        "a caller-set previewHighlight survives the preview open (not cleared)")
         m.previewOpen = false
     }
-
-    // MARK: - Activation closes the menu
 
     func testActivatingHighlightClosesAndRuns() {
         var fired = false
@@ -338,8 +332,6 @@ final class ThemedMenuTests: XCTestCase {
         XCTAssertEqual(m.menuProbe.resolvedCorner, .bottomLeading, "no room below ⇒ flip above, Grow from the bottom-leading corner")
         m.dismiss(animated: false)
     }
-
-    // MARK: - Submenu cascade
 
     /// A menu with one submenu row ("More" → Sub 1/2/3) between two leaf rows.
     private func cascadeItems() -> [ThemedMenu.MenuItem] {

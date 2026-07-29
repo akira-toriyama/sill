@@ -45,8 +45,6 @@ final class ResolvedPaletteWithTests: XCTestCase {
             forceDarkAqua: false)
     }
 
-    // MARK: - Equatable
-
     func testEqualsItself() {
         XCTAssertEqual(everyFieldSpelledOut(), everyFieldSpelledOut())
     }
@@ -55,8 +53,6 @@ final class ResolvedPaletteWithTests: XCTestCase {
         let p = everyFieldSpelledOut()
         XCTAssertEqual(p.with(), p, "with() with no arguments must be the identity")
     }
-
-    // MARK: - Per-field round trip
 
     /// For each of the 14 fields: overriding it CHANGES the palette, lands the
     /// new value on the right field, and leaves the other 13 alone (proved by
@@ -123,8 +119,6 @@ final class ResolvedPaletteWithTests: XCTestCase {
         XCTAssertEqual(p.with(forceDarkAqua: true).with(forceDarkAqua: p.forceDarkAqua), p)
     }
 
-    // MARK: - The double-optional contract
-
     /// The one genuinely subtle part of the signature. On the three
     /// already-optional fields `nil` means "leave alone" and `.some(nil)` means
     /// "clear it" — get this backwards and `with()` would wipe the background of
@@ -143,8 +137,6 @@ final class ResolvedPaletteWithTests: XCTestCase {
         XCTAssertNil(p.with(vibrancyMaterial: .some(nil)).vibrancyMaterial)
     }
 
-    // MARK: - The two call sites this replaced
-
     /// `applying(_:)` must still move exactly the accent trio and hold every
     /// other role steady — the property its docstring promises, now that it is
     /// three arguments instead of a restated fourteen.
@@ -154,7 +146,6 @@ final class ResolvedPaletteWithTests: XCTestCase {
         XCTAssertEqual(moved.primary, probe)
         XCTAssertEqual(moved.secondary, probe)
         XCTAssertEqual(moved.selection, probe)
-        // Everything else held steady.
         XCTAssertEqual(moved.background, p.background)
         XCTAssertEqual(moved.foreground, p.foreground)
         XCTAssertEqual(moved.muted, p.muted)

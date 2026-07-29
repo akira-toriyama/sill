@@ -255,8 +255,6 @@ public enum CLIKit {
         return argv[j]
     }
 
-    // MARK: token classification
-
     /// A token is "flag-shaped" iff it begins with `-` and is not the lone
     /// `-` (which is a value sentinel, e.g. stdin) and not empty. Note
     /// `--` is also flag-shaped but is always handled as the terminator

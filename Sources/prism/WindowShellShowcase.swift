@@ -186,8 +186,6 @@ private struct ShellOverlayContent: View {
     }
 }
 
-// MARK: - Showcase card
-
 struct MockWindowShell: View, ShowcaseBench {
     var cellSpacing: CGFloat { 6 }
     let p: ResolvedPalette

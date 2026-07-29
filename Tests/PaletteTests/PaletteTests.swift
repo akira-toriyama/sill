@@ -114,8 +114,6 @@ final class PaletteTests: XCTestCase {
         XCTAssertEqual(paletteFor("chomp")?.error.rgb, 0xFF0000)
     }
 
-    // MARK: - backgroundMode
-
     /// backgroundMode defaults from background: nil → vibrancy, concrete → fixed.
     func testBackgroundModeDefaultsFromBackground() {
         XCTAssertEqual(ThemeSpec.system.backgroundMode, .vibrancy)     // bg nil

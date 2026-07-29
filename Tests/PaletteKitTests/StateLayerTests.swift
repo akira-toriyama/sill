@@ -30,8 +30,6 @@ final class StateLayerTests: XCTestCase {
 
     private var pal: ResolvedPalette { resolve(Theme.dracula.spec) }
 
-    // MARK: - The resolution table
-
     /// On an opaque role FILL the overlay is the contrast ink — MUI's "darker
     /// shade" as a Material-3 on-colour overlay, which is theme-robust in a way
     /// a fixed black/white wash is not.
@@ -84,8 +82,6 @@ final class StateLayerTests: XCTestCase {
                            p.primary.withAlphaComponent(0.5), "\(theme.rawValue)")
         }
     }
-
-    // MARK: - The contradiction being fixed
 
     /// THE point of this change. `ThemedButton`/`Chip`/`FAB`/`Checkbox`/
     /// `ButtonGroup` resolved disabled to `muted`; `ThemedListRow` resolved it

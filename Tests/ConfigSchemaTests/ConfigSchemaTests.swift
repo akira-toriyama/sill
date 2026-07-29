@@ -160,12 +160,10 @@ final class ConfigSchemaTests: XCTestCase {
         let rule = try XCTUnwrap((cursor["properties"] as? [String: Any])?["rule"] as? [String: Any])
         XCTAssertEqual(rule["type"] as? String, "array")
 
-        // overlay.themes → permissive object at overlay → themes.
         let ov = try XCTUnwrap(props["overlay"] as? [String: Any])
         let themes = try XCTUnwrap((ov["properties"] as? [String: Any])?["themes"] as? [String: Any])
         XCTAssertEqual(themes["additionalProperties"] as? Bool, true)
 
-        // behavior: own `roles` key + permissive (quoted bundle-id child).
         let behavior = try XCTUnwrap(props["behavior"] as? [String: Any])
         XCTAssertEqual(behavior["additionalProperties"] as? Bool, true)
         XCTAssertNotNil((behavior["properties"] as? [String: Any])?["roles"])

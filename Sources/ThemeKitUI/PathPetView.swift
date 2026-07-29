@@ -11,7 +11,6 @@
 // a zigzag inset into its bounds and gets the same pixels.
 //
 // COORDINATE / ORIENTATION (Approach A — flip the WHOLE polyline up-front)
-// ───────────────────────────────────────────────────────────────────────
 // The pure geometry (`polylineLength` / `roundedCornerPath` / `markAtArcLength` /
 // the cursors) is coordinate-agnostic — it just walks whatever polyline it's
 // handed. The old draw hosted the path in a NON-flipped (+y-UP) view; the SwiftUI
@@ -84,7 +83,6 @@ public struct PathPetView: View {
 
     public var body: some View {
         if let f = stillFrame {
-            // Static frozen frame — `now` is the ABSOLUTE frozen seconds.
             Canvas { ctx, size in
                 paint(into: &ctx, size: size, now: f)
             }
@@ -99,8 +97,6 @@ public struct PathPetView: View {
             }
         }
     }
-
-    // MARK: - Render
 
     /// Replicate the Effects PathPet draw (with the standalone view's `showHead`
     /// default = true): guide trail → glowing head dot → the pac / panic ghost.

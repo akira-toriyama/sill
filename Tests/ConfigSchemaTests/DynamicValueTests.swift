@@ -76,16 +76,12 @@ final class DynamicValueTests: XCTestCase {
         return try XCTUnwrap(props["desktop"] as? [String: Any])
     }
 
-    // MARK: - Emit
-
     func testDynamicValueEmitsPatternPropertiesAndStrictAdditional() throws {
         let desktop = try emittedDesktop(descriptor())
         XCTAssertEqual(desktop["type"] as? String, "object")
-        // The open map: values keyed by the ordinal pattern, everything else strict.
         XCTAssertEqual(desktop["additionalProperties"] as? Bool, false)
         let pp = try XCTUnwrap(desktop["patternProperties"] as? [String: Any])
         let valueSchema = try XCTUnwrap(pp[ordinalPattern] as? [String: Any])
-        // The value schema resolves to the nested section[]/tab[] arrays.
         let valueProps = try XCTUnwrap(valueSchema["properties"] as? [String: Any])
         XCTAssertNotNil(valueProps["section"], "value shape exposes section[]")
         XCTAssertNotNil(valueProps["tab"], "value shape exposes tab[]")
@@ -117,8 +113,6 @@ final class DynamicValueTests: XCTestCase {
         XCTAssertEqual(ap["type"] as? String, "object")
         XCTAssertNotNil((ap["properties"] as? [String: Any])?["section"])
     }
-
-    // MARK: - Validate
 
     private func validate(_ toml: String) throws -> [ValidationError] {
         descriptor().validate(try Toml.parse(toml))

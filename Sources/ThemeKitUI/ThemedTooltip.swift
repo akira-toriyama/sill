@@ -49,8 +49,6 @@ public final class ThemedTooltip: NSObject {
     // The concrete, post-flip side (never `.auto`) is the shared `PopupSide`
     // (see PopupPanel.swift) — it drives the arrow edge.
 
-    // MARK: - Public configuration
-
     /// The anchor the tooltip describes. Held WEAK — the anchor owns its own
     /// lifecycle; the tooltip must not keep a dead view alive.
     public weak var anchor: NSView? { _anchor }
@@ -82,8 +80,6 @@ public final class ThemedTooltip: NSObject {
             if previewVisible { present(animated: false) } else { hide() }
         }
     }
-
-    // MARK: - Internals
 
     nonisolated(unsafe) private weak var _anchor: NSView?
     nonisolated(unsafe) private var trackingArea: NSTrackingArea?
@@ -127,8 +123,6 @@ public final class ThemedTooltip: NSObject {
     private let maxWidth: CGFloat = 300     // wrap past this
     private let arrowBase: CGFloat = 11     // triangle base width
     private let arrowLen: CGFloat = 8       // triangle protrusion (≈ base / √2)
-
-    // MARK: - Init
 
     public init(anchor: NSView, text: String, palette: ResolvedPalette,
                 placement: Placement = .auto) {
@@ -270,8 +264,6 @@ public final class ThemedTooltip: NSObject {
         pendingHide = work
         DispatchQueue.main.asyncAfter(deadline: .now() + leaveDelay, execute: work)
     }
-
-    // MARK: - Panel
 
     private func ensurePanel() {
         guard panel == nil else { return }
@@ -458,8 +450,6 @@ public final class ThemedTooltip: NSObject {
         if let a = _anchor, a.visibleRect.isEmpty { hide(); return }
         reposition()
     }
-
-    // MARK: - Helpers
 
     private var backingScale: CGFloat {
         _anchor?.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2

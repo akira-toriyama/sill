@@ -10,8 +10,6 @@ import Motion
 import ThemeKit
 import ThemeKitUI
 
-// MARK: - UI scale
-
 /// One knob for the whole prism preview's type + metrics. Every font goes
 /// through `sysFont`, and the fixed panel / swatch / icon / window sizes are
 /// multiplied by this, so bumping it enlarges the entire gallery uniformly.
@@ -23,8 +21,6 @@ func sysFont(_ size: CGFloat, weight: Font.Weight = .regular,
              design: Font.Design = .default) -> Font {
     .system(size: size * uiScale, weight: weight, design: design)
 }
-
-// MARK: - Gallery
 
 /// prism-internal spelling of the shared loud unwrap: every name reaching
 /// here comes from `canonicalThemeNames` (chips, tiles, the Picker), so a
@@ -62,7 +58,7 @@ struct Gallery: View {
     @State private var selection: SidebarItem?
 
     /// Live theme selection for the top-bar Picker: `"all"` (every theme) or one
-    /// canonical theme name. Seeded from the config; the detail pages (Tasks 6-7)
+    /// canonical theme name. Seeded from the config; the detail pages
     /// read it to render a widget in the chosen palette.
     @State private var selectedTheme: String
 
@@ -234,8 +230,6 @@ struct Gallery: View {
             return items.isEmpty ? nil : SidebarSection(title: s.title, items: items)
         }
     }
-
-    // MARK: detail page — placeholder per selection (real pages: Tasks 6-7)
 
     @ViewBuilder private var detailPage: some View {
         if let selection {
@@ -466,8 +460,6 @@ struct FlowLayout: Layout {
     }
 }
 
-// MARK: - Copy-ref button
-
 /// Copies a component's `pasteReadyCore` (type-to-use · imports · a minimal
 /// compilable-shape init) to the clipboard — so the user can paste it into
 /// ANOTHER Claude Code session that then DROPS the part straight into code.
@@ -599,7 +591,6 @@ struct TokenSpecimen: View {
     let p: ResolvedPalette
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Radius ramp — a filled tile per step, rounded by the token.
             tokenRow("Radius") {
                 ForEach(Radius.scale, id: \.name) { step in
                     swatchCol("\(step.name)·\(Int(step.pt))") {
@@ -609,7 +600,6 @@ struct TokenSpecimen: View {
                     }
                 }
             }
-            // Space ramp — two accent bars separated by the token's gap.
             tokenRow("Space") {
                 ForEach(Space.scale, id: \.name) { step in
                     swatchCol("\(step.name)·\(Int(step.pt))") {
@@ -730,14 +720,11 @@ struct Checker: View {
     }
 }
 
-// MARK: - Effect flash palette
 //
 // The effect preview moved to EffectShowcase.swift's `LiveEffectStrip` — the
 // old static `EffectStrip` only listed the flash palette, so the dynamic atom
 // looked disabled. The live version drives `resolveBorder` off a clock, so the
 // effect actually animates (cycling chip + glowing card border + a "live" dot).
-
-// MARK: - Helpers
 
 /// SwiftUI font for a `FontKind` (prism-local; mirrors PaletteKit's uiFont
 /// without touching the global `pal`). `.menu` ≈ system for a specimen.

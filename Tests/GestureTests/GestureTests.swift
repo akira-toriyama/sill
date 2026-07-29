@@ -13,8 +13,6 @@ import XCTest
 import CoreGraphics
 #endif
 
-// MARK: - Direction
-
 final class DirectionTests: XCTestCase {
     func testRawValuesAreLURD() {
         XCTAssertEqual(Direction.left.rawValue, "L")
@@ -41,8 +39,6 @@ final class DirectionTests: XCTestCase {
         XCTAssertEqual(empty.patternString, "")
     }
 }
-
-// MARK: - Sample plumbing
 
 final class SampleTests: XCTestCase {
     func testStoresCoordinatesAndTime() {
@@ -83,8 +79,6 @@ final class SampleTests: XCTestCase {
     }
     #endif
 }
-
-// MARK: - recognize
 
 final class RecognizeTests: XCTestCase {
 
@@ -175,8 +169,6 @@ final class RecognizeTests: XCTestCase {
     }
 }
 
-// MARK: - reversals / isOpposite
-
 final class ReversalTests: XCTestCase {
     func testIsOpposite() {
         XCTAssertTrue(Recognition.isOpposite("L", "R"))
@@ -198,8 +190,6 @@ final class ReversalTests: XCTestCase {
         XCTAssertEqual(Recognition.reversals("LRUD"), 2)   // LR + UD, the RU join is not opposite
     }
 }
-
-// MARK: - patternIssue
 
 final class PatternIssueTests: XCTestCase {
     func testValidPatternsHaveNoIssue() {
@@ -243,8 +233,6 @@ final class RecognitionRoundTripTests: XCTestCase {
         XCTAssertNil(Recognition.patternIssue(pattern))
     }
 }
-
-// MARK: - GestureRecognitionSpec
 
 final class GestureRecognitionSpecTests: XCTestCase {
     func testDefaults() {

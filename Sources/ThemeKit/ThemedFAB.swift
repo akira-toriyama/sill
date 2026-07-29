@@ -57,8 +57,6 @@ public final class ThemedFAB: ThemedControl {
     /// `ResolvedPalette` role; greyed while disabled.
     public enum Role { case primary, secondary }
 
-    // MARK: - Public configuration
-
     public var variant: Variant = .circular { didSet { applyTheme(); relayout() } }
     public var size:    Size    = .large    { didSet { applyTheme(); relayout() } }
     public var role:    Role    = .primary  { didSet { applyTheme() } }
@@ -84,8 +82,6 @@ public final class ThemedFAB: ThemedControl {
     /// `NSControl` `target`/`action`, on a mouse-up inside, Space, or the
     /// `keyEquivalent`.
     public var onTap: (() -> Void)?
-
-    // MARK: - Internals
 
     private let shadowLayer   = CALayer()        // elevation — UNCLIPPED, explicit shadowPath
     private let fillLayer     = CALayer()        // round/pill fill (clips the overlay child)
@@ -127,8 +123,6 @@ public final class ThemedFAB: ThemedControl {
         }
     }
 
-    // MARK: - Init
-
     public override init(palette: ResolvedPalette) {
         super.init(palette: palette)
 
@@ -166,8 +160,6 @@ public final class ThemedFAB: ThemedControl {
         invalidateIntrinsicContentSize()
         needsLayout = true
     }
-
-    // MARK: - Theming
 
     // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
     // (honours .mono/.rounded/.menu; the old local helper dropped two).
@@ -216,8 +208,6 @@ public final class ThemedFAB: ThemedControl {
         return palette.shadow(.dp8)
     }
 
-    // MARK: - Base hook overrides
-
     override func applyThemeSnap() {
         fillLayer.backgroundColor = baseFillColor.cgColor
     }
@@ -261,8 +251,6 @@ public final class ThemedFAB: ThemedControl {
                                  pt: metrics.iconPt, tint: inkColor, scale: themeBackingScale)
     }
 
-    // MARK: - Layout
-
     override func positionLayers(in bounds: CGRect, local: CGRect) {
         let b = bounds
         let r = min(b.width, b.height) / 2
@@ -298,8 +286,6 @@ public final class ThemedFAB: ThemedControl {
         rebuildIcon()        // re-rasterize at the new device scale
         needsLayout = true
     }
-
-    // MARK: - Activation
 
     override func activate() {
         guard isEnabled else { return }

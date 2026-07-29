@@ -46,9 +46,7 @@ struct MockPerchOverlay: View {
                         // ghosting-out — idle look, faded + shrunk via the transform rail
                         hint("GH", opacity: 0.32, scale: 0.9).position(x: w * 0.20, y: h * 0.78)
                         hint("RU", opacity: 0.28, scale: 0.88).position(x: w * 0.56, y: h * 0.82)
-                        // miss flash
                         hint("X", state: .miss).position(x: w * 0.50, y: h * 0.16)
-                        // modifier badge
                         hint("EN", badge: "⌘").position(x: w * 0.82, y: h * 0.82)
                         // the other shapes — underline / tag / single-glyph circle
                         ThemedPillView(palette: p, label: "TY", shape: .underline,

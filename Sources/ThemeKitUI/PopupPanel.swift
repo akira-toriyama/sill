@@ -98,8 +98,6 @@ func themedPopupPanel(interactive: Bool, role: NSAccessibility.Role) -> PopupPan
     return p
 }
 
-// MARK: - Placement
-
 /// The concrete, post-flip side a popup sits on relative to its anchor (never an
 /// `.auto`). Promoted out of `ThemedTooltip.Side` so the placement engine and the
 /// future menu share one vocabulary.
@@ -436,8 +434,6 @@ final class PopupGlue: NSObject {
 
     deinit { NotificationCenter.default.removeObserver(self) }
 }
-
-// MARK: - Outside-click monitor teardown
 
 /// Remove an `NSEvent` monitor token safely from ANY thread — inline on main,
 /// bounced to main otherwise. Used from a `nonisolated` `deinit`: the token is

@@ -124,8 +124,6 @@ public struct ThemedFABView: View {
         return (fxPressed ? Elevation.dp12 : Elevation.dp8).token
     }
 
-    // MARK: - Body
-
     public var body: some View {
         content
             .background {

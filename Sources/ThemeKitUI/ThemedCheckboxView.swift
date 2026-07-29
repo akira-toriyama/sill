@@ -115,8 +115,6 @@ public struct ThemedCheckboxView: View {
     }
     private var labelColor: NSColor { enabled ? palette.foreground : palette.disabledInk }
 
-    // MARK: - Body
-
     /// Layout mirrors `intrinsicContentSize` + `positionLayers`: the box sits
     /// centred in a `target`-square hit area at the leading edge; the label
     /// starts `labelGap` after the BOX edge (inside the target square — the

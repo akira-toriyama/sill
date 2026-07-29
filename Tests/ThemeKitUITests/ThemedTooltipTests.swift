@@ -44,8 +44,6 @@ final class ThemedTooltipTests: XCTestCase {
         return (win, anchor, tip)
     }
 
-    // MARK: - Placement + flip
-
     func testFlipsAwayFromScreenEdges() throws {
         guard let vf = NSScreen.main?.visibleFrame else { throw XCTSkip("no screen") }
         let p = theme()
@@ -112,8 +110,6 @@ final class ThemedTooltipTests: XCTestCase {
             _ = w
         }
     }
-
-    // MARK: - Delays, AX, lifecycle
 
     func testDelayDefaults() {
         let (w, _, t) = anchored(at: NSRect(x: 300, y: 300, width: 40, height: 24))
@@ -200,7 +196,6 @@ final class ThemedTooltipTests: XCTestCase {
         t.invalidate()
         XCTAssertFalse(t.tooltipProbe.isVisible, "hidden after invalidate()")
         XCTAssertTrue(anchor.trackingAreas.isEmpty, "tracking area removed after invalidate()")
-        // Idempotent.
         t.invalidate()
         XCTAssertFalse(t.tooltipProbe.isVisible, "invalidate() is idempotent")
         _ = w
