@@ -156,7 +156,7 @@ ThemedComboBoxView(palette: resolve(themeSpec), options: ["Apple", "Banana", "Gr
         name: "ThemedButton", module: "ThemeKit",
         kind: "MUI <Button> (basic, three-variant push button)",
         summary: "Themed AppKit push button; re-themes by assigning a PaletteKit ResolvedPalette.",
-        consumes: "Embed the NSView directly: it is a public final class ThemedButton: NSControl, init(palette:); add as a subview / wrap in NSViewRepresentable (no controller, no child window).",
+        consumes: "Embed the NSView directly: it is a public final class ThemedButton: NSControl, init(palette:); add as a subview (no controller, no child window). SwiftUI hosts use ThemeKitUI's `ThemedButtonView`, a native view drawing the same anatomy (grouping stays AppKit-only).",
         keyAPI: [
                  "palette: ResolvedPalette — theme; assigning re-themes the whole button (didSet)",
                  "title: String — label (drawn UPPERCASE w/ tracking; AX name keeps original case)",
@@ -178,7 +178,7 @@ ThemedComboBoxView(palette: resolve(themeSpec), options: ["Apple", "Banana", "Gr
         family: .action,
         defaultType: "ThemedButtonView",
         imports: [
-            "import ThemeKitUI    // ThemedButtonView — the SwiftUI front",
+            "import ThemeKitUI    // ThemedButtonView — the SwiftUI-native front",
             "import PaletteKit    // ResolvedPalette + resolve(_:)",
             "import ThemeKit      // ThemedButton.Variant/Size/Role types used as param defaults",
         ],
@@ -191,7 +191,7 @@ ThemedButtonView(
 )
 """,
         sourcePath: "ThemeKitUI/ThemedButtonView.swift",
-        appkitEscape: "ThemedButton (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedButtonView is an NSViewRepresentable wrapping it"),
+        appkitEscape: "ThemedButton (NSControl, module ThemeKit) — only if NOT in SwiftUI (or for ThemedButtonGroup grouping); ThemedButtonView is SwiftUI-native and draws the same anatomy."),
     KitComponent(
         name: "ThemedButtonGroup", module: "ThemeKit",
         kind: "MUI <ButtonGroup> (basic, joined) — composes real ThemedButtons into one control; .segmented mode adds exclusive single-select",

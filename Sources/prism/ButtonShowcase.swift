@@ -1,9 +1,9 @@
-// prism — ThemeKit button bench. Hosts the REAL shared `ThemedButton`
-// (ThemeKit) inside the SwiftUI gallery so it can be evaluated live in every
-// theme: the top row is fully INTERACTIVE (hover with the pointer, click to
-// bump the tap counter — the 演出 to feel), and the rows below force each
-// state via the `preview…` overrides so hover / pressed / focus / disabled
-// capture deterministically in a screenshot.
+// prism — button bench. Shows the REAL shared `ThemedButtonView` (ThemeKitUI,
+// SwiftUI-native) so it can be evaluated live in every theme: the top row is
+// fully INTERACTIVE (hover with the pointer, click to bump the tap counter —
+// the 演出 to feel), and the rows below force each state via the `preview…`
+// overrides so hover / pressed / focus / disabled capture deterministically
+// in a screenshot.
 
 import SwiftUI
 import PaletteKit
@@ -18,7 +18,7 @@ struct MockButton: View, ShowcaseBench {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKit · button — the real shared control (top row LIVE: hover / click)")
+            Text("ThemeKitUI · button — the real shared control (top row LIVE: hover / click)")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 

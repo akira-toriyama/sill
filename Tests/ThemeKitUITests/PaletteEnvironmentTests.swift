@@ -86,14 +86,15 @@ final class PaletteEnvironmentTests: XCTestCase {
     // MARK: - the same contract across widget kinds
 
     /// Spot-checks widgets that reach AppKit by different routes — a plain
-    /// bridge with its own `ThemedControl` base, a composite bridge, and the
-    /// floor-1 IME field editor — so a per-widget wiring slip cannot hide
-    /// behind the chip passing. (ThemedFABView held the second slot until it
-    /// went SwiftUI-native — its evidence now lives in ThemedFABRenderTests.)
+    /// bridge (the menu trigger, hosting the AppKit `ThemedButton`), a
+    /// composite bridge, and the floor-1 IME field editor — so a per-widget
+    /// wiring slip cannot hide behind the chip passing. (ThemedFABView and
+    /// ThemedButtonView held slots here until they went SwiftUI-native —
+    /// their evidence now lives in the ThemedFAB/ThemedButtonRenderTests.)
     func testEveryWidgetKindHonoursTheAmbientTheme() {
         XCTAssertEqual(
-            firstSubview(host(ThemedButtonView(title: "OK").sillTheme(dracula)), of: ThemedButton.self)?.palette,
-            dracula, "ThemedButtonView")
+            firstSubview(host(ThemedMenuTriggerView(items: []).sillTheme(dracula)), of: ThemedButton.self)?.palette,
+            dracula, "ThemedMenuTriggerView")
         XCTAssertEqual(
             firstSubview(host(ThemedButtonGroupView(titles: ["A", "B"]).sillTheme(dracula)),
                          of: ThemedButtonGroup.self)?.palette,
@@ -105,9 +106,9 @@ final class PaletteEnvironmentTests: XCTestCase {
 
     func testEveryWidgetKindStillHonoursAnExplicitOverride() {
         XCTAssertEqual(
-            firstSubview(host(ThemedButtonView(palette: gruvbox, title: "OK").sillTheme(dracula)),
+            firstSubview(host(ThemedMenuTriggerView(palette: gruvbox, items: []).sillTheme(dracula)),
                          of: ThemedButton.self)?.palette,
-            gruvbox, "ThemedButtonView")
+            gruvbox, "ThemedMenuTriggerView")
         XCTAssertEqual(
             firstSubview(host(ThemedButtonGroupView(palette: gruvbox, titles: ["A", "B"]).sillTheme(dracula)),
                          of: ThemedButtonGroup.self)?.palette,
