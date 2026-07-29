@@ -780,6 +780,95 @@ public func suggest(_ raw: String) -> String? {
     return best
 }
 
+// MARK: The verdict (the shared decision tree)
+
+/// The classification of one raw theme-name token — the full decision
+/// tree behind a config clamp or a CLI reject, as ONE value. Every
+/// consumer app had hand-written this same cascade around the individual
+/// primitives (wand / perch / facet each kept a canonical → retired →
+/// suggest chain of their own; the t-0j0z sweep rewrote it in three
+/// repos in one day), so the tree itself is now vocabulary. What to DO
+/// with each case stays app policy: clamp, exit(2), log — sill only
+/// says what the name IS.
+public enum ThemeNameVerdict: Sendable, Hashable {
+    /// A live name, normalized (trimmed + lowercased). May be the
+    /// `random` meta-name — resolve it with `concreteRandomThemeName`
+    /// when the session needs a stable concrete pick.
+    case canonical(String)
+    /// A name the catalog CUT — the tombstone carries the full story
+    /// (`story` is the ready-made reject sentence).
+    case retired(RetiredTheme)
+    /// Never a catalog name. `suggestion` is the did-you-mean hint
+    /// across the catalog AND the caller's `extras`, or `nil` when
+    /// nothing reads close (including the empty string).
+    case unknown(suggestion: String?)
+}
+
+/// Classify a raw `--theme=` / config value through the whole shared
+/// decision tree: caller-local extras → live catalog → tombstones →
+/// did-you-mean. `extras` are app-local names sill's catalog doesn't
+/// know (wand's `neon` / `splatoon` engine themes); they count as
+/// canonical and participate in the `unknown` suggestion. Pure;
+/// case-insensitive and trimmed like `canonical(_:)`.
+public func classifyThemeName(_ raw: String,
+                              extras: [String] = []) -> ThemeNameVerdict {
+    let s = raw.trimmingCharacters(in: .whitespaces).lowercased()
+    if extras.contains(s) { return .canonical(s) }
+    if let name = canonical(s) { return .canonical(name) }
+    if let tomb = retiredTheme(s) { return .retired(tomb) }
+    guard !s.isEmpty else { return .unknown(suggestion: nil) }
+    var best: String?
+    var bestDist = Int.max
+    for name in canonicalThemeNames + extras where name != "random" {
+        let d = levenshtein(s, name)
+        if d < bestDist { bestDist = d; best = name }
+    }
+    // Same typo threshold as `suggest(_:)` — hint only when it reads
+    // like a slip, not a wildly different string.
+    return .unknown(suggestion: bestDist <= max(2, s.count / 2) ? best : nil)
+}
+
+extension RetiredTheme {
+    /// The canonical reject sentence for this tombstone —
+    /// `retired from the sill catalog in v1.36.0 (reason) — try "x"`.
+    /// One authored phrasing so app logs can't drift apart (wand and
+    /// perch had already each composed their own copy of this string);
+    /// apps embed it in their own log/exit framing.
+    public var story: String {
+        let alt = tryInstead.map { " — try \"\($0)\"" } ?? ""
+        return "retired from the sill catalog in \(retiredIn) (\(reason))" + alt
+    }
+}
+
+/// Resolve the `random` meta-name to a concrete catalog name, stable for
+/// the caller to keep (paletteFor's own `random` roll re-rolls per call,
+/// which is why every app resolved the NAME first). Excludes `system` —
+/// a vibrancy sentinel, not paint, so a random roll must never land on
+/// it — and `random` itself; `extras` join the pool so app-local engine
+/// themes can win the draw (wand's roll includes neon / splatoon).
+public func concreteRandomThemeName(extras: [String] = []) -> String {
+    let pool = canonicalThemeNames.filter { $0 != "random" && $0 != "system" }
+        + extras
+    return pool.randomElement() ?? "terminal"
+}
+
+/// The spec behind a name the CALLER already validated — the loud twin
+/// of `paletteFor(_:)` for the "assumed canonical" seam every consumer
+/// had hand-guarded (prism's `specFor`, wand's `wandSpec`, perch's
+/// `perchThemeSpec` guard): by the time a name reaches a draw call it
+/// passed validation, so a miss is a caller bug — trap at the caller's
+/// line rather than paint a wrong theme.
+public func paletteForCanonical(_ name: String,
+                                file: StaticString = #fileID,
+                                line: UInt = #line) -> ThemeSpec {
+    guard let spec = paletteFor(name) else {
+        preconditionFailure(
+            "'\(name)' is not a canonical theme name — the caller assumed it pre-validated",
+            file: file, line: line)
+    }
+    return spec
+}
+
 /// Classic Levenshtein edit distance (pure). Theme names are short, so the
 /// two-row DP is plenty.
 func levenshtein(_ lhs: String, _ rhs: String) -> Int {

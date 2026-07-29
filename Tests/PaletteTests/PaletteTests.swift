@@ -204,6 +204,61 @@ final class PaletteTests: XCTestCase {
         XCTAssertNil(suggest("zzzzzzzzzz"))                    // nothing close
     }
 
+    // MARK: - the verdict (shared decision tree)
+
+    func testClassifyCanonicalNormalizes() {
+        XCTAssertEqual(classifyThemeName("  DRACULA "), .canonical("dracula"))
+        XCTAssertEqual(classifyThemeName("random"), .canonical("random"))  // meta-name kept
+    }
+
+    func testClassifyExtrasCountAsCanonicalAndSuggest() {
+        // wand-shaped extras: app-local engine themes sill doesn't know.
+        XCTAssertEqual(classifyThemeName("neon", extras: ["neon", "splatoon"]),
+                       .canonical("neon"))
+        // …and they participate in the did-you-mean.
+        XCTAssertEqual(classifyThemeName("splatoo", extras: ["neon", "splatoon"]),
+                       .unknown(suggestion: "splatoon"))
+        // Without extras, `neon` is not a theme (it's an effect name).
+        XCTAssertEqual(classifyThemeName("neon"),
+                       .unknown(suggestion: classifyUnknownSuggestion("neon")))
+    }
+
+    func testClassifyRetiredCarriesTombstone() {
+        // Derived from the tombstone list, not a copied name.
+        for tomb in retiredThemeNames {
+            XCTAssertEqual(classifyThemeName(tomb.name), .retired(tomb))
+            XCTAssertTrue(tomb.story.contains(tomb.retiredIn))
+            if let alt = tomb.tryInstead {
+                XCTAssertTrue(tomb.story.contains(alt))
+            }
+        }
+    }
+
+    func testClassifyUnknownSuggestsOrNil() {
+        XCTAssertEqual(classifyThemeName("dracua"), .unknown(suggestion: "dracula"))
+        XCTAssertEqual(classifyThemeName(""), .unknown(suggestion: nil))
+        XCTAssertEqual(classifyThemeName("zzzzzzzzzz"), .unknown(suggestion: nil))
+    }
+
+    func testConcreteRandomThemeNameIsConcretePaint() {
+        for _ in 0..<64 {
+            let name = concreteRandomThemeName(extras: ["neon"])
+            XCTAssertNotEqual(name, "random")
+            XCTAssertNotEqual(name, "system")   // vibrancy sentinel, not paint
+            XCTAssertTrue(canonicalThemeNames.contains(name) || name == "neon")
+        }
+    }
+
+    func testPaletteForCanonicalMatchesFailableTwin() {
+        for name in canonicalThemeNames where name != "random" {
+            XCTAssertEqual(paletteForCanonical(name), paletteFor(name))
+        }
+    }
+
+    /// The suggestion `classifyThemeName` gives an unknown name — spelled
+    /// via `suggest` so the two stay pinned to the same threshold.
+    private func classifyUnknownSuggestion(_ raw: String) -> String? { suggest(raw) }
+
     // MARK: - EffectIntensity (pure, shared knob)
 
     func testEffectIntensityMultipliers() {
