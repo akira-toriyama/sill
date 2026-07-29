@@ -391,7 +391,7 @@ ThemedCheckboxView(
         name: "ThemedFAB", module: "ThemeKit",
         kind: "MUI <Fab> (basic) — circular icon FAB + extended icon+label pill, accent-only",
         summary: "AppKit floating action button, themed by assigning a PaletteKit ResolvedPalette.",
-        consumes: "Embed the NSView directly: `let f = ThemedFAB(palette:)`, set leadingSymbol/label/variant/size/role/onTap, add as a subview. No controller/child-window. Circular needs an explicit square frame or it stretches to a pill; extended sizes to intrinsicContentSize.",
+        consumes: "Embed the NSView directly: `let f = ThemedFAB(palette:)`, set leadingSymbol/label/variant/size/role/onTap, add as a subview. No controller/child-window. SwiftUI hosts use ThemeKitUI's `ThemedFABView`, a native view drawing the same anatomy (a circular FAB sizes itself to its fixed square).",
         keyAPI: [
                  "palette: ResolvedPalette — assign to (re)theme; didSet repaints",
                  "leadingSymbol: String? — Phosphor slug; whole control if circular, leading adornment if extended",
@@ -410,16 +410,15 @@ ThemedCheckboxView(
              ],
         family: .action,
         defaultType: "ThemedFABView",
-        imports: [ "import ThemeKitUI   // ThemedFABView (the SwiftUI front)",
+        imports: [ "import ThemeKitUI   // ThemedFABView — the SwiftUI-native front",
                    "import ThemeKit     // ThemedFAB.Variant / .Size / .Role enums",
                    "import PaletteKit   // ResolvedPalette + resolve(_:)" ],
         initSnippet: """
   ThemedFABView(palette: resolve(themeSpec), variant: .circular, size: .large,
                 role: .primary, symbol: "plus")
-      .frame(width: 56, height: 56)
 """,
         sourcePath: "ThemeKitUI/ThemedFABView.swift",
-        appkitEscape: "ThemedFAB (NSView, module ThemeKit) — only if NOT in SwiftUI"),
+        appkitEscape: "ThemedFAB (NSControl, module ThemeKit) — only if NOT in SwiftUI; ThemedFABView is SwiftUI-native and draws the same anatomy."),
     KitComponent(
         name: "ThemedDivider", module: "ThemeKit",
         kind: "MUI <Divider> (themed device-pixel hairline rule, optional text-in-divider)",

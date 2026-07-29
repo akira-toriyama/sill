@@ -86,16 +86,18 @@ final class PaletteEnvironmentTests: XCTestCase {
     // MARK: - the same contract across widget kinds
 
     /// Spot-checks widgets that reach AppKit by different routes — a plain
-    /// bridge, a control with its own `ThemedControl` base, and the floor-1 IME
-    /// field editor — so a per-widget wiring slip cannot hide behind the
-    /// chip passing.
+    /// bridge with its own `ThemedControl` base, a composite bridge, and the
+    /// floor-1 IME field editor — so a per-widget wiring slip cannot hide
+    /// behind the chip passing. (ThemedFABView held the second slot until it
+    /// went SwiftUI-native — its evidence now lives in ThemedFABRenderTests.)
     func testEveryWidgetKindHonoursTheAmbientTheme() {
         XCTAssertEqual(
             firstSubview(host(ThemedButtonView(title: "OK").sillTheme(dracula)), of: ThemedButton.self)?.palette,
             dracula, "ThemedButtonView")
         XCTAssertEqual(
-            firstSubview(host(ThemedFABView().sillTheme(dracula)), of: ThemedFAB.self)?.palette,
-            dracula, "ThemedFABView")
+            firstSubview(host(ThemedButtonGroupView(titles: ["A", "B"]).sillTheme(dracula)),
+                         of: ThemedButtonGroup.self)?.palette,
+            dracula, "ThemedButtonGroupView")
         XCTAssertEqual(
             firstSubview(host(ThemedTextFieldView().sillTheme(dracula)), of: ThemedTextField.self)?.palette,
             dracula, "ThemedTextFieldView")
@@ -107,9 +109,9 @@ final class PaletteEnvironmentTests: XCTestCase {
                          of: ThemedButton.self)?.palette,
             gruvbox, "ThemedButtonView")
         XCTAssertEqual(
-            firstSubview(host(ThemedFABView(palette: gruvbox).sillTheme(dracula)),
-                         of: ThemedFAB.self)?.palette,
-            gruvbox, "ThemedFABView")
+            firstSubview(host(ThemedButtonGroupView(palette: gruvbox, titles: ["A", "B"]).sillTheme(dracula)),
+                         of: ThemedButtonGroup.self)?.palette,
+            gruvbox, "ThemedButtonGroupView")
         XCTAssertEqual(
             firstSubview(host(ThemedTextFieldView(palette: gruvbox).sillTheme(dracula)),
                          of: ThemedTextField.self)?.palette,
