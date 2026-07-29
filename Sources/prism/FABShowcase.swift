@@ -1,10 +1,10 @@
-// prism — ThemeKit FAB bench. Hosts the REAL shared `ThemedFAB` (ThemeKit)
-// inside the SwiftUI gallery so the float / elevation / hover-press 演出 can be
-// evaluated live in every theme. The top row is INTERACTIVE (hover for the
-// state layer, click to bump the counter + feel the press deepen the shadow);
-// the rows below force each state via the `preview…` overrides for deterministic
-// capture. Shaped widget: an NSViewRepresentable fills its SwiftUI frame, so a
-// circular FAB is given an explicit square frame (else it stretches to a pill).
+// prism — FAB bench. Shows the REAL shared `ThemedFABView` (ThemeKitUI,
+// SwiftUI-native) so the float / elevation / hover-press 演出 can be evaluated
+// live in every theme. The top row is INTERACTIVE (hover for the state layer,
+// click to bump the counter + feel the press deepen the shadow); the rows below
+// force each state via the `preview…` overrides for deterministic capture. The
+// native circular FAB sizes itself to its fixed square; the explicit frames
+// kept here also pin the cell layout.
 
 import SwiftUI
 import PaletteKit
@@ -25,7 +25,7 @@ struct MockFAB: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKit · FAB — the real shared control (top row LIVE: hover / click, watch it float)")
+            Text("ThemeKitUI · FAB — the real shared control (top row LIVE: hover / click, watch it float)")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
