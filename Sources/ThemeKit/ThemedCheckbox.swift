@@ -30,8 +30,6 @@ public final class ThemedCheckbox: ThemedControl {
     /// v1 ships `.primary` only.
     public enum Role { case primary }
 
-    // MARK: - Public configuration
-
     public var size: Size = .medium { didSet { applyTheme(); relayout() } }
     public var role: Role = .primary { didSet { applyTheme() } }
 
@@ -55,8 +53,6 @@ public final class ThemedCheckbox: ThemedControl {
     public var previewChecked: Bool?       = nil { didSet { syncAccessibility(); applyState(animated: false) } }
     public var previewIndeterminate: Bool? = nil { didSet { syncAccessibility(); applyState(animated: false) } }
 
-    // MARK: - Internals
-
     private let hoverCircleLayer = CALayer()       // circular state layer behind the box
     private let boxFillLayer  = CAShapeLayer()     // filled rounded square when set
     private let boxStrokeLayer = CAShapeLayer()    // outline ring when unchecked
@@ -64,8 +60,6 @@ public final class ThemedCheckbox: ThemedControl {
     private let labelLayer    = CATextLayer()
 
     private var labelTextSize: CGSize = .zero
-
-    // MARK: - Metrics
 
     private struct Metrics {
         let target, box, radius, stroke, labelFont, labelGap: CGFloat
@@ -87,8 +81,6 @@ public final class ThemedCheckbox: ThemedControl {
         let w = boxRightInTarget + m.labelGap + tw + (m.target - m.box) / 2
         return NSSize(width: ceil(w), height: m.target)
     }
-
-    // MARK: - Init
 
     public override init(palette: ResolvedPalette) {
         super.init(palette: palette)
@@ -125,8 +117,6 @@ public final class ThemedCheckbox: ThemedControl {
 
     private func relayout() { invalidateIntrinsicContentSize(); needsLayout = true }
 
-    // MARK: - State helpers
-
     private var fxChecked: Bool { previewChecked ?? isChecked }
     private var fxIndeterminate: Bool { previewIndeterminate ?? isIndeterminate }
     private var eff: Bool { fxChecked || fxIndeterminate }   // box is "filled"
@@ -154,8 +144,6 @@ public final class ThemedCheckbox: ThemedControl {
         return .clear
     }
     private var labelColor: NSColor { isEnabled ? palette.foreground : palette.disabledInk }
-
-    // MARK: - Theming
 
     override func applyThemeSnap() {
         boxStrokeLayer.lineWidth = metrics.stroke
@@ -217,8 +205,6 @@ public final class ThemedCheckbox: ThemedControl {
         return nil
     }
 
-    // MARK: - Layout
-
     override func positionLayers(in bounds: CGRect, local: CGRect) {
         let m = metrics
         let targetRect = NSRect(x: 0, y: (bounds.height - m.target) / 2,
@@ -251,8 +237,6 @@ public final class ThemedCheckbox: ThemedControl {
         return concentricRingPath(in: boxRect, radius: CGFloat(m.radius))
     }
 
-    // MARK: - Contents scale
-
     override func updateContentsScale(_ s: CGFloat) {
         for l in [hoverCircleLayer, boxFillLayer, boxStrokeLayer, glyphLayer] {
             l.contentsScale = s
@@ -260,8 +244,6 @@ public final class ThemedCheckbox: ThemedControl {
         labelLayer.contentsScale = s
         needsLayout = true
     }
-
-    // MARK: - Activation
 
     override func activate() {
         toggle(fromUser: true)

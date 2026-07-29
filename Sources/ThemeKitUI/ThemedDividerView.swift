@@ -90,8 +90,6 @@ public struct ThemedDividerView: View {
         }
     }
 
-    // MARK: - Drawing
-
     private func draw(_ context: inout GraphicsContext, size: CGSize) {
         let t = ruleThickness
         let (lead, trail) = longAxisInsets()

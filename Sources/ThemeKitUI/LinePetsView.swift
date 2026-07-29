@@ -10,7 +10,6 @@
 // knob) and gets the same pixels. `frozen` (absolute seconds) freezes one frame.
 //
 // COORDINATE / ORIENTATION
-// ────────────────────────
 // `linePetPosition(on:distance:)` (Effects) places pets in a NON-flipped
 // (+y-UP) frame where "top" = `track.maxY`, and returns `rot` as the travel
 // angle measured CCW from +x in that +y-up frame. The SwiftUI `Canvas` here is
@@ -78,7 +77,6 @@ public struct LinePetsView: View {
 
     public var body: some View {
         if let f = stillFrame {
-            // Static frozen frame — `now` is the ABSOLUTE frozen seconds.
             Canvas { ctx, size in
                 paint(into: &ctx, size: size, now: f)
             }
@@ -93,8 +91,6 @@ public struct LinePetsView: View {
             }
         }
     }
-
-    // MARK: - Render
 
     /// Lap every pet around the inset border and blit its pixel sprite, applying
     /// the +y-up → +y-down conversion at each pet's placement.

@@ -53,7 +53,6 @@ struct MockSkeleton: View {
                         .frame(width: 120, height: 40) }
                 }
                 ex("card row", h: 44) {
-                    // a realistic compose: avatar + two text lines
                     lead {
                         HStack(spacing: 8) {
                             ThemedSkeletonView(palette: p, variant: .circular, previewFrozen: skeletonFrozen)

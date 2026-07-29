@@ -263,9 +263,7 @@ public func drawInkSplatter(_ shape: SplatterShape, now: Double) {
         let rimColor = (NSColor.black.blended(withFraction: 0.45, of: ink) ?? ink)
             .withAlphaComponent(0.78 * a)
         rimColor.setFill(); catmullRomPath(unit.rim).fill()
-        // Main body.
         ink.withAlphaComponent(0.96 * a).setFill(); catmullRomPath(unit.body).fill()
-        // Droplet specks.
         ink.withAlphaComponent(0.88 * a).setFill()
         for speck in unit.droplets { catmullRomPath(speck).fill() }
     }

@@ -46,8 +46,6 @@ final class ThemedButtonGroupTests: XCTestCase {
     private let allCorners: CACornerMask =
         [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner, .layerMinXMaxYCorner]
 
-    // MARK: - Corner merging
-
     func testHorizontalCornersRoundOnlyOuter() {
         let c = group { $0.orientation = .horizontal; $0.variant = .outlined }.groupProbe.perMemberCorners
         XCTAssertEqual(c[0], leftPair, "first rounds left, squares the seam")
@@ -86,8 +84,6 @@ final class ThemedButtonGroupTests: XCTestCase {
         XCTAssertEqual(e[2], .all)
     }
 
-    // MARK: - Elevation / dividers per variant
-
     func testContainedUsesOneGroupShadowMembersShadowless() {
         let g = group { $0.variant = .contained }.groupProbe
         XCTAssertTrue(g.perMemberGroupedShadow.allSatisfy { $0 }, "members forgo their own shadow")
@@ -123,8 +119,6 @@ final class ThemedButtonGroupTests: XCTestCase {
                   p.muted, "disabled divider = muted")
     }
 
-    // MARK: - Fan-out
-
     func testSizeFansToEveryMember() {
         let h = group { $0.size = .large }.groupProbe.perMemberHeight
         XCTAssertTrue(h.allSatisfy { $0 == 42 }, "every member adopts the group size (large = 42)")
@@ -140,8 +134,6 @@ final class ThemedButtonGroupTests: XCTestCase {
         XCTAssertEqual(g.groupProbe.perMemberEnabled, [true, false, true],
                        "a per-segment disable ANDs with the group")
     }
-
-    // MARK: - Selection
 
     func testActionsModeNeverMarksASegmentActive() {
         let g = group { $0.mode = .actions; $0.variant = .outlined; $0.selectedIndex = 1 }
@@ -214,8 +206,6 @@ final class ThemedButtonGroupTests: XCTestCase {
                         .intrinsicContentSize.height, 3 * 36, "text members butt with no overlap")
     }
 
-    // MARK: - Intrinsic size
-
     func testHorizontalIntrinsicAndFullWidth() {
         let g = group { $0.variant = .outlined }
         XCTAssertEqual(g.intrinsicContentSize.height, 36, "uniform member height")
@@ -235,7 +225,6 @@ final class ThemedButtonGroupTests: XCTestCase {
         XCTAssertEqual(b.buttonProbe.maskedCorners, allCorners, "all corners rounded by default")
         XCTAssertEqual(b.buttonProbe.drawnBorderEdges, .all, "closed perimeter by default")
         XCTAssertFalse(b.buttonProbe.groupedShadow, "keeps its own shadow by default")
-        // the standalone border path still spans the inset button rect
         let bounds = b.buttonProbe.borderPathBounds
         XCTAssertEqual(bounds.width, 119, accuracy: 1.0, "border path ≈ the inset button rect")
     }

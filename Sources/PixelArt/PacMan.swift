@@ -32,8 +32,8 @@ public func pacManCells(diameterCells d: Int, mouthHalfRad: Double)
         for col in 0..<d {
             let cx = Double(col) + 0.5 - r
             let cy = Double(row) + 0.5 - r
-            if cx * cx + cy * cy > r * r { continue }          // outside circle
-            if abs(atan2(cy, cx)) < mouthHalfRad { continue }  // inside mouth wedge
+            if cx * cx + cy * cy > r * r { continue }
+            if abs(atan2(cy, cx)) < mouthHalfRad { continue }
             out.append((col: col, row: row))
         }
     }

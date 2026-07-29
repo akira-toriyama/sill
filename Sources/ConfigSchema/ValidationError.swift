@@ -74,7 +74,7 @@ public struct ValidationError: Sendable, Equatable {
         var out = ""
         for seg in path {
             if seg.hasPrefix("[") {
-                out += seg                       // index folds onto the prior key
+                out += seg
             } else if out.isEmpty {
                 out = seg
             } else {

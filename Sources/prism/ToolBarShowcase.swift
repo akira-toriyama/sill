@@ -15,8 +15,6 @@ import PaletteKit
 import ThemeKit
 import ThemeKitUI
 
-// MARK: - Showcase
-
 struct MockToolBar: View, ShowcaseBench {
     var cellSpacing: CGFloat { 4 }
     var cellCaptionSize: CGFloat { 7.5 }
@@ -61,7 +59,6 @@ struct MockToolBar: View, ShowcaseBench {
                     .frame(height: 64)
             }
 
-            // Density variants.
             row("variants") {
                 cell("regular (64)")  { ThemedToolBarView(palette: p, items: liveItems, variant: .regular).frame(height: 64) }
                 cell("dense (48)")    { ThemedToolBarView(palette: p, items: liveItems, variant: .dense).frame(height: 48) }
@@ -78,7 +75,6 @@ struct MockToolBar: View, ShowcaseBench {
                 }
             }
 
-            // Sections (flexGrow spacers) — left-title vs centred title.
             row("sections (flex spacers)") {
                 cell("left title · right actions (1 flex)") {
                     ThemedToolBarView(palette: p, items: [

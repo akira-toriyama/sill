@@ -33,8 +33,6 @@ final class SpecOpenStringMapTests: XCTestCase {
         return try XCTUnwrap(props["alias"] as? [String: Any])
     }
 
-    // MARK: - emit
-
     func testEmitTypesTheMapValues() throws {
         let alias = try aliasSubtree(of: Self.spec.jsonSchema())
         XCTAssertEqual(alias["type"] as? String, "object")
@@ -87,8 +85,6 @@ final class SpecOpenStringMapTests: XCTestCase {
         XCTAssertEqual(ap["type"] as? String, "string")
     }
 
-    // MARK: - validate
-
     func testValidateAcceptsAllStringValues() throws {
         let root = try Toml.parse("""
         [alias]
@@ -112,8 +108,6 @@ final class SpecOpenStringMapTests: XCTestCase {
         XCTAssertTrue(message.lowercased().contains("string"),
                       "should demand a string value: \(message)")
     }
-
-    // MARK: - decode
 
     /// `decode` drives `.table` sections only — an `.openStringMap` section is
     /// skipped (the app decodes its open map itself), same as `.dynamicTable`.

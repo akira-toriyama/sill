@@ -80,8 +80,6 @@ final class ValidatorTests: XCTestCase {
         errors.map(\.rule)
     }
 
-    // MARK: - Happy path
-
     func testFullyValidDocumentHasNoErrors() throws {
         let errs = try validate("""
         [options]
@@ -156,8 +154,6 @@ final class ValidatorTests: XCTestCase {
                       "a non-string array element is a type mismatch")
     }
 
-    // MARK: - enum / range
-
     func testEnumViolation() throws {
         let errs = try validate("""
         [[bindings]]
@@ -195,8 +191,6 @@ final class ValidatorTests: XCTestCase {
         XCTAssertTrue(errs.contains { if case .notInEnum(let k, _, _) = $0.rule { return k == "action-noop" }; return false },
                       "constTrue field set to false is rejected")
     }
-
-    // MARK: - cross-field
 
     func testAnyOfRequiredViolation() throws {
         // input present but NO action-* → anyOfRequired fails.
@@ -240,8 +234,6 @@ final class ValidatorTests: XCTestCase {
         XCTAssertTrue(errs.contains { if case .oneOfRequired(_, let n) = $0.rule { return n == 2 }; return false })
     }
 
-    // MARK: - nested array-of-tables
-
     func testNestedPerAppRequiredFieldMissing() throws {
         let errs = try validate("""
         [[bindings]]
@@ -275,8 +267,6 @@ final class ValidatorTests: XCTestCase {
         XCTAssertTrue(errs.contains { if case .emptyArrayOfTables(let k) = $0.rule { return k == "per-app" }; return false })
     }
 
-    // MARK: - open maps
-
     func testOpenIntMapOutOfRange() throws {
         let errs = try validate("""
         [v-key-aliases]
@@ -294,8 +284,6 @@ final class ValidatorTests: XCTestCase {
         """)
         XCTAssertTrue(errs.contains { if case .typeMismatch = $0.rule { return true }; return false })
     }
-
-    // MARK: - section-level type + permissive
 
     func testSectionWrongShapeFlagged() throws {
         // `bindings` is an array-of-tables; giving it a plain table is a mismatch.
@@ -317,8 +305,6 @@ final class ValidatorTests: XCTestCase {
         ]
         XCTAssertEqual(permissive.validate(doc), [], "a permissive object accepts arbitrary keys")
     }
-
-    // MARK: - multiple errors accumulate
 
     func testValidatorReportsAllViolationsNotJustFirst() throws {
         let errs = try validate("""

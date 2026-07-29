@@ -30,8 +30,6 @@ public final class ThemedDivider: NSView {
     /// (MUI spacing(2)), 8 pt vertical (MUI spacing(1)).
     public enum Variant { case fullWidth, inset, middle }
 
-    // MARK: - Public configuration
-
     /// The theme. Assigning re-themes the rule.
     public var palette: ResolvedPalette { didSet { applyTheme() } }
 
@@ -70,13 +68,10 @@ public final class ThemedDivider: NSView {
         didSet { layerTxn(animated: false) { gapLayer.backgroundColor = surface.cgColor } }
     }
 
-    // MARK: - Internals
-
     private let ruleLayer = CALayer()        // the hairline fill (solid backgroundColor)
     private let gapLayer = CALayer()         // surface fill cutting the rule under the label
     private let labelLayer = CATextLayer()   // optional centred text-in-divider
 
-    // Metrics
     private let labelPadX: CGFloat = 10          // breathing room each side of the label
     private let middleInset: CGFloat = CGFloat(Space.xl)        // MUI spacing(2) — horizontal `.middle` long-axis margin
     private let middleVerticalInset: CGFloat = CGFloat(Space.md) // MUI spacing(1) — vertical `.middle` long-axis (top/bottom) margin
@@ -97,8 +92,6 @@ public final class ThemedDivider: NSView {
     }
 
     private var hasLabel: Bool { label != nil && orientation == .horizontal }
-
-    // MARK: - Init
 
     public init(palette: ResolvedPalette) {
         self.palette = palette
@@ -135,8 +128,6 @@ public final class ThemedDivider: NSView {
         needsLayout = true
         needsDisplay = true
     }
-
-    // MARK: - Theming
 
     // The label is `.caption` (11pt) via `palette.uiFont(_:)` — the shared
     // type-scale resolver (honours .mono/.rounded/.menu).
@@ -179,8 +170,6 @@ public final class ThemedDivider: NSView {
         }
     }
 
-    // MARK: - Device-pixel geometry
-
     private var backingScale: CGFloat { themeBackingScale }
 
     /// Hairline thickness in points: one device pixel when `deviceHairline`, else
@@ -212,8 +201,6 @@ public final class ThemedDivider: NSView {
         case (.vertical, .middle):       return (middleVerticalInset, middleVerticalInset)
         }
     }
-
-    // MARK: - Layout
 
     public override func layout() {
         super.layout()

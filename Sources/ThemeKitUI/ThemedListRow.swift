@@ -45,8 +45,6 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
         return !onAccent
     }
 
-    // MARK: geometry
-
     private var indentWidth: CGFloat { CGFloat(max(0, item.indentLevel)) * metrics.indentStep }
 
     private var rowHeight: CGFloat { item.laidOutHeight(metrics) }
@@ -55,8 +53,6 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
         if case let .sectionHeader(_, collapsed) = item.kind { return !item.isDisabled && collapsed != nil }
         return false
     }
-
-    // MARK: colors
 
     private func secondaryFont() -> Font {
         item.secondaryMono
@@ -99,8 +95,6 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
         case let .custom(hex): return Color(nsColor: NSColor(hex))
         }
     }
-
-    // MARK: body
 
     var body: some View {
         rowContent
@@ -305,8 +299,6 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
         }
         .frame(width: metrics.imageBox, height: metrics.imageBox)
     }
-
-    // MARK: text
 
     @ViewBuilder private var textStack: some View {
         VStack(alignment: .leading, spacing: metrics.lineGap) {

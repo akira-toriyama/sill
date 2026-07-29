@@ -33,8 +33,6 @@ final class ThemedDividerRenderTests: XCTestCase {
         setPalette(cobalt)
     }
 
-    // MARK: - raster helpers
-
     private let scale: CGFloat = 2
 
     /// Rasterise `view` inside a fixed frame. The divider fixes its own thin

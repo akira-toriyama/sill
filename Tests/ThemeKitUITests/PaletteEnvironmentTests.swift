@@ -35,8 +35,6 @@ final class PaletteEnvironmentTests: XCTestCase {
         setPalette(cobalt)
     }
 
-    // MARK: - hosting helpers
-
     private func host<V: View>(_ view: V) -> NSView {
         let h = NSHostingView(rootView: view)
         h.frame = NSRect(x: 0, y: 0, width: 320, height: 120)
@@ -51,8 +49,6 @@ final class PaletteEnvironmentTests: XCTestCase {
         for s in v.subviews { if let x = firstSubview(s, of: type) { return x } }
         return nil
     }
-
-    // MARK: - the three tiers
 
     func testFallsBackToTheProcessDefault() {
         let d = firstSubview(host(ThemedChipView()), of: ThemedChip.self)
@@ -82,8 +78,6 @@ final class PaletteEnvironmentTests: XCTestCase {
         let a = firstSubview(host(ThemedChipView().sillTheme(Theme.dracula)), of: ThemedChip.self)
         XCTAssertEqual(a?.palette, dracula)
     }
-
-    // MARK: - the same contract across widget kinds
 
     /// Spot-checks widgets that reach AppKit by different routes — a plain
     /// bridge (the menu trigger, hosting the AppKit `ThemedButton`), a
@@ -118,8 +112,6 @@ final class PaletteEnvironmentTests: XCTestCase {
                          of: ThemedTextField.self)?.palette,
             gruvbox, "ThemedTextFieldView")
     }
-
-    // MARK: - the environment value itself
 
     func testEnvironmentDefaultsToNil() {
         XCTAssertNil(EnvironmentValues().sillPalette,

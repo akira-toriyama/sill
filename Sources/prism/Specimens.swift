@@ -63,8 +63,6 @@ import ThemeKitUI
 /// where panel met card; this definite outline is what separates the two.
 @MainActor func panelStroke(_ p: ResolvedPalette) -> NSColor { elevate(p, by: 0.24) }
 
-// MARK: - Shared container
-
 struct SpecimenBox<Content: View>: View {
     let title: String
     let p: ResolvedPalette

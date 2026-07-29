@@ -104,8 +104,6 @@ public final class ThemedToolBar: NSView {
         case divider
     }
 
-    // MARK: - Public configuration
-
     /// The theme. Assigning re-themes the bar + every composed item.
     public var palette: ResolvedPalette { didSet { applyTheme() } }
 
@@ -159,8 +157,6 @@ public final class ThemedToolBar: NSView {
     /// behavior for a plain toolbar.
     public var highlightedItem: Int? { didSet { if highlightedItem != oldValue { applyHover() } } }
 
-    // MARK: - Internals
-
     private let shadowLayer   = CALayer()   // elevation — UNCLIPPED, explicit shadowPath
     private let backdropLayer = CALayer()   // surface fill (rounded per corners)
     private let hairlineLayer = CALayer()   // flat-bar bottom border hairline
@@ -170,8 +166,6 @@ public final class ThemedToolBar: NSView {
     private var hoveredItem: Int?
 
     public override var isFlipped: Bool { false }   // y-up: y == 0 is the bottom edge
-
-    // MARK: - Metrics
 
     private var resolvedGutter: CGFloat {
         if let gutter { return gutter }
@@ -191,8 +185,6 @@ public final class ThemedToolBar: NSView {
     private var hairlineThickness: CGFloat { 1.0 / backingScale }
 
     private var backingScale: CGFloat { themeBackingScale }
-
-    // MARK: - Init
 
     public init(palette: ResolvedPalette) {
         self.palette = palette
@@ -218,8 +210,6 @@ public final class ThemedToolBar: NSView {
 
     @available(*, unavailable)
     public required init?(coder: NSCoder) { nil }
-
-    // MARK: - Build (construct one view per item)
 
     private func rebuild() {
         for v in itemViews { v?.removeFromSuperview() }
@@ -270,8 +260,6 @@ public final class ThemedToolBar: NSView {
     private func reconfigureControlSizes() {
         for b in buttons.values { b.size = resolvedControlSize }
     }
-
-    // MARK: - Theming
 
     // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
     // (honours .mono/.rounded/.menu; the old local helper dropped two).
@@ -409,8 +397,6 @@ public final class ThemedToolBar: NSView {
         guard items.indices.contains(index) else { return nil }
         return itemViews[index]?.frame
     }
-
-    // MARK: - Item sizing
 
     private func itemWidth(_ index: Int) -> CGFloat {
         switch items[index] {

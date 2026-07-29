@@ -62,8 +62,6 @@ import ListCore
 @MainActor
 public final class ThemedMenu: NSObject {
 
-    // MARK: - MenuItem
-
     /// One menu entry. `init(_:action:)` builds the common action row (id == title).
     /// A `.separator` / `.header` is built with the static helpers. A row carries
     /// its OWN behavior (`action`) — the React event-handler model.
@@ -131,8 +129,6 @@ public final class ThemedMenu: NSObject {
         }
     }
 
-    // MARK: - Public configuration
-
     /// The theme. Assigning re-themes the hosted list AND the (snapped) panel
     /// surface + edge — the mandated contract.
     public var palette: ResolvedPalette { didSet { applyTheme() } }
@@ -169,12 +165,8 @@ public final class ThemedMenu: NSObject {
         didSet { guard presentation != oldValue else { return }; applyPresentation() }
     }
 
-    // MARK: Callbacks
-
     /// Menu open / close edge.
     public var onOpenChange: ((Bool) -> Void)?
-
-    // MARK: Preview / capture seam
 
     /// Force the menu OPEN against a stored `previewAnchor`, skipping the fade + the
     /// dismiss monitors — deterministic still capture + tests (the combo's
@@ -205,8 +197,6 @@ public final class ThemedMenu: NSObject {
             }
         }
     }
-
-    // MARK: - Internals
 
     /// The hosted SwiftUI list, driven imperatively via `controller` and hosted in an
     /// AppKit `HostingListView` (its `mouseUp` does the synchronous row-click commit).
@@ -270,8 +260,6 @@ public final class ThemedMenu: NSObject {
 
     // Probe state (set by reframe()).
     private var lastFrame: CGRect = .zero
-
-    // MARK: - Init
 
     public init(palette: ResolvedPalette) {
         self.palette = palette
@@ -491,8 +479,6 @@ public final class ThemedMenu: NSObject {
     private static var loadingRow: MenuItem { MenuItem(id: "__themedmenu.loading", title: "Loading…", isEnabled: false) }
     private static var emptyRow: MenuItem   { MenuItem(id: "__themedmenu.empty",   title: "No items", isEnabled: false) }
 
-    // MARK: - Theming
-
     public func applyTheme() {
         // Paint the OPAQUE menu surface on BOTH the hosted list (via its style) and
         // the container (which shows in the vertical-padding strips + carries the
@@ -594,8 +580,6 @@ public final class ThemedMenu: NSObject {
         onOpenChange?(true)
     }
 
-    // MARK: - Panel + layout
-
     private func ensurePanel() {
         guard panel == nil else { return }
         let p = themedPopupPanel(interactive: true, role: .menu)
@@ -684,8 +668,6 @@ public final class ThemedMenu: NSObject {
 
         lastFrame = frame
     }
-
-    // MARK: - Activation
 
     /// A row opens a cascade when it has static children OR a deferred provider.
     /// The single source of truth for "is this a folder row?".
@@ -995,8 +977,6 @@ public final class ThemedMenu: NSObject {
         m = CATransform3DTranslate(m, -dx, -dy, 0)
         return m
     }
-
-    // MARK: - Helpers
 
     private var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 

@@ -26,8 +26,6 @@ public final class ThemedTextField: NSView {
     /// rule; `standard` = bare bottom rule only.
     public enum Variant { case outlined, filled, standard }
 
-    // MARK: - Public configuration
-
     /// The theme. Assigning re-themes the whole field.
     public var palette: ResolvedPalette { didSet { applyTheme() } }
 
@@ -161,8 +159,6 @@ public final class ThemedTextField: NSView {
         NSAccessibility.post(element: field, notification: .valueChanged)
     }
 
-    // MARK: - Internals
-
     private let field = FocusReportingTextField()
     private let strokeLayer = CAShapeLayer()   // border (outlined) / rule (filled,standard)
     private let notchLayer = CALayer()         // surface fill cutting the outlined top rule
@@ -174,7 +170,6 @@ public final class ThemedTextField: NSView {
     private var focused = false
     private var floated = false
 
-    // Metrics
     private let boxH: CGFloat = 40
     private let padX: CGFloat = CGFloat(Space.lg)
     private let iconSize: CGFloat = 17
@@ -195,8 +190,6 @@ public final class ThemedTextField: NSView {
     }
     private var hasSupport: Bool { errorText != nil || helperText != nil }
     private var isError: Bool { errorText != nil }
-
-    // MARK: - Init
 
     public init(palette: ResolvedPalette) {
         self.palette = palette
@@ -252,7 +245,6 @@ public final class ThemedTextField: NSView {
         needsDisplay = true
     }
 
-    // MARK: - Theming
     // Fonts come from `palette.uiFont(_:)` — the shared type-scale resolver:
     // `.body` (13pt) for the input + floating label, `.secondaryBody` (11pt
     // medium) for the supporting line. The old local `themedFont` only
@@ -331,8 +323,6 @@ public final class ThemedTextField: NSView {
         }
     }
 
-    // MARK: - Focus
-
     /// True when the field (or its field editor) is the window's first
     /// responder — the GROUND TRUTH for focus, checked after edges settle.
     private var isFieldFirstResponder: Bool {
@@ -375,8 +365,6 @@ public final class ThemedTextField: NSView {
     }
 
     fileprivate func endedEditing() { onEndEditing?(field.stringValue) }
-
-    // MARK: - Floating-label animation
 
     private func syncFloat(animated: Bool) {
         let shouldFloat = label != nil && (isFocused || !field.stringValue.isEmpty)
@@ -446,8 +434,6 @@ public final class ThemedTextField: NSView {
                                   width: w, height: h)
         notchLayer.opacity = 1
     }
-
-    // MARK: - Layout
 
     private struct Geometry {
         var box: NSRect
@@ -534,8 +520,6 @@ public final class ThemedTextField: NSView {
         strokeLayer.contentsScale = s
     }
 
-    // MARK: - Drawing
-
     public override func draw(_ dirty: NSRect) {
         let geo = geometry()
         let box = geo.box
@@ -547,7 +531,6 @@ public final class ThemedTextField: NSView {
             fieldFill.setFill(); r.fill()
         }
 
-        // Adornments.
         if let sym = leadingSymbol, let r = geo.leadingIcon {
             drawSymbol(sym, in: r, color: isFocused ? palette.primary : palette.muted)
         }
@@ -558,7 +541,6 @@ public final class ThemedTextField: NSView {
             drawSymbol(sym, in: r, color: palette.muted)
         }
 
-        // Supporting line.
         if hasSupport {
             let msg = errorText ?? helperText ?? ""
             let color = isError ? palette.error : palette.muted
@@ -585,8 +567,6 @@ public final class ThemedTextField: NSView {
         }
         tinted.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
     }
-
-    // MARK: - Hit testing / focus on click
 
     public override func mouseDown(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)

@@ -42,8 +42,6 @@ final class RenameAndPathRenderTests: XCTestCase {
                      + "property, so adding one to SchemaField can never silently drop it here")
     }
 
-    // MARK: - ValidationError path rendering
-
     private func rendered(_ path: [String]) -> String {
         ValidationError(path: path, rule: .unknownKey(key: "x"), message: "").pathString
     }

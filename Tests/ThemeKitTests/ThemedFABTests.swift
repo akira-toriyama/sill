@@ -59,8 +59,6 @@ final class ThemedFABTests: XCTestCase {
         wait(for: [e], timeout: 1.0)
     }
 
-    // MARK: - Geometry / the circle + pill invariant
-
     func testCircularIsSquareAndFullyRound() {
         let p = theme()
         for (sz, d): (ThemedFAB.Size, CGFloat) in [(.small, 40), (.medium, 48), (.large, 56)] {
@@ -203,8 +201,6 @@ final class ThemedFABTests: XCTestCase {
                            "onSecondaryStroke = the contrast ink @ 0.4 (\(name))")
         }
     }
-
-    // MARK: - Activation + accessibility
 
     /// Space on a focused FAB flashes then fires onTap (after the 0.12 s flash).
     func testSpaceActivatesOnTap() {

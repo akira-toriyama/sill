@@ -51,7 +51,7 @@ public func nextGridIndex(from index: Int, dx: Int, dy: Int,
         if row >= rows { row = wrap ? 0 : rows - 1 }
     }
     let target = row * cols + col
-    return target >= count ? count - 1 : target   // ragged last-row snap
+    return target >= count ? count - 1 : target
 }
 
 /// Next focused index for a (dx,dy) intent, honoring the grid's main axis. A

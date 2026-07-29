@@ -32,8 +32,6 @@ final class ThemedCheckboxTests: XCTestCase {
         return c
     }
 
-    // MARK: - Glyph + fill per state
-
     func testUncheckedIsOutlineNoFill() {
         let p = palette()
         let c = box { $0.previewChecked = false }.checkboxProbe
@@ -102,8 +100,6 @@ final class ThemedCheckboxTests: XCTestCase {
         XCTAssertEqual(c.focusRingOpacity, 0, "disabled = no focus ring")
     }
 
-    // MARK: - Label + metrics
-
     func testTargetSizePerSize() {
         XCTAssertEqual(box { $0.size = .small }.checkboxProbe.target, 38)
         XCTAssertEqual(box { $0.size = .medium }.checkboxProbe.target, 42)
@@ -120,8 +116,6 @@ final class ThemedCheckboxTests: XCTestCase {
         sameColor(box { $0.label = "x" }.checkboxProbe.labelColor, p.foreground)
         sameColor(box { $0.label = "x"; $0.isEnabled = false }.checkboxProbe.labelColor, p.muted)
     }
-
-    // MARK: - Toggle / onChange contract
 
     func testUserToggleCyclesAndFiresOnChange() {
         let c = box { _ in }
@@ -149,8 +143,6 @@ final class ThemedCheckboxTests: XCTestCase {
         c.isChecked = true            // programmatic — must not call back
         XCTAssertFalse(fired, "a programmatic isChecked = never fires onChange")
     }
-
-    // MARK: - Accessibility
 
     func testAccessibilityRoleAndValue() {
         let c = box { $0.label = "Agree" }

@@ -11,7 +11,6 @@ import Foundation
 /// families. The `app` group is one tab per family app, each rendering that
 /// app's signature chrome mock (the old single `chrome` tab, split per app).
 enum KitFamily: String, CaseIterable, Identifiable {
-    // Kit group — foundations + the real ThemeKit widgets.
     case palette = "Palette", icon = "Icons", text = "Text", action = "Action",
          feedback = "Feedback", collection = "Collection", motion = "Motion",
          particles = "Particles"

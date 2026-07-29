@@ -9,8 +9,6 @@ import PaletteKit
 import ThemeKit
 import ThemeKitUI
 
-// MARK: - Showcase
-
 struct MockCheckbox: View, ShowcaseBench {
     let p: ResolvedPalette
     @State private var on = true
@@ -33,7 +31,6 @@ struct MockCheckbox: View, ShowcaseBench {
                 Spacer(minLength: 0)
             }
 
-            // Glyph states × sizes (forced).
             HStack(spacing: 18) {
                 tagged("unchecked") { ThemedCheckboxView(palette: p, previewChecked: false) }
                 tagged("checked")   { ThemedCheckboxView(palette: p, previewChecked: true) }

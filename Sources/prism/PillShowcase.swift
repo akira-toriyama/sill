@@ -28,7 +28,6 @@ struct MockThemedPill: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // shape × state
             ForEach(states, id: \.1) { state, sname in
                 HStack(spacing: 10) {
                     cap(sname)
@@ -47,7 +46,6 @@ struct MockThemedPill: View {
                                    shape: .pill, state: .idle, typedCount: n)
                 }
             }
-            // frost + badge
             HStack(spacing: 10) {
                 cap("frost/badge")
                 ThemedPillView(palette: p, label: "F", shape: .pill,

@@ -68,8 +68,6 @@ final class ThemedComboBoxTests: XCTestCase {
         _ = w
     }
 
-    // MARK: - Keyboard
-
     func testArrowDownAdvancesWrapsAndSkipsDisabled() {
         let (w, c) = hosted(["Apple", "Apricot", "Banana", "Grape", "Mango"])
         c.isOptionDisabled = { $0.label == "Banana" }   // index 2 disabled
@@ -135,8 +133,6 @@ final class ThemedComboBoxTests: XCTestCase {
         XCTAssertNil(c.selectedItem, "and the selection")
         _ = w
     }
-
-    // MARK: - Selection / blur
 
     func testProgrammaticSelectionDoesNotFireOnSelect() {
         let (w, c) = hosted(["Apple", "Apricot", "Banana"])
@@ -206,8 +202,6 @@ final class ThemedComboBoxTests: XCTestCase {
         }
     }
 
-    // MARK: - Empty state / lifecycle / placement
-
     func testNoOptionsRowOnEmptyFilter() {
         let (w, c) = hosted(["Apple", "Banana"])
         c.previewOpen = true
@@ -235,7 +229,7 @@ final class ThemedComboBoxTests: XCTestCase {
         c.invalidate()
         XCTAssertFalse(c.comboProbe.isOpen, "closed after invalidate()")
         XCTAssertFalse(c.comboProbe.panelOrderedIn, "panel ordered out")
-        c.invalidate()  // idempotent
+        c.invalidate()
         XCTAssertFalse(c.comboProbe.isOpen, "invalidate() is idempotent")
         _ = w
     }

@@ -35,8 +35,6 @@
 
 import Foundation
 
-// MARK: - Leaf field
-
 /// One scalar / array / map leaf in a config.toml input surface.
 public struct SchemaField: Sendable, Equatable {
     public enum Shape: Sendable, Equatable {
@@ -184,8 +182,6 @@ private final class ShapeBox: Sendable {
     init(_ shape: ObjectShape) { self.shape = shape }
 }
 
-// MARK: - Object / table shapes
-
 /// A table (or array-of-tables item) shape: its fields, what is required,
 /// the cross-field rules, and any nested array-of-tables children.
 public struct ObjectShape: Sendable {
@@ -271,8 +267,6 @@ public struct NestedTable: Sendable {
     }
 }
 
-// MARK: - Sections
-
 /// One top-level `config.toml` section.
 public struct SchemaSection: Sendable {
     public enum Kind: Sendable {
@@ -289,8 +283,6 @@ public struct SchemaSection: Sendable {
         self.name = name; self.kind = kind; self.doc = doc
     }
 }
-
-// MARK: - Root descriptor
 
 /// The whole config.toml input surface: a title, an optional `$comment`, and
 /// the ordered sections. The single source the emitter and the generic

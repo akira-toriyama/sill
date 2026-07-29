@@ -30,8 +30,6 @@
 import AppKit
 import SwiftDraw
 
-// MARK: - Phosphor weights
-
 /// The six Phosphor weights. The `regular` file has no suffix
 /// (`heart.svg`); every other weight is suffixed (`heart-bold.svg`), matching
 /// phosphor-icons/core's `assets/<weight>/` layout that we vendor verbatim.
@@ -129,8 +127,6 @@ func renderedIcon(_ image: NSImage, pt: CGFloat, tint: NSColor,
     return tintedBitmap(base: image, size: size,
                         color: image.isTemplate ? tint : nil, scale: scale)
 }
-
-// MARK: - Cache
 
 /// Caches the parsed `SVG` (Sendable DOM) per resource so a repaint never
 /// re-reads/re-parses the file; each call wraps it in a fresh vector `NSImage`

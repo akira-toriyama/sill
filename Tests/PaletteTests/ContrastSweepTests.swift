@@ -20,8 +20,6 @@ import Palette
 
 final class ContrastSweepTests: XCTestCase {
 
-    // MARK: - contrastRatio primitive
-
     /// Bounds: black-on-white is the WCAG max (21:1); a color against
     /// itself is 1:1.
     func testContrastRatioBounds() {
@@ -35,8 +33,6 @@ final class ContrastSweepTests: XCTestCase {
         let a = HexColor(0x123456), b = HexColor(0xABCDEF)
         XCTAssertEqual(contrastRatio(a, b), contrastRatio(b, a), accuracy: 1e-12)
     }
-
-    // MARK: - Catalog sweep
 
     private static let aa = 4.5      // SC 1.4.3 normal text
     private static let floor3 = 3.0  // SC 1.4.11 / large-text floor

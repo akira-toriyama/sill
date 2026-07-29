@@ -15,7 +15,6 @@ import PaletteKit
 import ThemeKit
 import ThemeKitUI
 
-// MARK: - Memoized loaders
 //
 // The icon tab follows the live effect path, so under a 30 Hz `TimelineView`
 // `MockIcons.body` re-runs every frame. The icons themselves NEVER change (the
@@ -65,8 +64,6 @@ private struct IconBarView: NSViewRepresentable {
         CGSize(width: proposal.width ?? 420, height: nsView.intrinsicContentSize.height)
     }
 }
-
-// MARK: - Showcase
 
 struct MockIcons: View {
     let p: ResolvedPalette
@@ -180,8 +177,6 @@ struct MockIcons: View {
                           variant: .contained)),
         ]
     }
-
-    // MARK: building blocks
 
     /// One tinted glyph. Template-renders the `.isTemplate` SVG mask so SwiftUI
     /// fills it with the role colour — the same treatment a widget applies.

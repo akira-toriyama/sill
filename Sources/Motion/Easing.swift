@@ -39,8 +39,6 @@ public extension ThemedTransition {
     }
 }
 
-// MARK: - Named curves
-
 public extension ThemedTransition.Easing {
     /// No easing — identity. Constant velocity (a steady sweep / a wave).
     static let linear = Self { $0 }
@@ -104,8 +102,6 @@ public extension ThemedTransition.Easing {
         return Self { curve.solve($0) }
     }
 }
-
-// MARK: - Unit cubic bezier solver
 
 /// A cubic bezier through `(0,0)`, `(x1,y1)`, `(x2,y2)`, `(1,1)`, solved as
 /// `y` for a given `x` — the standard WebKit `UnitBezier`. Value type, so the

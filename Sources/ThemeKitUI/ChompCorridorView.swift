@@ -14,7 +14,6 @@
 // gets the same pixels. `frozen` (absolute seconds) freezes one frame.
 //
 // COORDINATE / ORIENTATION (Approach A — flip the WHOLE polyline up-front)
-// ───────────────────────────────────────────────────────────────────────
 // The pure geometry (`polylineLength` / `roundedCornerPath` / `markAtArcLength` /
 // the cursors / `interiorCorners`) is coordinate-agnostic. The old draw hosted the
 // path NON-flipped (+y-UP); the SwiftUI `Canvas` is +y-DOWN, so we flip the whole
@@ -92,7 +91,6 @@ public struct ChompCorridorView: View {
 
     public var body: some View {
         if let f = stillFrame {
-            // Static frozen frame — `now` is the ABSOLUTE frozen seconds.
             Canvas { ctx, size in
                 paint(into: &ctx, size: size, now: f)
             }
@@ -107,8 +105,6 @@ public struct ChompCorridorView: View {
             }
         }
     }
-
-    // MARK: - Render
 
     /// One classified pellet on the centre row.
     private enum Kind { case dot, cherry, icon }

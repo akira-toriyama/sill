@@ -51,8 +51,6 @@ private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedLi
     var s = ThemedListStyle(); configure(&s); return s
 }
 
-// MARK: - Specimen data builders
-
 @MainActor private func facetItems() -> [ThemeKitUI.ListItem<String>] {
     func win(_ id: String, _ icon: String, _ app: String, _ title: String, _ badges: [Badge]) -> ThemeKitUI.ListItem<String> {
         ThemeKitUI.ListItem(id: id, image: glyph(icon, 18), primary: app, secondary: title, badges: badges)
@@ -172,8 +170,6 @@ private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedLi
     return [f("m1", "Introduction"), f("m2", "Getting Started"), f("m3", "Configuration"),
             f("m4", "Theming"), f("m5", "Widgets"), f("m6", "Migration")]
 }
-
-// MARK: - Showcase
 
 struct MockList: View, ShowcaseBench {
     var cellSpacing: CGFloat { 6 }

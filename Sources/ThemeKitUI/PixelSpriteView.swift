@@ -70,13 +70,10 @@ public struct PixelSpriteView: View {
             // Defensive: no frames → zero-size transparent placeholder.
             Color.clear.frame(width: 0, height: 0)
         } else if frames.count == 1 {
-            // ── Branch 1: single frame — pure static Image, no clock needed. ──
             spriteImage(frames[0])
         } else if let f = stillFrame {
-            // ── Branch 2: frozen — static Image at the given absolute `now`. ──
             spriteImage(ThemedTransition.frameStep(now: f, hz: hz, frames: frames))
         } else {
-            // ── Branch 3: live animation — birth-relative clock via TimelineView. ──
             // `context.date.timeIntervalSince(start)` gives seconds elapsed since
             // this view was born; `start` is read (never written) here.
             TimelineView(.animation) { context in
@@ -85,8 +82,6 @@ public struct PixelSpriteView: View {
             }
         }
     }
-
-    // MARK: - Render helper
 
     /// Render `sprite` as a nearest-neighbour Image sized to `pixelSize(cell:)`.
     @ViewBuilder private func spriteImage(_ sprite: PixelSprite) -> some View {

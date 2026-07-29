@@ -345,7 +345,6 @@ final class SpecEmitLoweringTests: XCTestCase {
         XCTAssertNil(tags["enum"], "field-level domain is dropped for an array")
         XCTAssertNil(tags["minimum"], "min is dropped for an array")
         XCTAssertNil(tags["maximum"], "max is dropped for an array")
-        // The element enum + default + doc DO survive.
         XCTAssertEqual((tags["items"] as? [String: Any])?["enum"] as? [String], ["a", "b"])
         XCTAssertEqual(tags["default"] as? [String], ["a"])
         XCTAssertEqual(tags["description"] as? String, "Tags.")

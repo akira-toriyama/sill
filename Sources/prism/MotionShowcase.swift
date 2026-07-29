@@ -42,14 +42,12 @@ struct MockMotion: View {
             let now = timeline.date.timeIntervalSinceReferenceDate
             let phase = now.truncatingRemainder(dividingBy: motionLoopSeconds) / motionLoopSeconds
             VStack(alignment: .leading, spacing: 10) {
-                // Curve plots — the shape of each easing, with a live marker.
                 HStack(alignment: .top, spacing: 8) {
                     ForEach(demoEasings, id: \.name) { item in
                         EasingPlot(name: item.name, easing: item.easing, phase: phase, p: p)
                     }
                     liveDot
                 }
-                // Pill tracks — the SAME easings driving real travel.
                 VStack(alignment: .leading, spacing: 5) {
                     ForEach(demoEasings, id: \.name) { item in
                         PillTrack(name: item.name, easing: item.easing, phase: phase, p: p)
@@ -72,8 +70,6 @@ struct MockMotion: View {
         }
     }
 }
-
-// MARK: - One easing-curve plot
 
 /// Plots `easing` as `y = f(t)` over a small square (with the linear diagonal +
 /// the 0/1 guide lines for reference) and a running marker at the current
@@ -109,7 +105,6 @@ private struct EasingPlot: View {
                 diag.addLine(to: CGPoint(x: px(1), y: py(1)))
                 ctx.stroke(diag, with: .color(muted.opacity(0.45)), lineWidth: 0.5)
 
-                // The easing curve.
                 var curve = Path()
                 curve.move(to: CGPoint(x: px(0), y: py(easing(0))))
                 let steps = 64
@@ -119,7 +114,6 @@ private struct EasingPlot: View {
                 }
                 ctx.stroke(curve, with: .color(accent), lineWidth: 1.5)
 
-                // Live marker riding the curve.
                 let mx = px(phase), my = py(easing(phase))
                 ctx.fill(Path(ellipseIn: CGRect(x: mx - 2.5, y: my - 2.5, width: 5, height: 5)),
                          with: .color(accent))
@@ -136,8 +130,6 @@ private struct EasingPlot: View {
         }
     }
 }
-
-// MARK: - One pill track
 
 /// A labelled track with a pill at `easing(phase)` along its length — the
 /// easing translated into real travel. The spring's overshoot rides slightly
@@ -157,7 +149,6 @@ private struct PillTrack: View {
             Canvas { ctx, size in
                 let w = size.width, h = size.height
                 let pillW: CGFloat = 16 * uiScale
-                // Track rail.
                 ctx.fill(Path(roundedRect: CGRect(x: 0, y: h / 2 - 1.5, width: w, height: 3),
                               cornerSize: CGSize(width: 1.5, height: 1.5)),
                          with: .color(Color(nsColor: p.muted).opacity(0.25)))
@@ -172,8 +163,6 @@ private struct PillTrack: View {
         }
     }
 }
-
-// MARK: - Duration-token legend
 
 /// The `ThemedTransition.Duration` ladder, read straight from the tokens (no
 /// hard-coded numbers — so the legend can't drift from the library), shown as

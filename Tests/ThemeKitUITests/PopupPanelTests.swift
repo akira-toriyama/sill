@@ -37,8 +37,6 @@ final class PopupPanelTests: XCTestCase {
         XCTAssertTrue(popupHidesOnDeactivate(.prohibited))
     }
 
-    // MARK: - The factory actually applies it
-
     /// Proves the wiring, not just the predicate: the panel the widgets are
     /// built from reads the LIVE host policy. Activation policy is global
     /// state, so each case restores it. `NSApplication.shared` (not `NSApp`)

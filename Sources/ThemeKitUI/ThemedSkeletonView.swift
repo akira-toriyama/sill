@@ -69,8 +69,6 @@ public struct ThemedSkeletonView: View {
     /// The wave's brighter band — `foreground` at the same tier.
     private var highlight: NSColor { palette.ink(.subtle, of: .foreground) }
 
-    // MARK: - Pose
-
     /// One drawable state: the fill opacity and the wave band's phase
     /// (`nil` = no band). Both stills and animated frames reduce to this.
     private struct Pose {
@@ -115,8 +113,6 @@ public struct ThemedSkeletonView: View {
                         wavePhase: t.truncatingRemainder(dividingBy: waveSeconds) / waveSeconds)
         }
     }
-
-    // MARK: - Body
 
     public var body: some View {
         Group {

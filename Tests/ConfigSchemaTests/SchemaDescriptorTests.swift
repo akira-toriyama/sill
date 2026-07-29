@@ -101,8 +101,6 @@ final class SchemaDescriptorTests: XCTestCase {
         return try XCTUnwrap(bindings["items"] as? [String: Any])
     }
 
-    // MARK: - Root
-
     func testRootIsStrictDraft07WithCommentAndSections() throws {
         let root = try emitted()
         XCTAssertEqual(root["$schema"] as? String, "http://json-schema.org/draft-07/schema#")
@@ -122,8 +120,6 @@ final class SchemaDescriptorTests: XCTestCase {
             with: Data(d.jsonSchema().utf8)) as? [String: Any])
         XCTAssertNil(obj["$comment"])
     }
-
-    // MARK: - Field shapes
 
     func testScalarShapes() throws {
         let props = try XCTUnwrap(bindingItem(try emitted())["properties"] as? [String: Any])
@@ -185,8 +181,6 @@ final class SchemaDescriptorTests: XCTestCase {
         XCTAssertEqual((props["hold-while-timeout"] as? [String: Any])?["exclusiveMinimum"] as? Int, 0)
     }
 
-    // MARK: - Enum + per-value hover
-
     func testEnumAndEnumDocsAlignIndexWise() throws {
         let props = try XCTUnwrap(bindingItem(try emitted())["properties"] as? [String: Any])
         let field = try XCTUnwrap(props["repeat"] as? [String: Any])
@@ -199,8 +193,6 @@ final class SchemaDescriptorTests: XCTestCase {
         XCTAssertTrue(enumDocs[1] is NSNull, "a nil enumDoc entry lowers to JSON null")
         XCTAssertEqual(enumDocs[2] as? String, "Let repeats through.")
     }
-
-    // MARK: - Cross-field rules
 
     func testAnyOfRequiredBecomesAllOfAnyOf() throws {
         let allOf = try XCTUnwrap(bindingItem(try emitted())["allOf"] as? [[String: Any]])
@@ -238,8 +230,6 @@ final class SchemaDescriptorTests: XCTestCase {
         XCTAssertEqual(try bindingItem(try emitted())["required"] as? [String], ["input"])
     }
 
-    // MARK: - Nested array-of-tables
-
     func testNestedTableIsArrayWithMinItems() throws {
         let binding = try bindingItem(try emitted())
         let perApp = try XCTUnwrap(
@@ -250,8 +240,6 @@ final class SchemaDescriptorTests: XCTestCase {
         XCTAssertEqual(item["additionalProperties"] as? Bool, false)
         XCTAssertEqual(item["required"] as? [String], ["bundle-id"])
     }
-
-    // MARK: - Vendor extensions
 
     func testInitKeysAndConstraints() throws {
         let item = try bindingItem(try emitted(.init(constraintsKey: "x-demo-constraints")))
@@ -267,8 +255,6 @@ final class SchemaDescriptorTests: XCTestCase {
         XCTAssertNil(item["x-constraints"], "the default key is not used when overridden")
     }
 
-    // MARK: - rejected fields
-
     func testRejectedFieldInKeySetButNotInSchema() throws {
         XCTAssertTrue(bindingShape().keySet.contains("action-toggle-var-on-up"),
                       "rejected key stays in keySet so the unknown-key check recognises it")
@@ -283,8 +269,6 @@ final class SchemaDescriptorTests: XCTestCase {
         XCTAssertFalse(keySet.contains("x-taplo"))
         XCTAssertFalse(keySet.contains("x-constraints"))
     }
-
-    // MARK: - Open-map sections
 
     func testOpenStringMapSection() throws {
         let props = try XCTUnwrap(try emitted()["properties"] as? [String: Any])
@@ -315,8 +299,6 @@ final class SchemaDescriptorTests: XCTestCase {
                        "the item node carries the SHAPE doc")
     }
 
-    // MARK: - EmitOptions byte knobs
-
     func testSlashEscapingKnob() {
         let escaped = descriptor().jsonSchema(options: .init(escapeSlashes: true))
         XCTAssertTrue(escaped.contains(#"http:\/\/json-schema.org"#),
@@ -331,8 +313,6 @@ final class SchemaDescriptorTests: XCTestCase {
                        "default emits no trailing newline")
         XCTAssertTrue(descriptor().jsonSchema(options: .init(trailingNewline: true)).hasSuffix("}\n"))
     }
-
-    // MARK: - Determinism
 
     func testEmissionIsDeterministic() {
         XCTAssertEqual(descriptor().jsonSchema(), descriptor().jsonSchema())
@@ -417,7 +397,6 @@ final class SchemaDescriptorTests: XCTestCase {
         XCTAssertEqual(perApp["type"] as? String, "array")
         XCTAssertNil(perApp["minItems"], "a non-nonEmpty nested table has no minItems")
         XCTAssertEqual(perSpace["minItems"] as? Int, 1, "the nonEmpty nested table keeps minItems:1")
-        // Both nested keys join the keySet.
         let shape = ObjectShape(fields: [SchemaField("id", .string, doc: "id")],
                                 nested: [NestedTable(key: "per-app", item: leaf),
                                          NestedTable(key: "per-space", item: leaf)])
@@ -495,18 +474,15 @@ final class SchemaDescriptorTests: XCTestCase {
         let castProps = try XCTUnwrap(cast["properties"] as? [String: Any])
         XCTAssertNotNil(castProps["button"], "own field sits beside nested objects")
 
-        // Permissive child: additionalProperties true, NO properties map.
         let themes = try XCTUnwrap(castProps["themes"] as? [String: Any])
         XCTAssertEqual(themes["additionalProperties"] as? Bool, true)
         XCTAssertNil(themes["properties"], "an empty permissive object omits properties")
         XCTAssertEqual(themes["description"] as? String, "Dynamic names.")
 
-        // Strict child: additionalProperties false, with its own properties.
         let overlay = try XCTUnwrap(castProps["overlay"] as? [String: Any])
         XCTAssertEqual(overlay["additionalProperties"] as? Bool, false)
         XCTAssertNotNil((overlay["properties"] as? [String: Any])?["enabled"])
 
-        // Nested-object keys join the keySet.
         XCTAssertEqual(parent.keySet, ["button", "themes", "overlay"])
     }
 

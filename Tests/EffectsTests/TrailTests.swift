@@ -189,8 +189,6 @@ final class TrailTests: XCTestCase {
         XCTAssertFalse(eatCrossed(arc: 10, prev: 90, cur: 5))
     }
 
-    // MARK: - roundedCornerPath
-
     func testRoundedCornerCutsAndBridges() {
         // ⌐ corner at (10,0); radius 4 ≤ ½·10 → P=(6,0), Q=(10,4) via (10,0).
         let steps = roundedCornerPath([(x: 0, y: 0), (x: 10, y: 0), (x: 10, y: 10)],
@@ -275,8 +273,6 @@ final class TrailTests: XCTestCase {
         XCTAssertTrue(interiorCorners([(x: 0, y: 0), (x: 10, y: 0),
                                        (x: 10, y: 0), (x: 10, y: 10)]).isEmpty)
     }
-
-    // MARK: - AppKit path builder
 
     @MainActor
     func testNSBezierPathFromSteps() {

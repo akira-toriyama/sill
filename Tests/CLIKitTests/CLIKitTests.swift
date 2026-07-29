@@ -43,7 +43,6 @@ final class CLIKitTests: XCTestCase {
 
     let jig = CLIKit.Spec(arity: ["-c": .flag, "-r": .flag, "-n": .flag], aliases: [:], allowsPositionals: true)
 
-    // helper: assert flags (name,values) in order + positionals
     private func expect(_ argv: [String], _ spec: CLIKit.Spec,
                         flags: [(String, [String])], positionals: [String] = [],
                         file: StaticString = #filePath, line: UInt = #line) {
@@ -150,8 +149,6 @@ final class CLIKitTests: XCTestCase {
         expectThrow(["--at", "800"], wand, .missingValue(flag: "--at", expected: 2, got: 1))
         expectThrow(["--follo"], facetView, .unknownFlag("--follo", suggestion: "--follow"))
     }
-
-    // MARK: usage rendering / exit floor
 
     func testUsageMessages() {
         XCTAssertEqual(CLIKit.ParseError.unknownFlag("--foo", suggestion: "--follow").usageMessage,

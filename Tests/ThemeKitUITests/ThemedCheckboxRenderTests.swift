@@ -111,8 +111,6 @@ final class ThemedCheckboxRenderTests: XCTestCase {
         return r.at(dpx(origin + fx * box), dpx(origin + fy * box))
     }
 
-    // MARK: - intrinsic geometry
-
     func testBareBoxIntrinsicSizeIsTheTargetSquare() {
         XCTAssertEqual(render(ThemedCheckboxView(palette: dracula)).w, dpx(42),
                        "medium bare box = the 42 pt hit target")
@@ -125,8 +123,6 @@ final class ThemedCheckboxRenderTests: XCTestCase {
         XCTAssertGreaterThan(r.w, dpx(42), "a label extends the width past the target square")
         XCTAssertEqual(r.h, dpx(42), "…the height stays the target")
     }
-
-    // MARK: - glyph states
 
     func testUncheckedDrawsTheOutlineRingOnly() {
         let r = render(ThemedCheckboxView(palette: dracula, previewChecked: false))

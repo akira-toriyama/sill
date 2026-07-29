@@ -43,8 +43,6 @@ final class SpecValidateBridgeTests: XCTestCase {
         ]
     )
 
-    // MARK: - makeDescriptor shape
-
     func testDescriptorSectionsMirrorTopLevelHeaders() throws {
         let d = Self.spec.makeDescriptor()
         XCTAssertEqual(d.title, "bridge fixture")

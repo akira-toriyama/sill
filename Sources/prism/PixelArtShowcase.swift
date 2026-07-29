@@ -120,7 +120,6 @@ final class PacLadderNSView: NSView {
         let mouth = mouthHalfRad(phase: ThemedTransition.frameStep(
             now: now, hz: chompMouthHz, frames: chompMouthFrames))
 
-        // Row 1 — the Pac-Man face at tier .m.
         let m = cell(.m)
         let y1 = pad
         drawPacMan(diameterCells: pacDiameter, mouthHalfRad: mouth, cell: m, at: CGPoint(x: pad, y: y1))

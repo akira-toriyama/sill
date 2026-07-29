@@ -42,8 +42,6 @@ final class ThemedButtonTests: XCTestCase {
         return b
     }
 
-    // MARK: - Metrics
-
     func testHeightPerSize() {
         XCTAssertEqual(laidOut { $0.size = .small }.buttonProbe.height, 30)
         XCTAssertEqual(laidOut { $0.size = .medium }.buttonProbe.height, 36)
@@ -70,8 +68,6 @@ final class ThemedButtonTests: XCTestCase {
         XCTAssertGreaterThan(withIcon.intrinsicContentSize.width, plain.intrinsicContentSize.width,
                              "a leading icon widens the intrinsic content")
     }
-
-    // MARK: - Fill / ink per variant
 
     func testContainedFillIsRole() {
         let p = palette()
@@ -145,8 +141,6 @@ final class ThemedButtonTests: XCTestCase {
         XCTAssertGreaterThan(b.buttonProbe.shadowOpacity, rest, "focus raises elevation above rest")
     }
 
-    // MARK: - Outlined border
-
     func testOutlinedBorderRestingHalfAlphaThenFull() {
         let p = palette()
         let resting = laidOut { $0.variant = .outlined }
@@ -163,8 +157,6 @@ final class ThemedButtonTests: XCTestCase {
         XCTAssertFalse(laidOut { $0.variant = .contained }.buttonProbe.borderVisible)
     }
 
-    // MARK: - Elevation
-
     func testContainedElevatesWhenEnabled() {
         XCTAssertGreaterThan(laidOut { $0.variant = .contained }.buttonProbe.shadowOpacity, 0,
                              "contained rests with an elevation shadow")
@@ -177,8 +169,6 @@ final class ThemedButtonTests: XCTestCase {
         let press = laidOut { $0.variant = .contained; $0.previewPressed = true }.buttonProbe.shadowOpacity
         XCTAssertGreaterThan(press, rest, "pressed elevation > resting")
     }
-
-    // MARK: - Disabled
 
     func testDisabledInkMutedNoOverlayNoShadow() {
         let p = palette()
@@ -194,8 +184,6 @@ final class ThemedButtonTests: XCTestCase {
         XCTAssertEqual(alpha(b.buttonProbe.overlayColor), 0, accuracy: 0.001,
                        "disabled suppresses the forced hover overlay")
     }
-
-    // MARK: - Activation + accessibility
 
     /// The full keyboard path: Space on a focused button flashes pressed then
     /// fires `onTap` (after the 0.12 s flash) — pump the main queue to await it.

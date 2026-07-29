@@ -76,8 +76,6 @@ func appMockView(_ a: KitFamily, p: ResolvedPalette, themeName: String, showEffe
     }
 }
 
-// MARK: - Foundation / App page
-
 /// The detail pane for a `.foundation` or `.app` sidebar selection. Resolves the
 /// top bar's chosen theme (`"all"` ⇒ dracula, a concrete palette must be picked
 /// for a single page) and renders:

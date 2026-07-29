@@ -14,8 +14,6 @@ import AppKit
 @MainActor
 final class SplatterTests: XCTestCase {
 
-    // MARK: - Deterministic geometry
-
     func testSameSeedSameShape() {
         let a = rollSplatter(at: (x: 0, y: 0), size: 100, colors: [0x11, 0x22],
                              seed: 42, now: 0)

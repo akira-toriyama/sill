@@ -41,8 +41,6 @@ import Foundation
 /// `theme.transitions` as a small declarative bundle. Pure + `Sendable`.
 public enum ThemedTransition {}
 
-// MARK: - Duration tokens
-
 public extension ThemedTransition {
     /// Named transition durations in SECONDS (`TimeInterval`, the CA/AppKit
     /// convention — never milliseconds, so there is no `/1000` at call sites).

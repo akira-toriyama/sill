@@ -11,8 +11,6 @@ import Palette
 
 final class VocabularyTests: XCTestCase {
 
-    // MARK: Theme catalog
-
     /// Every canonical name (minus the `random` meta-name) resolves to a
     /// spec, and distinct names resolve to distinct specs — i.e. the
     /// table has no duplicate / shadowed entries.

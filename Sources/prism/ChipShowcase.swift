@@ -52,7 +52,6 @@ struct MockChip: View, ShowcaseBench {
             stateRow("filled · clickable states", variant: .filled)
             stateRow("outlined · clickable states", variant: .outlined)
 
-            // Roles (filled).
             HStack(spacing: 10) {
                 cell("neutral")   { ThemedChipView(palette: p, role: .neutral,   title: "Neutral") }
                 cell("primary")   { ThemedChipView(palette: p, role: .primary,   title: "Primary") }
@@ -61,7 +60,6 @@ struct MockChip: View, ShowcaseBench {
                 Spacer(minLength: 0)
             }
 
-            // Sizes + leading icon + outlined + selected.
             HStack(alignment: .bottom, spacing: 10) {
                 cell("small")     { ThemedChipView(palette: p, size: .small, title: "Small") }
                 cell("medium")    { ThemedChipView(palette: p, size: .medium, title: "Medium") }
@@ -72,7 +70,6 @@ struct MockChip: View, ShowcaseBench {
                 Spacer(minLength: 0)
             }
 
-            // Keycap variant — the real shortcut glyphs (<kbd>).
             VStack(alignment: .leading, spacing: 5) {
                 Text("keycap (<kbd>) — mono, key-shaped, static")
                     .font(sysFont(8, design: .monospaced))

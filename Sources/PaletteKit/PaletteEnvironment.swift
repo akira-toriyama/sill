@@ -1,7 +1,6 @@
 // PaletteKit — SwiftUI theme propagation.
 //
 // WHY THIS EXISTS
-// ---------------
 // Until now sill's SwiftUI front had no ambient theme: every widget took
 // `palette: ResolvedPalette` as an explicit init argument, 61 declarations
 // across 25 files, and exactly ONE `@Environment` appeared in all of Sources

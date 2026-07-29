@@ -34,8 +34,6 @@ public final class ThemedSkeleton: NSView {
     /// `wave` = a highlight sweeping left→right; `none` = a static wash.
     public enum Animation { case pulse, wave, none }
 
-    // MARK: - Public configuration
-
     /// The theme. Assigning re-tints the wash WITHOUT disturbing a running
     /// animation (colour is snapped on its own keypath).
     public var palette: ResolvedPalette { didSet { applyTheme(); invalidate() } }
@@ -56,15 +54,12 @@ public final class ThemedSkeleton: NSView {
     /// (the analogue of ThemedTextField's `previewFocused`).
     public var previewFrozen: Bool = false { didSet { rebuildAnimation() } }
 
-    // MARK: - Internals
-
     private let fillLayer = CALayer()             // the tinted placeholder shape
     private let waveLayer = CAGradientLayer()     // wave-only highlight band (child of fill)
 
     private static let pulseKey = "skeleton.pulse"
     private static let waveKey  = "skeleton.wave"
 
-    // Metrics
     private let pulseRoundTrip: CFTimeInterval = 2.0   // MUI pulse: 2 s ease-in-out round trip
     private let waveSeconds: CFTimeInterval = 1.6      // MUI wave: 1.6 s linear sweep
     private let initialDelay: CFTimeInterval = 0.5     // MUI initial delay
@@ -106,8 +101,6 @@ public final class ThemedSkeleton: NSView {
         }
     }
 
-    // MARK: - Init
-
     public init(palette: ResolvedPalette) {
         self.palette = palette
         super.init(frame: .zero)
@@ -147,8 +140,6 @@ public final class ThemedSkeleton: NSView {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
-    // MARK: - Theming
-
     // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
     // (honours .mono/.rounded/.menu; the old local helper dropped two).
 
@@ -170,8 +161,6 @@ public final class ThemedSkeleton: NSView {
             self.waveLayer.locations = [0, 0.5, 1]
         }
     }
-
-    // MARK: - Ambient-animation lifecycle
 
     private var reduceMotion: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -290,8 +279,6 @@ public final class ThemedSkeleton: NSView {
     private func positionWave(atPhase p: CGFloat) {
         waveLayer.position = CGPoint(x: waveX(atPhase: p), y: bounds.height / 2)
     }
-
-    // MARK: - Layout
 
     public override func layout() {
         super.layout()

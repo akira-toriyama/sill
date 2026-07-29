@@ -42,8 +42,6 @@ final class ThemedChipTests: XCTestCase {
         return c
     }
 
-    // MARK: - Metrics
-
     func testHeightPerSize() {
         XCTAssertEqual(laidOut { $0.size = .small }.chipProbe.height, 24)
         XCTAssertEqual(laidOut { $0.size = .medium }.chipProbe.height, 32)
@@ -90,8 +88,6 @@ final class ThemedChipTests: XCTestCase {
         XCTAssertGreaterThan(withX.chipProbe.intrinsicWidth, plain.chipProbe.intrinsicWidth,
                              "the × widens the intrinsic content")
     }
-
-    // MARK: - Fill / ink per variant + role
 
     func testFilledNeutralFillIsMutedWash() {
         let p = palette()
@@ -160,8 +156,6 @@ final class ThemedChipTests: XCTestCase {
         sameColor(k.chipProbe.fillColor, p.ink(.faint, of: .foreground), "keycap fill unchanged by role")
     }
 
-    // MARK: - Selection
-
     func testSelectedNeutralUsesSelectionWash() {
         let p = palette()
         sameColor(laidOut { $0.variant = .filled; $0.isSelected = true }.chipProbe.fillColor,
@@ -193,8 +187,6 @@ final class ThemedChipTests: XCTestCase {
         XCTAssertGreaterThan(ap, ah, "pressed state layer is stronger than hover")
     }
 
-    // MARK: - Focus ring
-
     func testFocusRingHiddenWhenNotFocused() {
         XCTAssertEqual(laidOut { $0.onTap = {} }.chipProbe.focusRingOpacity, 0)
     }
@@ -219,8 +211,6 @@ final class ThemedChipTests: XCTestCase {
                        "and shows no ring even when forced")
     }
 
-    // MARK: - Disabled
-
     func testDisabledInkMutedAndSuppressesForcedHover() {
         let p = palette()
         let c = laidOut { $0.variant = .filled; $0.onTap = {}; $0.isEnabled = false; $0.previewHovered = true }
@@ -229,8 +219,6 @@ final class ThemedChipTests: XCTestCase {
                        "disabled suppresses the forced hover overlay")
         XCTAssertFalse(c.acceptsFirstResponder, "disabled chip is not focusable")
     }
-
-    // MARK: - Activation + keyboard
 
     /// Space activates a clickable chip's onTap (no flash — chips fire immediately).
     func testSpaceActivatesClickable() {
@@ -272,8 +260,6 @@ final class ThemedChipTests: XCTestCase {
         XCTAssertEqual(c.action, #selector(Sink.tap))
     }
 
-    // MARK: - Accessibility
-
     func testAccessibilityRoleClickableVsStatic() {
         XCTAssertEqual(laidOut { $0.onTap = {} }.accessibilityRole(), .button,
                        "a clickable chip is a button")
@@ -281,8 +267,6 @@ final class ThemedChipTests: XCTestCase {
                        "a static chip is static text")
         XCTAssertEqual(laidOut(title: "design").accessibilityLabel(), "design")
     }
-
-    // MARK: - Event helpers
 
     private func spaceDown(isARepeat: Bool = false) -> NSEvent {
         NSEvent.keyEvent(
