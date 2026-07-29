@@ -33,7 +33,7 @@ missing entry, because it is the one place a reader trusts not to be stale.
 2. [The theming contract](#2-the-theming-contract) — spec, resolved palette, resolve, derive recipe, role, canonical role field, sentinel, background mode, vibrancy, systemDynamic, process default, ambient theming, prop-drilling, precedence
 3. [Derived vocabulary](#3-derived-vocabulary-not-themable) — derived accessor, ink tier, surface tier, state layer, state base, contrast ink, role tint, resting stroke, disabled ink, secondary ink, on-primary, control role
 4. [Tokens](#4-tokens) — token, scale, ramp, elevation, type role, transition duration
-5. [The catalog](#5-the-catalog) — catalog, preset, fixed preset, member, rawValue, random, paletteFor, tombstone, effect name, pet, effect spec
+5. [The catalog](#5-the-catalog) — catalog, preset, fixed preset, member, rawValue, random, paletteFor, tombstone, verdict, effect name, pet, effect spec
 6. [The AppKit floors](#6-the-appkit-floors) — floor, floor 1/2/3, edit core, window shell, draw core, debt, 要相談
 7. [Gates](#7-gates) — gate, ratchet, set equality, allow-list, both directions, baseline, blind spot, green means
 8. [Release and consumers](#8-release-and-consumers) — rule of three, consumer, pin, flag day, on main vs released, rolling draft, publish, fleet
@@ -347,6 +347,18 @@ that returns to the catalog leaves the list (dracula, gruvbox, rainbow and
 system all did, so only latte is buried). `suggest(_:)` short-circuits a retired
 name to its `tryInstead` instead of a Levenshtein guess.
 `Sources/Palette/Palette.swift`, *RetiredTheme*.
+
+**verdict** — a `ThemeNameVerdict`: the classification of one raw theme-name
+token through the whole shared decision tree (`classifyThemeName(_:extras:)` —
+caller extras → live catalog → tombstone → did-you-mean), as one value:
+`.canonical` / `.retired` / `.unknown(suggestion:)`. The tree became vocabulary
+because every consumer app had hand-written the same cascade around the
+individual primitives (the t-0j0z sweep rewrote it in three repos in one day).
+What to DO with a verdict stays app policy — clamp, exit(2), log; sill only says
+what the name IS. Satellites: `RetiredTheme.story` (the one authored reject
+sentence), `concreteRandomThemeName(extras:)` (the stable `random` roll),
+`paletteForCanonical(_:)` (the loud twin of `paletteFor` for pre-validated
+names). `Sources/Palette/Palette.swift`, *ThemeNameVerdict*.
 
 **effect name** — a member of `canonicalEffectNames`, the vocabulary accepted by
 `[border] effect`. The NAME lists live in pure `Palette`, not in `Effects`,

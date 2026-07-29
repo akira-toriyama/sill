@@ -26,15 +26,11 @@ func sysFont(_ size: CGFloat, weight: Font.Weight = .regular,
 
 // MARK: - Gallery
 
-/// prism-internal unwrap of the failable `paletteFor`: every name reaching
+/// prism-internal spelling of the shared loud unwrap: every name reaching
 /// here comes from `canonicalThemeNames` (chips, tiles, the Picker), so a
-/// miss is a prism bug — crash loud rather than paint a wrong theme.
-func specFor(_ name: String) -> ThemeSpec {
-    guard let spec = paletteFor(name) else {
-        preconditionFailure("prism: unknown theme name '\(name)'")
-    }
-    return spec
-}
+/// miss is a prism bug — `paletteForCanonical` traps at the call site
+/// rather than paint a wrong theme.
+func specFor(_ name: String) -> ThemeSpec { paletteForCanonical(name) }
 
 struct Gallery: View {
     let config: PrismConfig
