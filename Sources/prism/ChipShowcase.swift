@@ -1,9 +1,9 @@
-// prism — ThemeKit chip bench. Hosts the REAL shared `ThemedChip` (ThemeKit)
-// inside the SwiftUI gallery so it can be evaluated live in every theme: the top
-// rows are INTERACTIVE (hover a clickable filter chip, click to toggle, click the
-// × to remove a tag); the rows below force each state via the `preview…`
-// overrides so hover / pressed / focus / disabled capture deterministically. The
-// keycap variant shows the real `⌘ ⇧ ⌘N ⇧⌘N` glyphs.
+// prism — chip bench. Shows the REAL shared `ThemedChipView` (ThemeKitUI,
+// SwiftUI-native) so it can be evaluated live in every theme: the top rows are
+// INTERACTIVE (hover a clickable filter chip, click to toggle, click the × to
+// remove a tag); the rows below force each state via the `preview…` overrides
+// so hover / pressed / focus / disabled capture deterministically. The keycap
+// variant shows the real `⌘ ⇧ ⌘N ⇧⌘N` glyphs.
 
 import SwiftUI
 import PaletteKit
@@ -20,7 +20,7 @@ struct MockChip: View, ShowcaseBench {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKit · chip — the real shared token (top rows LIVE: toggle / hover / × to remove)")
+            Text("ThemeKitUI · chip — the real shared token (top rows LIVE: toggle / hover / × to remove)")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
