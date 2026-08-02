@@ -20,6 +20,7 @@ import Motion
 public struct ThemedCheckboxView: View {
     @Environment(\.sillPalette) private var ambientPalette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var ancestorEnabled
     private let explicitPalette: ResolvedPalette?
     /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
     var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
@@ -27,7 +28,10 @@ public struct ThemedCheckboxView: View {
     var label: String?
     var isChecked: Bool
     var isIndeterminate: Bool
-    var enabled: Bool
+    private let explicitEnabled: Bool
+    /// The `enabled:` argument ∧ the ancestor `.disabled(_:)` environment — a
+    /// disabled ancestor paints the disabled state (stock-control parity).
+    var enabled: Bool { explicitEnabled && ancestorEnabled }
     var previewHovered: Bool
     var previewPressed: Bool
     var previewFocused: Bool
@@ -59,7 +63,7 @@ public struct ThemedCheckboxView: View {
         self.label = label
         self.isChecked = isChecked
         self.isIndeterminate = isIndeterminate
-        self.enabled = enabled
+        self.explicitEnabled = enabled
         self.previewHovered = previewHovered
         self.previewPressed = previewPressed
         self.previewFocused = previewFocused

@@ -210,6 +210,20 @@ final class ThemedCheckboxRenderTests: XCTestCase {
                        "disabled ignores previewHovered — no state circle")
     }
 
+    /// The environment side of the family enabled rule: `enabled` is the
+    /// argument ∧ `@Environment(\.isEnabled)`, so an ancestor `.disabled(true)`
+    /// paints the SAME disabled pixels as `enabled: false` (stock-control parity).
+    func testAncestorDisabledPaintsTheDisabledState() {
+        let box = { [self] (enabled: Bool) in
+            ThemedCheckboxView(palette: dracula, enabled: enabled, previewChecked: true)
+        }
+        let r = render(box(true).disabled(true))
+        assertHue(boxProbe(r, 0.85, 0.85), is: dracula.disabledInk,
+                  "an ancestor .disabled(true) fills the set box disabledInk")
+        XCTAssertEqual(r.px, render(box(false)).px,
+                       "…matching enabled: false byte-for-byte")
+    }
+
     // MARK: - the three theming tiers, read off the painted fill
 
     func testFallsBackToTheProcessDefault() {

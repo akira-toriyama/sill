@@ -18,15 +18,17 @@
 // `activate()` directly, never touching the flash helper the button uses.
 // The `preview…` overrides force each state for deterministic capture.
 //
-// `enabled` is this view's OWN argument, matching ThemedButtonView /
-// ThemedFABView / ThemedCheckboxView — an ancestor `.disabled(true)` blocks hit
-// testing but does not paint the disabled state. That is the opposite of the
-// NSViewRepresentable bridge, and the swap fixes the direction that mattered:
-// SwiftUI drives a hosted `NSControl`'s `isEnabled` from
-// `@Environment(\.isEnabled)` AFTER `updateNSView`, so the bridge's
-// `c.isEnabled = enabled` was clobbered on every update and
+// `enabled` is the view's `enabled:` argument ANDed with the ancestor
+// `.disabled(_:)` environment (`\.isEnabled`) — the family-wide rule (Button /
+// FAB / Checkbox / Chip / ButtonGroup; ToolBar items inherit it through
+// ThemedButtonView), so a disabled ancestor paints the disabled state exactly
+// like a stock SwiftUI control. The retired NSViewRepresentable bridge could
+// honour NEITHER side reliably: SwiftUI drives a hosted `NSControl`'s
+// `isEnabled` from `@Environment(\.isEnabled)` AFTER `updateNSView`, so the
+// bridge's `c.isEnabled = enabled` was clobbered on every update and
 // `ThemedChipView(enabled: false)` rendered fully ENABLED (measured 2026-08-02;
-// `testDisabledGreysTheFillAndInkRegardlessOfRole` is the regression guard).
+// `testDisabledGreysTheFillAndInkRegardlessOfRole` guards the argument side,
+// `testAncestorDisabledPaintsTheDisabledState` the environment side).
 
 import SwiftUI
 import AppKit
@@ -38,6 +40,7 @@ import Motion
 public struct ThemedChipView: View {
     @Environment(\.sillPalette) private var ambientPalette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var ancestorEnabled
     private let explicitPalette: ResolvedPalette?
     /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
     var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
@@ -47,7 +50,10 @@ public struct ThemedChipView: View {
     var title: String
     var leading: String?
     var selected: Bool
-    var enabled: Bool
+    private let explicitEnabled: Bool
+    /// The `enabled:` argument ∧ the ancestor `.disabled(_:)` environment — a
+    /// disabled ancestor paints the disabled state (stock-control parity).
+    var enabled: Bool { explicitEnabled && ancestorEnabled }
     var previewHovered: Bool
     var previewPressed: Bool
     var previewFocused: Bool
@@ -89,7 +95,7 @@ public struct ThemedChipView: View {
         self.title = title
         self.leading = leading
         self.selected = selected
-        self.enabled = enabled
+        self.explicitEnabled = enabled
         self.previewHovered = previewHovered
         self.previewPressed = previewPressed
         self.previewFocused = previewFocused

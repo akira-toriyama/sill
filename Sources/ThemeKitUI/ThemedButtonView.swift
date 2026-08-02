@@ -28,6 +28,7 @@ import Motion
 public struct ThemedButtonView: View {
     @Environment(\.sillPalette) private var ambientPalette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var ancestorEnabled
     private let explicitPalette: ResolvedPalette?
     /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
     var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
@@ -40,7 +41,10 @@ public struct ThemedButtonView: View {
     var leadingImage: NSImage?      // pre-resolved icon (SVG / logo / …)
     var trailingImage: NSImage?
     var fullWidth: Bool
-    var enabled: Bool
+    private let explicitEnabled: Bool
+    /// The `enabled:` argument ∧ the ancestor `.disabled(_:)` environment — a
+    /// disabled ancestor paints the disabled state (stock-control parity).
+    var enabled: Bool { explicitEnabled && ancestorEnabled }
     var previewHovered: Bool
     var previewPressed: Bool
     var previewFocused: Bool
@@ -117,7 +121,7 @@ public struct ThemedButtonView: View {
         self.leadingImage = leadingImage
         self.trailingImage = trailingImage
         self.fullWidth = fullWidth
-        self.enabled = enabled
+        self.explicitEnabled = enabled
         self.previewHovered = previewHovered
         self.previewPressed = previewPressed
         self.previewFocused = previewFocused

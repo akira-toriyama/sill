@@ -280,6 +280,20 @@ final class ThemedButtonGroupRenderTests: XCTestCase {
         }
     }
 
+    /// The environment side of the family enabled rule: `enabled` is the
+    /// argument ∧ `@Environment(\.isEnabled)`, so an ancestor `.disabled(true)`
+    /// paints the SAME disabled pixels as `enabled: false` (stock-control parity).
+    func testAncestorDisabledGreysEveryMember() {
+        let group = { [self] (enabled: Bool) in
+            ThemedButtonGroupView(palette: dracula, titles: empty3, enabled: enabled)
+        }
+        let r = renderOn(backdrop, group(true).disabled(true))
+        assertHue(r.at(seamX(0), dpx(0.5)), is: blend(dracula.disabledStroke, on: backdrop),
+                  "an ancestor .disabled(true) drops the role stroke")
+        XCTAssertEqual(r.px, renderOn(backdrop, group(false)).px,
+                       "…matching enabled: false byte-for-byte")
+    }
+
     func testPerSegmentDisableAndsWithTheGroup() {
         let r = renderOn(backdrop, ThemedButtonGroupView(palette: dracula, titles: empty3,
                                                          disabledMember: 1))

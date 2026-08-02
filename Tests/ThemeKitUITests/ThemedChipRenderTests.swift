@@ -245,6 +245,21 @@ final class ThemedChipRenderTests: XCTestCase {
                   "…and the ink greys to muted")
     }
 
+    /// The environment side of the family enabled rule: `enabled` is the
+    /// argument ∧ `@Environment(\.isEnabled)`, so an ancestor `.disabled(true)`
+    /// paints the SAME disabled pixels as `enabled: false` (stock-control parity).
+    func testAncestorDisabledPaintsTheDisabledState() {
+        let chip = { [self] (enabled: Bool) in
+            ThemedChipView(palette: dracula, role: .error, title: "Tag",
+                           leading: "plus", enabled: enabled)
+        }
+        let r = renderOn(backdrop, chip(true).disabled(true))
+        assertHue(fillProbe(r), is: blend(dracula.ink(.subtle, of: .muted), on: backdrop),
+                  "an ancestor .disabled(true) greys the fill — not just hit testing")
+        XCTAssertEqual(r.px, renderOn(backdrop, chip(false)).px,
+                       "…matching enabled: false byte-for-byte")
+    }
+
     // MARK: - the outlined stroke
 
     func testOutlinedRoleStrokeRestsAtHalfRoleAndSharpensOnInteraction() {

@@ -21,6 +21,7 @@ import Motion
 public struct ThemedFABView: View {
     @Environment(\.sillPalette) private var ambientPalette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var ancestorEnabled
     private let explicitPalette: ResolvedPalette?
     /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
     var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
@@ -30,7 +31,10 @@ public struct ThemedFABView: View {
     var symbol: String?
     var image: NSImage?          // pre-resolved icon (SVG / logo / …); wins over symbol
     var label: String
-    var enabled: Bool
+    private let explicitEnabled: Bool
+    /// The `enabled:` argument ∧ the ancestor `.disabled(_:)` environment — a
+    /// disabled ancestor paints the disabled state (stock-control parity).
+    var enabled: Bool { explicitEnabled && ancestorEnabled }
     var previewHovered: Bool
     var previewPressed: Bool
     var previewFocused: Bool
@@ -55,7 +59,7 @@ public struct ThemedFABView: View {
         self.symbol = symbol
         self.image = image
         self.label = label
-        self.enabled = enabled
+        self.explicitEnabled = enabled
         self.previewHovered = previewHovered
         self.previewPressed = previewPressed
         self.previewFocused = previewFocused

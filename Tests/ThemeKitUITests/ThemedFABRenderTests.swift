@@ -147,6 +147,20 @@ final class ThemedFABRenderTests: XCTestCase {
                   "…and the glyph greys to disabledInk")
     }
 
+    /// The environment side of the family enabled rule: `enabled` is the
+    /// argument ∧ `@Environment(\.isEnabled)`, so an ancestor `.disabled(true)`
+    /// paints the SAME disabled pixels as `enabled: false` (stock-control parity).
+    func testAncestorDisabledPaintsTheDisabledState() {
+        let fab = { [self] (enabled: Bool) in
+            ThemedFABView(palette: dracula, enabled: enabled)
+        }
+        let r = render(fab(true).disabled(true))
+        assertHue(fillProbe(r), is: dracula.disabledFill,
+                  "an ancestor .disabled(true) drops the role fill")
+        XCTAssertEqual(r.px, render(fab(false)).px,
+                       "…matching enabled: false byte-for-byte")
+    }
+
     // MARK: - interaction states (forced via the preview overrides)
 
     func testHoverWashesContrastInkOverTheRoleFill() {
