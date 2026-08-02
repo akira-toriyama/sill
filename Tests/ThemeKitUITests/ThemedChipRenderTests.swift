@@ -309,7 +309,7 @@ final class ThemedChipRenderTests: XCTestCase {
     }
 
     func testTheDeleteGlyphEmphasisesOnHoverWithoutLightingTheBody() {
-        let chip = { (hovered: Bool) in
+        let chip = { [self] (hovered: Bool) in
             ThemedChipView(palette: dracula, variant: .outlined, title: "Tag",
                            previewHovered: hovered, deletable: true)
         }
