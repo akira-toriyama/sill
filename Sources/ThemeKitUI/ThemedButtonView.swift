@@ -8,10 +8,15 @@
 // Interaction parity with the `ThemedControl` machinery: hover, press with drag-out
 // cancel, Tab focus + Space activation with the auto-repeat and in-flight
 // flash guards, and the 0.16 s ease-out interaction transitions. The
-// `preview…` overrides force each state for deterministic capture. Grouping
-// (roundedCorners / drawnBorderEdges / groupedShadow) is a ThemedButtonGroup
-// composition concern and stays on the AppKit widget — this view is the
-// STANDALONE button.
+// `preview…` overrides force each state for deterministic capture.
+//
+// `grouping` carries the joined-segment chrome — the SwiftUI mirror of the
+// AppKit button's `roundedCorners` / `drawnBorderEdges` / `groupedShadow`.
+// It lives HERE, not in the group, because the outlined border has to sharpen
+// from `restingStroke` to the full role on THIS member's own hover / press /
+// focus, and those are `@State` / `@FocusState` private to this view: a
+// container drawing the seam from outside cannot see them. `nil` = standalone,
+// which is byte-identical to a plain rounded rect.
 
 import SwiftUI
 import AppKit
@@ -39,7 +44,48 @@ public struct ThemedButtonView: View {
     var previewHovered: Bool
     var previewPressed: Bool
     var previewFocused: Bool
+    var grouping: Grouping?
     var onTap: (() -> Void)?
+
+    /// Joined-segment chrome. A `ThemedButtonGroup` member rounds only the
+    /// group's OUTER corners, drops the shared seam edge so two abutting
+    /// strokes collapse to one hairline, and forgoes its own elevation so the
+    /// group can own one continuous shadow. The vocabulary is the AppKit
+    /// widget's, verbatim — `ThemedButtonGroup`'s position → corners / edges
+    /// tables port line-for-line.
+    /// `CACornerMask` is a QuartzCore `OptionSet` that ships neither `Hashable`
+    /// nor `Sendable`, so both are written out here over the raw bit patterns —
+    /// three PODs, no reference state.
+    public struct Grouping: Hashable, @unchecked Sendable {
+        public var roundedCorners: CACornerMask
+        public var drawnBorderEdges: ThemedButton.BorderEdges
+        public var groupedShadow: Bool
+
+        /// The standalone default: all four corners, a closed perimeter, its
+        /// own elevation.
+        public static let standalone = Grouping()
+
+        public init(roundedCorners: CACornerMask = .themedAllCorners,
+                    drawnBorderEdges: ThemedButton.BorderEdges = .all,
+                    groupedShadow: Bool = false) {
+            self.roundedCorners = roundedCorners
+            self.drawnBorderEdges = drawnBorderEdges
+            self.groupedShadow = groupedShadow
+        }
+
+        public static func == (a: Grouping, b: Grouping) -> Bool {
+            a.roundedCorners == b.roundedCorners
+                && a.drawnBorderEdges == b.drawnBorderEdges
+                && a.groupedShadow == b.groupedShadow
+        }
+        public func hash(into h: inout Hasher) {
+            h.combine(roundedCorners.rawValue)
+            h.combine(drawnBorderEdges.rawValue)
+            h.combine(groupedShadow)
+        }
+    }
+
+    private var g: Grouping { grouping ?? .standalone }
 
     @State private var hovered = false
     @State private var pressed = false
@@ -53,7 +99,8 @@ public struct ThemedButtonView: View {
                 leadingImage: NSImage? = nil, trailingImage: NSImage? = nil,
                 fullWidth: Bool = false, enabled: Bool = true,
                 previewHovered: Bool = false, previewPressed: Bool = false,
-                previewFocused: Bool = false, onTap: (() -> Void)? = nil) {
+                previewFocused: Bool = false, grouping: Grouping? = nil,
+                onTap: (() -> Void)? = nil) {
         self.explicitPalette = palette
         self.variant = variant
         self.size = size
@@ -68,6 +115,7 @@ public struct ThemedButtonView: View {
         self.previewHovered = previewHovered
         self.previewPressed = previewPressed
         self.previewFocused = previewFocused
+        self.grouping = grouping
         self.onTap = onTap
     }
 
@@ -173,22 +221,28 @@ public struct ThemedButtonView: View {
         content
             .background {
                 ZStack {
-                    RoundedRectangle(cornerRadius: m.radius)
+                    SeamShape(corners: g.roundedCorners, radius: m.radius)
                         .fill(Color(nsColor: baseFillColor))
-                        .shadow(color: .black.opacity(elevation.opacity),
+                        // `groupedShadow` zeroes the OPACITY only, so the ladder
+                        // still computes (ThemedButton.applyInteractionState).
+                        .shadow(color: .black.opacity(g.groupedShadow ? 0 : elevation.opacity),
                                 radius: CGFloat(elevation.blur),
                                 x: 0, y: CGFloat(elevation.dy))
-                    RoundedRectangle(cornerRadius: m.radius)
+                    SeamShape(corners: g.roundedCorners, radius: m.radius)
                         .fill(Color(nsColor: overlayColor))
-                    RoundedRectangle(cornerRadius: m.radius)
-                        .strokeBorder(Color(nsColor: borderColor), lineWidth: 1)
+                    SeamBorderShape(corners: g.roundedCorners, radius: m.radius,
+                                    edges: g.drawnBorderEdges, inset: 0.5)
+                        .stroke(Color(nsColor: borderColor), lineWidth: 1)
                         .opacity(variant == .outlined ? 1 : 0)
                 }
             }
             .overlay {
-                RoundedRectangle(cornerRadius: m.radius)
-                    .inset(by: -ringOutset)
+                // `focusRingPath`: the box outset by 2 with its radius bumped by
+                // the same 2, and the member's OWN corner mask — so a middle
+                // segment rings square and a first segment rings on the left only.
+                SeamShape(corners: g.roundedCorners, radius: m.radius + ringOutset)
                     .stroke(Color(nsColor: palette.primary), lineWidth: 2)
+                    .padding(-ringOutset)
                     .opacity(fxFocused ? 1 : 0)
             }
             .animation(interaction, value: fxHovered)
@@ -233,6 +287,7 @@ public struct ThemedButtonView: View {
                     .kerning(0.4)
                     .foregroundColor(Color(nsColor: titleColor))
                     .fixedSize()
+                    .frame(width: titleWidth)
             }
             iconView(trailingImage, slug: trailing)
         }
@@ -245,6 +300,18 @@ public struct ThemedButtonView: View {
 
     private func hasIcon(_ image: NSImage?, _ slug: String?) -> Bool {
         image != nil || slug != nil
+    }
+
+    /// The label slot, measured exactly as `ThemedButton.rebuildTitle` measures
+    /// it — `ceil(attributedWidth) + 2`, kerning included. SwiftUI's own `Text`
+    /// layout is ~2.5 pt tighter; a standalone button hides that behind the
+    /// 64 pt `minWidth`, but a ButtonGroup SUMS its members, so the divergence
+    /// accumulates across a row.
+    private var titleWidth: CGFloat? {
+        guard !title.isEmpty else { return nil }
+        let attr = NSAttributedString(string: title.uppercased(), attributes: [
+            .font: palette.uiFont(m.font, .medium), .kern: 0.4])
+        return ceil(attr.size().width) + 2
     }
 
     /// One icon slot: the pre-resolved `image` wins over the Phosphor slug;
@@ -312,4 +379,95 @@ public struct ThemedButtonView: View {
         guard enabled else { return }
         onTap?()
     }
+}
+
+// MARK: - Corner-aware shapes
+//
+// Ports of `ThemedButton.closedCornerPath` / `borderPath`, which build their
+// arcs explicitly. That is also what keeps the corner CIRCULAR: SwiftUI's
+// `RoundedRectangle(cornerRadius:)` defaults to `.continuous`, and a squircle
+// visibly diverges from `CALayer.cornerRadius` (caught in the ThemedChipView
+// before/after raster, #164). AppKit's y is UP and SwiftUI's is DOWN, so the
+// `CACornerMask` names map to the opposite vertical half here — the mapping is
+// spelled out per point rather than left to the reader.
+
+/// A CLOSED rounded-rect rounding only `corners` (the rest squared).
+struct SeamShape: Shape {
+    var corners: CACornerMask
+    var radius: CGFloat
+    /// `local.insetBy(dx:dy:)` — the AppKit border sits half a line-width in.
+    var inset: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        let b = rect.insetBy(dx: inset, dy: inset)
+        let r = min(radius, min(b.width, b.height) / 2)
+        let p = CGMutablePath()
+        let c = VisualCorners(b)
+        func rad(_ mask: CACornerMask) -> CGFloat { corners.contains(mask) ? r : 0 }
+        p.move(to: CGPoint(x: b.midX, y: b.maxY))          // the y-up "minY" mid-edge
+        p.addArc(tangent1End: c.bottomRight, tangent2End: c.topRight, radius: rad(.layerMaxXMinYCorner))
+        p.addArc(tangent1End: c.topRight, tangent2End: c.topLeft, radius: rad(.layerMaxXMaxYCorner))
+        p.addArc(tangent1End: c.topLeft, tangent2End: c.bottomLeft, radius: rad(.layerMinXMaxYCorner))
+        p.addArc(tangent1End: c.bottomLeft, tangent2End: c.bottomRight, radius: rad(.layerMinXMinYCorner))
+        p.closeSubpath()
+        return Path(p)
+    }
+}
+
+/// The outlined border: a closed perimeter when `edges == .all`, else an OPEN
+/// path that omits the shared seam edge so two abutting members stroke ONE
+/// hairline. Only the two seam configurations a group produces are special-cased
+/// — anything else falls back to the closed path, including a subset that still
+/// holds both `.right` and `.bottom`. That last arm strokes an edge that was not
+/// asked for; it is the AppKit widget's behaviour, kept so the two cannot drift.
+struct SeamBorderShape: Shape {
+    var corners: CACornerMask
+    var radius: CGFloat
+    var edges: ThemedButton.BorderEdges
+    var inset: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        guard edges != .all else {
+            return SeamShape(corners: corners, radius: radius, inset: inset).path(in: rect)
+        }
+        let b = rect.insetBy(dx: inset, dy: inset)
+        let r = min(radius, min(b.width, b.height) / 2)
+        let c = VisualCorners(b)
+        func rad(_ mask: CACornerMask) -> CGFloat { corners.contains(mask) ? r : 0 }
+        let p = CGMutablePath()
+        if !edges.contains(.right) {              // horizontal seam: open on the right
+            p.move(to: c.topRight)                // the square endpoint never consults `rad`
+            p.addArc(tangent1End: c.topLeft, tangent2End: c.bottomLeft, radius: rad(.layerMinXMaxYCorner))
+            p.addArc(tangent1End: c.bottomLeft, tangent2End: c.bottomRight, radius: rad(.layerMinXMinYCorner))
+            p.addLine(to: c.bottomRight)
+        } else if !edges.contains(.bottom) {      // vertical seam: open on the bottom
+            p.move(to: c.bottomRight)
+            p.addArc(tangent1End: c.topRight, tangent2End: c.topLeft, radius: rad(.layerMaxXMaxYCorner))
+            p.addArc(tangent1End: c.topLeft, tangent2End: c.bottomLeft, radius: rad(.layerMinXMaxYCorner))
+            p.addLine(to: c.bottomLeft)
+        } else {
+            return SeamShape(corners: corners, radius: radius, inset: inset).path(in: rect)
+        }
+        return Path(p)
+    }
+}
+
+/// The four corners of a SwiftUI (y-DOWN) rect, named by what they LOOK like —
+/// so the `CACornerMask` cases, which are named for AppKit's y-UP layer space,
+/// can be read off without re-deriving the flip at each call site.
+private struct VisualCorners {
+    let topLeft, topRight, bottomRight, bottomLeft: CGPoint
+    init(_ b: CGRect) {
+        topLeft     = CGPoint(x: b.minX, y: b.minY)   // .layerMinXMaxYCorner
+        topRight    = CGPoint(x: b.maxX, y: b.minY)   // .layerMaxXMaxYCorner
+        bottomRight = CGPoint(x: b.maxX, y: b.maxY)   // .layerMaxXMinYCorner
+        bottomLeft  = CGPoint(x: b.minX, y: b.maxY)   // .layerMinXMinYCorner
+    }
+}
+
+public extension CACornerMask {
+    /// All four — the standalone button's mask, and `ThemedButtonGroup`'s
+    /// `.lone` case.
+    static let themedAllCorners: CACornerMask =
+        [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner, .layerMinXMaxYCorner]
 }
