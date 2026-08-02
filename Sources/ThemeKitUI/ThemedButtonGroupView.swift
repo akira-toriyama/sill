@@ -28,6 +28,7 @@ import ThemeKit
 public struct ThemedButtonGroupView: View {
     @Environment(\.sillPalette) private var ambientPalette
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.isEnabled) private var ancestorEnabled
     private let explicitPalette: ResolvedPalette?
     /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
     var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
@@ -40,7 +41,10 @@ public struct ThemedButtonGroupView: View {
     var fullWidth: Bool
     /// MUI `disableElevation` — drop the contained group's shadow.
     var disableElevation: Bool
-    var enabled: Bool
+    private let explicitEnabled: Bool
+    /// The `enabled:` argument ∧ the ancestor `.disabled(_:)` environment — a
+    /// disabled ancestor paints the disabled state (stock-control parity).
+    var enabled: Bool { explicitEnabled && ancestorEnabled }
     var disabledMember: Int?
     var selectedIndex: Int?
     var previewSelectedIndex: Int?
@@ -75,7 +79,7 @@ public struct ThemedButtonGroupView: View {
         self.mode = mode
         self.fullWidth = fullWidth
         self.disableElevation = disableElevation
-        self.enabled = enabled
+        self.explicitEnabled = enabled
         self.disabledMember = disabledMember
         self.selectedIndex = selectedIndex
         self.previewSelectedIndex = previewSelectedIndex

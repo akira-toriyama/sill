@@ -170,6 +170,21 @@ final class ThemedButtonRenderTests: XCTestCase {
         assertHue(iconProbe(r), is: dracula.muted, "…and the ink greys to muted")
     }
 
+    /// The environment side of the family enabled rule: `enabled` is the
+    /// argument ∧ `@Environment(\.isEnabled)`, so an ancestor `.disabled(true)`
+    /// paints the SAME disabled pixels as `enabled: false` (stock-control parity).
+    func testAncestorDisabledPaintsTheDisabledState() {
+        let button = { [self] (enabled: Bool) in
+            ThemedButtonView(palette: dracula, variant: .contained, role: .error,
+                             title: "Button", leading: "plus", enabled: enabled)
+        }
+        let r = render(button(true).disabled(true))
+        assertHue(fillProbe(r), is: dracula.ink(.subtle, of: .muted),
+                  "an ancestor .disabled(true) greys the fill — not just hit testing")
+        XCTAssertEqual(r.px, render(button(false)).px,
+                       "…matching enabled: false byte-for-byte")
+    }
+
     func testOutlinedStrokeRestsAtHalfRoleAndSharpensOnHover() {
         let rest = render(ThemedButtonView(palette: dracula, variant: .outlined, title: "Button"))
         // strokeBorder puts the 1 pt stroke fully inside the edge: probe half

@@ -289,6 +289,21 @@ final class ThemedToolBarRenderTests: XCTestCase {
                   "…and it is half the bar's height, not the full height")
     }
 
+    /// The bar has no own `enabled:` argument — its buttons are ThemedButtonViews,
+    /// which read `\.isEnabled`, so an ancestor `.disabled(true)` greys every item
+    /// exactly like per-item `enabled: false` (the family rule, transitively).
+    func testAncestorDisabledGreysEveryItem() {
+        let bar = { [self] (itemsEnabled: Bool) in
+            ThemedToolBarView(palette: dracula, items: [
+                .button(title: "On", symbol: nil, enabled: itemsEnabled),
+                .button(title: "Off", symbol: nil, enabled: itemsEnabled),
+            ])
+        }
+        XCTAssertEqual(renderOn(backdrop, bar(true).disabled(true)).px,
+                       renderOn(backdrop, bar(false)).px,
+                       "ancestor .disabled(true) == per-item enabled: false, byte-for-byte")
+    }
+
     func testADisabledItemGreysWhileItsNeighbourDoesNot() {
         let items: [ThemedToolBarView.Item] = [
             .button(title: "On", symbol: nil),
