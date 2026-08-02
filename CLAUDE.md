@@ -21,8 +21,15 @@ CLT ships neither XCTest nor swift-testing, and adding swift-testing as a packag
 dependency does not rescue it (the generated runner links `_TestingInterop`, which
 is toolchain-only; measured 2026-07-26). In that state CI is the FIRST execution
 of any test you write — say so rather than implying a test passed. `swift build`
-plus the two script gates still hold, and pure value logic can be exercised by
-building a temporary `.executableTarget` that asserts and exits non-zero.
+plus the two script gates still hold, and a temporary `.executableTarget` that
+asserts and exits non-zero can dry-run more than pure value logic: `ImageRenderer`
+and `NSHostingView` + `cacheDisplay` both work without XCTest, so the RENDER
+assertions of a widget test run there too (measured 2026-08-02, #164). **Derive
+that target from the test file mechanically** — strip the XCTest plumbing with a
+script, never hand-copy — and **never fix a compile error in the derived copy**:
+that leaves it in the source and CI catches it a round-trip later (which is
+exactly what happened in #164). `swift build` does NOT compile test targets, so
+a green build says nothing about whether your tests compile.
 
 **Both are local gates now — run them before every commit.** `swift build` is the
 quick CLT compile bar; `scripts/test.sh` runs the whole XCTest suite by pointing
