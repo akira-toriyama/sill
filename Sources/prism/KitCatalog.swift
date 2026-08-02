@@ -284,7 +284,7 @@ ThemedToolBarView(palette: palette, items: items) { index in
         name: "ThemedChip", module: "ThemeKit",
         kind: "MUI <Chip> fused with HTML <kbd> — a compact token: tag / status pill / keycap",
         summary: "Themed compact AppKit token (tag / status / keycap), themed by assigning a ResolvedPalette.",
-        consumes: "Embed the NSView directly: it is a public final class ThemedChip: NSControl, init(palette:); add as a subview / wrap in NSViewRepresentable (no controller, no child window). Hugs its label (intrinsicContentSize, minWidth 0).",
+        consumes: "Embed the NSView directly: it is a public final class ThemedChip: NSControl, init(palette:); add as a subview (no controller, no child window). Hugs its label (intrinsicContentSize, minWidth 0). SwiftUI hosts use ThemeKitUI's `ThemedChipView`, a native view drawing the same anatomy.",
         keyAPI: [
                  "palette: ResolvedPalette — theme; assigning re-themes the whole chip (didSet)",
                  "title: String — label drawn AS-IS (not uppercased); a keycap's glyph run, e.g. \"⇧⌘N\"",
@@ -306,7 +306,7 @@ ThemedToolBarView(palette: palette, items: items) { index in
         family: .action,
         defaultType: "ThemedChipView",
         imports: [
-            "import ThemeKitUI   // ThemedChipView — the public SwiftUI front",
+            "import ThemeKitUI   // ThemedChipView — the SwiftUI-native front",
             "import ThemeKit     // ThemedChip.Variant / .Size / .Role enums",
             "import PaletteKit   // ResolvedPalette + resolve(_:)",
         ],
@@ -317,7 +317,7 @@ ThemedToolBarView(palette: palette, items: items) { index in
                  clickable: true, deletable: false, onTap: { })
 """,
         sourcePath: "ThemeKitUI/ThemedChipView.swift",
-        appkitEscape: "ThemedChip (NSView, module ThemeKit) — the real AppKit chip ThemedChipView wraps via NSViewRepresentable; drop to it only if ThemedChipView can't be hosted (e.g. non-SwiftUI AppKit call site)"),
+        appkitEscape: "ThemedChip (NSControl, module ThemeKit) — only if NOT in SwiftUI (a raw AppKit call site, or when you need the NSControl target/action channel); ThemedChipView is SwiftUI-native and draws the same anatomy."),
     KitComponent(
         name: "ThemedPill", module: "ThemeKitUI",
         kind: "Display/indicator pill — perch's universal hint pill in ONE SwiftUI surface (tag/badge/status/search-indicator)",

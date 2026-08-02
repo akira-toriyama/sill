@@ -50,13 +50,20 @@ final class PaletteEnvironmentTests: XCTestCase {
         return nil
     }
 
+    // The specimen is `ThemedTextFieldView` — deliberately the FLOOR-1 widget.
+    // Every previous specimen (Chip, and before it FAB and Button) had to be
+    // swapped out the moment it went SwiftUI-native, and each swap risked
+    // silently weakening these cases (the assertion turns nil, not wrong). The
+    // IME field editor is the one bridge the AppKit-floor policy says will
+    // NEVER migrate, so the rotation stops here.
+
     func testFallsBackToTheProcessDefault() {
-        let d = firstSubview(host(ThemedChipView()), of: ThemedChip.self)
+        let d = firstSubview(host(ThemedTextFieldView()), of: ThemedTextField.self)
         XCTAssertEqual(d?.palette, cobalt, "no explicit argument and no ancestor theme ⇒ pal")
     }
 
     func testAmbientThemeBeatsTheProcessDefault() {
-        let d = firstSubview(host(ThemedChipView().sillTheme(dracula)), of: ThemedChip.self)
+        let d = firstSubview(host(ThemedTextFieldView().sillTheme(dracula)), of: ThemedTextField.self)
         XCTAssertEqual(d?.palette, dracula)
     }
 
@@ -64,27 +71,28 @@ final class PaletteEnvironmentTests: XCTestCase {
     /// and needs per-widget override. If this ever regresses, the bench silently
     /// starts painting one theme everywhere.
     func testExplicitArgumentBeatsTheAmbientTheme() {
-        let d = firstSubview(host(ThemedChipView(palette: gruvbox).sillTheme(dracula)),
-                             of: ThemedChip.self)
+        let d = firstSubview(host(ThemedTextFieldView(palette: gruvbox).sillTheme(dracula)),
+                             of: ThemedTextField.self)
         XCTAssertEqual(d?.palette, gruvbox)
     }
 
     func testInnerThemeOverridesOuterForItsSubtree() {
-        let v = VStack { ThemedChipView().sillTheme(gruvbox) }.sillTheme(dracula)
-        XCTAssertEqual(firstSubview(host(v), of: ThemedChip.self)?.palette, gruvbox)
+        let v = VStack { ThemedTextFieldView().sillTheme(gruvbox) }.sillTheme(dracula)
+        XCTAssertEqual(firstSubview(host(v), of: ThemedTextField.self)?.palette, gruvbox)
     }
 
     func testThemeOverloadMatchesTheResolvedOverload() {
-        let a = firstSubview(host(ThemedChipView().sillTheme(Theme.dracula)), of: ThemedChip.self)
+        let a = firstSubview(host(ThemedTextFieldView().sillTheme(Theme.dracula)),
+                             of: ThemedTextField.self)
         XCTAssertEqual(a?.palette, dracula)
     }
 
-    /// Spot-checks widgets that reach AppKit by different routes — a plain
-    /// bridge (the menu trigger, hosting the AppKit `ThemedButton`), a
-    /// composite bridge, and the floor-1 IME field editor — so a per-widget
-    /// wiring slip cannot hide behind the chip passing. (ThemedFABView and
-    /// ThemedButtonView held slots here until they went SwiftUI-native —
-    /// their evidence now lives in the ThemedFAB/ThemedButtonRenderTests.)
+    /// Spot-checks the OTHER routes into AppKit — a plain bridge (the menu
+    /// trigger, hosting the AppKit `ThemedButton`) and a composite bridge — so
+    /// a per-widget wiring slip cannot hide behind the field passing.
+    /// (ThemedFABView, ThemedButtonView and ThemedChipView held slots here
+    /// until they went SwiftUI-native — their evidence now lives in the
+    /// ThemedFAB / ThemedButton / ThemedChipRenderTests.)
     func testEveryWidgetKindHonoursTheAmbientTheme() {
         XCTAssertEqual(
             firstSubview(host(ThemedMenuTriggerView(items: []).sillTheme(dracula)), of: ThemedButton.self)?.palette,
@@ -93,9 +101,6 @@ final class PaletteEnvironmentTests: XCTestCase {
             firstSubview(host(ThemedButtonGroupView(titles: ["A", "B"]).sillTheme(dracula)),
                          of: ThemedButtonGroup.self)?.palette,
             dracula, "ThemedButtonGroupView")
-        XCTAssertEqual(
-            firstSubview(host(ThemedTextFieldView().sillTheme(dracula)), of: ThemedTextField.self)?.palette,
-            dracula, "ThemedTextFieldView")
     }
 
     func testEveryWidgetKindStillHonoursAnExplicitOverride() {
@@ -107,10 +112,6 @@ final class PaletteEnvironmentTests: XCTestCase {
             firstSubview(host(ThemedButtonGroupView(palette: gruvbox, titles: ["A", "B"]).sillTheme(dracula)),
                          of: ThemedButtonGroup.self)?.palette,
             gruvbox, "ThemedButtonGroupView")
-        XCTAssertEqual(
-            firstSubview(host(ThemedTextFieldView(palette: gruvbox).sillTheme(dracula)),
-                         of: ThemedTextField.self)?.palette,
-            gruvbox, "ThemedTextFieldView")
     }
 
     func testEnvironmentDefaultsToNil() {
