@@ -1,22 +1,22 @@
-// ThemeKitUI — SwiftUI bridge for ThemeKit's `ThemedTooltip`. A real anchor (a
-// `ThemedButton`) with a live `ThemedTooltip` attached: hover it to see the
-// inverted bubble fade in on its own child window. The tooltip is a CONTROLLER,
-// so the Coordinator retains it. (A static tooltip bubble can't appear in a
-// screenshot of the host window — it lives on a separate child window.)
+// ThemeKitUI — ThemedTooltipAnchorView: a SwiftUI anchor with a live
+// `ThemedTooltip` attached — hover it to see the inverted bubble fade in on its
+// own child window. SwiftUI-NATIVE: the anchor is the real `ThemedButtonView`
+// and the tooltip attaches through the `.themedTooltip(_:)` modifier (the
+// shared `PopupAnchorProxy` supplies the popup controller its NSView anchor —
+// floor-2 plumbing, ruled 2026-08-02). (A static tooltip bubble can't appear in
+// a screenshot of the host window — it lives on a separate child window; the
+// prism grid draws an inline mock instead.)
 
 import SwiftUI
-import AppKit
 import PaletteKit
-import ThemeKit
 
-public struct ThemedTooltipAnchorView: NSViewRepresentable {
-    @Environment(\.sillPalette) private var ambientPalette
+public struct ThemedTooltipAnchorView: View {
     private let explicitPalette: ResolvedPalette?
-    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
-    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     let text: String
     let placement: ThemedTooltip.Placement
 
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default —
+    /// resolved by the button and the tooltip modifier themselves.
     public init(palette: ResolvedPalette? = nil, text: String,
                 placement: ThemedTooltip.Placement) {
         self.explicitPalette = palette
@@ -24,28 +24,8 @@ public struct ThemedTooltipAnchorView: NSViewRepresentable {
         self.placement = placement
     }
 
-    public final class Coordinator { var tooltip: ThemedTooltip? }
-    public func makeCoordinator() -> Coordinator { Coordinator() }
-
-    public func makeNSView(context: Context) -> ThemedButton {
-        let b = ThemedButton(palette: palette)
-        b.variant = .outlined
-        b.title = "Hover me"
-        context.coordinator.tooltip =
-            ThemedTooltip.attach(to: b, text: text, palette: palette, placement: placement)
-        return b
+    public var body: some View {
+        ThemedButtonView(palette: explicitPalette, variant: .outlined, title: "Hover me")
+            .themedTooltip(text, palette: explicitPalette, placement: placement)
     }
-
-    public func updateNSView(_ b: ThemedButton, context: Context) {
-        b.palette = palette
-        b.title = "Hover me"
-        if let t = context.coordinator.tooltip {
-            t.palette = palette
-            t.text = text
-            t.placement = placement
-        }
-    }
-
-    public func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedButton,
-                             context: Context) -> CGSize? { nsView.intrinsicContentSize }
 }

@@ -563,7 +563,7 @@ ThemedTooltipAnchorView(palette: resolve(themeSpec), text: "A live themed toolti
                          placement: .auto)
 """,
         sourcePath: "ThemeKitUI/ThemedTooltipAnchorView.swift",
-        appkitEscape: "ThemedTooltip (NSObject controller, module ThemeKitUI) — a per-anchor CONTROLLER (not an NSView) that owns a free, click-through, non-activating NSPanel floating above the host window; its anchor is a real ThemedButton (module ThemeKit, NSView). Only reach for ThemedTooltip.attach(to:text:palette:placement:) directly (skipping ThemedTooltipAnchorView) if you need the controller API (show()/hide()/invalidate(), enterDelay/leaveDelay, previewVisible) on an existing NSView outside a SwiftUI tree."),
+        appkitEscape: "ThemedTooltip (NSObject controller, module ThemeKitUI) — a per-anchor CONTROLLER (not an NSView) that owns a free, click-through, non-activating NSPanel floating above the host window; the bubble CONTENT is SwiftUI (TooltipBubble in an NSHostingView, floor-2 discipline). In SwiftUI, attach to ANY view with the .themedTooltip(_:palette:placement:) modifier (it anchors through the shared PopupAnchorProxy). Only reach for ThemedTooltip.attach(to:text:palette:placement:) directly if you need the controller API (show()/hide()/invalidate(), enterDelay/leaveDelay, previewVisible) on an existing NSView outside a SwiftUI tree."),
     KitComponent(
         name: "ThemedBackdrop", module: "ThemeKitUI",
         kind: "SwiftUI-native themed backdrop surface — what panels/pills/cards sit on (solid or alpha scrim, any Shape; NO blur)",
