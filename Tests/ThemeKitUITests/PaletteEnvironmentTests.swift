@@ -50,11 +50,6 @@ final class PaletteEnvironmentTests: XCTestCase {
         return nil
     }
 
-    /// Enough of a tool bar to produce a real `ThemedToolBar`.
-    private var toolBarItems: [ThemedToolBarView.Item] {
-        [.button(title: "A", symbol: nil), .divider, .button(title: "B", symbol: nil)]
-    }
-
     // The specimen is `ThemedTextFieldView` — deliberately the FLOOR-1 widget.
     // Every previous specimen (Chip, and before it FAB and Button) had to be
     // swapped out the moment it went SwiftUI-native, and each swap risked
@@ -92,21 +87,23 @@ final class PaletteEnvironmentTests: XCTestCase {
         XCTAssertEqual(a?.palette, dracula)
     }
 
-    /// Spot-checks the OTHER routes into AppKit — a plain bridge (the menu
-    /// trigger, hosting the AppKit `ThemedButton`) and a composite bridge (the
-    /// tool bar, which builds its own item views) — so a per-widget wiring slip
-    /// cannot hide behind the field passing. (ThemedFABView, ThemedButtonView,
-    /// ThemedChipView and ThemedButtonGroupView each held a slot here until
-    /// they went SwiftUI-native; their evidence now lives in the matching
-    /// Themed…RenderTests.)
+    /// Spot-checks the OTHER bridges into AppKit — the menu trigger (hosting an
+    /// AppKit `ThemedButton`) and the combo box (hosting a `ThemedTextField`
+    /// with its own option machinery) — so a per-widget wiring slip cannot hide
+    /// behind the field passing. FIVE widgets have vacated this list as they
+    /// went SwiftUI-native (FAB, Button, Chip, ButtonGroup, ToolBar); their
+    /// evidence lives in the matching Themed…RenderTests. Only these two and
+    /// the tooltip anchor are left, so the roll-call is nearly spent — the
+    /// three tier cases above are deliberately anchored to the floor-1 field
+    /// instead.
     func testEveryWidgetKindHonoursTheAmbientTheme() {
         XCTAssertEqual(
             firstSubview(host(ThemedMenuTriggerView(items: []).sillTheme(dracula)), of: ThemedButton.self)?.palette,
             dracula, "ThemedMenuTriggerView")
         XCTAssertEqual(
-            firstSubview(host(ThemedToolBarView(items: toolBarItems).sillTheme(dracula)),
-                         of: ThemedToolBar.self)?.palette,
-            dracula, "ThemedToolBarView")
+            firstSubview(host(ThemedComboBoxView(options: ["A", "B"]).sillTheme(dracula)),
+                         of: ThemedTextField.self)?.palette,
+            dracula, "ThemedComboBoxView")
     }
 
     func testEveryWidgetKindStillHonoursAnExplicitOverride() {
@@ -115,9 +112,9 @@ final class PaletteEnvironmentTests: XCTestCase {
                          of: ThemedButton.self)?.palette,
             gruvbox, "ThemedMenuTriggerView")
         XCTAssertEqual(
-            firstSubview(host(ThemedToolBarView(palette: gruvbox, items: toolBarItems).sillTheme(dracula)),
-                         of: ThemedToolBar.self)?.palette,
-            gruvbox, "ThemedToolBarView")
+            firstSubview(host(ThemedComboBoxView(palette: gruvbox, options: ["A", "B"]).sillTheme(dracula)),
+                         of: ThemedTextField.self)?.palette,
+            gruvbox, "ThemedComboBoxView")
     }
 
     func testEnvironmentDefaultsToNil() {

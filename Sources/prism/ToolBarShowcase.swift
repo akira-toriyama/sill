@@ -1,4 +1,5 @@
-// prism — ThemeKit toolbar bench. Hosts the REAL shared `ThemedToolBar` (ThemeKit)
+// prism — toolbar bench. Shows the REAL shared `ThemedToolBarView` (ThemeKitUI,
+// SwiftUI-native)
 // inside the SwiftUI gallery so the surface / elevation / variant / flex-section
 // layout + the composed buttons' hover-press 演出 can be evaluated live in every
 // theme. The top row is INTERACTIVE (hover an item, click to bump the counter);
@@ -42,7 +43,7 @@ struct MockToolBar: View, ShowcaseBench {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("ThemeKit · toolbar — the real shared app bar (top row LIVE: hover an item, click to bump)")
+            Text("ThemeKitUI · toolbar — the real shared app bar (top row LIVE: hover an item, click to bump)")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
