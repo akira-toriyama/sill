@@ -34,8 +34,9 @@
 # shrink. Entries tagged DEBT are the ones a future PR is expected to remove.
 #
 # READ THIS BEFORE TRUSTING A GREEN RUN: green means the debt did not GROW. It
-# does NOT mean the policy is satisfied — 6 of the 8 entries below are DEBT.
-# Only two are real floors: the IME field editor and the markdown draw core.
+# does NOT mean the policy is satisfied — 2 of the 5 entries below are DEBT.
+# Three are permanent: the IME field editor, the markdown draw core, and the
+# popup anchor proxy (floor-2 plumbing, ruled 2026-08-02).
 #
 # Usage: scripts/appkit-floor.sh [--list]
 # Exit:  0 = matches the allow-list · 1 = drifted · 2 = the gate could not run.
@@ -49,13 +50,10 @@ cd "$(dirname "$0")/.."
 # WHICH floor justifies an entry, or that it is debt awaiting migration.
 read -r -d '' ALLOWED <<'EOF' || true
 MarkdownKitUI/MarkdownTextView.swift:NSViewRepresentable        # floor 3 — the selectable rich-text draw core
+ThemeKitUI/PopupAnchor.swift:NSViewRepresentable                # floor 2 plumbing — the ONE anchor proxy popups present(from:) (permanent, ruled 2026-08-02)
 ThemeKitUI/ThemedComboBoxView.swift:NSViewRepresentable         # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedMenuTriggerView.swift:NSViewRepresentable      # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedTextFieldView.swift:NSViewRepresentable        # floor 1 — the IME field-editor core
-ThemeKitUI/ThemedTooltipAnchorView.swift:NSViewRepresentable    # DEBT — should be SwiftUI-native
-ThemeKitUI/ThemedTooltip.swift:CAShapeLayer                     # DEBT — bubble CONTENT in CALayer, past the floor-2 shell
-ThemeKitUI/ThemedTooltip.swift:CATextLayer                      # DEBT — bubble CONTENT in CALayer, past the floor-2 shell
-ThemeKitUI/ThemedTooltip.swift:CALayer                          # DEBT — bubble CONTENT in CALayer, past the floor-2 shell
 EOF
 
 # --- scan ------------------------------------------------------------------
@@ -73,8 +71,10 @@ ROOTS = ("Sources/ThemeKitUI", "Sources/MarkdownKitUI")
 # A conformance DECLARATION, not a mention. `\b` is unavailable in BSD sed, and
 # the shell-quoting of this regex was itself a portability bug once — keeping
 # the scan in python removes both hazards.
+# The optional `<...>` keeps a GENERIC representable (PopupAnchorProxy<C>) from
+# slipping past the ratchet.
 DECL = re.compile(r"^\s*(?:public\s+|private\s+|internal\s+|final\s+)*"
-                  r"(?:struct|class)\s+\w+\s*:[^{]*\bNSViewRepresentable\b")
+                  r"(?:struct|class)\s+\w+\s*(?:<[^>]*>)?\s*:[^{]*\bNSViewRepresentable\b")
 # CALayer & friends at CONSTRUCTION — `.layer` access is not a widget drawing
 # itself in Core Animation.
 CTOR = re.compile(r"\b(CALayer|CAShapeLayer|CATextLayer|CAGradientLayer|NSVisualEffectView)\s*\(\s*\)")

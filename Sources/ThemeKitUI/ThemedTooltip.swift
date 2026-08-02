@@ -2,9 +2,11 @@
 // basic). A small inverted-surface bubble on a free, borderless, non-activating
 // `NSPanel` that floats ABOVE the host window — it must draw outside the
 // anchor's clip / bounds, so it is a per-anchor CONTROLLER (not an NSView
-// wrapper). Themed by assigning a PaletteKit `ResolvedPalette`. AppKit /
-// @MainActor (the permitted popup-shell floor; `ThemedTooltipAnchorView` is the
-// SwiftUI front).
+// wrapper). Themed by assigning a PaletteKit `ResolvedPalette`. AppKit is the
+// permitted floor-2 SHELL only; the bubble CONTENT is SwiftUI (`TooltipBubble`
+// in an `NSHostingView` — the floor-2 discipline; it replaced the CALayer trio
+// under the 2026-08-02 ruling). SwiftUI hosts attach via `.themedTooltip(_:)`,
+// which anchors through the shared `PopupAnchorProxy`.
 //
 // Sill's FIRST owned child window (it LIFTED facet's KeyablePanel / PopupMenu
 // child-window ideas — sill must never depend on facet). The shared factory that
@@ -31,9 +33,13 @@
 //     dark / neon — theme-robust "grey 700"); text = best-contrast black/white
 //     on the foreground (the same WCAG crossover `onPrimary` uses). No border;
 //     the shadow + the inversion carry the separation.
+//   * Panel GEOMETRY stays measured on the AppKit side (`boundingRect` of the
+//     attributed text): `placePopup` needs the size BEFORE SwiftUI lays out,
+//     and keeping the measurement unchanged keeps every placement/flip/clamp
+//     byte-identical to the CALayer implementation it replaced.
 
 import AppKit
-import QuartzCore
+import SwiftUI
 import Palette
 import PaletteKit
 import Motion
@@ -84,10 +90,10 @@ public final class ThemedTooltip: NSObject {
     nonisolated(unsafe) private weak var _anchor: NSView?
     nonisolated(unsafe) private var trackingArea: NSTrackingArea?
 
-    private let bubbleView = NSView()
-    private let fillLayer  = CALayer()        // rounded inverted surface (clips nothing)
-    private let arrowLayer = CAShapeLayer()   // triangle on the anchor-facing edge
-    private let textLayer  = CATextLayer()    // wrapped label
+    /// The SwiftUI bubble host — the floor-2 "contents go through NSHostingView"
+    /// discipline. Built with the panel; its root view is re-assigned on every
+    /// rebuild / reposition.
+    private var hosting: NSHostingView<TooltipBubble>?
 
     private var panel: PopupPanel?
     private var isShown = false
@@ -131,21 +137,6 @@ public final class ThemedTooltip: NSObject {
         self.palette = palette
         self.placement = placement
         super.init()
-
-        // Layer tree lives on the (cheap) bubble view from the start; the
-        // window-server-backed NSPanel is created lazily on first show.
-        bubbleView.wantsLayer = true
-        bubbleView.layer?.masksToBounds = false
-        let s = backingScale
-        fillLayer.contentsScale = s
-        arrowLayer.contentsScale = s
-        arrowLayer.lineWidth = 0
-        textLayer.contentsScale = s
-        textLayer.isWrapped = true
-        textLayer.truncationMode = .none
-        bubbleView.layer?.addSublayer(fillLayer)
-        bubbleView.layer?.addSublayer(arrowLayer)
-        bubbleView.layer?.addSublayer(textLayer)
 
         installTrackingArea(on: anchor)
         anchor.toolTip = nil                       // no native double-fire
@@ -270,28 +261,31 @@ public final class ThemedTooltip: NSObject {
         // Passive bubble: click-through + out of AX (VoiceOver reaches the text via
         // the anchor's accessibilityHelp instead).
         let p = themedPopupPanel(interactive: false, role: .unknown)
-        p.contentView = bubbleView
+        let host = NSHostingView(rootView: bubble())
+        host.wantsLayer = true                     // the PopupFade surface
+        hosting = host
+        p.contentView = host
         p.contentView?.setAccessibilityElement(false)
         panel = p
     }
 
     private func fadeIn(animated: Bool) {
-        guard let panel, let bl = bubbleView.layer else { return }
+        guard let panel, let hl = hosting?.layer else { return }
         panel.orderFrontRegardless()         // NEVER makeKey — must not steal focus
-        fade.fadeIn(bl, animated: animated)
+        fade.fadeIn(hl, animated: animated)
     }
 
     private func fadeOut(animated: Bool) {
-        guard let panel, let bl = bubbleView.layer else { return }
+        guard let panel, let hl = hosting?.layer else { return }
         // Order out only if this fade still stands (no re-show superseded it).
         let gen = fadeGen
-        fade.fadeOut(bl, panel: panel, animated: animated) { [weak self] in
+        fade.fadeOut(hl, panel: panel, animated: animated) { [weak self] in
             guard let self else { return false }
             return self.fadeGen == gen && !self.isShown
         }
     }
 
-    // MARK: - Content (measure + theme the bubble; size is text-driven)
+    // MARK: - Content (measure the text; the drawing is the SwiftUI bubble)
 
     // Fonts via `palette.uiFont(_:)` — the shared type-scale resolver
     // (honours .mono/.rounded/.menu; the old local helper dropped two).
@@ -302,8 +296,19 @@ public final class ThemedTooltip: NSObject {
     /// Best-contrast ink on the (opaque) foreground.
     private var textColor: NSColor { palette.bestContrast(on: palette.foreground) }
 
-    /// Re-measure the text, re-theme the layers, and reposition a shown bubble.
-    /// Snapped (a theme / text swap should not smear).
+    /// The current bubble model — everything the SwiftUI content needs to draw
+    /// the committed placement.
+    private func bubble() -> TooltipBubble {
+        TooltipBubble(text: text, font: palette.uiFont(.tooltip),
+                      fill: fillColor, ink: textColor,
+                      side: resolvedSide, cross: lastArrowCross, fillSize: fillSize,
+                      cornerRadius: cornerRadius, hpad: hpad, vpad: vpad,
+                      arrowBase: arrowBase, arrowLen: arrowLen)
+    }
+
+    /// Re-measure the text, refresh the bubble content, and reposition a shown
+    /// bubble. Measurement stays on the AppKit side (`boundingRect`) — the
+    /// placement engine needs the size before SwiftUI lays out.
     private func rebuild() {
         let font = palette.uiFont(.tooltip)
         let para = NSMutableParagraphStyle()
@@ -315,21 +320,9 @@ public final class ThemedTooltip: NSObject {
         let bound = attr.boundingRect(
             with: CGSize(width: maxTextW, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading])
-        let tw = ceil(bound.width), th = ceil(bound.height)
-        fillSize = CGSize(width: tw + 2 * hpad, height: th + 2 * vpad)
-
-        let s = backingScale
-        fade.transact(animated: false) {
-            self.textLayer.string = attr
-            self.textLayer.bounds = CGRect(x: 0, y: 0, width: tw, height: th)
-            self.textLayer.foregroundColor = self.textColor.cgColor
-            self.textLayer.contentsScale = s
-            self.fillLayer.backgroundColor = self.fillColor.cgColor
-            self.fillLayer.cornerRadius = self.cornerRadius
-            self.fillLayer.contentsScale = s
-            self.arrowLayer.fillColor = self.fillColor.cgColor
-            self.arrowLayer.contentsScale = s
-        }
+        fillSize = CGSize(width: ceil(bound.width) + 2 * hpad,
+                          height: ceil(bound.height) + 2 * vpad)
+        hosting?.rootView = bubble()
         if isShown { reposition() }
     }
 
@@ -348,15 +341,15 @@ public final class ThemedTooltip: NSObject {
                                          fillSize: fillSize, gap: gap, arrowLen: arrowLen))
         else { return }
 
-        // Lay out the bubble + arrow in the committed frame (tooltip-local; the
-        // arrow re-points at the anchor except within a corner-clear inset).
+        // Commit the placement into the SwiftUI content (the arrow re-points at
+        // the anchor except within a corner-clear inset).
         let fill = fillRect(in: frame.size, side: side)
         let cross = arrowCross(side: side, onScreen: onScreen, panelOrigin: frame.origin, fill: fill)
-        layoutBubble(side: side, panelSize: frame.size, fill: fill, cross: cross)
 
         resolvedSide = side
         lastBubbleFrame = frame
         lastArrowCross = cross
+        hosting?.rootView = bubble()
     }
 
     private func resolvePreferred(_ p: Placement) -> PopupSide {
@@ -369,7 +362,8 @@ public final class ThemedTooltip: NSObject {
     }
 
     /// The fill surface within the panel content (Y-up); the arrow occupies the
-    /// remaining strip on the anchor-facing edge.
+    /// remaining strip on the anchor-facing edge. Used for the cross-axis clamp;
+    /// the SwiftUI bubble derives its own (y-down) twin from the same inputs.
     private func fillRect(in size: CGSize, side: PopupSide) -> CGRect {
         switch side {
         case .bottom:   return CGRect(x: 0,        y: 0,       width: fillSize.width, height: fillSize.height)  // arrow on top
@@ -379,10 +373,10 @@ public final class ThemedTooltip: NSObject {
         }
     }
 
-    /// Arrow centre on the cross axis (panel-local), clamped clear of the rounded
-    /// corners so it always reads as one shape — pointed at the anchor centre, or
-    /// as close as the corner-clear inset allows when the anchor sits within
-    /// (cornerRadius + arrowBase/2) of a corner.
+    /// Arrow centre on the cross axis (panel-local, Y-UP), clamped clear of the
+    /// rounded corners so it always reads as one shape — pointed at the anchor
+    /// centre, or as close as the corner-clear inset allows when the anchor sits
+    /// within (cornerRadius + arrowBase/2) of a corner.
     private func arrowCross(side: PopupSide, onScreen: CGRect, panelOrigin: CGPoint, fill: CGRect) -> CGFloat {
         let inset = cornerRadius + arrowBase / 2
         switch side {
@@ -391,43 +385,6 @@ public final class ThemedTooltip: NSObject {
         case .leading, .trailing:
             return min(max(onScreen.midY - panelOrigin.y, fill.minY + inset), fill.maxY - inset)
         }
-    }
-
-    private func layoutBubble(side: PopupSide, panelSize: CGSize, fill: CGRect, cross: CGFloat) {
-        fade.transact(animated: false) {
-            self.fillLayer.frame = fill
-            self.fillLayer.cornerRadius = self.cornerRadius
-            self.textLayer.position = CGPoint(x: fill.midX, y: fill.midY)
-            self.arrowLayer.frame = CGRect(origin: .zero, size: panelSize)
-            self.arrowLayer.path = self.arrowPath(side: side, fill: fill, cross: cross)
-        }
-    }
-
-    /// A filled triangle pointing OUTWARD (toward the anchor), its base overlapped
-    /// 1 pt into the fill so the rounded surface + arrow read seamlessly.
-    private func arrowPath(side: PopupSide, fill: CGRect, cross: CGFloat) -> CGPath {
-        let b = arrowBase, len = arrowLen, ov: CGFloat = 1
-        let path = CGMutablePath()
-        switch side {
-        case .bottom:   // arrow on top edge, pointing up
-            path.move(to: CGPoint(x: cross - b / 2, y: fill.maxY - ov))
-            path.addLine(to: CGPoint(x: cross + b / 2, y: fill.maxY - ov))
-            path.addLine(to: CGPoint(x: cross, y: fill.maxY + len))
-        case .top:      // arrow on bottom edge, pointing down
-            path.move(to: CGPoint(x: cross - b / 2, y: fill.minY + ov))
-            path.addLine(to: CGPoint(x: cross + b / 2, y: fill.minY + ov))
-            path.addLine(to: CGPoint(x: cross, y: fill.minY - len))
-        case .leading:  // arrow on right edge, pointing right
-            path.move(to: CGPoint(x: fill.maxX - ov, y: cross - b / 2))
-            path.addLine(to: CGPoint(x: fill.maxX - ov, y: cross + b / 2))
-            path.addLine(to: CGPoint(x: fill.maxX + len, y: cross))
-        case .trailing: // arrow on left edge, pointing left
-            path.move(to: CGPoint(x: fill.minX + ov, y: cross - b / 2))
-            path.addLine(to: CGPoint(x: fill.minX + ov, y: cross + b / 2))
-            path.addLine(to: CGPoint(x: fill.minX - len, y: cross))
-        }
-        path.closeSubpath()
-        return path
     }
 
     // MARK: - Host glue (keep the bubble pinned to a moving / scrolling anchor)
@@ -451,12 +408,149 @@ public final class ThemedTooltip: NSObject {
         reposition()
     }
 
-    private var backingScale: CGFloat {
-        _anchor?.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-    }
-
     private var reduceMotion: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+}
+
+// MARK: - The SwiftUI bubble content (floor 2: shell AppKit, contents SwiftUI)
+
+/// The drawn bubble: one path (rounded inverted fill + the anchor-facing arrow,
+/// base overlapped 1 pt into the fill so they read seamlessly) plus the wrapped,
+/// centred label. Laid out in the PANEL's coordinate space (top-left origin) —
+/// the controller commits `side` / `cross` / `fillSize` from the placement
+/// engine, so this view is a pure function of the committed placement.
+struct TooltipBubble: View {
+    let text: String
+    let font: NSFont
+    let fill: NSColor
+    let ink: NSColor
+    let side: PopupSide
+    let cross: CGFloat          // arrow apex on the cross axis, panel-local Y-UP
+    let fillSize: CGSize
+    let cornerRadius: CGFloat
+    let hpad: CGFloat
+    let vpad: CGFloat
+    let arrowBase: CGFloat
+    let arrowLen: CGFloat
+
+    private var panelSize: CGSize { popupPanelSize(side, fill: fillSize, arrowLen: arrowLen) }
+
+    /// The fill surface in the view's (y-down) space — the y-flipped twin of the
+    /// controller's y-up `fillRect`.
+    private var fillFrame: CGRect {
+        switch side {
+        case .bottom:   return CGRect(x: 0, y: arrowLen, width: fillSize.width, height: fillSize.height)  // arrow on top
+        case .top:      return CGRect(x: 0, y: 0, width: fillSize.width, height: fillSize.height)         // arrow on bottom
+        case .leading:  return CGRect(x: 0, y: 0, width: fillSize.width, height: fillSize.height)         // arrow on right
+        case .trailing: return CGRect(x: arrowLen, y: 0, width: fillSize.width, height: fillSize.height)  // arrow on left
+        }
+    }
+
+    /// The arrow apex on the cross axis, y-flipped for a horizontal side (the
+    /// cross is an x for top/bottom — no flip — and a y-up y for leading/trailing).
+    private var crossYDown: CGFloat {
+        switch side {
+        case .top, .bottom:       return cross
+        case .leading, .trailing: return panelSize.height - cross
+        }
+    }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            TooltipBubbleShape(side: side, fill: fillFrame, cross: crossYDown,
+                               cornerRadius: cornerRadius,
+                               arrowBase: arrowBase, arrowLen: arrowLen)
+                .fill(Color(nsColor: fill))
+            // Width-only constraint (the AppKit-measured wrap width) + centre
+            // via `.position`: clamping the HEIGHT to the measured value too
+            // makes SwiftUI truncate to "…" whenever its line height lands a
+            // hair over the TextKit measurement (found in the before/after
+            // raster comparison, 2026-08-02).
+            Text(text)
+                .font(Font(font as CTFont))
+                .foregroundStyle(Color(nsColor: ink))
+                .multilineTextAlignment(.center)
+                .frame(width: fillSize.width - 2 * hpad)
+                .position(x: fillFrame.midX, y: fillFrame.midY)
+        }
+        .frame(width: panelSize.width, height: panelSize.height, alignment: .topLeading)
+    }
+}
+
+/// Rounded fill + the outward-pointing triangle as ONE path (nonzero fill), the
+/// triangle's base overlapped 1 pt into the fill. Geometry in y-down view space.
+struct TooltipBubbleShape: Shape {
+    let side: PopupSide
+    let fill: CGRect
+    let cross: CGFloat          // apex centre on the cross axis, y-down
+    let cornerRadius: CGFloat
+    let arrowBase: CGFloat
+    let arrowLen: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path(roundedRect: fill, cornerRadius: cornerRadius)
+        let b = arrowBase, len = arrowLen, ov: CGFloat = 1
+        var t = Path()
+        switch side {
+        case .bottom:   // bubble below the anchor — arrow on the TOP edge, pointing up
+            t.move(to: CGPoint(x: cross - b / 2, y: fill.minY + ov))
+            t.addLine(to: CGPoint(x: cross + b / 2, y: fill.minY + ov))
+            t.addLine(to: CGPoint(x: cross, y: fill.minY - len))
+        case .top:      // arrow on the BOTTOM edge, pointing down
+            t.move(to: CGPoint(x: cross - b / 2, y: fill.maxY - ov))
+            t.addLine(to: CGPoint(x: cross + b / 2, y: fill.maxY - ov))
+            t.addLine(to: CGPoint(x: cross, y: fill.maxY + len))
+        case .leading:  // arrow on the RIGHT edge, pointing right
+            t.move(to: CGPoint(x: fill.maxX - ov, y: cross - b / 2))
+            t.addLine(to: CGPoint(x: fill.maxX - ov, y: cross + b / 2))
+            t.addLine(to: CGPoint(x: fill.maxX + len, y: cross))
+        case .trailing: // arrow on the LEFT edge, pointing left
+            t.move(to: CGPoint(x: fill.minX + ov, y: cross - b / 2))
+            t.addLine(to: CGPoint(x: fill.minX + ov, y: cross + b / 2))
+            t.addLine(to: CGPoint(x: fill.minX - len, y: cross))
+        }
+        t.closeSubpath()
+        p.addPath(t)
+        return p
+    }
+}
+
+// MARK: - The SwiftUI attachment (`.themedTooltip`)
+
+public extension View {
+    /// Attach a themed tooltip to ANY SwiftUI view. The bubble floats on its
+    /// own non-activating child window (floor 2), anchored through the shared
+    /// invisible `PopupAnchorProxy` laid under this view — hover the view to
+    /// show it after the enter delay. Palette: explicit argument > ambient
+    /// `.sillTheme(_:)` > the process default.
+    func themedTooltip(_ text: String, palette: ResolvedPalette? = nil,
+                       placement: ThemedTooltip.Placement = .auto) -> some View {
+        modifier(ThemedTooltipModifier(text: text, explicitPalette: palette,
+                                       placement: placement))
+    }
+}
+
+struct ThemedTooltipModifier: ViewModifier {
+    @Environment(\.sillPalette) private var ambientPalette
+    let text: String
+    let explicitPalette: ResolvedPalette?
+    let placement: ThemedTooltip.Placement
+
+    private var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
+
+    func body(content: Content) -> some View {
+        content.background(PopupAnchorProxy<ThemedTooltip>(
+            attach: { [text, placement, palette] anchor in
+                ThemedTooltip.attach(to: anchor, text: text, palette: palette,
+                                     placement: placement)
+            },
+            update: { [text, placement, palette] tip in
+                tip.text = text
+                tip.palette = palette
+                tip.placement = placement
+            },
+            detach: { $0.invalidate() }))
     }
 }
 
@@ -464,7 +558,9 @@ public final class ThemedTooltip: NSObject {
 // Test-only window into the resolved bubble — placement (POST flip / clamp),
 // colours, arrow point, AX — so a deterministic test can assert them via
 // `previewVisible` without synthetic mouse events. Same-file extension so it can
-// read the private state; not built into release.
+// read the private state; not built into release. The colour fields are the
+// MODEL the SwiftUI bubble draws from (the drawn pixels themselves are covered
+// by `ThemedTooltipRenderTests` on `TooltipBubble`).
 extension ThemedTooltip {
     struct TooltipProbe {
         let isVisible: Bool
@@ -480,12 +576,12 @@ extension ThemedTooltip {
         let axHelpOnAnchor: String?
     }
     var tooltipProbe: TooltipProbe {
-        let animating = bubbleView.layer?.animation(forKey: "opacity") != nil
+        let animating = hosting?.layer?.animation(forKey: "opacity") != nil
         return TooltipProbe(
             isVisible: isShown,
             resolvedSide: resolvedSide,
-            fillColor: fillLayer.backgroundColor,
-            textColor: textLayer.foregroundColor,
+            fillColor: fillColor.cgColor,
+            textColor: textColor.cgColor,
             bubbleFrame: lastBubbleFrame,
             arrowCross: lastArrowCross,
             cornerRadius: cornerRadius,
