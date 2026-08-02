@@ -34,7 +34,7 @@
 # shrink. Entries tagged DEBT are the ones a future PR is expected to remove.
 #
 # READ THIS BEFORE TRUSTING A GREEN RUN: green means the debt did not GROW. It
-# does NOT mean the policy is satisfied — 2 of the 5 entries below are DEBT.
+# does NOT mean the policy is satisfied — 1 of the 4 entries below is DEBT.
 # Three are permanent: the IME field editor, the markdown draw core, and the
 # popup anchor proxy (floor-2 plumbing, ruled 2026-08-02).
 #
@@ -52,7 +52,6 @@ read -r -d '' ALLOWED <<'EOF' || true
 MarkdownKitUI/MarkdownTextView.swift:NSViewRepresentable        # floor 3 — the selectable rich-text draw core
 ThemeKitUI/PopupAnchor.swift:NSViewRepresentable                # floor 2 plumbing — the ONE anchor proxy popups present(from:) (permanent, ruled 2026-08-02)
 ThemeKitUI/ThemedComboBoxView.swift:NSViewRepresentable         # DEBT — should be SwiftUI-native
-ThemeKitUI/ThemedMenuTriggerView.swift:NSViewRepresentable      # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedTextFieldView.swift:NSViewRepresentable        # floor 1 — the IME field-editor core
 EOF
 
