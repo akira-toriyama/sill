@@ -47,6 +47,12 @@ public struct ThemedButtonView: View {
     var grouping: Grouping?
     var onTap: (() -> Void)?
 
+    /// MUI <IconButton>: drop the 64 pt min-width floor so the button is
+    /// exactly the square its host frames it into. INTERNAL — the only thing
+    /// that frames its own items is `ThemedToolBarView`, and the AppKit bar
+    /// sidesteps the same floor the same way (by setting frames absolutely).
+    var iconOnly = false
+
     /// Joined-segment chrome. A `ThemedButtonGroup` member rounds only the
     /// group's OUTER corners, drops the shared seam edge so two abutting
     /// strokes collapse to one hairline, and forgoes its own elevation so the
@@ -294,8 +300,15 @@ public struct ThemedButtonView: View {
         .padding(.leading, m.hpad + (hasIcon(leadingImage, leading) ? m.outerAdj : 0))
         .padding(.trailing, m.hpad + (hasIcon(trailingImage, trailing) ? m.outerAdj : 0))
         .frame(height: m.height)
-        .frame(minWidth: m.minWidth)
+        .frame(minWidth: iconOnly ? 0 : m.minWidth)
         .frame(maxWidth: fullWidth ? .infinity : nil)
+    }
+
+    /// Opt this button out of the min-width floor (see `iconOnly`).
+    func asIconButton(_ on: Bool = true) -> Self {
+        var copy = self
+        copy.iconOnly = on
+        return copy
     }
 
     private func hasIcon(_ image: NSImage?, _ slug: String?) -> Bool {

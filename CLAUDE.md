@@ -140,7 +140,7 @@ say mocks are "wired into `ThemeCard`" predate its removal.
 未登録の AppKit 構造が増えても落ち、コードが消えた stale entry が残っていても落ちる
 （＝移行 PR は自分の行を消すことになり、リストは縮む一方）。**green の意味を誤読しない
 こと** —— 「負債が増えなかった」だけで「ポリシーを満たした」ではない。現況は
-**9 個中 7 個が DEBT**（床で正当化されるのは `ThemedTextFieldView` の IME 編集コアと
+**8 個中 6 個が DEBT**（床で正当化されるのは `ThemedTextFieldView` の IME 編集コアと
 `MarkdownTextView` の描画コアの 2 個だけ）で、残りは SwiftUI 化待ち。
 
 ## Icons (SVG, since v1.8.0)

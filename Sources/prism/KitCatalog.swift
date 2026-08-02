@@ -279,7 +279,7 @@ ThemedToolBarView(palette: palette, items: items) { index in
         cellType: "ThemedToolBarView.Item",
         cellInit: ".button(title: nil, symbol: \"list\")",
         sourcePath: "ThemeKitUI/ThemedToolBarView.swift",
-        appkitEscape: "ThemedToolBar (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedToolBarView.makeNSView hosts it directly"),
+        appkitEscape: "ThemedToolBar (NSView, module ThemeKit) — only if NOT in SwiftUI, or when a row needs the AppKit-only `.custom(NSView)` item; ThemedToolBarView is SwiftUI-native and draws the same chrome."),
     KitComponent(
         name: "ThemedChip", module: "ThemeKit",
         kind: "MUI <Chip> fused with HTML <kbd> — a compact token: tag / status pill / keycap",
