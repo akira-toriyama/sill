@@ -87,27 +87,12 @@ final class PaletteEnvironmentTests: XCTestCase {
         XCTAssertEqual(a?.palette, dracula)
     }
 
-    /// Spot-checks the LAST remaining bridge into AppKit — the combo box
-    /// (hosting a `ThemedTextField` with its own option machinery) — so a
-    /// per-widget wiring slip cannot hide behind the field passing. SEVEN
-    /// widgets have vacated this list as they went SwiftUI-native (FAB, Button,
-    /// Chip, ButtonGroup, ToolBar, the tooltip anchor, and the menu trigger);
-    /// their evidence lives in the matching Themed…RenderTests. The roll-call
-    /// is spent when the combo migrates — the three tier cases above are
-    /// deliberately anchored to the floor-1 field instead.
-    func testEveryWidgetKindHonoursTheAmbientTheme() {
-        XCTAssertEqual(
-            firstSubview(host(ThemedComboBoxView(options: ["A", "B"]).sillTheme(dracula)),
-                         of: ThemedTextField.self)?.palette,
-            dracula, "ThemedComboBoxView")
-    }
-
-    func testEveryWidgetKindStillHonoursAnExplicitOverride() {
-        XCTAssertEqual(
-            firstSubview(host(ThemedComboBoxView(palette: gruvbox, options: ["A", "B"]).sillTheme(dracula)),
-                         of: ThemedTextField.self)?.palette,
-            gruvbox, "ThemedComboBoxView")
-    }
+    // The per-widget roll-call that used to live here is SPENT: all EIGHT
+    // widgets vacated it as they went SwiftUI-native (FAB, Button, Chip,
+    // ButtonGroup, ToolBar, the tooltip anchor, the menu trigger, and finally
+    // the combo box on 2026-08-02). Their evidence lives in the matching
+    // Themed…RenderTests; the tier cases above stay anchored to the floor-1
+    // field, the one bridge that never migrates.
 
     func testEnvironmentDefaultsToNil() {
         XCTAssertNil(EnvironmentValues().sillPalette,

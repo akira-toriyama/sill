@@ -433,10 +433,14 @@ core requires. What floor 1 does NOT cover is view-layer bridging: that is why
 `Sources/ThemeKitUI/ThemedComboBox.swift`, *the synchronous commit*.
 
 **debt** — an AppKit construct in the tree that is NOT justified by a floor, i.e.
-awaiting SwiftUI conversion. The current count is **16 constructs of which 14 are
-debt**; only `ThemedTextFieldView` (floor 1) and `MarkdownTextView` (floor 3) are
-justified. The number is printed on every green run precisely so nobody reads the
-green as "policy met". `scripts/appkit-floor.sh`, *allow-list*.
+awaiting SwiftUI conversion. At booking (2026-07-28) the count was **16
+constructs of which 14 were debt**; the 床外し epic booked the last one out on
+2026-08-02, leaving **3 constructs, all floors** — `ThemedTextFieldView` (floor
+1, whose file also carries the `FieldHostProxy` adoption seam),
+`PopupAnchorProxy` (floor-2 plumbing) and `MarkdownTextView` (floor 3). The
+number is printed on every green run precisely so nobody reads the green as
+"policy met" — from here, any nonzero debt count is a regression.
+`scripts/appkit-floor.sh`, *allow-list*.
 
 **要相談** — the standing rule for anything beyond the three floors: ask the user
 first, do not widen AppKit unilaterally. It applies to the named near-misses too

@@ -33,10 +33,12 @@
 # Every migration PR therefore deletes its own line, and the list can only
 # shrink. Entries tagged DEBT are the ones a future PR is expected to remove.
 #
-# READ THIS BEFORE TRUSTING A GREEN RUN: green means the debt did not GROW. It
-# does NOT mean the policy is satisfied — 1 of the 4 entries below is DEBT.
-# Three are permanent: the IME field editor, the markdown draw core, and the
-# popup anchor proxy (floor-2 plumbing, ruled 2026-08-02).
+# READ THIS BEFORE TRUSTING A GREEN RUN: green means the debt did not GROW.
+# Since 2026-08-02 the two readings coincide: every DEBT entry has been booked
+# out and the three lines below are all permanent floors — the IME field editor
+# (whose file also carries the FieldHostProxy adoption seam), the markdown draw
+# core, and the popup anchor proxy (floor-2 plumbing, ruled 2026-08-02). A new
+# entry showing up here means the debt era is starting again — 要相談 first.
 #
 # Usage: scripts/appkit-floor.sh [--list]
 # Exit:  0 = matches the allow-list · 1 = drifted · 2 = the gate could not run.
@@ -51,8 +53,7 @@ cd "$(dirname "$0")/.."
 read -r -d '' ALLOWED <<'EOF' || true
 MarkdownKitUI/MarkdownTextView.swift:NSViewRepresentable        # floor 3 — the selectable rich-text draw core
 ThemeKitUI/PopupAnchor.swift:NSViewRepresentable                # floor 2 plumbing — the ONE anchor proxy popups present(from:) (permanent, ruled 2026-08-02)
-ThemeKitUI/ThemedComboBoxView.swift:NSViewRepresentable         # DEBT — should be SwiftUI-native
-ThemeKitUI/ThemedTextFieldView.swift:NSViewRepresentable        # floor 1 — the IME field-editor core
+ThemeKitUI/ThemedTextFieldView.swift:NSViewRepresentable        # floor 1 — the IME field-editor core + the FieldHostProxy adoption seam (glossary §6)
 EOF
 
 # --- scan ------------------------------------------------------------------
