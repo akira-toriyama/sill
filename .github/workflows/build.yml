@@ -35,7 +35,7 @@ jobs:
       # LIBRARY-ONLY (no .app) so — unlike facet — there is no ./package.sh
       # step. XCTest also runs LOCALLY now via `scripts/test.sh` (an installed
       # Xcode over the CLT-default shell); CI is the canonical required gate.
-      - uses: akira-toriyama/.github/actions/swift-build@v2
+      - uses: akira-toriyama/.github/actions/swift-build@v2.1.3
 
   # appkit-floor — the 3-floor AppKit policy, machine-enforced.
   #
@@ -101,4 +101,4 @@ jobs:
   # test / a `Bite-exempt:` commit trailer): akira-toriyama/.github
   # docs/swift-bite.md. Live-ammunition record: swift-toml-edit#29.
   bite:
-    uses: akira-toriyama/.github/.github/workflows/swift-bite.yml@v2
+    uses: akira-toriyama/.github/.github/workflows/swift-bite.yml@v2.1.3
