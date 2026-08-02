@@ -11,12 +11,13 @@ import SwiftUI
 import PaletteKit
 
 public struct ThemedTooltipAnchorView: View {
+    @Environment(\.sillPalette) private var ambientPalette
     private let explicitPalette: ResolvedPalette?
+    /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
+    var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
     let text: String
     let placement: ThemedTooltip.Placement
 
-    /// Explicit argument > ambient `.sillTheme(_:)` > the process default —
-    /// resolved by the button and the tooltip modifier themselves.
     public init(palette: ResolvedPalette? = nil, text: String,
                 placement: ThemedTooltip.Placement) {
         self.explicitPalette = palette
@@ -25,7 +26,7 @@ public struct ThemedTooltipAnchorView: View {
     }
 
     public var body: some View {
-        ThemedButtonView(palette: explicitPalette, variant: .outlined, title: "Hover me")
-            .themedTooltip(text, palette: explicitPalette, placement: placement)
+        ThemedButtonView(palette: palette, variant: .outlined, title: "Hover me")
+            .themedTooltip(text, palette: palette, placement: placement)
     }
 }
