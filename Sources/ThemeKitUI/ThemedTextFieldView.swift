@@ -159,3 +159,58 @@ public struct ThemedTextFieldView: NSViewRepresentable {
         }
     }
 }
+
+// MARK: - FieldHostProxy (floor-1 plumbing — the adoption seam)
+
+/// Hosts a CONTROLLER-OWNED `ThemedTextField` in SwiftUI — the floor-1 adoption
+/// seam, the `PopupAnchorProxy` of the edit core (glossary §6, *IME-adjacent
+/// composition*). A composite widget whose visible control IS the floor-1 field
+/// (today only `ThemedComboBoxView`) routes through THIS representable instead
+/// of declaring its own: floor 1 covers the edit core, not view-layer bridging,
+/// so this file — the one booked floor-1 line in `scripts/appkit-floor.sh` —
+/// is the only place a `ThemedTextField` crosses into SwiftUI.
+///
+/// `attach` runs once (from `makeNSView`) and returns the field to host plus
+/// the controller that owns + wires it; the coordinator RETAINS the controller
+/// (the ThemedTooltip/ThemedMenu "caller MUST retain" contract). `update`
+/// re-drives the controller's value inputs on every SwiftUI update — theming
+/// only, by the same static-once discipline the combo documents. `detach` runs
+/// at dismantle for deterministic teardown (`invalidate()`).
+///
+/// Sizing is the composite-field contract the combo has always had: width = the
+/// proposal (230 pt when unspecified), height = the field's intrinsic height.
+struct FieldHostProxy<Controller: AnyObject>: NSViewRepresentable {
+    let attach: @MainActor () -> (field: ThemedTextField, controller: Controller)
+    let update: @MainActor (Controller) -> Void
+    let detach: @MainActor (Controller) -> Void
+
+    /// `dismantleNSView` is static, so the coordinator carries BOTH the retained
+    /// controller and the `detach` closure that tears it down.
+    final class Coordinator {
+        var controller: Controller?
+        var detach: (@MainActor (Controller) -> Void)?
+    }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> ThemedTextField {
+        let (field, controller) = attach()
+        context.coordinator.controller = controller
+        context.coordinator.detach = detach
+        return field
+    }
+
+    func updateNSView(_ v: ThemedTextField, context: Context) {
+        if let c = context.coordinator.controller { update(c) }
+    }
+
+    static func dismantleNSView(_ v: ThemedTextField, coordinator: Coordinator) {
+        if let c = coordinator.controller { coordinator.detach?(c) }
+        coordinator.controller = nil
+        coordinator.detach = nil
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ThemedTextField,
+                      context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 230, height: nsView.intrinsicContentSize.height)
+    }
+}

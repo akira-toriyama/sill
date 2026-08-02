@@ -78,12 +78,13 @@ links zero AppKit. AppKit widget modules (`PaletteKit`, `Effects`, `ThemeKit`)
 must NEVER be a dependency of a pure `*Core`; apps consume them from their
 *View* layer only. Module name ≠ its primary public type (module `ThemeKit`,
 type `ThemedTextField` — avoids a Module.Module collision). The public SwiftUI
-front is **`ThemeKitUI`** (most widgets an `NSViewRepresentable` wrapping their
-`ThemeKit` AppKit widget, but the backdrop/pill/grid parts and effect renderers
-are SwiftUI-native); apps consume *that* from their View layer. Standing
-direction: confine AppKit to the 3 essential floors (IME field-editor core + the
-nonactivating-panel window shell + the selectable rich-text/markdown render core) and
-make everything else SwiftUI-native — a migration in progress, not a finished state
+front is **`ThemeKitUI`** (SwiftUI-native widgets; the only remaining
+`NSViewRepresentable`s are the floor-1 field host — `ThemedTextFieldView` plus
+its `FieldHostProxy` adoption seam — and the floor-2 `PopupAnchorProxy`); apps
+consume *that* from their View layer. Standing direction: confine AppKit to the
+3 essential floors (IME field-editor core + the nonactivating-panel window shell
++ the selectable rich-text/markdown render core) — **completed for the widget
+layer on 2026-08-02**, and held there by the ratchet
 (see **AppKit 使用可ポリシー**).
 
 ## Theming contract
@@ -111,8 +112,8 @@ IME field editor, the non-activating panel/popup shell, and the selectable
 rich-text/markdown render core — see **AppKit 使用可ポリシー**).
 A widget belongs in sill once ≥2 apps would otherwise hand-draw it
 (rule-of-three). Every widget MUST add a `prism` showcase — a `Themed<Widget>View`
-SwiftUI bridge in `ThemeKitUI` (today an `NSViewRepresentable` hosting the REAL
-AppKit widget) that prism imports + a `Mock<Widget>` view taking the palette as
+SwiftUI view in `ThemeKitUI` (SwiftUI-native since 2026-08-02; AppKit only
+through the booked floors) that prism imports + a `Mock<Widget>` view taking the palette as
 `p` (conform it to `ShowcaseBench` for the shared captioned-cell chrome, and give
 its tab a `KitFamily` case), so it appears live across all themes (prism never
 imports an app's View → no drift). `ThemeCard` is RETIRED — earlier notes that
@@ -138,10 +139,11 @@ say mocks are "wired into `ThemeCard`" predate its removal.
 **このポリシーは機械強制されている** — `scripts/appkit-floor.sh`（CI: `build.yml` の
 `appkit-floor` job）。allow-list を**集合として等価比較**するので双方向のラチェット:
 未登録の AppKit 構造が増えても落ち、コードが消えた stale entry が残っていても落ちる
-（＝移行 PR は自分の行を消すことになり、リストは縮む一方）。**green の意味を誤読しない
-こと** —— 「負債が増えなかった」だけで「ポリシーを満たした」ではない。現況は
-**8 個中 6 個が DEBT**（床で正当化されるのは `ThemedTextFieldView` の IME 編集コアと
-`MarkdownTextView` の描画コアの 2 個だけ）で、残りは SwiftUI 化待ち。
+（＝移行 PR は自分の行を消すことになり、リストは縮む一方）。**床外しは 2026-08-02 に
+完了** — allow-list は床の 3 行だけ（床1 `ThemedTextFieldView`＋同ファイルの
+`FieldHostProxy` 採用継ぎ目・床2 plumbing `PopupAnchorProxy`・床3
+`MarkdownTextView`）。**green の意味を誤読しないこと** —— 「負債が増えなかった」の
+意味は変わらず、ここから DEBT が 1 でも数えられたらそれ自体が退行。
 
 ## Icons (SVG, since v1.8.0)
 

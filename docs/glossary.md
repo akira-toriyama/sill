@@ -408,11 +408,39 @@ permission, not a preference. Confirmed 2026-06-23, widened from two to three on
   prism, 2026-06-30). The `NSTextView` draw core ONLY.
   `Sources/MarkdownKitUI/`, *MarkdownView*.
 
+**IME-adjacent composition** — how a widget whose visible control IS the floor-1
+field (today only the combo box) splits across the floors; settled 2026-08-02,
+ahead of its migration, because a naive rewrite would step through the floor.
+The combo owns NO floor of its own — it composes three layers that each already
+have a home:
+
+- the FIELD is a real `ThemedTextField` — **floor 1**. Hosting it in SwiftUI
+  goes through the floor-1 file's representable ONLY (`FieldHostProxy` in
+  `ThemedTextFieldView.swift`, the adoption seam for a controller-owned field);
+  a composite widget never declares its own `NSViewRepresentable` for it.
+- the POPUP is `PopupPanel` + the dismiss monitor + `PopupGlue` — **floor 2**,
+  untouched.
+- the ROWS are the hosted SwiftUI list (`HostedThemedList`) — already native.
+
+The controller's DIRECT references to its field — the synchronous commit's
+focus re-assert, the silent committed-label push while the field is first
+responder, the AX value announcements — are floor-1-adjacent WIRING and stay
+AppKit: a SwiftUI binding push is asynchronous by design (it lands on a later
+render) and is suppressed while the field is first responder, either of which
+breaks the commit-before-the-next-tick-focus-reconcile discipline the edit
+core requires. What floor 1 does NOT cover is view-layer bridging: that is why
+`ThemedComboBoxView`'s own representable conformance was **debt**, not floor.
+`Sources/ThemeKitUI/ThemedComboBox.swift`, *the synchronous commit*.
+
 **debt** — an AppKit construct in the tree that is NOT justified by a floor, i.e.
-awaiting SwiftUI conversion. The current count is **16 constructs of which 14 are
-debt**; only `ThemedTextFieldView` (floor 1) and `MarkdownTextView` (floor 3) are
-justified. The number is printed on every green run precisely so nobody reads the
-green as "policy met". `scripts/appkit-floor.sh`, *allow-list*.
+awaiting SwiftUI conversion. At booking (2026-07-28) the count was **16
+constructs of which 14 were debt**; the 床外し epic booked the last one out on
+2026-08-02, leaving **3 constructs, all floors** — `ThemedTextFieldView` (floor
+1, whose file also carries the `FieldHostProxy` adoption seam),
+`PopupAnchorProxy` (floor-2 plumbing) and `MarkdownTextView` (floor 3). The
+number is printed on every green run precisely so nobody reads the green as
+"policy met" — from here, any nonzero debt count is a regression.
+`scripts/appkit-floor.sh`, *allow-list*.
 
 **要相談** — the standing rule for anything beyond the three floors: ask the user
 first, do not widen AppKit unilaterally. It applies to the named near-misses too
