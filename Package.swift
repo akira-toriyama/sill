@@ -61,7 +61,7 @@ let package = Package(
         // (ConfigSchema decodes flat `parseFlat` tables, not `.arrayOfTables`),
         // so the floor moves to 2.x and the family unifies on it (chord#148).
         .package(url: "https://github.com/akira-toriyama/swift-toml-edit.git",
-                 .upToNextMajor(from: "2.0.0")),
+                 .upToNextMajor(from: "3.0.0")),
 
         // SwiftDraw (Zlib · zero deps · pure-Swift CoreGraphics SVG renderer,
         // macOS 10.15+) — ThemeKit's SVG rasterizer. The ONLY path that
@@ -76,7 +76,7 @@ let package = Package(
         // 0.24.0 predates SVGView and gives the same `SVG(fileURL:)` / `rasterize`
         // / `NSImage(_:)` API. Bump only if a CLT-buildable newer release lands.
         .package(url: "https://github.com/swhitty/SwiftDraw.git",
-                 .upToNextMinor(from: "0.24.0")),
+                 .upToNextMinor(from: "0.29.0")),
         // swiftlang/, NOT apple/ — the repo moved and `apple/` is the stale
         // redirect. SwiftPM derives the package identity from the URL, so a
         // consumer that pulls both (glance does) hits "Conflicting identity for
