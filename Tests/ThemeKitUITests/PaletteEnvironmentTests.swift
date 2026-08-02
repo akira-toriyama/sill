@@ -87,19 +87,15 @@ final class PaletteEnvironmentTests: XCTestCase {
         XCTAssertEqual(a?.palette, dracula)
     }
 
-    /// Spot-checks the OTHER bridges into AppKit — the menu trigger (hosting an
-    /// AppKit `ThemedButton`) and the combo box (hosting a `ThemedTextField`
-    /// with its own option machinery) — so a per-widget wiring slip cannot hide
-    /// behind the field passing. FIVE widgets have vacated this list as they
-    /// went SwiftUI-native (FAB, Button, Chip, ButtonGroup, ToolBar); their
-    /// evidence lives in the matching Themed…RenderTests. Only these two and
-    /// the tooltip anchor are left, so the roll-call is nearly spent — the
-    /// three tier cases above are deliberately anchored to the floor-1 field
-    /// instead.
+    /// Spot-checks the LAST remaining bridge into AppKit — the combo box
+    /// (hosting a `ThemedTextField` with its own option machinery) — so a
+    /// per-widget wiring slip cannot hide behind the field passing. SEVEN
+    /// widgets have vacated this list as they went SwiftUI-native (FAB, Button,
+    /// Chip, ButtonGroup, ToolBar, the tooltip anchor, and the menu trigger);
+    /// their evidence lives in the matching Themed…RenderTests. The roll-call
+    /// is spent when the combo migrates — the three tier cases above are
+    /// deliberately anchored to the floor-1 field instead.
     func testEveryWidgetKindHonoursTheAmbientTheme() {
-        XCTAssertEqual(
-            firstSubview(host(ThemedMenuTriggerView(items: []).sillTheme(dracula)), of: ThemedButton.self)?.palette,
-            dracula, "ThemedMenuTriggerView")
         XCTAssertEqual(
             firstSubview(host(ThemedComboBoxView(options: ["A", "B"]).sillTheme(dracula)),
                          of: ThemedTextField.self)?.palette,
@@ -107,10 +103,6 @@ final class PaletteEnvironmentTests: XCTestCase {
     }
 
     func testEveryWidgetKindStillHonoursAnExplicitOverride() {
-        XCTAssertEqual(
-            firstSubview(host(ThemedMenuTriggerView(palette: gruvbox, items: []).sillTheme(dracula)),
-                         of: ThemedButton.self)?.palette,
-            gruvbox, "ThemedMenuTriggerView")
         XCTAssertEqual(
             firstSubview(host(ThemedComboBoxView(palette: gruvbox, options: ["A", "B"]).sillTheme(dracula)),
                          of: ThemedTextField.self)?.palette,
