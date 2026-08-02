@@ -195,7 +195,7 @@ ThemedButtonView(
         name: "ThemedButtonGroup", module: "ThemeKit",
         kind: "MUI <ButtonGroup> (basic, joined) — composes real ThemedButtons into one control; .segmented mode adds exclusive single-select",
         summary: "AppKit NSView row/column of joined ThemedButtons, themed by assigning a ResolvedPalette.",
-        consumes: "Embed the NSView directly: `ThemedButtonGroup(palette:)`, set segments + props, add as a subview (it sizes via intrinsicContentSize / fullWidth). No controller or child window.",
+        consumes: "Embed the NSView directly: `ThemedButtonGroup(palette:)`, set segments + props, add as a subview (it sizes via intrinsicContentSize / fullWidth). No controller or child window. SwiftUI hosts use ThemeKitUI's `ThemedButtonGroupView`, a native view that composes ThemedButtonView with the same joined chrome.",
         keyAPI: [
                  "segments: [Segment] — members; Segment(title, leading:/trailing: Phosphor slug, isEnabled:)",
                  "palette: ResolvedPalette — assign to (re)theme group + all members",
@@ -220,7 +220,7 @@ ThemedButtonView(
         defaultType: "ThemedButtonGroupView",
         imports: [
             "import SwiftUI       // View front",
-            "import ThemeKitUI    // ThemedButtonGroupView — the SwiftUI front",
+            "import ThemeKitUI    // ThemedButtonGroupView — the SwiftUI-native front",
             "import PaletteKit    // ResolvedPalette + resolve(_:)",
             "import ThemeKit      // ThemedButtonGroup.Orientation / ThemedButton.Variant,Size,Role types used as param defaults",
         ],
@@ -232,7 +232,7 @@ ThemedButtonGroupView(
 )
 """,
         sourcePath: "ThemeKitUI/ThemedButtonGroupView.swift",
-        appkitEscape: "ThemedButtonGroup (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedButtonGroupView is an NSViewRepresentable wrapping it"),
+        appkitEscape: "ThemedButtonGroup (NSView, module ThemeKit) — only if NOT in SwiftUI; ThemedButtonGroupView is SwiftUI-native and composes ThemedButtonView with the same joined chrome (ThemedButtonView.Grouping)."),
     KitComponent(
         name: "ThemedToolBar", module: "ThemeKit",
         kind: "MUI <AppBar> + <Toolbar> (fused) — a horizontal app bar that composes real ThemedButtons",

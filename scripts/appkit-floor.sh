@@ -34,7 +34,7 @@
 # shrink. Entries tagged DEBT are the ones a future PR is expected to remove.
 #
 # READ THIS BEFORE TRUSTING A GREEN RUN: green means the debt did not GROW. It
-# does NOT mean the policy is satisfied — 8 of the 10 entries below are DEBT.
+# does NOT mean the policy is satisfied — 7 of the 9 entries below are DEBT.
 # Only two are real floors: the IME field editor and the markdown draw core.
 #
 # Usage: scripts/appkit-floor.sh [--list]
@@ -49,7 +49,6 @@ cd "$(dirname "$0")/.."
 # WHICH floor justifies an entry, or that it is debt awaiting migration.
 read -r -d '' ALLOWED <<'EOF' || true
 MarkdownKitUI/MarkdownTextView.swift:NSViewRepresentable        # floor 3 — the selectable rich-text draw core
-ThemeKitUI/ThemedButtonGroupView.swift:NSViewRepresentable      # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedComboBoxView.swift:NSViewRepresentable         # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedMenuTriggerView.swift:NSViewRepresentable      # DEBT — should be SwiftUI-native
 ThemeKitUI/ThemedTextFieldView.swift:NSViewRepresentable        # floor 1 — the IME field-editor core

@@ -1,5 +1,5 @@
-// prism — ThemeKit button-group bench. Hosts the REAL shared `ThemedButtonGroup`
-// (ThemeKit) inside the SwiftUI gallery so the joined seams / corners / divider /
+// prism — button-group bench. Shows the REAL shared `ThemedButtonGroupView`
+// (ThemeKitUI, SwiftUI-native) so the joined seams / corners / divider /
 // elevation can be evaluated live in every theme. The top rows are INTERACTIVE
 // (hover a member, click to bump the tap counter, click the segmented group to
 // move selection); the rows below force each variant / orientation / state via
@@ -17,7 +17,7 @@ struct MockButtonGroup: View, ShowcaseBench {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKit · button group — the real shared joined control (top rows LIVE)")
+            Text("ThemeKitUI · button group — the real shared joined control (top rows LIVE)")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
 
