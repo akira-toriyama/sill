@@ -52,6 +52,22 @@ final class ThemedComboBoxRenderTests: XCTestCase {
         firstSubview(host(view), of: ThemedTextField.self)
     }
 
+    // MARK: - the migration itself (the pin swift-bite demands)
+
+    /// The one observable this migration changes at the TYPE level: the combo
+    /// view no longer bridges AppKit itself. The hosted TREE is deliberately
+    /// identical before/after (same field, same wiring — that is the point of
+    /// the adoption seam), so this conformance check is what pins the change —
+    /// and what fails if anyone ever hands the combo its own representable
+    /// again instead of routing through the floor-1 `FieldHostProxy`.
+    func testTheComboViewIsNotARepresentableAnymore() {
+        // Typed through Any.Type so the check happens at RUNTIME on whichever
+        // tree is under test (a direct `is` here is statically known and warns).
+        let viewType: Any.Type = ThemedComboBoxView.self
+        XCTAssertFalse(viewType is any NSViewRepresentable.Type,
+                       "floor 1 covers the edit core, not view-layer bridging (glossary §6)")
+    }
+
     // MARK: - the adoption wiring (the field is real AND controller-owned)
 
     func testTheFloorOneFieldIsHostedAndAdoptedByTheController() {
