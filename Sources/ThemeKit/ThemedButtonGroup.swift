@@ -39,7 +39,12 @@ public final class ThemedButtonGroup: NSView {
         }
     }
 
-    public enum Orientation { case horizontal, vertical }
+    /// `Sendable` because this one crosses into SwiftUI: `ThemeKitUI`'s
+    /// `JoinedGroupLayout` is a `Layout`, and a `Layout` must be `Sendable`, so
+    /// it cannot store a non-`Sendable` property. `@MainActor` on the enclosing
+    /// class does NOT reach a nested type, and the sibling config enums here do
+    /// not cross that line — so this conformance is the crossing, not a style.
+    public enum Orientation: Sendable { case horizontal, vertical }
 
     /// `actions` = a faithful joined action group (no segment ever active);
     /// `segmented` = exclusive single-select (the ToggleButtonGroup analogue).
