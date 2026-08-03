@@ -51,7 +51,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     var onHover: (ID?) -> Void
     var onDrop: (ListCore.DragContext<ID>, ListCore.DropTarget<ID>) -> Void
     var onEmptyAction: (String) -> Void
-    var onRowRects: ([ID: CGRect]) -> Void        // hosted popup: per-row viewport frames → host hit-test
+    var onRowRects: ([ID: CGRect]) -> Void        // per-row viewport frames: hosted hit-test, standalone anchoring
     var emptyActionRow: ((String) -> String?)?
     var query: String
     var noOptionsText: String
@@ -165,7 +165,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                       dimmed: dimmedIDs.contains(item.id),
                       drop: rowDrop(item.id))
             .reportRowGeom(item.id)
-            .reportRowRect(item.id, when: style.hosted)
+            .reportRowRect(item.id)
             .contentShape(Rectangle())
             .modifier(StandaloneRowInteraction(active: !style.hosted,
                                                onTap: { handleTap(item) },

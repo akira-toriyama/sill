@@ -60,19 +60,24 @@ extension View {
         )
     }
 
-    /// Report a row's VIEWPORT-space frame into `RowRectPreference` under `id`, but
-    /// only when `active` (the `hosted` popup path — a standalone list skips it).
-    @ViewBuilder func reportRowRect<ID: Hashable>(_ id: ID, when active: Bool) -> some View {
-        if active {
-            background(
-                GeometryReader { geo in
-                    Color.clear.preference(key: RowRectPreference.self,
-                                           value: [AnyHashable(id): geo.frame(in: .named(themedListViewportSpace))])
-                }
-            )
-        } else {
-            self
-        }
+    /// Report a row's VIEWPORT-space frame into `RowRectPreference` under `id`.
+    ///
+    /// Unconditional. This used to be gated on `style.hosted`, which quietly made
+    /// one flag decide two unrelated things: whether the host drives click/hover
+    /// AND whether row rects exist at all. A standalone list that wants to anchor
+    /// something to a row — facet's hover thumbnails — then had no way to ask for
+    /// rects without also surrendering its tap and hover gestures (`hosted` turns
+    /// `StandaloneRowInteraction` off), so the previews silently never appeared.
+    /// Publishing always costs one more `GeometryReader` per VISIBLE row on top of
+    /// `reportRowGeom`, which is already unconditional — the gate saved a second
+    /// copy of a cost the list was paying regardless.
+    func reportRowRect<ID: Hashable>(_ id: ID) -> some View {
+        background(
+            GeometryReader { geo in
+                Color.clear.preference(key: RowRectPreference.self,
+                                       value: [AnyHashable(id): geo.frame(in: .named(themedListViewportSpace))])
+            }
+        )
     }
 }
 
