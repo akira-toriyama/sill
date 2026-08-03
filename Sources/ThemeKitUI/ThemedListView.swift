@@ -20,6 +20,11 @@ import ListCore
 public struct ListPreview<ID: Hashable & Sendable> {
     public var selection: Set<ID>
     public var highlight: ID?
+    /// The row under the pointer. Every other widget in the kit freezes hover
+    /// (`ThemedButton`/`Chip`/`FAB`/`Checkbox` take `previewHovered`, the button
+    /// group takes `previewHoveredIndex`); the list was the lone holdout, so its
+    /// pointer veil was the one row state a static bench shot could never show.
+    public var hovered: ID?
     public var scrollX: CGFloat?
     public var scrollY: CGFloat?
     public var dragSource: ID?
@@ -32,6 +37,15 @@ public struct ListPreview<ID: Hashable & Sendable> {
         self.selection = selection; self.highlight = highlight
         self.scrollX = scrollX; self.scrollY = scrollY
         self.dragSource = dragSource; self.dropTarget = dropTarget; self.dragChunk = dragChunk
+    }
+
+    /// A copy with the pointer parked on `id`. `hovered` arrives as a method
+    /// rather than another initialiser parameter on purpose: the API differ reads
+    /// any change to this label list as the old initialiser being REMOVED, which
+    /// would force a major rating on a change that breaks no caller. Every future
+    /// frozen state should land the same way.
+    public func hovering(_ id: ID?) -> ListPreview {
+        var c = self; c.hovered = id; return c
     }
 }
 
@@ -51,7 +65,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     var onHover: (ID?) -> Void
     var onDrop: (ListCore.DragContext<ID>, ListCore.DropTarget<ID>) -> Void
     var onEmptyAction: (String) -> Void
-    var onRowRects: ([ID: CGRect]) -> Void        // hosted popup: per-row viewport frames → host hit-test
+    var onRowRects: ([ID: CGRect]) -> Void        // per-row viewport frames: hosted hit-test, standalone anchoring
     var emptyActionRow: ((String) -> String?)?
     var query: String
     var noOptionsText: String
@@ -99,7 +113,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     @FocusState private var focused: Bool            // standalone keyboard focus (.onKeyPress)
 
     // Drag/reorder (M2c) — the live lift + the per-row geometry the pure resolvers consume.
-    private struct DragInfo { var source: ID; var chunkIDs: [ID]; var target: ListCore.DropTarget<ID>?; var location: CGPoint; var isKeyboard: Bool = false }
+    private struct DragInfo { var source: ID; var chunkIDs: [ID]; var target: ListCore.DropTarget<ID>?; var location: CGPoint; var isKeyboard: Bool = false; var tilt: CGFloat = 0 }
     @State private var dragState: DragInfo?
     @State private var geomMap: [AnyHashable: RowGeom] = [:]
     @State private var dragAim: [ListCore.DropTarget<ID>] = []   // ordered keyboard-drag targets
@@ -109,6 +123,9 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     private var visible: [ListItem<ID>] { ListItem.visibleRows(items, collapsed: collapsed) }
     private var effectiveSelection: Set<ID> { preview?.selection ?? selection }
     private var effectiveHighlight: ID? { preview?.highlight ?? highlight }
+    /// A frozen `preview` OWNS hover — falling through to the live `hoveredID`
+    /// would let a stray pointer contaminate a deterministic capture.
+    private var effectiveHovered: ID? { preview != nil ? preview?.hovered : hoveredID }
 
     private var scrollAxes: Axis.Set { style.horizontalContentScroll ? [.horizontal, .vertical] : .vertical }
 
@@ -157,7 +174,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         ThemedListRow(item: item, metrics: metrics, style: style, palette: palette,
                       isSelected: effectiveSelection.contains(item.id),
                       isHighlighted: effectiveHighlight == item.id,
-                      isHovered: preview == nil && hoveredID == item.id,
+                      isHovered: effectiveHovered == item.id,
                       zebraOdd: parity[item.id] ?? false,
                       surfaceOpaque: opaque,
                       dividerInset: dividers[item.id],
@@ -165,7 +182,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                       dimmed: dimmedIDs.contains(item.id),
                       drop: rowDrop(item.id))
             .reportRowGeom(item.id)
-            .reportRowRect(item.id, when: style.hosted)
+            .reportRowRect(item.id)
             .contentShape(Rectangle())
             .modifier(StandaloneRowInteraction(active: !style.hosted,
                                                onTap: { handleTap(item) },
@@ -366,6 +383,10 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                     dragState = DragInfo(source: item.id, chunkIDs: chunk, target: nil, location: value.location)
                 }
                 var ds = dragState!
+                // Lean into the sideways motion, the way a held card does. Smoothed
+                // against the previous frame so a jittery pointer doesn't flutter it.
+                let dx = value.location.x - ds.location.x
+                ds.tilt = max(-7, min(7, ds.tilt * 0.6 + dx * 0.8))
                 ds.location = value.location
                 let geomArr = visible.map { geom($0.id) ?? RowGeom(yOffset: 0, height: 0) }
                 ds.target = resolveDropTarget(atDocY: value.location.y, source: ds.source, rows: visible.map(\.asRow),
@@ -387,28 +408,91 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
 
     // SwiftUI drag ghost — follows the pointer during a live lift; REPLACES the AppKit
     // DragGhost child window (an in-bounds overlay, so it's screencaptureable + no window).
+    //
+    // It carries the LIFTED ROWS THEMSELVES, not a label for them: the rows are
+    // already here as `ListItem`s, so re-rendering them through `ThemedListRow` is
+    // both cheaper and truer than the text chip that used to stand in for them —
+    // and unlike a bitmap snapshot it re-themes and re-scales for free.
+    //
+    // It also reads the `eff*` seam like every other drag affordance. Reading
+    // `dragState` directly and refusing to draw under a `preview` is what kept it
+    // out of prism's four drag cells since M2c: the bench rendered the dimming and
+    // the insertion line but never once the ghost, so no capture could show it
+    // regressing.
+
+    /// How many lifted rows the card shows before collapsing the rest into `+N`.
+    private var ghostRowCap: Int { 4 }
+
+    /// The rows the lift is carrying, in visible order. A chunk lift may name only
+    /// its members (prism's chunk cells do), so the chunk alone is enough.
+    private var ghostItems: [ListItem<ID>] {
+        var ids = Set(effDragChunk)
+        if let src = effDragSource { ids.insert(src) }
+        guard !ids.isEmpty else { return [] }
+        return visible.filter { ids.contains($0.id) }
+    }
+
+    /// The row the card is pinned to when there is no pointer to follow.
+    private var ghostAnchor: ID? { effDragSource ?? effDragChunk.first }
+
+    /// The source row's top in content space, summed from the metrics rather than
+    /// read out of `geomMap` — the frozen `preview` path has to place the ghost on
+    /// the FIRST render pass, before any preference has propagated.
+    private func metricRowTop(_ id: ID) -> CGFloat? {
+        var y: CGFloat = 0
+        for item in visible {
+            if item.id == id { return y }
+            y += item.laidOutHeight(metrics)
+        }
+        return nil
+    }
+
+    /// Live lift follows the pointer. A frozen `preview` has no pointer, so the card
+    /// parks just below the row it lifted — the pose a real lift settles into.
+    private func ghostCentre(in size: CGSize) -> CGPoint? {
+        if let ds = dragState { return ds.location }
+        guard preview != nil, let src = ghostAnchor, let top = metricRowTop(src),
+              let first = ghostItems.first
+        else { return nil }
+        return CGPoint(x: size.width / 2,
+                       y: top + first.laidOutHeight(metrics) / 2 + 22)
+    }
+
+    @ViewBuilder private func ghostCard(width: CGFloat) -> some View {
+        let shown = Array(ghostItems.prefix(ghostRowCap))
+        let hidden = ghostItems.count - shown.count
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(shown, id: \.id) { item in
+                ThemedListRow(item: item, metrics: metrics, style: style, palette: palette,
+                              isSelected: false, isHighlighted: false, surfaceOpaque: true)
+            }
+            if hidden > 0 {
+                Text("+\(hidden)")
+                    .font(Font(palette.uiFont(.badge) as CTFont))
+                    .foregroundColor(Color(nsColor: palette.onPrimary(1)))
+                    .padding(.horizontal, 7).frame(height: 16)
+                    .background(Capsule().fill(Color(nsColor: palette.primary)))
+                    .padding(.horizontal, metrics.leadingInset).padding(.bottom, 6)
+            }
+        }
+        .frame(width: width, alignment: .leading)
+        .background(Color(nsColor: palette.background ?? .windowBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: palette.primary), lineWidth: 1))
+        .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
+    }
+
     @ViewBuilder private var dragGhostLayer: some View {
-        if let ds = dragState, preview == nil {
-            let count = ds.chunkIDs.isEmpty ? 1 : ds.chunkIDs.count
-            let title = items.first { $0.id == ds.source }?.primary ?? ""
-            HStack(spacing: 6) {
-                Text(title).font(Font(palette.uiFont(.body) as CTFont)).lineLimit(1)
-                    .foregroundColor(Color(nsColor: palette.foreground))
-                if count > 1 {
-                    Text("\(count)")
-                        .font(Font(palette.uiFont(.badge) as CTFont))
-                        .foregroundColor(Color(nsColor: palette.onPrimary(1)))
-                        .padding(.horizontal, 7).frame(height: 16)
-                        .background(Capsule().fill(Color(nsColor: palette.primary)))
+        if !ghostItems.isEmpty {
+            GeometryReader { proxy in
+                if let centre = ghostCentre(in: proxy.size) {
+                    ghostCard(width: max(120, proxy.size.width - 24))
+                        .rotationEffect(.degrees(Double(dragState?.tilt ?? 0)))
+                        .position(centre)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
                 }
             }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: palette.background ?? .windowBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: palette.primary), lineWidth: 1))
-            .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
-            .position(ds.location)
-            .allowsHitTesting(false)
-            .transition(.opacity)
         }
     }
 

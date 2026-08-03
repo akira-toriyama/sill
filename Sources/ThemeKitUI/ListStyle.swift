@@ -32,8 +32,13 @@ public struct ThemedListStyle {
     /// activation — the host's AppKit `mouseUp` fires the synchronous commit, and
     /// hover comes from an AppKit tracking area (a non-key panel's `.onHover`/tap
     /// can slip a tick or miss). `false` (default) = standalone (facet inline): rows
-    /// own tap-select + `.onHover` as in M2. When true the view reports per-row
-    /// viewport rects via `RowRectPreference` so the host can hit-test a click.
+    /// own tap-select + `.onHover` as in M2.
+    ///
+    /// This flag governs THAT and nothing else. Per-row viewport rects
+    /// (`RowRectPreference` → `onRowRects`) are published for every list, hosted or
+    /// not: a hosted popup hit-tests a click with them, a standalone list anchors to
+    /// them, and gating them here made choosing one capability silently forfeit the
+    /// other.
     public var hosted: Bool = false
     public var vendsRowAXElements: Bool = false
     public var surfaceColor: NSColor? = nil
