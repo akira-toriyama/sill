@@ -250,6 +250,34 @@ struct MockList: View, ShowcaseBench {
             }
 
             HStack(alignment: .top, spacing: 20) {
+                // The pointer veil, which no cell could show until `ListPreview`
+                // learned to freeze hover. The row is also SELECTED because the
+                // wash only paints on a selected row (ThemedListRow :356).
+                cell("hover · pointer veil on the selected row") {
+                    ThemedListView(items: reorderItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["r2"]).hovering("r2"))
+                    .frame(width: 300, height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+
+                cell("hover · the same row, pointer away (the reference shot)") {
+                    ThemedListView(items: reorderItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["r2"]))
+                    .frame(width: 300, height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(alignment: .top, spacing: 20) {
                 cell("drag · chunk reorder (facet) · header + its windows lift as one") {
                     ThemedListView(items: facetItems(),
                                    style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true; $0.draggable = true },
