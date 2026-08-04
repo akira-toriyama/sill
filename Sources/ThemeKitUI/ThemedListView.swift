@@ -116,6 +116,8 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     private struct DragInfo { var source: ID; var chunkIDs: [ID]; var target: ListCore.DropTarget<ID>?; var location: CGPoint; var isKeyboard: Bool = false; var tilt: CGFloat = 0 }
     @State private var dragState: DragInfo?
     @State private var geomMap: [AnyHashable: RowGeom] = [:]
+    /// Content-space width — the sideways drag-abort boundary (see `dragGesture`).
+    @State private var contentWidth: CGFloat = 0
     @State private var dragAim: [ListCore.DropTarget<ID>] = []   // ordered keyboard-drag targets
     @State private var dragAimIndex = 0
 
@@ -294,6 +296,11 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
             .frame(maxWidth: style.horizontalContentScroll ? nil : .infinity, alignment: .leading)
             .scrollTargetLayout()
             .coordinateSpace(.named(themedListContentSpace))
+            .background(GeometryReader { geo in
+                Color.clear.onChange(of: geo.size.width, initial: true) { _, w in
+                    contentWidth = w                   // sideways abort boundary
+                }
+            })
             .onPreferenceChange(RowGeomPreference.self) { geomMap = $0 }
             .overlay { dragGhostLayer }
         }
@@ -425,6 +432,18 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                 let dx = value.location.x - ds.location.x
                 ds.tilt = max(-7, min(7, ds.tilt * 0.6 + dx * 0.8))
                 ds.location = value.location
+                // The SIDEWAYS abort zone: a pointer dragged more than the
+                // escape margin past the list's left/right edge resolves no
+                // target (release does nothing) — the vertical twin lives in
+                // `resolveDropTarget`. Flicking a lift off the list is the
+                // one way to abandon a mouse drag, so the affordances must
+                // disappear out there rather than promise the clamped edge.
+                if value.location.x < -dropEscapeMargin
+                    || value.location.x > contentWidth + dropEscapeMargin {
+                    ds.target = nil
+                    dragState = ds
+                    return
+                }
                 let geomArr = visible.map { geom($0.id) ?? RowGeom(yOffset: 0, height: 0) }
                 ds.target = resolveDropTarget(atDocY: value.location.y, source: ds.source, rows: visible.map(\.asRow),
                                               geom: geomArr, mode: style.dragMode, chunkIDs: ds.chunkIDs,

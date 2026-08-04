@@ -24,14 +24,30 @@ final class ListDnDTests: XCTestCase {
                                        mode: .both, chunkIDs: [], validate: yes), "onto self ⇒ nil")
     }
     func testOutOfBounds() {
+        // WITHIN `dropEscapeMargin` of the extent the edge gaps still resolve —
+        // a reorder list keeps taking drops just past its first/last row…
         XCTAssertEqual(resolveDropTarget(atDocY: -5, source: "c", rows: rows, geom: geom,
                                          mode: .reorderBetween, chunkIDs: [], validate: yes)?.placement,
                        .between(beforeID: "a"))
-        XCTAssertEqual(resolveDropTarget(atDocY: 999, source: "a", rows: rows, geom: geom,
+        XCTAssertEqual(resolveDropTarget(atDocY: 120 + dropEscapeMargin - 1, source: "a",
+                                         rows: rows, geom: geom,
                                          mode: .reorderBetween, chunkIDs: [], validate: yes)?.placement,
                        .between(beforeID: nil))
         XCTAssertNil(resolveDropTarget(atDocY: -5, source: "a", rows: rows, geom: geom,
                                        mode: .dropOnto, chunkIDs: [], validate: yes))
+    }
+    func testFlickAwayAborts() {
+        // …and BEYOND it the drag resolves nothing: the release is an abort,
+        // not a commit into the first/last section (the facet #448 regression —
+        // the clamp used to turn "drag off the list and let go" into a move).
+        XCTAssertNil(resolveDropTarget(atDocY: -dropEscapeMargin - 1, source: "c",
+                                       rows: rows, geom: geom,
+                                       mode: .reorderBetween, chunkIDs: [], validate: yes))
+        XCTAssertNil(resolveDropTarget(atDocY: 120 + dropEscapeMargin + 1, source: "a",
+                                       rows: rows, geom: geom,
+                                       mode: .reorderBetween, chunkIDs: [], validate: yes))
+        XCTAssertNil(resolveDropTarget(atDocY: 999, source: "a", rows: rows, geom: geom,
+                                       mode: .both, chunkIDs: [], validate: yes))
     }
     func testValidatorVeto() {
         let vetoB: (DragContext<String>, DropTarget<String>) -> Bool = { _, t in t.placement != .onto(id: "b") }
