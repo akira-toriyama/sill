@@ -92,18 +92,34 @@ private func validatedTarget<ID: Hashable>(_ placement: DropPlacement<ID>, _ sou
     return target
 }
 
+/// How far beyond the list's vertical extent a pointer may stray and still
+/// resolve the edge gap. BEYOND it the drag resolves to nil — releasing does
+/// nothing, which is the flick-away escape hatch a mouse drag needs once
+/// lifted (macOS DnD convention: affordances disappear, the release aborts).
+/// WITHIN it the edge gaps keep working, so a reorder list still takes a drop
+/// just past its first/last row. Without the cut-off, the clamp turned an
+/// abort gesture into a commit into the first/last section (facet #448).
+public let dropEscapeMargin: CGFloat = 32
+
 /// The validated drop target a pointer at `docY` resolves to (pure). A non-empty `chunkIDs`
 /// forces `.reorderBetween` (a chunk reorders to a gap, never onto a row).
+/// A `docY` more than `dropEscapeMargin` outside the rows' extent is nil — the abort zone.
 public func resolveDropTarget<ID: Hashable>(atDocY docY: CGFloat, source: ID,
                                             rows: [ListRow<ID>], geom: [RowGeom],
                                             mode requestedMode: DragMode, chunkIDs: [ID],
                                             validate: (DragContext<ID>, DropTarget<ID>) -> Bool) -> DropTarget<ID>? {
     guard !rows.isEmpty else { return nil }
     let mode: DragMode = chunkIDs.isEmpty ? requestedMode : .reorderBetween
+    if docY < -dropEscapeMargin { return nil }
     if docY < 0 {
         return mode == .dropOnto ? nil : validatedTarget(.between(beforeID: rows[0].id), source, rows: rows, chunkIDs: chunkIDs, validate: validate)
     }
     guard let i = rowIndex(atDocY: docY, geom: geom) else {
+        // Furthest MEASURED extent, not `geom.last` — a culled (unmeasured)
+        // row reports a zero rect, and the caller's fallback zeros must not
+        // shrink the abort boundary to the top of the list.
+        let end = geom.map { $0.yOffset + $0.height }.max() ?? 0
+        if docY > end + dropEscapeMargin { return nil }
         return mode == .dropOnto ? nil : validatedTarget(.between(beforeID: nil), source, rows: rows, chunkIDs: chunkIDs, validate: validate)
     }
     if rows[i].isSeparator { return nil }
