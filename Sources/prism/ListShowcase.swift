@@ -330,6 +330,19 @@ struct MockList: View, ShowcaseBench {
                         .stroke(Color(nsColor: p.border), lineWidth: 1))
                 }
 
+                cell("outline cursor parked ON a section header") {
+                    // The cursor walks headers (seed row, h/l section jumps) —
+                    // the ring must be visible there too, not `.row`-only.
+                    ThemedListView(items: facetItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.highlightStyle = .outline },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["w1"], highlight: "wsA"))
+                    .frame(width: 320, height: 150)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+
                 cell("zebra · alternating rows (resets per section)") {
                     ThemedListView(items: facetItems(),
                                    style: makeStyle { $0.zebra = true; $0.selectionMode = .none },
@@ -449,6 +462,13 @@ struct MockList: View, ShowcaseBench {
                                    style: makeStyle { $0.selectionMode = .single; $0.highlightStyle = .outline },
                                    palette: p,
                                    preview: ListPreview(selection: ["w1"], highlight: "w2")),
+                    320, 150, p)),
+
+            ("outline cursor parked ON a section header",
+             chrome(ThemedListView(items: facetItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.highlightStyle = .outline },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["w1"], highlight: "wsA")),
                     320, 150, p)),
 
             ("zebra · alternating rows (resets per section)",

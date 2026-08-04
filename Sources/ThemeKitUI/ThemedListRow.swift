@@ -413,13 +413,23 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
     }
 
     /// The keyboard cursor ring (highlightStyle == .outline): a 1.5pt primary stroke ON
-    /// TOP of any fill, inset so the stroke isn't clipped at the row edges.
+    /// TOP of any fill, inset so the stroke isn't clipped at the row edges. Drawn on
+    /// rows AND section headers: the cursor WALKS headers (it seeds on the first row,
+    /// which is a header whenever the list has sections; a section jump parks on an
+    /// empty group's header), so a `.row`-only ring made the cursor vanish there while
+    /// Enter still acted on the invisible row (facet #448). A separator is never a
+    /// cursor stop, so it keeps no ring.
     @ViewBuilder private var outlineRing: some View {
-        if case .row = item.kind, isHighlighted, style.highlightStyle == .outline {
+        if isHighlighted, style.highlightStyle == .outline, !isSeparator {
             RoundedRectangle(cornerRadius: metrics.roundedRadius)
                 .inset(by: 1.5)
                 .stroke(Color(nsColor: palette.primary), lineWidth: 1.5)
         }
+    }
+
+    private var isSeparator: Bool {
+        if case .separator = item.kind { return true }
+        return false
     }
 }
 
