@@ -129,6 +129,21 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
 
     private var scrollAxes: Axis.Set { style.horizontalContentScroll ? [.horizontal, .vertical] : .vertical }
 
+    /// A preview that pins an explicit offset owns the viewport — the follow
+    /// scrolls below must not move a deterministically framed capture.
+    private var previewPinsScroll: Bool { preview?.scrollX != nil || preview?.scrollY != nil }
+
+    /// The row a drop target is anchored to — what the viewport must show for
+    /// the aim to be visible. End-of-list (`between(nil)`) anchors to the last
+    /// visible row.
+    private var dropTargetAnchor: ID? {
+        guard let t = effDropTarget else { return nil }
+        switch t.placement {
+        case .onto(let id): return id
+        case .between(let beforeID): return beforeID ?? visible.last?.id
+        }
+    }
+
     /// The effective surface — nil ⇒ vibrancy (host material shows through).
     private var effectiveSurface: NSColor? { style.surfaceColor ?? palette.background }
     private var surfaceIsOpaque: Bool { (effectiveSurface?.alphaComponent ?? 0) >= 1 }
@@ -284,6 +299,22 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         }
         .scrollIndicators(.hidden)
         .scrollPosition($scrollPos)
+        // The viewport FOLLOWS the keyboard: the cursor and the drop aim scroll
+        // into view whichever side moved them — sill's own `.onKeyPress` path or
+        // a host driving `highlight` / `preview.dropTarget` from its own key
+        // monitor (facet swallows the arrows before `.onKeyPress` can run, so a
+        // scroll that lives only inside `moveHighlight` is unreachable for it).
+        // `scrollTo(id:)` is the minimal scroll — a no-op for a visible row —
+        // so hover-driven highlight (`highlightFollowsHover`) never jiggles, and
+        // a mouse drag's target, which sits under the pointer, never fights it.
+        .onChange(of: effectiveHighlight) { _, h in
+            guard let h, !previewPinsScroll else { return }
+            scrollPos.scrollTo(id: h)
+        }
+        .onChange(of: dropTargetAnchor) { _, anchor in
+            guard let anchor, !previewPinsScroll else { return }
+            scrollPos.scrollTo(id: anchor)
+        }
         .coordinateSpace(.named(themedListViewportSpace))          // hosted hit-test (M3)
         .onPreferenceChange(RowRectPreference.self) { rects in
             onRowRects(Dictionary(uniqueKeysWithValues: rects.compactMap { key, rect in
@@ -334,7 +365,8 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                 highlight = sel[next]
             }
         }
-        if let h = highlight { scrollPos.scrollTo(id: h) }
+        // No manual scroll here — the `.onChange(of: effectiveHighlight)` follow
+        // covers this path and every host-driven one alike.
     }
 
     private func activateHighlight() {
