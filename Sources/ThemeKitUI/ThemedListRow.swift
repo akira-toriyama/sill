@@ -36,7 +36,7 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
 
     private var fillsHighlight: Bool { isHighlighted && style.highlightStyle == .fill }
     private var drawsFill: Bool { isSelected || fillsHighlight }
-    private var onAccent: Bool { drawsFill && style.hoverStyle == .solidAccent }
+    private var onAccent: Bool { drawsFill && style.selectionInk == .solidAccent }
     private var paintsZebra: Bool {
         style.zebra && surfaceOpaque && !isSelected && !fillsHighlight && zebraOdd
     }
@@ -105,7 +105,9 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
             .overlay(outlineRing)
             .opacity(dimmed ? 0.4 : 1)     // lifted drag source / chunk member dims
             .overlay { dropOverlay }       // drop affordance at full opacity, above the dim
-            .modifier(RowAX(vends: style.vendsRowAXElements && item.asRow.isSelectable, label: axLabel))
+            .modifier(RowAX(vends: style.vendsRowAXElements && item.asRow.isSelectable,
+                            flattens: style.flattensRowAXChildren,
+                            label: axLabel))
     }
 
     /// The label VoiceOver reads for an actionable row (opt-in via `vendsRowAXElements`,
@@ -353,7 +355,7 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
                 if drawsFill {
                     selectionFill
                 }
-                if style.hoverStyle == .wash, isSelected, isHovered {
+                if style.selectionInk == .wash, isSelected, isHovered {
                     selectionShape(Color(nsColor: palette.hover))
                 }
             }
@@ -391,7 +393,7 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
         } else {
             ZStack(alignment: .leading) {
                 selectionShape(Color(nsColor: palette.selection))  // wash
-                if !style.roundedSelection {                       // 3pt primary accent bar (combo's)
+                if style.showsSelectionAccentBar {                 // 3pt primary accent bar (combo's)
                     Rectangle().fill(Color(nsColor: palette.primary))
                         .frame(width: metrics.accentBar)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -425,13 +427,20 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
 /// actionable row as ONE button-trait element whose label is the menu-item text
 /// (VoiceOver reads it as a menu row + activates on press). Default (off / a
 /// non-actionable row) leaves SwiftUI's automatic per-view AX untouched.
+///
+/// `flattens` (`style.flattensRowAXChildren`) is a SEPARATE decision from vending:
+/// `.ignore` discards the row's inner elements, which is right for a menu item
+/// (one utterance) and wrong for a content row whose badges and secondary line
+/// carry meaning. They were one switch, so asking for row AX silently deleted
+/// the contents.
 private struct RowAX: ViewModifier {
     let vends: Bool
+    let flattens: Bool
     let label: String
     func body(content: Content) -> some View {
         if vends {
             content
-                .accessibilityElement(children: .ignore)
+                .accessibilityElement(children: flattens ? .ignore : .contain)
                 .accessibilityLabel(label)
                 .accessibilityAddTraits(.isButton)
         } else {

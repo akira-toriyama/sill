@@ -426,6 +426,40 @@ for the 実処理), never an app `NSColor` or a raw `NSView` — so the componen
 GENERAL React-style components; facet / wand are study cases, **not** coupling
 targets.
 
+### One config field, one decision (no ride-along gates)
+
+**A field that carries STATE must not also decide whether an unrelated capability
+exists.** A consumer picks the value for the reason the name advertises and loses
+the other thing silently — no compile error, no warning, and a green logic suite,
+because the capability is still coded and merely unreachable.
+
+Six of these shipped in `ThemedListStyle` before anyone named the shape (audit
+2026-08-03). `hosted` meant "an AppKit host owns the click" *and* decided whether
+per-row rects were published at all, so facet could not have hover thumbnails
+without giving up its tap and hover gestures — the previews just never appeared.
+`sectionHeader(collapsed:)` carried the fold state *and* whether the header could
+be clicked, so a plain header swallowed every click while <kbd>Enter</kbd> on the
+same row still worked. `selectionMode` picked the selection semantics *and*
+whether the list could take keyboard focus. `roundedSelection` picked the
+selection's SHAPE *and* deleted the 3pt accent bar. `vendsRowAXElements` asked
+for row AX *and* discarded the row's contents. `ThemedGridView`'s `selection:`
+binding said who OWNS the value *and* who reaps ids that no longer exist.
+
+The test is mechanical: **name the field, then name every capability it turns
+off. More than one ⇒ split it, or drop the gate.** Prefer dropping — a gate that
+saves nothing measurable (`hosted` was guarding a second `GeometryReader` on rows
+that already had one) is pure downside. When the field's only uses turn out to be
+the ride-along, the fix is a rename: `hoverStyle` had two uses and both were the
+selection fill, so it became `selectionInk`.
+
+Defaults follow from this: a fresh config **grants** every capability, so a
+consumer opts out deliberately instead of opting out by accident.
+
+Guarded by `Tests/ThemeKitUITests/ListStyleGateTests.swift`, which asserts the
+INDEPENDENCE (flip the old gate, assert the capability is unmoved) rather than
+the current defaults. There is deliberately no lint for this — the shape needs a
+reader, and the cases that exist are booked.
+
 ### Two embedding shapes
 
 | shape | what | widgets |

@@ -13,15 +13,25 @@ import ListCore
 
 public enum Density: Equatable { case comfortable, compact }
 public enum SelectionMode: Equatable { case none, single, multiple }   // .multiple is NEW (M2b)
-public enum HoverStyle: Equatable { case wash, solidAccent }
+/// How a row that draws a fill (selected, or highlighted under `.fill`) is inked:
+/// a translucent `selection` wash, or an opaque `primary` slab whose contents flip
+/// to `onPrimary`. Named for what it governs — it was `hoverStyle`, whose only two
+/// uses were both this decision, so the name sent consumers looking for a hover
+/// knob and hid the one they were actually setting.
+public enum SelectionInk: Equatable { case wash, solidAccent }
 public enum HighlightStyle: Equatable { case fill, outline }
 
 public struct ThemedListStyle {
     public var density: Density = .comfortable
     public var selectionMode: SelectionMode = .single
-    public var hoverStyle: HoverStyle = .wash
+    public var selectionInk: SelectionInk = .wash
     public var highlightStyle: HighlightStyle = .fill
     public var roundedSelection: Bool = false
+    /// Draw the 3pt `primary` bar down the leading edge of a wash-inked fill
+    /// (the combo's affordance). Independent of `roundedSelection`, which picks
+    /// the fill's SHAPE: choosing the pill used to delete the bar with no way to
+    /// ask for both. Not consulted under `.solidAccent`, which has no wash to mark.
+    public var showsSelectionAccentBar: Bool = true
     public var showsDividers: Bool = false
     public var zebra: Bool = false                     // AppKit widget's `alternatingRowBackground`
     public var horizontalContentScroll: Bool = false
@@ -40,7 +50,18 @@ public struct ThemedListStyle {
     /// them, and gating them here made choosing one capability silently forfeit the
     /// other.
     public var hosted: Bool = false
+    /// Take keyboard focus (`.onKeyPress` nav, type-select, keyboard drag).
+    /// Independent of `selectionMode`: a list that selects nothing still navigates
+    /// and activates by keyboard, and gating focus on `.none` made picking the
+    /// selection semantics silently forfeit every key. A list embedded in a
+    /// non-key host (menu/combo, where AppKit owns the keys) sets this false.
+    public var takesKeyboardFocus: Bool = true
     public var vendsRowAXElements: Bool = false
+    /// Collapse a vended row to ONE AX element, hiding its inner labels/badges.
+    /// Only consulted when `vendsRowAXElements` is on. Splitting it out is what
+    /// lets a list vend rows for VoiceOver WITHOUT silently swallowing the row's
+    /// contents — the two used to be the same switch.
+    public var flattensRowAXChildren: Bool = true
     public var surfaceColor: NSColor? = nil
     public var backgroundAlpha: CGFloat = 1            // parity-PLUS (design decision ⑤)
     // drag config (M2c)

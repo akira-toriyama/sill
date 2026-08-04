@@ -99,7 +99,7 @@ struct MockMenu: View, ShowcaseBench {
             HStack(alignment: .top, spacing: 24) {
                 cell("inline mock · the open menu") {
                     ThemedListView(items: menuRows(),
-                                   style: makeStyle { $0.selectionMode = .none; $0.hoverStyle = .solidAccent; $0.highlightFollowsHover = true; $0.density = .compact },
+                                   style: makeStyle { $0.selectionMode = .none; $0.selectionInk = .solidAccent; $0.highlightFollowsHover = true; $0.density = .compact },
                                    palette: p,
                                    preview: ListPreview(highlight: "open"))
                     .frame(width: 232, height: mockMenuContentHeight)

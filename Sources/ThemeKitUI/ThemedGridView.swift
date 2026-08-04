@@ -94,9 +94,11 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
             .onChange(of: geo.size) { recomputeColumns(width: crossWidth(geo)) }
             .onChange(of: ids) { _, newIds in
                 let present = Set(newIds)
-                if selectionBinding == nil {
-                    internalSelection = reconcileGridSelection(internalSelection, existing: present)
-                }
+                // Reap ids that no longer exist WHOEVER owns the storage. Handing
+                // in a binding says "I want to observe the selection", not "I will
+                // also garbage-collect it" — and gating the reap on `selectionBinding
+                // == nil` meant a bound Set grew without bound across refreshes.
+                selection.wrappedValue = reconcileGridSelection(selection.wrappedValue, existing: present)
                 if let c = cursor, !present.contains(c) { cursor = nil }
                 if let h = hovered, !present.contains(h) { hovered = nil }
             }

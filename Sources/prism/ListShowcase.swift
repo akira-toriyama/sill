@@ -200,7 +200,7 @@ struct MockList: View, ShowcaseBench {
 
                 cell("wand tome · solidAccent · no-select") {
                     ThemedListView(items: wandItems(p),
-                                   style: makeStyle { $0.selectionMode = .none; $0.hoverStyle = .solidAccent; $0.roundedSelection = true },
+                                   style: makeStyle { $0.selectionMode = .none; $0.selectionInk = .solidAccent; $0.roundedSelection = true },
                                    palette: p,
                                    preview: ListPreview(highlight: "s2"))
                     .frame(width: 300, height: 188)
@@ -391,7 +391,7 @@ struct MockList: View, ShowcaseBench {
 
             ("wand tome · solidAccent · no-select",
              chrome(ThemedListView(items: wandItems(p),
-                                   style: makeStyle { $0.selectionMode = .none; $0.hoverStyle = .solidAccent; $0.roundedSelection = true },
+                                   style: makeStyle { $0.selectionMode = .none; $0.selectionInk = .solidAccent; $0.roundedSelection = true },
                                    palette: p,
                                    preview: ListPreview(highlight: "s2")),
                     300, 188, p)),
