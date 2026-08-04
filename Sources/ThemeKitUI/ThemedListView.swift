@@ -204,10 +204,17 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     /// Reduce Motion collapses sections without animating the row diff.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// COLLAPSING needs a collapsible header; being TAPPABLE does not. Those were
+    /// one guard, so a host that declared a plain header (`collapsed: nil`) lost
+    /// the click entirely — while Enter on the same header still activated it,
+    /// because `activateHighlight` never consulted the Kind. The decision now
+    /// lives in `ListItem.tapOutcome`, which derives each outcome separately, and
+    /// the mouse reaches exactly what the keyboard reaches.
     private func handleTap(_ item: ListItem<ID>) {
-        switch item.kind {
-        case let .sectionHeader(_, kindCollapsed):
-            guard kindCollapsed != nil, !item.isDisabled else { return }   // collapsible only
+        let outcome = ListItem<ID>.tapOutcome(kind: item.kind,
+                                              isDisabled: item.isDisabled,
+                                              selectionMode: style.selectionMode)
+        if outcome.togglesSection {
             // Reduce Motion applies the same state change with no row-diff
             // animation: the rows appear/disappear rather than sliding. A nil
             // animation is how SwiftUI spells "do it, don't animate it".
@@ -215,17 +222,15 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                 collapsed = toggleSection(item.id, in: collapsed)          // ListCore — animates the row diff + caret
             }
             onToggleSection(item.id)
-        case .row where !item.isDisabled:
-            if style.selectionMode == .none { onActivate(item.id); return }
+        }
+        if outcome.selects {
             let r = ThemedListSelect.click(id: item.id, current: selection, anchor: selectionAnchor,
                                            mods: currentSelectMods(), selectable: ListItem.selectableIDs(visible))
             selection = r.selection
             selectionAnchor = r.anchor
             onSelectionChange(r.selection)
-            onActivate(item.id)
-        default:
-            break
         }
+        if outcome.activates { onActivate(item.id) }
     }
 
     /// Live keyboard modifiers at click time → pure `SelectMods` (only in `.multiple`;
@@ -286,7 +291,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
             }))
         }
         .background(surfaceBackground)
-        .focusable(style.selectionMode != .none)          // standalone lists take keyboard focus
+        .focusable(style.takesKeyboardFocus)              // independent of selectionMode (see ThemedListStyle)
         .focused($focused)
         .onKeyPress(.upArrow)   { if keyboardDragging { aimKeyboard(-1) } else { moveHighlight(-1) }; return .handled }
         .onKeyPress(.downArrow) { if keyboardDragging { aimKeyboard(1) }  else { moveHighlight(1) };  return .handled }

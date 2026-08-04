@@ -215,7 +215,7 @@ struct MockWandLauncher: View {
     @ViewBuilder private func menuCard(rows: [ThemeKitUI.ListItem<String>], lit: String,
                                        height: CGFloat, width: CGFloat) -> some View {
         ThemedListView(items: rows,
-                       style: makeStyle { $0.selectionMode = .none; $0.hoverStyle = .solidAccent; $0.highlightFollowsHover = true; $0.density = .compact },
+                       style: makeStyle { $0.selectionMode = .none; $0.selectionInk = .solidAccent; $0.highlightFollowsHover = true; $0.density = .compact },
                        palette: p,
                        preview: ListPreview(highlight: lit))
         .frame(width: width, height: height)

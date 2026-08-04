@@ -9,11 +9,38 @@
 import AppKit
 import ListCore
 
+/// What a click on a row resolves to. Three INDEPENDENT decisions, so none of
+/// them can quietly acquire a gate on another — which is exactly how tapping a
+/// section header came to require the header be collapsible, and how a
+/// `.none` list stopped reporting activation at all.
+struct RowTapOutcome: Equatable {
+    var togglesSection = false
+    var selects = false
+    var activates = false
+}
+
 public struct ListItem<ID: Hashable & Sendable> {
     public enum Kind: Equatable {
         case row
         case sectionHeader(subtitle: String? = nil, collapsed: Bool? = nil)
         case separator
+    }
+
+    /// Pure tap resolution — the decision half of `ThemedListView.handleTap`,
+    /// lifted out so it is testable without a click and so each outcome is
+    /// derived from only the input that legitimately governs it:
+    /// collapsibility governs COLLAPSING, `selectionMode` governs SELECTING,
+    /// and neither governs whether an enabled row reports ACTIVATION.
+    static func tapOutcome(kind: Kind, isDisabled: Bool, selectionMode: SelectionMode) -> RowTapOutcome {
+        guard !isDisabled else { return RowTapOutcome() }
+        switch kind {
+        case let .sectionHeader(_, collapsed):
+            return RowTapOutcome(togglesSection: collapsed != nil, activates: true)
+        case .row:
+            return RowTapOutcome(selects: selectionMode != .none, activates: true)
+        case .separator:
+            return RowTapOutcome()
+        }
     }
 
     public let id: ID

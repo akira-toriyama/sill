@@ -17,7 +17,7 @@
 // widget lives in ThemeKitUI (the SwiftUI front) while its non-key `PopupPanel`
 // shell + the composed `ThemedToolBar` (horizontal presentation) come from ThemeKit
 // (the AppKit floors it depends on) — the reverse edge would cycle. The controller
-// is configured `selectionMode = .none` (the menu only HIGHLIGHTS) · `hoverStyle =
+// is configured `selectionMode = .none` (the menu only HIGHLIGHTS) · `selectionInk =
 // .solidAccent` (+ `onPrimary` ink) · `highlightFollowsHover` · `wrapsHighlight` ·
 // `vendsRowAXElements` (per-row `.menuItem` AX) · `hosted` (the host window keeps
 // key; the keyDown monitor drives nav and the AppKit `mouseUp` commits a row click).
@@ -281,11 +281,12 @@ public final class ThemedMenu: NSObject {
         var s = ThemedListStyle()
         s.density = density
         s.selectionMode = .none
-        s.hoverStyle = .solidAccent
+        s.selectionInk = .solidAccent
         s.highlightFollowsHover = true
         s.wrapsHighlight = true
         s.vendsRowAXElements = true          // per-row `.menuItem` AX (VoiceOver)
         s.hosted = true                      // AppKit mouseUp owns the click; rows are inert
+        s.takesKeyboardFocus = false         // the panel's AppKit responder owns the keys
         s.surfaceColor = menuSurface
         return s                             // reservesLeadingImageColumn stays true (checkmark/icon gutter)
     }

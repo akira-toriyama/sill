@@ -15,7 +15,7 @@
 // while its non-key `PopupPanel` shell + `ThemedTextField` field-editor come from
 // ThemeKit (the AppKit floors it depends on) — the reverse edge would cycle. The
 // controller is configured `selectionMode = .none` (the COMBO owns the committed
-// pick; the dropdown only HIGHLIGHTS) · `hoverStyle = .wash` (+ a `primary` accent
+// pick; the dropdown only HIGHLIGHTS) · `selectionInk = .wash` (+ a `primary` accent
 // bar that reads on neon) · `wrapsHighlight` · `highlightFollowsHover` · `hosted`
 // (the field keeps first responder; the combo forwards ↑↓/⏎ into the controller and
 // the AppKit `mouseUp` commits a row click SYNCHRONOUSLY so the value lands before
@@ -274,13 +274,14 @@ public final class ThemedComboBox: NSObject {
         var style = ThemedListStyle()
         style.density = .comfortable
         style.selectionMode = .none
-        style.hoverStyle = .wash
+        style.selectionInk = .wash
         style.wrapsHighlight = true
         style.highlightFollowsHover = true
         style.showsDividers = false
         style.reservesLeadingImageColumn = false   // option rows carry no image → text flush at leadingInset
         style.surfaceColor = listSurface
         style.hosted = true
+        style.takesKeyboardFocus = false     // the field/panel owns the keys, not the list
         return style
     }
 
