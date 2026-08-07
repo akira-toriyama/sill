@@ -71,10 +71,9 @@ struct MarkdownRenderer {
         let children = Array(document.children)
         for (index, child) in children.enumerated() {
             out.append(visitor.visit(child))
-            // single newline + paragraphSpacing between blocks (\n\n doubles the gap).
-            if index < children.count - 1 {
-                out.append(NSAttributedString(string: "\n"))
-            }
+            // The SAME block-join policy the visitor applies to nested siblings —
+            // this is the document's top level, not a second policy.
+            visitor.appendBlockSeparator(to: out, after: index, of: children.count)
         }
         return out
     }
@@ -103,13 +102,22 @@ private struct Visitor: MarkupVisitor {
     /// body-attributed newline (each block carries its own paragraphSpacing, so
     /// "\n\n" would double the gap), and nothing follows the last sibling.
     ///
+    /// `fileprivate`, not `private`, because `MarkdownRenderer.render` joins the
+    /// DOCUMENT's top-level siblings and must use this same policy — it used to
+    /// append a bare `"\n"` of its own, which is only invisible when the newline
+    /// merges into the preceding block's last line. After a code block,
+    /// blockquote or table (each ends with its own unconditional terminator) the
+    /// separator starts a fresh line fragment and is sized by its OWN font, so a
+    /// bare one collapsed the gap to 14.0pt against a body-attributed 20.0pt
+    /// (measured 2026-08-03, system 13 + `bodyLineSpacing` 4).
+    ///
     /// This is the block SEPARATOR only. The other bare `"\n"`s in this file are a
     /// different operation and must NOT be routed through here: the code-block /
     /// blockquote / table-cell terminators are unconditional, and the cell's own
     /// paragraph style is stamped over them afterwards — they are deliberately
     /// unattributed.
-    private func appendBlockSeparator(to out: NSMutableAttributedString,
-                                      after index: Int, of count: Int) {
+    fileprivate func appendBlockSeparator(to out: NSMutableAttributedString,
+                                          after index: Int, of count: Int) {
         guard index < count - 1 else { return }
         out.append(NSAttributedString(string: "\n", attributes: bodyAttrs()))
     }

@@ -114,6 +114,73 @@ final class MarkdownRendererTests: XCTestCase {
                      "cell terminator must stay bare — it is not a block separator")
     }
 
+    // MARK: - Block separator, DOCUMENT level (`render`'s own join loop)
+
+    // The two tests above render a SINGLE top-level block ("- a\n- b" is one
+    // list, "> a\n>\n> b" is one blockquote), so they only ever exercise the
+    // visitor's nested join. `render` joins the document's top-level siblings in
+    // its own loop, and that one used to append a BARE "\n" — the exact
+    // regression the test above warns about, one level up and untested.
+    //
+    // It is invisible after a paragraph, where the newline merges into the
+    // preceding line. After a block that ends with its own unconditional
+    // terminator (code block / blockquote / table) the separator starts a FRESH
+    // line fragment and is sized by its own font, so bare vs body-attributed is
+    // a real 14.0pt vs 20.0pt (system 13 + `bodyLineSpacing` 4, measured).
+
+    func testDocumentLevelBlockSeparatorIsAttributedAfterACodeBlock() {
+        let a = render("```\ncode\n```\n\nbeta")
+        XCTAssertEqual(a.string, "code\n\nbeta")
+        // [4] is the code CELL TERMINATOR — unconditional, deliberately bare.
+        XCTAssertNil(a.attribute(.font, at: 4, effectiveRange: nil),
+                     "cell terminator must stay bare — it is not a block separator")
+        // [5] is the document-level BLOCK SEPARATOR — must carry body metrics.
+        XCTAssertNotNil(a.attribute(.font, at: 5, effectiveRange: nil))
+        XCTAssertNotNil(a.attribute(.foregroundColor, at: 5, effectiveRange: nil))
+        let ps = a.attribute(.paragraphStyle, at: 5, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertEqual(ps?.lineSpacing, MarkdownStyle.default.bodyLineSpacing)
+    }
+
+    func testDocumentLevelSeparatorLineIsNotShorterThanABodyLine() {
+        // The geometric consequence, asserted RELATIVELY so it survives a font
+        // metric change: a bare separator lays out SHORTER than the body line
+        // that follows it (14.0 vs 16.0), a body-attributed one taller (20.0).
+        for source in ["```\ncode\n```\n\nbeta",       // code block
+                       "> quoted\n\nbeta",             // blockquote
+                       "| A | B |\n|---|---|\n| 1 | 2 |\n\nbeta"] {   // table
+            let a = render(source)
+            let sep = a.length - "\nbeta".count   // the separator before the trailer
+            let heights = fragmentHeights(a)
+            XCTAssertGreaterThanOrEqual(
+                heights[sep], heights[a.length - 1],
+                "separator line collapsed below a body line in \(source.debugDescription)")
+        }
+    }
+
+    /// Lay the string out in the real TextKit 1 stack and return, per character
+    /// index, the height of the line fragment it lands in.
+    private func fragmentHeights(_ a: NSAttributedString) -> [CGFloat] {
+        let storage = NSTextStorage(attributedString: a)
+        let lm = InlineCodePillLayoutManager()
+        storage.addLayoutManager(lm)
+        let container = NSTextContainer(size: NSSize(width: 400,
+                                                     height: CGFloat.greatestFiniteMagnitude))
+        container.lineFragmentPadding = 0
+        lm.addTextContainer(container)
+        lm.ensureLayout(for: container)
+
+        var out = [CGFloat](repeating: 0, count: a.length)
+        var glyph = 0
+        while glyph < lm.numberOfGlyphs {
+            var glyphRange = NSRange()
+            let rect = lm.lineFragmentRect(forGlyphAt: glyph, effectiveRange: &glyphRange)
+            let chars = lm.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+            for i in chars.location ..< min(NSMaxRange(chars), a.length) { out[i] = rect.height }
+            glyph = NSMaxRange(glyphRange)
+        }
+        return out
+    }
+
     // MARK: - GFM table (floor-3 NSTextTable path)
 
     func testGFMTableParsesIntoCellsNotLiteralPipes() {
