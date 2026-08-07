@@ -60,8 +60,12 @@ let package = Package(
         // `SourceSpan`) and the `__line__` key is gone — additive for sill
         // (ConfigSchema decodes flat `parseFlat` tables, not `.arrayOfTables`),
         // so the floor moves to 2.x and the family unifies on it (chord#148).
+        // 3.0.0: the line-based strict scanner is retired and `parse` delegates
+        // to `parseWithSpans` (swift-toml-edit#19) — a rewrite of the engine
+        // BEHIND the same `parse` / `parseFlat` surface ConfigSchema decodes
+        // over, so sill's two `import Toml` sites are untouched.
         .package(url: "https://github.com/akira-toriyama/swift-toml-edit.git",
-                 .upToNextMajor(from: "2.0.0")),
+                 .upToNextMajor(from: "3.0.0")),
 
         // SwiftDraw (Zlib · zero deps · pure-Swift CoreGraphics SVG renderer,
         // macOS 10.15+) — ThemeKit's SVG rasterizer. The ONLY path that
@@ -75,6 +79,12 @@ let package = Package(
         // full Xcode — it fails to compile under CommandLineTools (the local gate).
         // 0.24.0 predates SVGView and gives the same `SVG(fileURL:)` / `rasterize`
         // / `NSImage(_:)` API. Bump only if a CLT-buildable newer release lands.
+        // 0.29.0 is NOT that release (measured 2026-08-03, CLT-only shell): 17
+        // errors, and the wall is now TWO Xcode-only macro plugins, not one —
+        // `SVGView.swift:220` still needs `PreviewsMacros` for `#Preview`, and
+        // `AsyncSVGView.swift:37` adds `SwiftUIMacros` for `@Entry`. Dependabot
+        // re-proposes it weekly (the `swift` group is `patterns: ["*"]`); this
+        // paragraph is the standing verdict, so re-measure rather than re-derive.
         .package(url: "https://github.com/swhitty/SwiftDraw.git",
                  .upToNextMinor(from: "0.24.0")),
         // swiftlang/, NOT apple/ — the repo moved and `apple/` is the stale
