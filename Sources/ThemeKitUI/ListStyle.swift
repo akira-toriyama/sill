@@ -33,6 +33,14 @@ public struct ThemedListStyle {
     /// ask for both. Not consulted under `.solidAccent`, which has no wash to mark.
     public var showsSelectionAccentBar: Bool = true
     public var showsDividers: Bool = false
+    /// Draw the theme-painted overlay scroll indicator(s) — a `muted` pill that
+    /// appears while the viewport moves and fades out at rest, on each axis
+    /// whose content overflows. Replaces the native `NSScroller`, which is
+    /// suppressed unconditionally: the system knob ignores the palette, and
+    /// `.scrollIndicators(.hidden)` proved to be a no-op on the AppKit-backed
+    /// `ScrollView` (measured 2026-08-08, t-8649), so OFF here means "no
+    /// indicator at all", not "the native one".
+    public var showsScrollIndicators: Bool = true
     public var zebra: Bool = false                     // AppKit widget's `alternatingRowBackground`
     public var horizontalContentScroll: Bool = false
     public var reservesLeadingImageColumn: Bool = true

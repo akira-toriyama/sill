@@ -121,6 +121,15 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     @State private var dragAim: [ListCore.DropTarget<ID>] = []   // ordered keyboard-drag targets
     @State private var dragAimIndex = 0
 
+    // Themed scroll indicator (t-8649) — the live scroll geometry the knob is
+    // computed from, and the show-then-fade activity state.
+    private struct ScrollGeom: Equatable {
+        var offset: CGPoint; var content: CGSize; var container: CGSize
+    }
+    @State private var scrollGeom: ScrollGeom?
+    @State private var indicatorShown = false
+    @State private var indicatorFade: Task<Void, Never>?
+
     private var metrics: ListMetrics { .forDensity(style.density) }
     private var visible: [ListItem<ID>] { ListItem.visibleRows(items, collapsed: collapsed) }
     private var effectiveSelection: Set<ID> { preview?.selection ?? selection }
@@ -304,8 +313,23 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
             .onPreferenceChange(RowGeomPreference.self) { geomMap = $0 }
             .overlay { dragGhostLayer }
         }
-        .scrollIndicators(.hidden)
+        // `.never`, NOT `.hidden`: on the AppKit-backed macOS `ScrollView` the
+        // `.hidden` visibility is a no-op — the hosting scroll view keeps a
+        // persistent legacy-style `NSScroller` (system grey, and it reserves a
+        // 17pt gutter), identical to passing nothing. `.never` is what removes
+        // the scroller from the hierarchy. Measured with an `NSHostingView`
+        // probe, 2026-08-08 (t-8649) — and guarded by
+        // ThemedListScrollIndicatorTests, because this is exactly the shipped
+        // regression. The themed replacement is `scrollIndicatorLayer` below.
+        .scrollIndicators(.never)
         .scrollPosition($scrollPos)
+        .onScrollGeometryChange(for: ScrollGeom.self) { g in
+            ScrollGeom(offset: g.contentOffset, content: g.contentSize, container: g.containerSize)
+        } action: { _, new in
+            scrollGeom = new
+            flashScrollIndicators()
+        }
+        .overlay { scrollIndicatorLayer }
         // The viewport FOLLOWS the keyboard: the cursor and the drop aim scroll
         // into view whichever side moved them — sill's own `.onKeyPress` path or
         // a host driving `highlight` / `preview.dropTarget` from its own key
@@ -597,6 +621,63 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                 guard id == visible.last?.id else { return nil }
                 return isChunk ? .sectionBarBelow : .betweenBelow
             }
+        }
+    }
+
+    // MARK: themed scroll indicator (t-8649) — the SwiftUI replacement for the
+    // suppressed native `NSScroller`. Geometry comes from `scrollKnob` (pure,
+    // ListCore); this layer only paints. `muted` is the knob role — the same
+    // "subtle chrome on every theme" convention as the AppKit `ThemedScroller`
+    // facet used before the SwiftUI migration. Overlay-style: no track, no
+    // reserved gutter, pills float over the content's trailing/bottom edge.
+
+    private var indicatorThickness: CGFloat { 6 }
+    private var indicatorEdgeMargin: CGFloat { 3 }
+
+    /// Visible while the viewport moves (then fades), or PERSISTENTLY under a
+    /// preview that pins a scroll offset — a static prism capture has no
+    /// scroll activity, so activity-gating would make the knob unshowable.
+    private var indicatorVisible: Bool { indicatorShown || previewPinsScroll }
+
+    @ViewBuilder private var scrollIndicatorLayer: some View {
+        if style.showsScrollIndicators, indicatorVisible, let g = scrollGeom {
+            let ink = Color(nsColor: palette.muted)
+            ZStack(alignment: .topLeading) {
+                Color.clear
+                if let v = scrollKnob(content: g.content.height,
+                                      viewport: g.container.height,
+                                      offset: g.offset.y) {
+                    Capsule().fill(ink)
+                        .frame(width: indicatorThickness, height: v.length)
+                        .offset(x: g.container.width - indicatorThickness - indicatorEdgeMargin,
+                                y: v.offset)
+                }
+                if style.horizontalContentScroll,
+                   let h = scrollKnob(content: g.content.width,
+                                      viewport: g.container.width,
+                                      offset: g.offset.x) {
+                    Capsule().fill(ink)
+                        .frame(width: h.length, height: indicatorThickness)
+                        .offset(x: h.offset,
+                                y: g.container.height - indicatorThickness - indicatorEdgeMargin)
+                }
+            }
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        }
+    }
+
+    /// Show the pills now, and (re)arm the fade-out. Any frozen `preview` opts
+    /// out: activity there is layout noise, and a deterministic capture either
+    /// pins a scroll offset (→ persistent knob) or shows no knob at all.
+    private func flashScrollIndicators() {
+        guard style.showsScrollIndicators, preview == nil else { return }
+        indicatorShown = true
+        indicatorFade?.cancel()
+        indicatorFade = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.35)) { indicatorShown = false }
         }
     }
 
