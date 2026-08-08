@@ -83,6 +83,22 @@ struct MockThumbnailGrid: View {
                                     layout: .fixed(columns: 1),
                                     axis: .horizontal, aspectRatio: 1, palette: p)
                 .frame(height: 110)
+
+            Text("frozen · hover c1 · cursor ring c2 · selected c0 · shimmer phase 0.5")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
+
+            // The t-avbj freeze seam: every interactive chrome layer pinned, so a
+            // static capture shows hover veil + cursor ring + a mid-cell shimmer
+            // band deterministically (the grid had NO preview seam before, so
+            // none of these states could appear in a bench shot).
+            ThemedThumbnailGridView(loadedItems + loadingItems,
+                                    selection: .constant(["c0"]),
+                                    layout: .adaptive(minCellWidth: 96),
+                                    aspectRatio: 1, palette: p)
+                .preview(GridPreview(hovered: "c1", cursor: "c2"))
+                .previewShimmerPhase(0.5)
+                .frame(height: 240)
         }
     }
 }

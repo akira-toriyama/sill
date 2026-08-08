@@ -159,6 +159,7 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
                 }
                 headerContent(subtitle: subtitle)
                 Spacer(minLength: 0)
+                if showsGrip { reorderGrip }
             }
             .padding(.leading, metrics.leadingInset + indentWidth)
             .padding(.trailing, metrics.trailingInset)
@@ -264,6 +265,31 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
                 .frame(width: pt, height: pt)
                 .foregroundColor(color)
         }
+    }
+
+    /// The 2×3 reorder grip on a draggable header — the KitCatalog has claimed
+    /// this drawing since the drag layer shipped, but no draw code existed
+    /// (t-avbj: a catalog asserting behaviour that isn't there is how a blind
+    /// spot stays blind). Same liftability rule as `ThemedListView.isDragSource`:
+    /// any non-disabled header, collapsible or not.
+    private var showsGrip: Bool {
+        style.draggable && style.showsReorderGrip && !item.isDisabled
+    }
+
+    private var reorderGrip: some View {
+        let dot: CGFloat = 2, gap: CGFloat = 2.5
+        return VStack(spacing: gap) {
+            ForEach(0..<3, id: \.self) { _ in
+                HStack(spacing: gap) {
+                    ForEach(0..<2, id: \.self) { _ in
+                        Circle().fill(Color(nsColor: palette.muted))
+                            .frame(width: dot, height: dot)
+                    }
+                }
+            }
+        }
+        .opacity(0.8)
+        .accessibilityHidden(true)     // pure affordance; the header row itself carries AX
     }
 
     /// Reduce Motion snaps the caret rather than rotating it (see below).

@@ -103,6 +103,19 @@ struct MockToolBar: View, ShowcaseBench {
                                       variant: .compact, corners: .rounded,
                                       trackingMode: .nonActivatingPanel, previewHoveredItem: 1).fixedSize()
                 }
+                // The two states t-avbj added: frozen pressed / keyboard focus.
+                // A widget built for non-key panels can't be driven live in a
+                // bench, so without these the poses were bench-invisible.
+                cell("pressed item 2") {
+                    ThemedToolBarView(palette: p, items: stripItems, surface: .transparent,
+                                      variant: .compact, corners: .rounded)
+                        .previewPressed(2).fixedSize()
+                }
+                cell("focused item 4") {
+                    ThemedToolBarView(palette: p, items: stripItems, surface: .transparent,
+                                      variant: .compact, corners: .rounded)
+                        .previewFocused(4).fixedSize()
+                }
             }
         }
         .showcasePanel(p)

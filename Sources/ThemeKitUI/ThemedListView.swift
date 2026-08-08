@@ -39,6 +39,11 @@ public struct ListPreview<ID: Hashable & Sendable> {
         self.dragSource = dragSource; self.dropTarget = dropTarget; self.dragChunk = dragChunk
     }
 
+    /// Freeze the keyboard focus ring on. Live, the ring hangs off a
+    /// `@FocusState` no host can reach from outside the view, so this was the
+    /// one chrome layer a static bench shot could never show (t-avbj).
+    public var focusRing: Bool = false
+
     /// A copy with the pointer parked on `id`. `hovered` arrives as a method
     /// rather than another initialiser parameter on purpose: the API differ reads
     /// any change to this label list as the old initialiser being REMOVED, which
@@ -46,6 +51,12 @@ public struct ListPreview<ID: Hashable & Sendable> {
     /// frozen state should land the same way.
     public func hovering(_ id: ID?) -> ListPreview {
         var c = self; c.hovered = id; return c
+    }
+
+    /// A copy with the keyboard focus ring frozen on/off (same API-differ-safe
+    /// method shape as `hovering`).
+    public func showingFocusRing(_ on: Bool = true) -> ListPreview {
+        var c = self; c.focusRing = on; return c
     }
 }
 
@@ -137,6 +148,9 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     /// A frozen `preview` OWNS hover — falling through to the live `hoveredID`
     /// would let a stray pointer contaminate a deterministic capture.
     private var effectiveHovered: ID? { preview != nil ? preview?.hovered : hoveredID }
+    /// Same ownership rule for the focus ring: a frozen `preview` decides, live
+    /// falls through to the real `@FocusState`.
+    private var effectiveFocusRing: Bool { preview != nil ? (preview?.focusRing ?? false) : focused }
 
     private var scrollAxes: Axis.Set { style.horizontalContentScroll ? [.horizontal, .vertical] : .vertical }
 
@@ -366,7 +380,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
             return .handled
         }
         .overlay {
-            if focused {
+            if effectiveFocusRing {
                 RoundedRectangle(cornerRadius: 4).inset(by: 1)   // Radius.sm; matches AppKit managesFirstResponder ring
                     .stroke(Color(nsColor: palette.primary), lineWidth: 2)
             }

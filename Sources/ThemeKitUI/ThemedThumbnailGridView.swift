@@ -30,6 +30,22 @@ public struct ThemedThumbnailGridView: View {
     private let onActivate: ((String) -> Void)?
     private let allowsMultiSelect: Bool
 
+    /// Frozen chrome / shimmer for a static capture, forwarded to the inner
+    /// `ThemedGridView` / `ThemedThumbnailCell`. Set via the methods below,
+    /// not init parameters (the API differ reads an init-label change as a
+    /// removal — see `ListPreview.hovering`).
+    private var previewState: GridPreview<String>?
+    private var frozenShimmerPhase: CGFloat?
+
+    /// A copy rendering the frozen grid chrome (hover / cursor / focus).
+    public func preview(_ p: GridPreview<String>?) -> Self {
+        var c = self; c.previewState = p; return c
+    }
+    /// A copy with every loading cell's shimmer parked at `phase` (nil = live).
+    public func previewShimmerPhase(_ phase: CGFloat?) -> Self {
+        var c = self; c.frozenShimmerPhase = phase; return c
+    }
+
     /// Multi-select (or uncontrolled when `selection == nil`).
     public init(_ items: [ThumbnailItem],
                 selection: Binding<Set<String>>? = nil,
@@ -86,6 +102,8 @@ public struct ThemedThumbnailGridView: View {
                        palette: palette, onActivate: onActivate,
                        allowsMultiSelect: allowsMultiSelect) { item, _ in
             ThemedThumbnailCell(image: item.image, label: item.label, palette: palette)
+                .previewShimmerPhase(frozenShimmerPhase)
         }
+        .preview(previewState)
     }
 }

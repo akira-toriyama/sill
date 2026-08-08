@@ -353,6 +353,19 @@ struct MockList: View, ShowcaseBench {
                         .stroke(Color(nsColor: p.border), lineWidth: 1))
                 }
 
+                cell("frozen keyboard focus ring (list-level, primary)") {
+                    // The whole-list focus ring hangs off a @FocusState no bench
+                    // could reach (t-avbj) — `showingFocusRing()` freezes it.
+                    ThemedListView(items: facetItems(),
+                                   style: makeStyle { $0.selectionMode = .single },
+                                   palette: p,
+                                   preview: ListPreview<String>(selection: ["w1"]).showingFocusRing())
+                    .frame(width: 300, height: 150)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+
                 cell("horizontalContentScroll · long titles, no truncation") {
                     ThemedListView(items: longItems(),
                                    style: makeStyle { $0.selectionMode = .single; $0.horizontalContentScroll = true },

@@ -67,6 +67,23 @@ public struct ThemedToolBarView: View {
     var previewHoveredItem: Int?
     var onItemClick: ((Int) -> Void)?
 
+    /// Frozen pressed / focused button states for a static capture (t-avbj:
+    /// hover was the only freezable state on a widget built for non-key panels,
+    /// where nothing else can be driven live either). Set via the methods
+    /// below, NOT init parameters — the API differ reads an init-label change
+    /// as a removal (see `ListPreview.hovering`).
+    var previewPressedItem: Int?
+    var previewFocusedItem: Int?
+
+    /// A copy with item `i`'s button frozen in its pressed pose.
+    public func previewPressed(_ i: Int?) -> Self {
+        var c = self; c.previewPressedItem = i; return c
+    }
+    /// A copy with item `i`'s button frozen in its keyboard-focused pose.
+    public func previewFocused(_ i: Int?) -> Self {
+        var c = self; c.previewFocusedItem = i; return c
+    }
+
     /// Live mouse hover, used ONLY in `.nonActivatingPanel`, where the bar is
     /// the sole hover driver.
     @State private var hoveredItem: Int?
@@ -216,6 +233,8 @@ public struct ThemedToolBarView: View {
                              role: role, title: title ?? "", leading: symbol,
                              trailing: trailing, fullWidth: true, enabled: enabled,
                              previewHovered: forcedItem == i,
+                             previewPressed: previewPressedItem == i,
+                             previewFocused: previewFocusedItem == i,
                              onTap: { onItemClick?(i) })
                 .asIconButton(item.isIconOnly)
                 // The bar frames every item, so the member takes the width it is
