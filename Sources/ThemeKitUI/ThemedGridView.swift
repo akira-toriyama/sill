@@ -11,6 +11,21 @@ import GridCore
 // macOS 14+). The cell CONTENT is supplied by the consumer via @ViewBuilder.
 // NO AppKit. DnD + carousel/hero are out of scope (see design spec §3.2/§11).
 
+/// Frozen chrome state for a deterministic static screenshot (prism's per-cell
+/// capture) — the grid twin of the list's `ListPreview` (t-avbj: the grid had
+/// no seam at all, so hover / cursor / focus were bench-invisible). When
+/// non-nil the grid renders THIS instead of its live `@State`/`@FocusState`.
+public struct GridPreview<ID: Hashable> {
+    public var hovered: ID?
+    public var cursor: ID?
+    /// Whether the grid renders as focused (the cursor ring only draws on a
+    /// focused grid, mirroring the live `isFocused && cursor == id` rule).
+    public var focused: Bool
+    public init(hovered: ID? = nil, cursor: ID? = nil, focused: Bool = true) {
+        self.hovered = hovered; self.cursor = cursor; self.focused = focused
+    }
+}
+
 @MainActor
 public struct ThemedGridView<Data, ID, Cell>: View
 where Data: RandomAccessCollection, ID: Hashable, Cell: View {
@@ -34,6 +49,24 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     @State private var hovered: ID?
     @State private var resolvedColumns: Int = 1
     @FocusState private var isFocused: Bool
+
+    /// Frozen chrome for a static capture. Set via `.preview(_:)`, NOT an init
+    /// parameter — the API differ reads any init-label change as a removal
+    /// (see `ListPreview.hovering`), so frozen state lands as a method here too.
+    private var previewState: GridPreview<ID>?
+
+    /// A copy that renders the frozen `preview` instead of live interaction
+    /// state. Selection stays a binding — pass `.constant([...])` to freeze it.
+    public func preview(_ p: GridPreview<ID>?) -> Self {
+        var c = self; c.previewState = p; return c
+    }
+
+    /// A frozen preview OWNS each interactive facet (the `ListPreview` rule):
+    /// falling through to live state would let a stray pointer or focus change
+    /// contaminate a deterministic capture.
+    private var effHovered: ID? { previewState != nil ? previewState?.hovered : hovered }
+    private var effCursor: ID? { previewState != nil ? previewState?.cursor : cursor }
+    private var effFocused: Bool { previewState?.focused ?? isFocused }
 
     // Tokens (tuned later in prism).
     private let gap = CGFloat(Space.md)        // 8
@@ -125,8 +158,8 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     private func chrome(for element: Data.Element) -> some View {
         let id = element[keyPath: idKey]
         let isSel = selection.wrappedValue.contains(id)
-        let isCur = isFocused && cursor == id
-        let isHov = hovered == id
+        let isCur = effFocused && effCursor == id
+        let isHov = effHovered == id
         let state = GridCellState(isSelected: isSel, isHovered: isHov, isFocused: isCur)
 
         cellBuilder(element, state)

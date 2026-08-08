@@ -246,7 +246,7 @@ ThemedButtonGroupView(
                  "elevation: Int — 0 = flat + bottom hairline; >0 = drop shadow; corners: .square/.rounded (8pt panel)",
                  "onItemClick: ((Int)->Void)? — item button activation; onItemHover: ((Int?)->Void)? — hovered item changed",
                  "trackingMode: .standard/.nonActivatingPanel — .activeAlways + bar-driven item hover for a non-key launcher panel",
-                 "frameOnScreen(ofItem:) -> NSRect? — anchor a child panel below a folder button; previewHoveredItem: Int? — force hover for capture",
+                 "frameOnScreen(ofItem:) -> NSRect? — anchor a child panel below a folder button; previewHoveredItem: Int? — force hover for capture; SwiftUI ThemedToolBarView adds .previewPressed(i)/.previewFocused(i) — frozen pressed/keyboard-focused button poses",
              ],
         variants: [
                  "surface: surface / primary / secondary / transparent",
@@ -656,7 +656,7 @@ ThemedBackdropView(
                  "vendsRowAXElements (opt-in per-row AX with a \"checked\" marker for menu rows) + flattensRowAXChildren (whether that element swallows the row's contents) · takesKeyboardFocus (independent of selectionMode) · surfaceColor override (vibrancy escape hatch) · backgroundAlpha (ThemedToolBar idiom)",
                  "row kinds: .row / .sectionHeader(subtitle:collapsed:) (sticky, 1- or 2-line; collapsed Bool? opts into a disclosure triangle) / .separator; indentLevel:Int nests any row/header; ListTint: none/primary/secondary/error/.custom(HexColor); BadgeRole: neutral/primary/secondary/error; TrailingAccessory: none/chevron/shortcut(String)/custom(NSImage)",
                  "drag affordance: .onto lights the target row (2pt primary ring + faint fill); .between draws a 2pt primary insertion line + leading dot in the gap; the lifted source row dims. A CHUNK lift dims EVERY member row and draws a THICKER full-bleed section insertion bar; the overlay ghost is the members' capped (60%) union with an 'N items' badge. grid/rail/real-window drag stay app-side (not in sill)",
-                 "capture seams: preview: ListPreview(selection:highlight:scrollX:scrollY:dragSource:dropTarget:dragChunk:) — one frozen value pins every interactive state for a deterministic prism shot",
+                 "capture seams: preview: ListPreview(selection:highlight:scrollX:scrollY:dragSource:dropTarget:dragChunk:) + .hovering(id) (pointer veil) + .showingFocusRing() (the list-level keyboard ring) — one frozen value pins every interactive state for a deterministic prism shot; a preview that pins scrollX/scrollY also shows the themed scroll-indicator pill persistently",
              ],
         family: .collection,
         // Structured recipe (Task 3 worked example) — verified against the real
@@ -743,6 +743,7 @@ ThemedMenuTriggerView(palette: resolve(themeSpec), title: "Actions", items: item
                  "allowsMultiSelect: Bool — set internally by which init is used (multi-select ⇒ true, single-select convenience ⇒ false); Cmd-click toggles only when true, else replaces",
                  "keyboard: onMoveCommand arrow keys move a single roving cursor that REPLACES the selection (macOS grid convention); Return activates the cursor",
                  "GridCellState (isSelected/isHovered/isFocused) is handed to a custom cell builder so it can layer its own emphasis atop the kit's chrome",
+                 "capture seams: .preview(GridPreview(hovered:cursor:focused:)) freezes the interactive chrome, .previewShimmerPhase(0…1) parks the loading sweep — a static bench shot shows hover/cursor-ring/shimmer deterministically (selection freezes via .constant)",
              ],
         variants: [
                  "layout: fixed(columns:) / adaptive(minCellWidth:)",

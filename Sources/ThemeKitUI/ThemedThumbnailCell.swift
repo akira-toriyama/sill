@@ -16,6 +16,20 @@ public struct ThemedThumbnailCell: View {
     /// Explicit argument > ambient `.sillTheme(_:)` > the process default.
     var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
 
+    /// Frozen shimmer phase for a static capture: the sweep parks at this
+    /// fraction of the travel (0 = entering left, 1 = leaving right) instead of
+    /// animating. Without it every capture caught a different phase, so
+    /// theme-to-theme comparison of the loading cell never compared like with
+    /// like (t-avbj). Set via `.previewShimmerPhase(_:)`, not an init parameter
+    /// (the API differ reads an init-label change as a removal — see
+    /// `ListPreview.hovering`).
+    var frozenShimmerPhase: CGFloat?
+
+    /// A copy with the loading shimmer parked at `phase` (nil = live sweep).
+    public func previewShimmerPhase(_ phase: CGFloat?) -> Self {
+        var c = self; c.frozenShimmerPhase = phase; return c
+    }
+
     public init(image: NSImage?, label: String? = nil, palette: ResolvedPalette? = nil) {
         self.image = image
         self.label = label
@@ -30,7 +44,7 @@ public struct ThemedThumbnailCell: View {
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fill)
             } else {
-                ShimmerPlaceholder(palette: palette)
+                ShimmerPlaceholder(palette: palette, frozenPhase: frozenShimmerPhase)
             }
             if let label, !label.isEmpty {
                 Text(label)
@@ -58,6 +72,8 @@ struct ShimmerPlaceholder: View {
     // Internal, and only ever built by ThemedThumbnailCell, which has already
     // resolved the three tiers — so this takes the answer, not the question.
     let palette: ResolvedPalette
+    /// A frozen sweep position (0…1 across the travel); nil = animate live.
+    var frozenPhase: CGFloat? = nil
     @State private var travel: CGFloat = -1
     /// A band sweeping across the cell FOREVER is the strongest motion in this
     /// module, so Reduce Motion drops the sweep entirely and leaves the muted
@@ -82,13 +98,15 @@ struct ShimmerPlaceholder: View {
     /// never STARTED under Reduce Motion — hiding a running animation would
     /// keep the timer alive for nothing.
     @ViewBuilder private func sweep(_ geo: GeometryProxy) -> some View {
-        if !reduceMotion {
-            LinearGradient(
-                colors: [.clear,
-                         Color(nsColor: palette.foreground).opacity(0.12),
-                         .clear],
-                startPoint: .leading, endPoint: .trailing)
-                .frame(width: geo.size.width * 0.6)
+        if let phase = frozenPhase {
+            // A PARKED band, not a running animation: statically placed at the
+            // frozen fraction of the live travel (-1 … 1.3), so a capture is
+            // deterministic and theme-to-theme comparison compares like with
+            // like. Static, so it draws under Reduce Motion too — there is no
+            // motion to reduce.
+            band(geo).offset(x: (-1 + min(max(phase, 0), 1) * 2.3) * geo.size.width)
+        } else if !reduceMotion {
+            band(geo)
                 .offset(x: travel * geo.size.width)
                 .onAppear {
                     withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) {
@@ -96,5 +114,14 @@ struct ShimmerPlaceholder: View {
                     }
                 }
         }
+    }
+
+    private func band(_ geo: GeometryProxy) -> some View {
+        LinearGradient(
+            colors: [.clear,
+                     Color(nsColor: palette.foreground).opacity(0.12),
+                     .clear],
+            startPoint: .leading, endPoint: .trailing)
+            .frame(width: geo.size.width * 0.6)
     }
 }
