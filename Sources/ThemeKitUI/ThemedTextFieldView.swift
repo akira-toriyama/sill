@@ -185,9 +185,12 @@ struct FieldHostProxy<Controller: AnyObject>: NSViewRepresentable {
     let detach: @MainActor (Controller) -> Void
 
     /// `dismantleNSView` is static, so the coordinator carries BOTH the retained
-    /// controller and the `detach` closure that tears it down.
+    /// controller and the `detach` closure that tears it down. `update` is the
+    /// LATEST SwiftUI values — the window-attach re-run below must not replay
+    /// stale ones from `makeNSView` time.
     final class Coordinator {
         var controller: Controller?
+        var update: (@MainActor (Controller) -> Void)?
         var detach: (@MainActor (Controller) -> Void)?
     }
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -195,17 +198,28 @@ struct FieldHostProxy<Controller: AnyObject>: NSViewRepresentable {
     func makeNSView(context: Context) -> ThemedTextField {
         let (field, controller) = attach()
         context.coordinator.controller = controller
+        context.coordinator.update = update
         context.coordinator.detach = detach
+        // Re-drive on window attach/detach: the field arrives windowless, and a
+        // window-dependent controller seam (`previewOpen`) set at first update
+        // must be re-assertable once presenting becomes possible.
+        field.onDidMoveToWindow = { [weak coordinator = context.coordinator] in
+            guard let coordinator, let c = coordinator.controller else { return }
+            coordinator.update?(c)
+        }
         return field
     }
 
     func updateNSView(_ v: ThemedTextField, context: Context) {
+        context.coordinator.update = update
         if let c = context.coordinator.controller { update(c) }
     }
 
     static func dismantleNSView(_ v: ThemedTextField, coordinator: Coordinator) {
+        v.onDidMoveToWindow = nil
         if let c = coordinator.controller { coordinator.detach?(c) }
         coordinator.controller = nil
+        coordinator.update = nil
         coordinator.detach = nil
     }
 

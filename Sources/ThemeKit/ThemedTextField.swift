@@ -520,6 +520,17 @@ public final class ThemedTextField: NSView {
         strokeLayer.contentsScale = s
     }
 
+    /// Fires after the field lands in (or leaves) a window — ThemeKitUI's
+    /// `FieldHostProxy` re-drives its controller through this, because a
+    /// window-dependent seam (`ThemedComboBox.previewOpen`) asserted before the
+    /// window exists would otherwise be lost (SwiftUI promises no further
+    /// update after attachment).
+    package var onDidMoveToWindow: (() -> Void)?
+    public override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        onDidMoveToWindow?()
+    }
+
     public override func draw(_ dirty: NSRect) {
         let geo = geometry()
         let box = geo.box

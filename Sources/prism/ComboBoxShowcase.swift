@@ -1,11 +1,13 @@
 // prism — ThemeKit ComboBox bench. The dropdown lives on its OWN borderless
 // child window, which `screencapture -l<winid>` of prism's main window can NEVER
-// include — so (like the Tooltip bench) the per-theme grid draws an INLINE MOCK
-// of the OPEN dropdown (rounded `background` surface, 1 pt `border`, 30 pt rows,
-// the highlighted row = `selection` wash + a `primary` accent bar, a disabled
-// row in `tertiary`, and the "No options" empty row), plus a LIVE row hosting the
-// REAL `ThemedComboBox` so the type-to-filter / arrow-nav / click-select 演出 can
-// be felt by hand (it just won't appear in a static capture).
+// include — so (the Menu-bench pattern) the per-theme grid draws the OPEN
+// dropdown IN-WINDOW with the REAL kit: a `ThemedListView` in the exact config
+// `ThemedComboBox` hosts, mirroring its `syncList` row mapping (disabled rows,
+// the inert "No options" row, the actionable "Create …" row), inside the
+// container chrome the panel paints. A LIVE row hosts the REAL `ThemedComboBox`
+// so the type-to-filter / arrow-nav / click-select 演出 can be felt by hand (its
+// child window just won't appear in a static capture; `.previewOpen(_:)` /
+// `.previewHighlight(_:)` freeze it live for interactive verification).
 
 import SwiftUI
 import AppKit
@@ -14,54 +16,47 @@ import PaletteKit
 import ThemeKit
 import ThemeKitUI
 
-// MARK: - Inline mock of the OPEN dropdown (for the static grid)
+// MARK: - The OPEN dropdown, drawn in-window by the REAL kit
 
-private struct DropdownMock: View {
+/// Build a `ThemedListStyle` inline (the kit's config value type is assign-based).
+private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedListStyle {
+    var s = ThemedListStyle(); configure(&s); return s
+}
+
+/// The open dropdown: the REAL `ThemedListView` in `ThemedComboBox`'s exact
+/// hosting config (comfortable 30 pt rows · no selection · wash highlight +
+/// accent bar · hover-follows-highlight · no dividers · image-less flush rows),
+/// with `preview` freezing the highlight, inside the container chrome the panel
+/// draws (surface + 1 pt `border` + `Radius.lg` corners). This cell is the
+/// capture surface for the dropdown's THEMED DRAWING — placement / flip /
+/// dismiss stay covered by the controller's probe tests.
+private struct DropdownOpen: View {
     let p: ResolvedPalette
-    let rows: [String]
-    let highlight: Int?
-    var disabledIndex: Int? = nil
+    let rows: [ThemeKitUI.ListItem<String>]
+    let highlight: String?
     var width: CGFloat = 200
 
-    private var rowFont: Font {
-        p.font == .mono ? sysFont(13, design: .monospaced) : sysFont(13)
-    }
+    private var surface: NSColor { p.background ?? .textBackgroundColor }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if rows.isEmpty {
-                row("No options", color: p.muted, highlighted: false)
-            } else {
-                ForEach(Array(rows.enumerated()), id: \.offset) { i, label in
-                    let disabled = (i == disabledIndex)
-                    row(label,
-                        color: disabled ? p.tertiary : p.foreground,
-                        highlighted: i == highlight && !disabled)
-                }
-            }
-        }
-        .frame(width: width)
-        .background(RoundedRectangle(cornerRadius: 8)
-            .fill(Color(nsColor: p.background ?? .textBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 8)
+        ThemedListView(items: rows,
+                       style: makeStyle {
+                           $0.density = .comfortable
+                           $0.selectionMode = .none
+                           $0.selectionInk = .wash
+                           $0.wrapsHighlight = true
+                           $0.highlightFollowsHover = true
+                           $0.showsDividers = false
+                           $0.reservesLeadingImageColumn = false
+                           $0.surfaceColor = surface
+                       },
+                       palette: p,
+                       preview: ListPreview(highlight: highlight))
+        .frame(width: width, height: CGFloat(rows.count) * 30)
+        .background(Color(nsColor: surface))
+        .clipShape(RoundedRectangle(cornerRadius: CGFloat(Radius.lg)))
+        .overlay(RoundedRectangle(cornerRadius: CGFloat(Radius.lg))
             .stroke(Color(nsColor: p.border), lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    @ViewBuilder
-    private func row(_ label: String, color: NSColor, highlighted: Bool) -> some View {
-        ZStack(alignment: .leading) {
-            if highlighted {
-                Color(nsColor: p.selection)
-                Color(nsColor: p.primary).frame(width: 3)   // accent bar — reads on neon themes
-            }
-            Text(label)
-                .font(rowFont)
-                .foregroundColor(Color(nsColor: color))
-                .padding(.leading, 12)
-        }
-        .frame(height: 30)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -73,7 +68,7 @@ struct MockComboBox: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ThemeKit · ComboBox / Autocomplete — the REAL control (top row, on its own window: type to filter, ↑↓ to navigate, ⏎ / click to select); the grid below is a static mock of the open dropdown.")
+            Text("ThemeKit · ComboBox / Autocomplete — the REAL control (top row, on its own window: type to filter, ↑↓ to navigate, ⏎ / click to select); the grid below is the open dropdown drawn in-window by the REAL kit (a ThemedListView in the combo's exact hosting config).")
                 .font(sysFont(9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Color(nsColor: p.muted))
                 .fixedSize(horizontal: false, vertical: true)
@@ -98,16 +93,28 @@ struct MockComboBox: View {
                 Spacer(minLength: 0)
             }
 
+            // The dropdown rows mirror ThemedComboBox.syncList's mapping exactly:
+            // options → (id · primary · isDisabled), empty → ONE inert disabled
+            // "No options" row, actionable empty → ONE enabled "Create …" row.
             HStack(alignment: .top, spacing: 28) {
                 mockCell("open · highlighted row 1") {
-                    DropdownMock(p: p, rows: ["Apple", "Apricot", "Banana", "Grape", "Mango"],
-                                 highlight: 1, disabledIndex: 3)
+                    DropdownOpen(p: p, rows: [
+                        ThemeKitUI.ListItem(id: "Apple",   primary: "Apple"),
+                        ThemeKitUI.ListItem(id: "Apricot", primary: "Apricot"),
+                        ThemeKitUI.ListItem(id: "Banana",  primary: "Banana"),
+                        ThemeKitUI.ListItem(id: "Grape",   primary: "Grape", isDisabled: true),
+                        ThemeKitUI.ListItem(id: "Mango",   primary: "Mango"),
+                    ], highlight: "Apricot")
                 }
                 mockCell("no match · inert") {
-                    DropdownMock(p: p, rows: [], highlight: nil)
+                    DropdownOpen(p: p, rows: [
+                        ThemeKitUI.ListItem(id: "no-options", primary: "No options", isDisabled: true),
+                    ], highlight: nil)
                 }
                 mockCell("no match · actionable") {
-                    DropdownMock(p: p, rows: ["Create “kiwi”"], highlight: 0)
+                    DropdownOpen(p: p, rows: [
+                        ThemeKitUI.ListItem(id: "create", primary: "Create “kiwi”"),
+                    ], highlight: "create")
                 }
                 Spacer(minLength: 0)
             }
