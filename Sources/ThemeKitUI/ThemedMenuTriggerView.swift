@@ -57,7 +57,7 @@ public struct ThemedMenuTriggerView: View {
                 holder.anchor = anchor
                 return menu
             },
-            update: { [palette, items, presentation] menu in
+            update: { [palette, items, presentation] menu, _ in
                 menu.palette = palette
                 menu.presentation = presentation   // swap layout before items rebuild
                 menu.items = items                 // caller-driven rebuild (ThemedMenu.items didSet)

@@ -78,8 +78,10 @@ public final class ThemedTooltip: NSObject {
 
     /// Force-show the bubble inline, skipping the enter/leave delays and the
     /// fade — the capture / test seam (the analogue of ThemedTextField's
-    /// `previewFocused`). prism can't screenshot a separate child window, so the
-    /// bench draws an inline MOCK of the bubble instead; this exists for tests.
+    /// `previewFocused`). The panel is a child window, so a static capture of
+    /// the HOST window still won't include it — prism's grid draws the real
+    /// bubble in-window via `previewBubble` instead; this seam freezes the
+    /// live panel for tests and interactive (AX) verification.
     public var previewVisible = false {
         didSet {
             guard previewVisible != oldValue else { return }
@@ -306,6 +308,28 @@ public final class ThemedTooltip: NSObject {
                       arrowBase: arrowBase, arrowLen: arrowLen)
     }
 
+    /// The REAL bubble as a self-sized in-window SwiftUI view — the bench seam.
+    /// The panel is a child window a static capture of the host window can never
+    /// include, so prism draws THIS instead of a hand-copied mock (a mock is a
+    /// picture of nothing: drift there is exactly the blindness the bench exists
+    /// to catch). Runs the controller's own measurement + model pipeline; the
+    /// arrow apex is centred on the cross axis (the canonical resting pose — a
+    /// live bubble re-points it at the anchor).
+    package static func previewBubble(text: String, palette: ResolvedPalette,
+                                      placement: Placement) -> some View {
+        let anchor = NSView()                     // measurement needs no window
+        let tip = ThemedTooltip(anchor: anchor, text: text, palette: palette,
+                                placement: placement)   // init runs rebuild()
+        let side = tip.resolvePreferred(placement)      // preview = no flip
+        tip.resolvedSide = side
+        switch side {
+        case .top, .bottom:       tip.lastArrowCross = tip.fillSize.width / 2
+        case .leading, .trailing: tip.lastArrowCross = tip.fillSize.height / 2
+        }
+        let size = popupPanelSize(side, fill: tip.fillSize, arrowLen: tip.arrowLen)
+        return tip.bubble().frame(width: size.width, height: size.height)
+    }
+
     /// Re-measure the text, refresh the bubble content, and reposition a shown
     /// bubble. Measurement stays on the AppKit side (`boundingRect`) — the
     /// placement engine needs the size before SwiftUI lays out.
@@ -529,6 +553,19 @@ public extension View {
         modifier(ThemedTooltipModifier(text: text, explicitPalette: palette,
                                        placement: placement))
     }
+
+    /// The capture/test variant: `previewVisible` freezes the live bubble shown
+    /// (skipping hover delays and the fade) — the controller `previewVisible`
+    /// seam surfaced on the SwiftUI front. The bubble still floats on its child
+    /// window, so a static capture of the HOST window won't include it; for the
+    /// in-window bench cell see `ThemedTooltip.previewBubble`.
+    func themedTooltip(_ text: String, palette: ResolvedPalette? = nil,
+                       placement: ThemedTooltip.Placement = .auto,
+                       previewVisible: Bool) -> some View {
+        modifier(ThemedTooltipModifier(text: text, explicitPalette: palette,
+                                       placement: placement,
+                                       previewVisible: previewVisible))
+    }
 }
 
 struct ThemedTooltipModifier: ViewModifier {
@@ -536,6 +573,7 @@ struct ThemedTooltipModifier: ViewModifier {
     let text: String
     let explicitPalette: ResolvedPalette?
     let placement: ThemedTooltip.Placement
+    var previewVisible = false
 
     private var palette: ResolvedPalette { explicitPalette ?? ambientPalette ?? pal }
 
@@ -545,10 +583,14 @@ struct ThemedTooltipModifier: ViewModifier {
                 ThemedTooltip.attach(to: anchor, text: text, palette: palette,
                                      placement: placement)
             },
-            update: { [text, placement, palette] tip in
+            update: { [text, placement, palette, previewVisible] tip, anchor in
                 tip.text = text
                 tip.palette = palette
                 tip.placement = placement
+                // Only assert the preview once the anchor sits in a window —
+                // `present` needs one, and the proxy re-runs this closure on
+                // window attach, so an early `true` is not lost.
+                tip.previewVisible = previewVisible && anchor.window != nil
             },
             detach: { $0.invalidate() }))
     }

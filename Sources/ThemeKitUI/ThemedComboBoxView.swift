@@ -32,6 +32,9 @@ public struct ThemedComboBoxView: View {
     /// no-match, offer a "Create …" row that, when committed, appends + selects it.
     var createOnEmpty: Bool
 
+    var previewOpenFlag = false
+    var previewHighlightIndex: Int?
+
     public init(palette: ResolvedPalette? = nil, options: [String], label: String? = nil,
                 placeholder: String = "", leading: String? = "magnifying-glass",
                 freeText: Bool = false, createOnEmpty: Bool = false) {
@@ -42,6 +45,23 @@ public struct ThemedComboBoxView: View {
         self.leading = leading
         self.freeText = freeText
         self.createOnEmpty = createOnEmpty
+    }
+
+    /// Freeze the popup OPEN (no fade, no dismiss monitors) — the controller
+    /// `previewOpen` seam surfaced on the SwiftUI front (the ToolBar
+    /// `previewPressed(_:)` convention). The dropdown still floats on its
+    /// floor-2 child window, so a static capture of the HOST window won't
+    /// include it — prism's grid draws the real hosted list in-window instead;
+    /// this seam exists for tests and interactive (AX) verification.
+    public func previewOpen(_ open: Bool) -> Self {
+        var c = self; c.previewOpenFlag = open; return c
+    }
+
+    /// Force-highlight the row at this index into the FILTERED options (clamped;
+    /// nil leaves the live hover/arrow-key highlight alone) — the controller
+    /// `previewHighlight` seam surfaced on the SwiftUI front.
+    public func previewHighlight(_ i: Int?) -> Self {
+        var c = self; c.previewHighlightIndex = i; return c
     }
 
     public var body: some View {
@@ -68,9 +88,14 @@ public struct ThemedComboBoxView: View {
             },
             // Per-frame: the theme. Under an animatable theme the host re-themes
             // at 30 Hz, so this MUST stay cheap — and must NOT touch `options`.
-            update: { [palette] combo in
+            update: { [palette, previewOpenFlag, previewHighlightIndex] combo in
                 combo.palette = palette
                 combo.surfaceColor = palette.background
+                combo.previewHighlight = previewHighlightIndex
+                // Only assert the preview once the field sits in a window —
+                // presenting needs one, and the proxy re-runs this closure on
+                // window attach, so an early `true` is not lost.
+                combo.previewOpen = previewOpenFlag && combo.field.window != nil
             },
             detach: { $0.invalidate() })
     }

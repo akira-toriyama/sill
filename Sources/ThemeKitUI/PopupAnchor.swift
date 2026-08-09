@@ -25,23 +25,38 @@ import AppKit
 /// hit-test ownership — the `ThemedTooltip` mechanism).
 final class PopupAnchorNSView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    /// Fires after the anchor lands in (or leaves) a window. The proxy re-runs
+    /// its `update` through this: a controller preview seam asserted BEFORE the
+    /// window exists (`previewVisible` / `previewOpen` at first SwiftUI update)
+    /// would otherwise be lost — presenting needs a window, and SwiftUI promises
+    /// no further `updateNSView` after the view is attached.
+    var onDidMoveToWindow: (() -> Void)?
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        onDidMoveToWindow?()
+    }
 }
 
 /// Bridges a SwiftUI trigger to a popup CONTROLLER that needs a real NSView
 /// anchor. `attach` runs once with the freshly made anchor view and returns the
 /// controller (the coordinator retains it — the ThemedTooltip/ThemedMenu
 /// "caller MUST retain" contract); `update` re-drives the controller's value
-/// inputs on every SwiftUI update; `detach` runs at dismantle for deterministic
-/// teardown (`invalidate()`).
+/// inputs on every SwiftUI update AND on every window attach/detach (the anchor
+/// arrives windowless, so window-dependent state must be re-assertable); `detach`
+/// runs at dismantle for deterministic teardown (`invalidate()`).
 struct PopupAnchorProxy<Controller: AnyObject>: NSViewRepresentable {
     let attach: @MainActor (NSView) -> Controller
-    let update: @MainActor (Controller) -> Void
+    let update: @MainActor (Controller, PopupAnchorNSView) -> Void
     let detach: @MainActor (Controller) -> Void
 
     /// `dismantleNSView` is static, so the coordinator carries BOTH the retained
-    /// controller and the `detach` closure that tears it down.
+    /// controller and the `detach` closure that tears it down. `update` is the
+    /// LATEST SwiftUI values — the window-attach re-run must not replay stale
+    /// ones from `makeNSView` time.
     final class Coordinator {
         var controller: Controller?
+        var update: (@MainActor (Controller, PopupAnchorNSView) -> Void)?
         var detach: (@MainActor (Controller) -> Void)?
     }
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -49,17 +64,25 @@ struct PopupAnchorProxy<Controller: AnyObject>: NSViewRepresentable {
     func makeNSView(context: Context) -> PopupAnchorNSView {
         let v = PopupAnchorNSView()
         context.coordinator.controller = attach(v)
+        context.coordinator.update = update
         context.coordinator.detach = detach
+        v.onDidMoveToWindow = { [weak coordinator = context.coordinator, weak v] in
+            guard let coordinator, let v, let c = coordinator.controller else { return }
+            coordinator.update?(c, v)
+        }
         return v
     }
 
     func updateNSView(_ v: PopupAnchorNSView, context: Context) {
-        if let c = context.coordinator.controller { update(c) }
+        context.coordinator.update = update
+        if let c = context.coordinator.controller { update(c, v) }
     }
 
     static func dismantleNSView(_ v: PopupAnchorNSView, coordinator: Coordinator) {
+        v.onDidMoveToWindow = nil
         if let c = coordinator.controller { coordinator.detach?(c) }
         coordinator.controller = nil
+        coordinator.update = nil
         coordinator.detach = nil
     }
 }
