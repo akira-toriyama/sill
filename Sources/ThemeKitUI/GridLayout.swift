@@ -17,6 +17,13 @@ public struct GridCellState: Sendable {
     public let isSelected: Bool
     public let isHovered: Bool
     public let isFocused: Bool
+    /// True while a live drag would drop ONTO this cell (the grid already
+    /// draws the target ring; content may add its own emphasis). A `var`
+    /// outside the original init — the API differ reads a changed init label
+    /// set as a removal, so the DnD facets ride on defaults instead.
+    public var isDropTarget: Bool = false
+    /// True while this cell is the LIFTED drag source (the grid dims it).
+    public var isSwapSource: Bool = false
     public init(isSelected: Bool, isHovered: Bool, isFocused: Bool) {
         self.isSelected = isSelected
         self.isHovered = isHovered

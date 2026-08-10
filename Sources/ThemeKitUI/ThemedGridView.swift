@@ -21,8 +21,19 @@ public struct GridPreview<ID: Hashable> {
     /// Whether the grid renders as focused (the cursor ring only draws on a
     /// focused grid, mirroring the live `isFocused && cursor == id` rule).
     public var focused: Bool
+    /// Frozen DnD pose (t-n3be): the lifted source cell (dims + parks the
+    /// ghost) and the cell the drop would land ONTO (draws the target ring).
+    /// `var`s with defaults rather than init labels — the API differ reads a
+    /// changed init label set as a removal.
+    public var dragSource: ID?
+    public var dropTargetID: ID?
     public init(hovered: ID? = nil, cursor: ID? = nil, focused: Bool = true) {
         self.hovered = hovered; self.cursor = cursor; self.focused = focused
+    }
+
+    /// A copy frozen mid-drag: `source` lifted, the drop landing on `over`.
+    public func dragging(source: ID?, over: ID? = nil) -> Self {
+        var c = self; c.dragSource = source; c.dropTargetID = over; return c
     }
 }
 
@@ -50,6 +61,12 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     @State private var resolvedColumns: Int = 1
     @FocusState private var isFocused: Bool
 
+    // Drag/reorder (t-n3be) — the live lift + the per-cell frames the pure
+    // resolver consumes (the list's DragInfo/geomMap twin).
+    private struct DragInfo { var source: ID; var target: GridDropTarget<ID>?; var location: CGPoint; var tilt: CGFloat = 0 }
+    @State private var dragState: DragInfo?
+    @State private var cellFrames: [AnyHashable: CGRect] = [:]
+
     /// Frozen chrome for a static capture. Set via `.preview(_:)`, NOT an init
     /// parameter — the API differ reads any init-label change as a removal
     /// (see `ListPreview.hovering`), so frozen state lands as a method here too.
@@ -61,12 +78,48 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
         var c = self; c.previewState = p; return c
     }
 
+    // MARK: DnD opt-in (t-n3be — copy-methods, not init labels: the API differ
+    // reads a changed init label set as a removal)
+
+    /// Pointer DnD (nil = off). The grid resolves WHERE a drop lands (pure
+    /// GridCore math gated by the validator); the consumer's `onGridDrop`
+    /// decides WHAT it means (swap / move / reorder).
+    private var dragMode: GridDragMode?
+    private var dropValidate: (GridDragContext<ID>, GridDropTarget<ID>) -> Bool = { _, _ in true }
+    private var onDropHandler: ((GridDragContext<ID>, GridDropTarget<ID>) -> Void)?
+
+    /// A copy whose cells can be pointer-dragged. Keyboard lift is not yet
+    /// bound by the kit — `gridDragCandidates` is the pure aim list a host
+    /// can cycle itself.
+    public func draggable(_ mode: GridDragMode = .dropOnto) -> Self {
+        var c = self; c.dragMode = mode; return c
+    }
+
+    /// A copy whose drag resolution consults `validate` before offering a
+    /// placement (the list's `dropTargetValidator` twin). A rejected placement
+    /// draws no affordance and never reaches `onGridDrop`.
+    public func dropTargetValidator(_ validate: @escaping (GridDragContext<ID>, GridDropTarget<ID>) -> Bool) -> Self {
+        var c = self; c.dropValidate = validate; return c
+    }
+
+    /// A copy that delivers a committed drop. (Named to stay clear of
+    /// SwiftUI's own `onDrop`.)
+    public func onGridDrop(_ handler: @escaping (GridDragContext<ID>, GridDropTarget<ID>) -> Void) -> Self {
+        var c = self; c.onDropHandler = handler; return c
+    }
+
     /// A frozen preview OWNS each interactive facet (the `ListPreview` rule):
     /// falling through to live state would let a stray pointer or focus change
     /// contaminate a deterministic capture.
     private var effHovered: ID? { previewState != nil ? previewState?.hovered : hovered }
     private var effCursor: ID? { previewState != nil ? previewState?.cursor : cursor }
     private var effFocused: Bool { previewState?.focused ?? isFocused }
+    private var effDragSource: ID? { previewState != nil ? previewState?.dragSource : dragState?.source }
+    private var effDropTargetID: ID? {
+        if let p = previewState { return p.dropTargetID }
+        if case .onto(let id) = dragState?.target?.placement { return id }
+        return nil
+    }
 
     // Tokens (tuned later in prism).
     private let gap = CGFloat(Space.md)        // 8
@@ -115,6 +168,9 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
             ScrollView(axis == .vertical ? .vertical : .horizontal) {
                 gridBody
                     .padding(pad)
+                    .coordinateSpace(.named(themedGridContentSpace))
+                    .onPreferenceChange(CellFramePreference.self) { cellFrames = $0 }
+                    .overlay { dragGhostLayer }
             }
             .focusable()
             .focused($isFocused)
@@ -134,6 +190,7 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
                 selection.wrappedValue = reconcileGridSelection(selection.wrappedValue, existing: present)
                 if let c = cursor, !present.contains(c) { cursor = nil }
                 if let h = hovered, !present.contains(h) { hovered = nil }
+                if let ds = dragState, !present.contains(ds.source) { dragState = nil }
             }
         }
     }
@@ -160,7 +217,14 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
         let isSel = selection.wrappedValue.contains(id)
         let isCur = effFocused && effCursor == id
         let isHov = effHovered == id
-        let state = GridCellState(isSelected: isSel, isHovered: isHov, isFocused: isCur)
+        let isSrc = effDragSource == id
+        let isTgt = effDropTargetID == id
+        let state: GridCellState = {
+            var s = GridCellState(isSelected: isSel, isHovered: isHov, isFocused: isCur)
+            s.isDropTarget = isTgt
+            s.isSwapSource = isSrc
+            return s
+        }()
 
         cellBuilder(element, state)
             .modifier(AspectModifier(ratio: aspectRatio))
@@ -175,12 +239,106 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
                                   lineWidth: isSel ? 2 : 1)
             )
             .overlay(focusRing(isCur))
+            .opacity(isSrc ? 0.4 : 1)          // lifted source dims (the list's rule)
+            .overlay(dropRing(isTgt))          // target ring at full opacity, above the dim
             .shadow(color: shadowColor(selected: isSel, hovered: isHov),
                     radius: (isSel || isHov) ? 4 : 0, x: 0, y: (isSel || isHov) ? 2 : 0)
             .contentShape(Rectangle())
             .onHover { inside in hovered = inside ? id : (hovered == id ? nil : hovered) }
             .gesture(TapGesture(count: 2).onEnded { onActivate?(id) })
             .gesture(selectionGesture(id))
+            .modifier(OptionalDrag(active: dragMode != nil, gesture: cellDragGesture(id)))
+            .modifier(OptionalCellFrameReport(active: dragMode != nil, id: AnyHashable(id)))
+    }
+
+    /// The drop-target affordance — the grid twin of the list's `.onto` ring
+    /// (same inset / fill / stroke so the two widgets read as one family).
+    @ViewBuilder private func dropRing(_ on: Bool) -> some View {
+        if on {
+            RoundedRectangle(cornerRadius: corner, style: .continuous).inset(by: 1.5)
+                .fill(Color(nsColor: palette.primary).opacity(0.12))
+                .overlay(RoundedRectangle(cornerRadius: corner, style: .continuous).inset(by: 1.5)
+                    .stroke(Color(nsColor: palette.primary), lineWidth: 2))
+        }
+    }
+
+    // MARK: pointer drag (t-n3be — resolution stays pure in GridCore)
+
+    /// Cell frames in `ids` order, `.zero` for unmeasured (culled) cells — the
+    /// resolver ignores those rather than letting them shrink the abort zone.
+    private var orderedFrames: [CGRect] { ids.map { cellFrames[AnyHashable($0)] ?? .zero } }
+
+    /// The validated target a pointer at `point` resolves to — the one
+    /// resolution path the drag gesture uses (package: the validator-plumbing
+    /// test seam, mirroring `ThemedListView.pointerDropTarget`).
+    package func pointerDropTarget(at point: CGPoint, source: ID, frames: [CGRect]) -> GridDropTarget<ID>? {
+        guard let mode = dragMode else { return nil }
+        return resolveGridDropTarget(at: point, source: source, ids: ids, frames: frames,
+                                     mode: mode, validate: dropValidate)
+    }
+
+    private func cellDragGesture(_ id: ID) -> some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .named(themedGridContentSpace))
+            .onChanged { value in
+                if dragState == nil {
+                    dragState = DragInfo(source: id, target: nil, location: value.location)
+                }
+                var ds = dragState!
+                // Lean into the sideways motion (the list ghost's card tilt),
+                // smoothed against the previous frame.
+                let dx = value.location.x - ds.location.x
+                ds.tilt = max(-7, min(7, ds.tilt * 0.6 + dx * 0.8))
+                ds.location = value.location
+                ds.target = pointerDropTarget(at: value.location, source: ds.source, frames: orderedFrames)
+                dragState = ds
+            }
+            .onEnded { _ in
+                if let ds = dragState, let target = ds.target {
+                    onDropHandler?(GridDragContext(sourceID: ds.source), target)
+                }
+                dragState = nil
+            }
+    }
+
+    // MARK: drag ghost — the lifted cell itself follows the pointer (in-bounds
+    // overlay, screencaptureable; the list-ghost rule: re-rendering the real
+    // cell is truer than a stand-in chip). A frozen `preview` has no pointer,
+    // so the card parks low-right of the cell it lifted.
+
+    @ViewBuilder private var dragGhostLayer: some View {
+        if let src = effDragSource,
+           let element = elements.first(where: { $0[keyPath: idKey] == src }) {
+            GeometryReader { proxy in
+                if let centre = ghostCentre(for: src, in: proxy.size) {
+                    ghostCard(element)
+                        .rotationEffect(.degrees(Double(dragState?.tilt ?? 0)))
+                        .position(centre)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+            }
+        }
+    }
+
+    private func ghostCentre(for src: ID, in size: CGSize) -> CGPoint? {
+        if let ds = dragState { return ds.location }
+        guard previewState != nil else { return nil }
+        let f = cellFrames[AnyHashable(src)] ?? .zero
+        guard !f.isEmpty else { return CGPoint(x: size.width / 2, y: size.height / 2) }
+        return CGPoint(x: f.midX + f.width * 0.25, y: f.midY + f.height * 0.35)
+    }
+
+    private func ghostCard(_ element: Data.Element) -> some View {
+        let f = cellFrames[AnyHashable(element[keyPath: idKey])]
+        let size = (f?.isEmpty == false) ? f!.size : CGSize(width: 96, height: 96)
+        return cellBuilder(element, GridCellState(isSelected: false, isHovered: false, isFocused: false))
+            .modifier(AspectModifier(ratio: aspectRatio))
+            .frame(width: size.width, height: size.height)
+            .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: corner, style: .continuous)
+                .stroke(Color(nsColor: palette.primary), lineWidth: 1))
+            .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
+            .opacity(0.85)
     }
 
     @ViewBuilder

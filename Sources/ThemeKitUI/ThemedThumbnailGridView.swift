@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import PaletteKit
+import GridCore
 
 // ThemeKitUI — the batteries-included form of `ThemedGridView` (#17e): pass a list
 // of {id, image?, label?} and get a themed thumbnail grid with the default
@@ -44,6 +45,24 @@ public struct ThemedThumbnailGridView: View {
     /// A copy with every loading cell's shimmer parked at `phase` (nil = live).
     public func previewShimmerPhase(_ phase: CGFloat?) -> Self {
         var c = self; c.frozenShimmerPhase = phase; return c
+    }
+
+    // DnD opt-in, forwarded verbatim to the inner `ThemedGridView` (t-n3be).
+    private var dragMode: GridDragMode?
+    private var dropValidate: (GridDragContext<String>, GridDropTarget<String>) -> Bool = { _, _ in true }
+    private var onDropHandler: ((GridDragContext<String>, GridDropTarget<String>) -> Void)?
+
+    /// A copy whose cells can be pointer-dragged (see `ThemedGridView.draggable`).
+    public func draggable(_ mode: GridDragMode = .dropOnto) -> Self {
+        var c = self; c.dragMode = mode; return c
+    }
+    /// A copy whose drag resolution consults `validate` first.
+    public func dropTargetValidator(_ validate: @escaping (GridDragContext<String>, GridDropTarget<String>) -> Bool) -> Self {
+        var c = self; c.dropValidate = validate; return c
+    }
+    /// A copy that delivers a committed drop.
+    public func onGridDrop(_ handler: @escaping (GridDragContext<String>, GridDropTarget<String>) -> Void) -> Self {
+        var c = self; c.onDropHandler = handler; return c
     }
 
     /// Multi-select (or uncontrolled when `selection == nil`).
@@ -97,13 +116,23 @@ public struct ThemedThumbnailGridView: View {
     }
 
     public var body: some View {
-        ThemedGridView(items, id: \.id, selection: selection,
-                       layout: layout, axis: axis, aspectRatio: aspectRatio,
-                       palette: palette, onActivate: onActivate,
-                       allowsMultiSelect: allowsMultiSelect) { item, _ in
+        configuredGrid
+    }
+
+    /// Plain accessor (not a @ViewBuilder) so the DnD copy-methods can chain
+    /// conditionally onto the concrete `ThemedGridView` value.
+    private var configuredGrid: some View {
+        var grid = ThemedGridView(items, id: \.id, selection: selection,
+                                  layout: layout, axis: axis, aspectRatio: aspectRatio,
+                                  palette: palette, onActivate: onActivate,
+                                  allowsMultiSelect: allowsMultiSelect) { item, _ in
             ThemedThumbnailCell(image: item.image, label: item.label, palette: palette)
                 .previewShimmerPhase(frozenShimmerPhase)
         }
         .preview(previewState)
+        .dropTargetValidator(dropValidate)
+        if let mode = dragMode { grid = grid.draggable(mode) }
+        if let handler = onDropHandler { grid = grid.onGridDrop(handler) }
+        return grid
     }
 }
