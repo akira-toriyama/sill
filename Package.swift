@@ -216,7 +216,7 @@ let package = Package(
         // config.toml. Renders every catalog theme (all roles + font +
         // its OWN mock chrome specimens — never imports an app's View, so
         // no drift debt). The visual verification bench for the catalog.
-        .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "Motion", "ThemeKit", "ThemeKitUI", "PixelArt", "MarkdownKitUI"]),
+        .executableTarget(name: "prism", dependencies: ["Palette", "PaletteKit", "Effects", "Motion", "ThemeKit", "ThemeKitUI", "PixelArt", "MarkdownKitUI", "GridCore"]),
 
         // Shared assertion helpers for the widget test targets (test targets
         // can't depend on each other, so this is a plain target — its content

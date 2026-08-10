@@ -6,6 +6,7 @@ import SwiftUI
 import AppKit
 import PaletteKit
 import ThemeKitUI
+import GridCore
 
 struct MockThumbnailGrid: View {
     let p: ResolvedPalette
@@ -15,6 +16,11 @@ struct MockThumbnailGrid: View {
     // Return activation (the status line below updates).
     @State private var selection: Set<String> = ["c0"]
     @State private var lastActivated: String = "—"
+
+    // Live DnD state (t-n3be): drag a cell onto another and the two swap — the
+    // real pointer path (resolve → ring → ghost → commit), not a mock.
+    @State private var dndOrder: [Int] = Array(0..<6)
+    @State private var lastDrop: String = "—"
 
     private func swatch(_ nsColor: NSColor, _ size: CGFloat = 120) -> NSImage {
         let img = NSImage(size: NSSize(width: size, height: size))
@@ -99,6 +105,46 @@ struct MockThumbnailGrid: View {
                 .preview(GridPreview(hovered: "c1", cursor: "c2"))
                 .previewShimmerPhase(0.5)
                 .frame(height: 240)
+
+            Text("draggable · drag a cell onto another to SWAP · last drop: \(lastDrop)")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
+
+            // Live pointer DnD (t-n3be) — the REAL path (resolve → target ring →
+            // ghost → commit), not a hand-drawn mock (the t-avbj bench rule).
+            ThemedThumbnailGridView(dndItems,
+                                    layout: .fixed(columns: 3),
+                                    aspectRatio: 1, palette: p)
+                .draggable(.dropOnto)
+                .onGridDrop { ctx, target in
+                    guard case .onto(let over) = target.placement,
+                          let si = dndItems.firstIndex(where: { $0.id == ctx.sourceID }),
+                          let ti = dndItems.firstIndex(where: { $0.id == over }) else { return }
+                    dndOrder.swapAt(si, ti)
+                    lastDrop = "\(ctx.sourceID) ⇄ \(over)"
+                    prismLog("drop \(ctx.sourceID) onto \(over)")
+                }
+                .frame(height: 240)
+
+            Text("frozen · mid-drag pose — c0 lifted (dim + ghost) over c4 (target ring)")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
+
+            // The DnD freeze seam: source dim + parked ghost + target ring in one
+            // deterministic static pose.
+            ThemedThumbnailGridView(loadedItems,
+                                    selection: .constant([]),
+                                    layout: .fixed(columns: 3),
+                                    aspectRatio: 1, palette: p)
+                .draggable(.dropOnto)
+                .preview(GridPreview(focused: false).dragging(source: "c0", over: "c4"))
+                .frame(height: 160)
         }
+    }
+
+    /// The live-DnD grid's items in their current (swap-mutated) order.
+    private var dndItems: [ThumbnailItem] {
+        let base = loadedItems
+        return dndOrder.compactMap { base.indices.contains($0) ? base[$0] : nil }
     }
 }

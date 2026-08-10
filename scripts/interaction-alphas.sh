@@ -37,6 +37,7 @@ cd "$(dirname "$0")/.."
 read -r -d '' ALLOWED <<'EOF' || true
 ThemeKitUI/ThemedGridView.swift:0.08          # resting cell fill — no interaction
 ThemeKitUI/ThemedListRow.swift:0.12           # DnD drop-target wash — not pointer state
+ThemeKitUI/ThemedGridView.swift:0.12          # DnD drop-target wash — the grid twin of the list ring (t-n3be)
 ThemeKitUI/ThemedListRow.swift:0.16           # badge/tint backing pair
 ThemeKitUI/ThemedThumbnailCell.swift:0.12     # shimmer gradient stop
 EOF
