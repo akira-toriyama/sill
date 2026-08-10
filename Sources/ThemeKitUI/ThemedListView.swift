@@ -309,7 +309,14 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                         Section {
                             ForEach(sec.rows, id: \.id) { rowView($0, parity: parity, opaque: opaque, dividers: dividers) }
                         } header: {
+                            // Explicit scroll-target identity: a Section header is not a
+                            // ForEach child, so without this `.id` the keyboard follow's
+                            // `scrollTo(id:)` cannot resolve a header row and silently
+                            // no-ops (facet's tree — every row a header — never scrolled;
+                            // an Int-keyed list masks the gap by colliding with the outer
+                            // ForEach's `\.offset` identity).
                             rowView(header, parity: parity, opaque: opaque, dividers: dividers)
+                                .id(header.id)
                         }
                     } else {
                         ForEach(sec.rows, id: \.id) { rowView($0, parity: parity, opaque: opaque, dividers: dividers) }

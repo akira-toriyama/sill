@@ -110,6 +110,55 @@ final class ThemedListScrollFollowTests: XCTestCase {
                       + "committing a keyboard drop blind is the shipped regression")
     }
 
+    // MARK: - section headers are scroll targets too
+
+    func testHeaderHighlightScrollsIntoView() {
+        // facet's tree is ALL section headers (a workspace list with no
+        // windows yet). A Section header is not a ForEach child — it renders
+        // as the Section's pinned header content — so it is only resolvable
+        // by `scrollTo(id:)` through its explicit `.id`. Losing that `.id`
+        // is invisible to the Int-keyed cases above: an Int id collides with
+        // the outer section ForEach's `\.offset` identity and follows BY
+        // ACCIDENT (measured 2026-08-10 — the live facet tree, String-like
+        // enum ids, never scrolled while every Int probe passed). Hence
+        // String ids here.
+        final class StrSink { var last: [String: CGRect] = [:] }
+        let sink = StrSink()
+        let headers: [ListItem<String>] = (0..<30).map {
+            ListItem<String>(id: "h\($0)", primary: "workspace \($0)",
+                             kind: .sectionHeader(subtitle: "bsp", collapsed: nil))
+        }
+        func list(highlight: String?) -> ThemedListView<String> {
+            ThemedListView<String>(items: headers,
+                                   collapsed: .constant([]),
+                                   highlight: .constant(highlight),
+                                   style: ThemedListStyle(),
+                                   palette: pal,
+                                   onRowRects: { sink.last = $0 })
+        }
+        let h = NSHostingView(rootView: list(highlight: nil))
+        h.frame = NSRect(x: 0, y: 0, width: 340, height: 200)
+        let win = NSWindow(contentRect: h.frame, styleMask: [.borderless],
+                           backing: .buffered, defer: false)
+        win.contentView = h
+        h.layoutSubtreeIfNeeded()
+        _ = h.fittingSize
+        h.layoutSubtreeIfNeeded()
+        let before = Set(sink.last.keys)
+        h.rootView = list(highlight: "h25")
+        for _ in 0..<10 {
+            h.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        }
+        let after = Set(sink.last.keys)
+        XCTAssertTrue(before.contains("h0"), "a 200pt viewport starts at the top")
+        XCTAssertFalse(before.contains("h25"), "header 25 starts below the fold")
+        XCTAssertTrue(after.contains("h25"),
+                      "moving the cursor to a section header must scroll it into "
+                      + "view — headers without scroll-target identity are the "
+                      + "hole the live facet tree shipped into")
+    }
+
     // MARK: - a pinned capture stays put
 
     func testPinnedPreviewOffsetBeatsTheFollow() {
