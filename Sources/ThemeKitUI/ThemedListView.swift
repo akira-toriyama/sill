@@ -81,6 +81,10 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     var query: String
     var noOptionsText: String
     var preview: ListPreview<ID>?
+    /// Host pre-validation for drag resolution — consulted by BOTH the pointer
+    /// and the keyboard paths before a placement becomes a target. Set via
+    /// `dropTargetValidator(_:)`; the default accepts every placement.
+    var dropValidate: (ListCore.DragContext<ID>, ListCore.DropTarget<ID>) -> Bool = { _, _ in true }
 
     public init(items: [ListItem<ID>],
                 selection: Binding<Set<ID>> = .constant([]),
@@ -116,6 +120,17 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         self.query = query
         self.noOptionsText = noOptionsText
         self.preview = preview
+    }
+
+    /// A copy whose drag resolution consults `validate` before offering a
+    /// placement — the host's pre-validation seam (e.g. facet's drop
+    /// semantics). A rejected placement draws no affordance, joins no
+    /// keyboard aim, and never reaches `onDrop`. (A copy-method rather than
+    /// an init label: the API differ reads a changed label set as a removal.)
+    public func dropTargetValidator(_ validate: @escaping (ListCore.DragContext<ID>, ListCore.DropTarget<ID>) -> Bool) -> Self {
+        var copy = self
+        copy.dropValidate = validate
+        return copy
     }
 
     @State private var selectionAnchor: ID?          // sticky anchor for shift-range
@@ -490,9 +505,8 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                     return
                 }
                 let geomArr = visible.map { geom($0.id) ?? RowGeom(yOffset: 0, height: 0) }
-                ds.target = resolveDropTarget(atDocY: value.location.y, source: ds.source, rows: visible.map(\.asRow),
-                                              geom: geomArr, mode: style.dragMode, chunkIDs: ds.chunkIDs,
-                                              validate: { _, _ in true })
+                ds.target = pointerDropTarget(atDocY: value.location.y, source: ds.source,
+                                              chunkIDs: ds.chunkIDs, geom: geomArr)
                 dragState = ds
             }
             .onEnded { _ in
@@ -603,14 +617,35 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
 
     private func liftKeyboard() {
         guard style.draggable, let h = highlight else { return }
-        var chunk: [ID] = []
-        if let item = visible.first(where: { $0.id == h }), case .sectionHeader = item.kind {
-            chunk = chunkMemberIDs(forHeader: h, rows: visible.map(\.asRow))
-        }
-        dragAim = dragCandidates(source: h, rows: visible.map(\.asRow), mode: style.dragMode,
-                                 chunkIDs: chunk, validate: { _, _ in true })
+        let chunk = kbChunk(for: h)
+        dragAim = kbDragAim(from: h, chunkIDs: chunk)
         dragAimIndex = 0
         dragState = DragInfo(source: h, chunkIDs: chunk, target: dragAim.first, location: .zero, isKeyboard: true)
+    }
+
+    // The two drag-resolution paths, lifted out of the gesture/keypress
+    // closures so the validator plumbing is testable without synthesizing
+    // input (package = the ThemedListDropValidatorTests seam).
+
+    /// The validated target a pointer at `docY` resolves to — the single
+    /// resolution the mouse drag uses per move.
+    package func pointerDropTarget(atDocY docY: CGFloat, source: ID, chunkIDs: [ID],
+                                   geom: [RowGeom]) -> ListCore.DropTarget<ID>? {
+        resolveDropTarget(atDocY: docY, source: source, rows: visible.map(\.asRow),
+                          geom: geom, mode: style.dragMode, chunkIDs: chunkIDs,
+                          validate: dropValidate)
+    }
+
+    /// The ids a keyboard lift of `h` carries (the section chunk, or none).
+    package func kbChunk(for h: ID) -> [ID] {
+        guard let item = visible.first(where: { $0.id == h }), case .sectionHeader = item.kind else { return [] }
+        return chunkMemberIDs(forHeader: h, rows: visible.map(\.asRow))
+    }
+
+    /// The ordered keyboard-drag aim a lift of `h` cycles through.
+    package func kbDragAim(from h: ID, chunkIDs: [ID]) -> [ListCore.DropTarget<ID>] {
+        dragCandidates(source: h, rows: visible.map(\.asRow), mode: style.dragMode,
+                       chunkIDs: chunkIDs, validate: dropValidate)
     }
 
     private func aimKeyboard(_ delta: Int) {
