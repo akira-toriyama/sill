@@ -40,7 +40,27 @@ public enum PhosphorWeight: String, Sendable, CaseIterable {
     public var fileSuffix: String { self == .regular ? "" : "-\(rawValue)" }
 }
 
-// MARK: - Loaders (Bundle.module → SwiftDraw)
+// MARK: - Loaders (resource bundle → SwiftDraw)
+
+/// The ThemeKit resource bundle, resolved for every packaging shape.
+///
+/// SwiftPM's generated `Bundle.module` accessor for a statically linked
+/// consumer EXECUTABLE checks exactly two places — the app bundle ROOT
+/// (`Foo.app/sill_ThemeKit.bundle`, which codesign rejects as "unsealed
+/// contents present in the bundle root"; measured 2026-08-11) and the
+/// absolute BUILD_DIR of the machine that built it — then `fatalError`s.
+/// The build-dir fallback exists only on the dev machine, so a packaged
+/// .app crashed on its first glyph lookup anywhere else (facet #448
+/// acceptance, capsule VM). Check the app's SEALED `Contents/Resources/`
+/// first so a .app can legally carry the bundle; `Bundle.module` stays
+/// as the fallback for SwiftPM contexts (tests, `swift run`, prism).
+@MainActor
+private let themeKitResources: Bundle = {
+    if let url = Bundle.main.resourceURL?
+        .appendingPathComponent("sill_ThemeKit.bundle"),
+       let sealed = Bundle(url: url) { return sealed }
+    return Bundle.module
+}()
 
 /// A Phosphor icon as a TEMPLATE `NSImage` (a black `currentColor` mask) sized to
 /// `pt × pt`. Template = the widget tints it to the role colour via the shared
@@ -58,7 +78,7 @@ public func phosphorImage(_ name: String, pt: CGFloat,
     let file = name + weight.fileSuffix
     return IconStore.templateImage(key: "ph:\(weight.rawValue)/\(file)", pt: pt,
                                    describe: "Phosphor \"\(name)\" (\(weight.rawValue))") {
-        Bundle.module.url(forResource: file, withExtension: "svg",
+        themeKitResources.url(forResource: file, withExtension: "svg",
                           subdirectory: "Phosphor/\(weight.rawValue)")
     }
 }
@@ -72,7 +92,7 @@ public func phosphorImage(_ name: String, pt: CGFloat,
 public func simpleIconImage(_ name: String, pt: CGFloat) -> NSImage? {
     IconStore.templateImage(key: "si:\(name)", pt: pt,
                             describe: "Simple Icons \"\(name)\"") {
-        Bundle.module.url(forResource: name, withExtension: "svg", subdirectory: "SimpleIcons")
+        themeKitResources.url(forResource: name, withExtension: "svg", subdirectory: "SimpleIcons")
     }
 }
 
