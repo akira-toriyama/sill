@@ -124,6 +124,22 @@ private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedLi
     ]
 }
 
+// Badges whose labels are longer than any pill should be: the cap
+// (`ListMetrics.badgeMaxText`) truncates the LABEL so the row's title keeps its
+// text budget. Before the cap the cluster — which is `.fixedSize()` and never
+// compresses — could eat the whole primary line, so a host that wanted readable
+// words was pushed into dropping the words for glyphs.
+@MainActor private func cappedBadgeItems() -> [ThemeKitUI.ListItem<String>] {
+    [
+        ThemeKitUI.ListItem(id: "b1", image: glyph("note"), primary: "Notes",
+                            secondary: "memo.md",
+                            badges: [Badge("scratchpad:inbox-2026", role: .secondary)]),
+        ThemeKitUI.ListItem(id: "b2", image: glyph("music-note"), primary: "Music",
+                            secondary: "Focus playlist",
+                            badges: [Badge("master", role: .primary), Badge("sticky", role: .secondary)]),
+    ]
+}
+
 // A nested tree: collapsible section headers at varying `indentLevel` + indented
 // rows. Shows the indent steps (level 1 / 2), the disclosure caret (▾ / ▸), and — with
 // a live `collapsed` binding — animated collapse: clicking a header rotates its caret
@@ -296,6 +312,58 @@ struct MockList: View, ShowcaseBench {
                                    preview: ListPreview(dropTarget: DropTarget(placement: .between(beforeID: "today")),
                                                         dragChunk: ["later", "l1", "l2"]))
                     .frame(width: 300, height: 188)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+                Spacer(minLength: 0)
+            }
+
+            // The three restoration seams (t-h3rv): a host can now say WHICH row
+            // is the active one, WHAT a lift carries, and WHICH rows a coarse
+            // drop really lands in — each of which a consuming app was otherwise
+            // forced to fake in its own draw code (facet: a ● glued to the title
+            // string, a header that could only reorder, a 2pt line standing in
+            // for a whole workspace).
+            HStack(alignment: .top, spacing: 20) {
+                cell("emphasis · the ACTIVE section header (accent + semibold)") {
+                    ThemedListView(items: facetItems().map { $0.id == "wsB" ? $0.emphasized() : $0 },
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["w4"]))
+                    .frame(width: 320, height: 188)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+
+                cell("drop band · the destination SECTION, not a 2pt promise") {
+                    // The commit is section-granular (a window joins a WORKSPACE),
+                    // so the affordance is the area. Compare with the insertion
+                    // line two rows up: same drag, honest granularity.
+                    ThemedListView(items: facetItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true; $0.draggable = true },
+                                   palette: p,
+                                   preview: ListPreview(scrollY: 120, dragSource: "w1",
+                                                        dropTarget: DropTarget(placement: .onto(id: "wsB"))))
+                    .dropBand { target in
+                        if case .onto(let id) = target.placement, id == "wsB" { return ["wsB", "w4", "w5"] }
+                        return []
+                    }
+                    .frame(width: 320, height: 188)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(alignment: .top, spacing: 20) {
+                cell("badge · a long label truncates at the cap (the title keeps its budget)") {
+                    ThemedListView(items: cappedBadgeItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true },
+                                   palette: p)
+                    .frame(width: 320, height: 110)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8)
                         .stroke(Color(nsColor: p.border), lineWidth: 1))

@@ -56,6 +56,20 @@ public struct ListItem<ID: Hashable & Sendable> {
     public var indentLevel: Int
     public var axChecked: Bool
 
+    /// This row reads as the ACTIVE one: its primary line paints in `primary`
+    /// at one weight notch up. The "you are here" mark a section-header list
+    /// needs (facet's active workspace), which hosts previously had to fake by
+    /// appending a glyph to the TITLE STRING — a workaround that loses first to
+    /// tail truncation and splits the vocabulary from every other surface that
+    /// says "active" in the accent colour.
+    ///
+    /// Set post-construction (`item.isEmphasized = true`) or with
+    /// ``emphasized(_:)``. It is deliberately NOT an `init` parameter: the API
+    /// differ reads any change to that label list as the old initialiser being
+    /// REMOVED, which would force a major rating on a purely additive field
+    /// (measured 2026-08-12 with `swift package diagnose-api-breaking-changes`).
+    public var isEmphasized: Bool = false
+
     public init(id: ID, image: NSImage? = nil, primary: String,
                 secondary: String? = nil, secondaryMono: Bool = false,
                 badges: [Badge] = [], trailing: TrailingAccessory = .none,
@@ -66,6 +80,12 @@ public struct ListItem<ID: Hashable & Sendable> {
         self.badges = badges; self.trailing = trailing; self.tint = tint
         self.kind = kind; self.isDisabled = isDisabled
         self.indentLevel = indentLevel; self.axChecked = axChecked
+    }
+
+    /// A copy that reads as the active row (see ``isEmphasized``). Same
+    /// API-differ-safe copy-method shape as `ListPreview.hovering(_:)`.
+    public func emphasized(_ on: Bool = true) -> ListItem {
+        var c = self; c.isEmphasized = on; return c
     }
 
     /// The pure shadow the cores see — no NSImage crosses into `ListCore`.
