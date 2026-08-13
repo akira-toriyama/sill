@@ -77,9 +77,9 @@ jobs:
       # a commit MEANS for both the gate and the release, so the two can never
       # disagree. The action verifies the download's checksum and its build
       # provenance (fail-closed).
-      - uses: akira-toriyama/glyph/.github/actions/install@v1.0.0
+      - uses: akira-toriyama/glyph/.github/actions/install@v2.0.0
         with:
-          version: v1.0.0
+          version: v2.0.0
           token: ${{ github.token }}
 
       - name: Compose the verdict and upsert the rolling DRAFT
