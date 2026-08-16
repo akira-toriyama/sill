@@ -330,7 +330,11 @@ struct MockList: View, ShowcaseBench {
                     ThemedListView(items: facetItems().map { $0.id == "wsB" ? $0.emphasized() : $0 },
                                    style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true },
                                    palette: p,
-                                   preview: ListPreview(selection: ["w4"]))
+                                   // scrollY parks the emphasized wsB header mid-cell (a plain
+                                   // wsA pinned above it for contrast) — at scrollY 0 the row
+                                   // sits exactly on the 188pt clip edge and the cell shows
+                                   // nothing of its subject.
+                                   preview: ListPreview(selection: ["w4"], scrollY: 120))
                     .frame(width: 320, height: 188)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8)
