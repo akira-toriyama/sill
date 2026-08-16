@@ -85,6 +85,10 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     /// and the keyboard paths before a placement becomes a target. Set via
     /// `dropTargetValidator(_:)`; the default accepts every placement.
     var dropValidate: (ListCore.DragContext<ID>, ListCore.DropTarget<ID>) -> Bool = { _, _ in true }
+    /// Host veto over BEGINNING a lift — consulted before a row becomes a drag
+    /// source, on the pointer path and the keyboard path alike. Set via
+    /// `dragSourceValidator(_:)`; the default lets every enabled row lift.
+    var liftValidate: (ID) -> Bool = { _ in true }
     /// What travels with a lifted row. `nil` ⇒ the kit's rule (a section header
     /// carries its section, every other row travels alone). Set via
     /// `dragChunk(_:)`.
@@ -137,6 +141,20 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     public func dropTargetValidator(_ validate: @escaping (ListCore.DragContext<ID>, ListCore.DropTarget<ID>) -> Bool) -> Self {
         var copy = self
         copy.dropValidate = validate
+        return copy
+    }
+
+    /// A copy whose rows may only BEGIN a drag when `validate` accepts their
+    /// id — the "not grabbable" a host cannot spell with `isDisabled`, which
+    /// is the first flag `ListItem.tapOutcome` consults and so takes the row's
+    /// click, hover and selection down with the lift. A vetoed row stays a
+    /// full citizen except as a drag source: no ghost, no dimming, no drop
+    /// resolution — whether the lift comes from the pointer or from Space.
+    /// (A copy-method rather than an init label: the API differ reads a
+    /// changed label set as a removal.)
+    public func dragSourceValidator(_ validate: @escaping (ID) -> Bool) -> Self {
+        var copy = self
+        copy.liftValidate = validate
         return copy
     }
 
@@ -501,9 +519,19 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     // MARK: drag/reorder (M2c) — geometry produced here, drop math in ListCore
 
     /// Effective drag state = the frozen `preview` seam (static prism shot) OR the live lift.
-    private var effDragSource: ID? { preview?.dragSource ?? dragState?.source }
-    private var effDragChunk: [ID] { preview?.dragChunk ?? dragState?.chunkIDs ?? [] }
-    private var effDropTarget: ListCore.DropTarget<ID>? { preview?.dropTarget ?? dragState?.target }
+    ///
+    /// A lift the source validator vetoes must not RENDER either: live it can
+    /// never begin (the gesture/keyboard gates), so a frozen `preview` pinning
+    /// `dragSource` on a vetoed row would make the bench show a state the
+    /// widget cannot reach — a mock, in the t-avbj sense. A chunk-only preview
+    /// (no `dragSource`) has no source to judge and passes through.
+    private var liftVetoed: Bool {
+        guard let s = preview?.dragSource ?? dragState?.source else { return false }
+        return !liftValidate(s)
+    }
+    private var effDragSource: ID? { liftVetoed ? nil : (preview?.dragSource ?? dragState?.source) }
+    private var effDragChunk: [ID] { liftVetoed ? [] : (preview?.dragChunk ?? dragState?.chunkIDs ?? []) }
+    private var effDropTarget: ListCore.DropTarget<ID>? { liftVetoed ? nil : (preview?.dropTarget ?? dragState?.target) }
     private var dimmedIDs: Set<ID> {
         guard style.draggable || preview != nil else { return [] }
         var s = Set(effDragChunk)
@@ -512,10 +540,15 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     }
     private func geom(_ id: ID) -> RowGeom? { geomMap[AnyHashable(id)] }
 
-    private func isDragSource(_ item: ListItem<ID>) -> Bool {
+    /// Whether a lift of `item` may begin — the ONE gate every lift entry
+    /// consults (the row's drag-gesture attach, the gesture's own guard, and
+    /// the keyboard Space lift). `package` so the validator plumbing is
+    /// testable without synthesizing input, same as `pointerDropTarget`.
+    package func isDragSource(_ item: ListItem<ID>) -> Bool {
         guard style.draggable else { return false }
         if case .separator = item.kind { return false }
-        return !item.isDisabled            // headers ARE liftable (they carry their chunk)
+        guard !item.isDisabled else { return false }   // headers ARE liftable (they carry their chunk)
+        return liftValidate(item.id)
     }
 
     private func dragGesture(_ item: ListItem<ID>) -> some Gesture {
@@ -656,7 +689,11 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     private var keyboardDragging: Bool { dragState?.isKeyboard == true }
 
     private func liftKeyboard() {
-        guard style.draggable, let h = highlight else { return }
+        // The same source gate as the pointer path: a host can drive `highlight`
+        // from its own key monitor, so the cursor CAN sit on a row the kit's own
+        // ↑↓ (which walks selectable ids) would never reach — disabled or vetoed.
+        guard style.draggable, let h = highlight,
+              let item = visible.first(where: { $0.id == h }), isDragSource(item) else { return }
         let chunk = kbChunk(for: h)
         dragAim = kbDragAim(from: h, chunkIDs: chunk)
         dragAimIndex = 0
