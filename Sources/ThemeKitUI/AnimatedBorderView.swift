@@ -74,6 +74,15 @@ public struct AnimatedBorderView<S: Shape>: View {
     public var previewFrozen: Bool
     /// The phase held when `previewFrozen` (a recognizable mid-cycle colour).
     public var previewPhase: CGFloat
+    /// Whether a NON-`cycles` effect loops its colour through its own flash
+    /// palette (`resolveBorder`'s `cycleColors`). `true` (the default) keeps the
+    /// shipped continuously-cycling rim; `false` rests such an effect on its
+    /// STEADY colour — facet's `[border]` contract, where colour cycling is an
+    /// explicit opt-in (`cycle-seconds` set) and a bare effect holds its hue.
+    /// A `cycles` effect (rainbow) rotates regardless, exactly like the engine.
+    /// A `var` outside the init — the API differ reads a changed init label set
+    /// as a removal (the `GridPreview` rule), so the knob rides on a default.
+    public var cyclesColors: Bool = true
 
     public init(palette: ResolvedPalette? = nil,
                 effect: EffectSpec? = nil,
@@ -164,7 +173,7 @@ public struct AnimatedBorderView<S: Shape>: View {
             minWidth: Double(lineWidth),
             maxWidth: Double(maxBreath),
             cycleSeconds: cycleSeconds,
-            cycleColors: true,
+            cycleColors: cyclesColors,
             now: now,
             flash: effectsEnabled ? flash : nil)
 

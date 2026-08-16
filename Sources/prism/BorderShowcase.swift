@@ -40,10 +40,21 @@ struct MockBorder: View {
                 cell("effect · off (master)") {
                     AnimatedBorderView(palette: p, effect: demo, effectsEnabled: false)
                 }
+                cell("effect · steady colour") {
+                    steadyColorBorder
+                }
                 Spacer(minLength: 0)
             }
         }
         .showcasePanel(p)
+    }
+
+    /// `cyclesColors = false` — the rim holds the effect's steady hue instead of
+    /// looping its flash palette (facet's bare-`[border] effect` contract).
+    private var steadyColorBorder: AnimatedBorderView<RoundedRectangle> {
+        var v = AnimatedBorderView(palette: p, effect: demo, effectsEnabled: true)
+        v.cyclesColors = false
+        return v
     }
 
     /// A captioned sample panel with the REAL AnimatedBorderView overlaid on it.
