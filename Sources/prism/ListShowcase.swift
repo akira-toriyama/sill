@@ -362,6 +362,38 @@ struct MockList: View, ShowcaseBench {
                 Spacer(minLength: 0)
             }
 
+            // The drag-source veto (t-jzbf): "cannot be grabbed" WITHOUT `isDisabled`,
+            // which would take the row's click, hover and selection down with the
+            // lift. Both cells freeze the SAME lift on r2; the veto cell stays inert
+            // — no dim, no ghost — because the preview seam routes through the same
+            // gate the live gesture and Space lift use, so the bench cannot show a
+            // lift the widget would refuse to begin.
+            HStack(alignment: .top, spacing: 20) {
+                cell("drag source veto · the same frozen lift on r2 draws NOTHING (still clickable)") {
+                    ThemedListView(items: reorderItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true; $0.draggable = true; $0.dragMode = .reorderBetween },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["r2"], dragSource: "r2"))
+                    .dragSourceValidator { $0 != "r2" }
+                    .frame(width: 300, height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+
+                cell("drag source veto · reference: no veto, the lift dims r2 + shows the ghost") {
+                    ThemedListView(items: reorderItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true; $0.draggable = true; $0.dragMode = .reorderBetween },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["r2"], dragSource: "r2"))
+                    .frame(width: 300, height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+                Spacer(minLength: 0)
+            }
+
             HStack(alignment: .top, spacing: 20) {
                 cell("badge · a long label truncates at the cap (the title keeps its budget)") {
                     ThemedListView(items: cappedBadgeItems(),
