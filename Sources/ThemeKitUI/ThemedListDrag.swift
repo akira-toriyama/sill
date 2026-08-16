@@ -106,6 +106,22 @@ struct StandaloneRowInteraction: ViewModifier {
     }
 }
 
+/// Vend the pointer shape a row's affordance calls for (`ListPointerAffordance`,
+/// decided by `ThemedListView.pointerAffordance(for:)`); `nil` leaves the system
+/// arrow. macOS honours a pointer style only while the app is ACTIVE — over a
+/// non-activating panel at rest this is a no-op, the OS limit the AppKit
+/// predecessor accepted (its `NSCursor.set()` was the same silent no-op there).
+struct RowPointer: ViewModifier {
+    let kind: ListPointerAffordance?
+    @ViewBuilder func body(content: Content) -> some View {
+        switch kind {
+        case .link: content.pointerStyle(.link)
+        case .grab: content.pointerStyle(.grabIdle)
+        case nil:   content
+        }
+    }
+}
+
 /// Attach a drag gesture only when the row is a live drag source (so non-draggable rows
 /// keep their plain tap/hover handling untouched).
 struct OptionalDrag<G: Gesture>: ViewModifier {

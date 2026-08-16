@@ -42,6 +42,22 @@ public struct ThemedListStyle {
     /// indicator at all", not "the native one".
     public var showsScrollIndicators: Bool = true
     public var zebra: Bool = false                     // AppKit widget's `alternatingRowBackground`
+    /// Paint `hover` under an ENABLED `.row` the pointer is over, whether or
+    /// not it is selected. Off (default) keeps the kit's menu/combo reading —
+    /// the pointer veil only tints a SELECTED wash, because a menu's hover is
+    /// the moving highlight fill instead. A tree whose rows are click targets
+    /// (facet) turns this on for the flat per-row hover its AppKit
+    /// predecessor drew on every window row. A row already drawing a
+    /// selection/highlight fill keeps that fill — this never paints over one.
+    public var showsHoverFill: Bool = false
+    /// Vend pointer-shape affordances: an enabled row shows the link
+    /// (pointing-hand) pointer, and a section header shows the open-hand grab
+    /// pointer when `draggable` (headers are chunk drag-handles — the grip's
+    /// cursor twin). Off (default): the system arrow everywhere, the
+    /// menu/combo reading. Note macOS only honours a pointer style while the
+    /// app is ACTIVE — over a non-activating panel at rest this is a no-op,
+    /// the same OS limit the AppKit predecessor accepted.
+    public var showsPointerAffordances: Bool = false
     public var horizontalContentScroll: Bool = false
     public var reservesLeadingImageColumn: Bool = true
     public var wrapsHighlight: Bool = false

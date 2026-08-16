@@ -60,6 +60,11 @@ public struct ListPreview<ID: Hashable & Sendable> {
     }
 }
 
+/// The pointer shape a row vends under `style.showsPointerAffordances`.
+/// A package decision type (rather than SwiftUI's `PointerStyle` directly) so
+/// the kind-to-shape rule is testable without a pointer.
+package enum ListPointerAffordance { case link, grab }
+
 public struct ThemedListView<ID: Hashable & Sendable>: View {
     let items: [ListItem<ID>]
     @Binding var selection: Set<ID>
@@ -192,6 +197,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
 
     @State private var selectionAnchor: ID?          // sticky anchor for shift-range
     @State private var hoveredID: ID?                // pointer veil + highlightFollowsHover
+    @State private var reportedHoverID: ID?          // last id REPORTED via onHover (rows AND headers) — exit dedup
     @State private var scrollPos = ScrollPosition(edge: .top)   // frozen-preview + keyboard scroll
     @FocusState private var focused: Bool            // standalone keyboard focus (.onKeyPress)
 
@@ -297,6 +303,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
             .reportRowGeom(item.id)
             .reportRowRect(item.id)
             .contentShape(Rectangle())
+            .modifier(RowPointer(kind: pointerAffordance(for: item)))
             .modifier(StandaloneRowInteraction(active: !style.hosted,
                                                onTap: { handleTap(item) },
                                                onHover: { handleHover(item, $0) }))
@@ -357,15 +364,31 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         return mods
     }
 
-    private func handleHover(_ item: ListItem<ID>, _ hovering: Bool) {
-        guard case .row = item.kind, !item.isDisabled else { return }
+    /// Three independent hover consequences, derived separately: the `onHover`
+    /// REPORT covers every enabled, non-separator row — headers included; the
+    /// pointer VEIL lights `.row`s only; the menu-model FOLLOW moves the
+    /// highlight over `.row`s only. One `guard case .row` used to gate all
+    /// three, so a standalone list could not report a header hover at all —
+    /// while the hosted path (AppKit tracking → `ListController.setHover`)
+    /// reports every kind. That asymmetry is what killed facet's header
+    /// hover-preview: same capability, two paths, one silently gated
+    /// (t-fyvs's co-riding-gate shape, ak5e/M-header). `package` so the
+    /// report rule is testable without synthesizing pointer input.
+    package func handleHover(_ item: ListItem<ID>, _ hovering: Bool) {
+        if case .separator = item.kind { return }
+        guard !item.isDisabled else { return }
+        let isRow: Bool = { if case .row = item.kind { return true }; return false }()
         if hovering {
-            hoveredID = item.id
+            if isRow { hoveredID = item.id }
+            reportedHoverID = item.id
             onHover(item.id)
-            if style.highlightFollowsHover { highlight = item.id }    // menu: hover drives the cursor
-        } else if hoveredID == item.id {
-            hoveredID = nil
-            onHover(nil)
+            if style.highlightFollowsHover, isRow { highlight = item.id }    // menu: hover drives the cursor
+        } else {
+            if hoveredID == item.id { hoveredID = nil }
+            if reportedHoverID == item.id {
+                reportedHoverID = nil
+                onHover(nil)
+            }
             // highlightFollowsHover keeps the last-lit row on exit (AppKit menu parity) — don't clear highlight
         }
     }
@@ -539,6 +562,19 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         return s
     }
     private func geom(_ id: ID) -> RowGeom? { geomMap[AnyHashable(id)] }
+
+    /// The pointer affordance `item` vends — nil is the system arrow. Rows are
+    /// click targets (link); a draggable header is a chunk drag-handle (grab,
+    /// the reorder grip's cursor twin — facet's old tree used the same pair);
+    /// disabled rows and separators vend nothing.
+    package func pointerAffordance(for item: ListItem<ID>) -> ListPointerAffordance? {
+        guard style.showsPointerAffordances, !item.isDisabled else { return nil }
+        switch item.kind {
+        case .separator: return nil
+        case .sectionHeader: return style.draggable ? .grab : .link
+        case .row: return .link
+        }
+    }
 
     /// Whether a lift of `item` may begin — the ONE gate every lift entry
     /// consults (the row's drag-gesture attach, the gesture's own guard, and

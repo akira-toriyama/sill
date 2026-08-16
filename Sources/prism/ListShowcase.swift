@@ -290,6 +290,22 @@ struct MockList: View, ShowcaseBench {
                     .overlay(RoundedRectangle(cornerRadius: 8)
                         .stroke(Color(nsColor: p.border), lineWidth: 1))
                 }
+
+                // showsHoverFill (t-ak5e): the flat per-row hover a click-target
+                // tree draws on ANY row — r2 keeps its selection wash untouched
+                // while unselected r3 lights `hover` under the pointer. Default
+                // (off) is the two cells to the left: hover only tints a
+                // SELECTED wash.
+                cell("hover fill · showsHoverFill lights the UNSELECTED row under the pointer") {
+                    ThemedListView(items: reorderItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true; $0.showsHoverFill = true },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["r2"]).hovering("r3"))
+                    .frame(width: 300, height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
                 Spacer(minLength: 0)
             }
 
