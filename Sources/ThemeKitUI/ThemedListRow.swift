@@ -432,6 +432,12 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
                 if style.selectionInk == .wash, isSelected, isHovered {
                     selectionShape(Color(nsColor: palette.hover))
                 }
+                // The flat per-row hover (facet tree): only where no fill
+                // already owns the row, so a selected/highlight-filled row
+                // renders byte-identically with the flag on or off.
+                if style.showsHoverFill, isHovered, !drawsFill, !item.isDisabled {
+                    selectionShape(Color(nsColor: palette.hover))
+                }
             }
         case .sectionHeader:
             // Opaque "punch" so a PINNED header occludes the rows scrolling under it;
