@@ -27,6 +27,9 @@ public struct GridPreview<ID: Hashable> {
     /// changed init label set as a removal.
     public var dragSource: ID?
     public var dropTargetID: ID?
+    /// Frozen reorder pose (t-mej6 G2): the insertion SLOT the drop would land
+    /// at (draws the insertion line) — the `.at` twin of `dropTargetID`.
+    public var dropSlot: Int?
     public init(hovered: ID? = nil, cursor: ID? = nil, focused: Bool = true) {
         self.hovered = hovered; self.cursor = cursor; self.focused = focused
     }
@@ -34,6 +37,12 @@ public struct GridPreview<ID: Hashable> {
     /// A copy frozen mid-drag: `source` lifted, the drop landing on `over`.
     public func dragging(source: ID?, over: ID? = nil) -> Self {
         var c = self; c.dragSource = source; c.dropTargetID = over; return c
+    }
+
+    /// A copy frozen mid-reorder: `source` lifted, the drop landing at slot
+    /// `slot` (the insertion line draws there).
+    public func dragging(source: ID?, at slot: Int) -> Self {
+        var c = self; c.dragSource = source; c.dropSlot = slot; return c
     }
 }
 
@@ -62,10 +71,21 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     @FocusState private var isFocused: Bool
 
     // Drag/reorder (t-n3be) — the live lift + the per-cell frames the pure
-    // resolver consumes (the list's DragInfo/geomMap twin).
-    private struct DragInfo { var source: ID; var target: GridDropTarget<ID>?; var location: CGPoint; var tilt: CGFloat = 0 }
+    // resolver consumes (the list's DragInfo/geomMap twin). `isKeyboard` marks
+    // a Space-lifted drag (t-mej6 G3): its target comes from the aim list, not
+    // the pointer.
+    private struct DragInfo { var source: ID; var target: GridDropTarget<ID>?; var location: CGPoint; var tilt: CGFloat = 0; var isKeyboard: Bool = false }
     @State private var dragState: DragInfo?
     @State private var cellFrames: [AnyHashable: CGRect] = [:]
+    // Keyboard-drag aim (t-mej6 G3): the validated candidate list a lift walks,
+    // and the current aim (the list's dragAim/dragAimIndex twin — the grid
+    // steps it geometrically, see `aimKeyboard`).
+    @State private var dragAim: [GridDropTarget<ID>] = []
+    @State private var dragAimIndex: Int = 0
+    // Fit-to-viewport (t-mej6 G1): the pre-computed cell size when `fitsViewport`
+    // is on (SwiftUI's grid only sizes off the cross axis, so fitting both axes
+    // needs the explicit size).
+    @State private var fittedSize: CGSize?
 
     /// Frozen chrome for a static capture. Set via `.preview(_:)`, NOT an init
     /// parameter — the API differ reads any init-label change as a removal
@@ -88,11 +108,41 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     private var dropValidate: (GridDragContext<ID>, GridDropTarget<ID>) -> Bool = { _, _ in true }
     private var onDropHandler: ((GridDragContext<ID>, GridDropTarget<ID>) -> Void)?
 
-    /// A copy whose cells can be pointer-dragged. Keyboard lift is not yet
-    /// bound by the kit — `gridDragCandidates` is the pure aim list a host
-    /// can cycle itself.
+    /// A copy whose cells can be dragged — by pointer, and by keyboard
+    /// (t-mej6 G3): Space lifts the cursor cell, arrows aim geometrically
+    /// through the validated candidates, Return/Space commits, Esc cancels.
     public func draggable(_ mode: GridDragMode = .dropOnto) -> Self {
         var c = self; c.dragMode = mode; return c
+    }
+
+    // MARK: behaviour opt-ins (t-mej6 — each its own copy-method: a single-
+    // purpose gate per t-fyvs, and the API differ reads init-label changes as
+    // removals so none of these land as init parameters)
+
+    private var wrapsCursorFlag = false
+    private var clickActivates = false
+    private var fitsViewportFlag = false
+
+    /// A copy whose arrow-key cursor WRAPS at the grid's edges (t-mej6 G5) —
+    /// last column → first, last row → first (the ragged last row snaps to the
+    /// last real cell, `nextGridIndex`'s rule). Default: edges stop.
+    public func wrapsCursor(_ wraps: Bool = true) -> Self {
+        var c = self; c.wrapsCursorFlag = wraps; return c
+    }
+
+    /// A copy where a SINGLE click activates the cell (fires `onActivate`, on
+    /// top of moving the cursor) — the overlay-picker idiom (t-mej6 G4), where
+    /// a click means "choose this", not "select this". Double-click and Return
+    /// keep working; Cmd-click still toggles selection.
+    public func activatesOnClick(_ on: Bool = true) -> Self {
+        var c = self; c.clickActivates = on; return c
+    }
+
+    /// A copy that fits EVERY cell inside its container — no scrolling: cells
+    /// shrink (preserving `aspectRatio`) until all rows fit (t-mej6 G1, the
+    /// full-screen overlay-grid sizing rule). The grid centres the cell block.
+    public func fitsViewport(_ on: Bool = true) -> Self {
+        var c = self; c.fitsViewportFlag = on; return c
     }
 
     /// A copy whose drag resolution consults `validate` before offering a
@@ -118,6 +168,13 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     private var effDropTargetID: ID? {
         if let p = previewState { return p.dropTargetID }
         if case .onto(let id) = dragState?.target?.placement { return id }
+        return nil
+    }
+    /// The insertion SLOT a reorder drop would land at (`.at` twin of
+    /// `effDropTargetID`) — drives the insertion line (t-mej6 G2).
+    private var effDropSlot: Int? {
+        if let p = previewState { return p.dropSlot }
+        if case .at(let i) = dragState?.target?.placement { return i }
         return nil
     }
 
@@ -154,6 +211,14 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     private var ids: [ID] { elements.map { $0[keyPath: idKey] } }
 
     private var gridItems: [GridItem] {
+        // Fit mode pre-sizes the cell (both axes), so tracks are FIXED at that
+        // size — flexible/adaptive tracks would re-stretch the width the fit
+        // just computed.
+        if let fs = fittedSize {
+            let track = axis == .vertical ? fs.width : fs.height
+            return Array(repeating: GridItem(.fixed(track), spacing: gap),
+                         count: resolvedColumns)
+        }
         switch layout {
         case .fixed(let n):
             return Array(repeating: GridItem(.flexible(), spacing: gap),
@@ -165,22 +230,28 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
 
     public var body: some View {
         GeometryReader { geo in
-            ScrollView(axis == .vertical ? .vertical : .horizontal) {
-                gridBody
-                    .padding(pad)
-                    .coordinateSpace(.named(themedGridContentSpace))
-                    .onPreferenceChange(CellFramePreference.self) { cellFrames = $0 }
-                    .overlay { dragGhostLayer }
-            }
+            gridContainer(geo)
             .focusable()
             .focused($isFocused)
             .onKeyPress(.return) {
+                if keyboardDragging { commitKeyboardDrag(); return .handled }
                 if let c = cursor { onActivate?(c); return .handled }
                 return .ignored
             }
+            .onKeyPress(.space) {
+                if keyboardDragging { commitKeyboardDrag(); return .handled }
+                if dragMode != nil, cursor != nil { liftKeyboard(); return .handled }
+                return .ignored
+            }
+            .onKeyPress(.escape) {
+                // Only a live keyboard lift owns Esc — otherwise it stays the
+                // host's (an overlay grid dismisses on it).
+                guard keyboardDragging else { return .ignored }
+                cancelKeyboardDrag(); return .handled
+            }
             .onMoveCommand { move($0) }
-            .onAppear { recomputeColumns(width: crossWidth(geo)) }
-            .onChange(of: geo.size) { recomputeColumns(width: crossWidth(geo)) }
+            .onAppear { recomputeLayout(geo.size) }
+            .onChange(of: geo.size) { recomputeLayout(geo.size) }
             .onChange(of: ids) { _, newIds in
                 let present = Set(newIds)
                 // Reap ids that no longer exist WHOEVER owns the storage. Handing
@@ -190,8 +261,30 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
                 selection.wrappedValue = reconcileGridSelection(selection.wrappedValue, existing: present)
                 if let c = cursor, !present.contains(c) { cursor = nil }
                 if let h = hovered, !present.contains(h) { hovered = nil }
-                if let ds = dragState, !present.contains(ds.source) { dragState = nil }
+                if let ds = dragState, !present.contains(ds.source) {
+                    dragState = nil; dragAim = []; dragAimIndex = 0
+                }
+                recomputeLayout(geo.size)      // fit sizing tracks the count
             }
+        }
+    }
+
+    /// The scroll container (the default), or the fit-to-viewport block
+    /// (t-mej6 G1) — a non-scrolling, centred cell block whose cells were
+    /// pre-sized by `recomputeLayout`.
+    @ViewBuilder private func gridContainer(_ geo: GeometryProxy) -> some View {
+        let content = gridBody
+            .padding(pad)
+            .coordinateSpace(.named(themedGridContentSpace))
+            .onPreferenceChange(CellFramePreference.self) { cellFrames = $0 }
+            .overlay { dragGhostLayer }
+            .overlay { slotLineLayer }
+        if fitsViewportFlag {
+            content
+                .fixedSize()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        } else {
+            ScrollView(axis == .vertical ? .vertical : .horizontal) { content }
         }
     }
 
@@ -227,7 +320,8 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
         }()
 
         cellBuilder(element, state)
-            .modifier(AspectModifier(ratio: aspectRatio))
+            .modifier(AspectModifier(ratio: fittedSize == nil ? aspectRatio : nil))
+            .frame(width: fittedSize?.width, height: fittedSize?.height)
             .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
             .background(
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
@@ -375,9 +469,14 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
 
     /// Single tap replaces the selection; Cmd-tap toggles (multi-select only).
     /// ExclusiveGesture gives the Cmd variant precedence when the modifier is
-    /// held, so a plain and a Cmd click never both fire.
+    /// held, so a plain and a Cmd click never both fire. Under
+    /// `activatesOnClick` (t-mej6 G4) the plain tap ALSO fires `onActivate` —
+    /// the overlay-picker idiom where one click means "choose this".
     private func selectionGesture(_ id: ID) -> some Gesture {
-        let plain = TapGesture().onEnded { selectOnly(id); cursor = id; isFocused = true }
+        let plain = TapGesture().onEnded {
+            selectOnly(id); cursor = id; isFocused = true
+            if clickActivates { onActivate?(id) }
+        }
         let cmd = TapGesture().modifiers(.command).onEnded {
             if allowsMultiSelect { toggle(id) } else { selectOnly(id) }
             cursor = id; isFocused = true
@@ -388,19 +487,33 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     private func crossWidth(_ geo: GeometryProxy) -> CGFloat {
         (axis == .vertical ? geo.size.width : geo.size.height) - pad * 2
     }
-    // resolvedColumns is a best-effort headless mirror of SwiftUI's own adaptive layout, used for nav only; it can differ by one at boundary widths — self-corrects on the next move.
-    private func recomputeColumns(width: CGFloat) {
+    // resolvedColumns is a best-effort headless mirror of SwiftUI's own adaptive layout, used for nav only (and for fit sizing, where the FIXED tracks make it exact); it can differ by one at boundary widths — self-corrects on the next move.
+    private func recomputeLayout(_ size: CGSize) {
+        let width = (axis == .vertical ? size.width : size.height) - pad * 2
         switch layout {
         case .fixed(let n): resolvedColumns = Swift.max(n, 1)
         case .adaptive(let minW):
             resolvedColumns = gridColumns(availableWidth: width, minCellWidth: minW,
                                           gap: gap, max: Swift.max(ids.count, 1))
         }
+        guard fitsViewportFlag else { fittedSize = nil; return }
+        let avail = CGSize(width: size.width - pad * 2, height: size.height - pad * 2)
+        if axis == .vertical {
+            fittedSize = gridFittedCellSize(available: avail, count: ids.count,
+                                            columns: resolvedColumns, gap: gap,
+                                            aspectRatio: aspectRatio)
+        } else {
+            // Column-major: fit in TRANSPOSED space (tracks are rows), then
+            // swap the result back.
+            let t = gridFittedCellSize(available: CGSize(width: avail.height, height: avail.width),
+                                       count: ids.count, columns: resolvedColumns, gap: gap,
+                                       aspectRatio: aspectRatio.map { $0 > 0 ? 1 / $0 : 1 })
+            fittedSize = CGSize(width: t.height, height: t.width)
+        }
     }
     // Arrow keys drive a single roving cursor that REPLACES the selection (macOS list/grid convention); shift-extend isn't expressible via onMoveCommand without AppKit.
     private func move(_ direction: MoveCommandDirection) {
         guard !ids.isEmpty else { return }
-        let current = cursor.flatMap { ids.firstIndex(of: $0) } ?? 0
         let (dx, dy): (Int, Int)
         switch direction {
         case .left:  (dx, dy) = (-1, 0)
@@ -409,13 +522,80 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
         case .down:  (dx, dy) = (0, 1)
         @unknown default: (dx, dy) = (0, 0)
         }
+        // A live keyboard lift owns the arrows: they AIM the drop, not the
+        // cursor (t-mej6 G3).
+        if keyboardDragging { aimKeyboard(dx: dx, dy: dy); return }
+        let current = cursor.flatMap { ids.firstIndex(of: $0) } ?? 0
         // GridCore handles the row-major↔column-major axis swap (a horizontal
         // LazyHGrid fills column-major); `resolvedColumns` is the cross-axis count.
         let next = nextGridIndex(from: current, dx: dx, dy: dy,
                                  count: ids.count, columns: resolvedColumns,
-                                 horizontal: axis == .horizontal, wrap: false)
+                                 horizontal: axis == .horizontal, wrap: wrapsCursorFlag)
         cursor = ids[next]
         selectOnly(ids[next])
+    }
+
+    // MARK: keyboard drag (t-mej6 G3 — lift / aim / commit / cancel, the
+    // ThemedListView handleDragKey family shape; the aim STEP is geometric,
+    // because a 2-D grid's candidate list isn't linear)
+
+    private var keyboardDragging: Bool { dragState?.isKeyboard == true }
+
+    private func liftKeyboard() {
+        guard let mode = dragMode, let h = cursor else { return }
+        let aim = gridDragCandidates(source: h, ids: ids, mode: mode,
+                                     validate: dropValidate)
+        dragAim = aim
+        dragAimIndex = 0
+        var info = DragInfo(source: h, target: aim.first, location: .zero, isKeyboard: true)
+        info.location = aim.first.flatMap(targetAnchor)
+            ?? (cellFrames[AnyHashable(h)].map { CGPoint(x: $0.midX, y: $0.midY) } ?? .zero)
+        dragState = info
+    }
+
+    private func aimKeyboard(dx: Int, dy: Int) {
+        guard keyboardDragging, !dragAim.isEmpty else { return }
+        let points = dragAim.map { targetAnchor($0) ?? .zero }
+        dragAimIndex = gridAimIndex(from: Swift.min(dragAimIndex, dragAim.count - 1),
+                                    dx: dx, dy: dy, points: points)
+        dragState?.target = dragAim[dragAimIndex]
+        dragState?.location = points[dragAimIndex]
+    }
+
+    private func commitKeyboardDrag() {
+        if let ds = dragState, let target = ds.target {
+            onDropHandler?(GridDragContext(sourceID: ds.source), target)
+        }
+        cancelKeyboardDrag()
+    }
+
+    private func cancelKeyboardDrag() {
+        dragState = nil; dragAim = []; dragAimIndex = 0
+    }
+
+    /// Where a candidate target sits in content space (ghost park + aim
+    /// geometry) — the pure `gridTargetAnchor` over the measured frames.
+    private func targetAnchor(_ target: GridDropTarget<ID>) -> CGPoint? {
+        gridTargetAnchor(target, ids: ids, frames: orderedFrames,
+                         horizontal: axis == .horizontal, gap: gap)
+    }
+
+    // MARK: reorder insertion line (t-mej6 G2 — the grid twin of the list row's
+    // `insertionLine`: a 2pt primary line with 6pt end caps at the slot edge)
+
+    @ViewBuilder private var slotLineLayer: some View {
+        if let slot = effDropSlot,
+           let seg = gridSlotSegment(index: slot, frames: orderedFrames,
+                                     horizontal: axis == .horizontal, gap: gap) {
+            let accent = Color(nsColor: palette.primary)
+            ZStack {
+                Path { p in p.move(to: seg.a); p.addLine(to: seg.b) }
+                    .stroke(accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                Circle().fill(accent).frame(width: 6, height: 6).position(seg.a)
+                Circle().fill(accent).frame(width: 6, height: 6).position(seg.b)
+            }
+            .allowsHitTesting(false)
+        }
     }
 }
 

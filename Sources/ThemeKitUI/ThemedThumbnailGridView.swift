@@ -65,6 +65,27 @@ public struct ThemedThumbnailGridView: View {
         var c = self; c.onDropHandler = handler; return c
     }
 
+    // Behaviour opt-ins (t-mej6), forwarded verbatim to the inner grid.
+    private var wrapsCursorFlag = false
+    private var clickActivates = false
+    private var fitsViewportFlag = false
+
+    /// A copy whose arrow-key cursor wraps at the edges (see
+    /// `ThemedGridView.wrapsCursor`).
+    public func wrapsCursor(_ wraps: Bool = true) -> Self {
+        var c = self; c.wrapsCursorFlag = wraps; return c
+    }
+    /// A copy where a single click activates (see
+    /// `ThemedGridView.activatesOnClick`).
+    public func activatesOnClick(_ on: Bool = true) -> Self {
+        var c = self; c.clickActivates = on; return c
+    }
+    /// A copy that fits every cell inside its container, no scrolling (see
+    /// `ThemedGridView.fitsViewport`).
+    public func fitsViewport(_ on: Bool = true) -> Self {
+        var c = self; c.fitsViewportFlag = on; return c
+    }
+
     /// Multi-select (or uncontrolled when `selection == nil`).
     public init(_ items: [ThumbnailItem],
                 selection: Binding<Set<String>>? = nil,
@@ -131,6 +152,9 @@ public struct ThemedThumbnailGridView: View {
         }
         .preview(previewState)
         .dropTargetValidator(dropValidate)
+        .wrapsCursor(wrapsCursorFlag)
+        .activatesOnClick(clickActivates)
+        .fitsViewport(fitsViewportFlag)
         if let mode = dragMode { grid = grid.draggable(mode) }
         if let handler = onDropHandler { grid = grid.onGridDrop(handler) }
         return grid

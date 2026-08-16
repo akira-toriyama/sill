@@ -105,11 +105,50 @@ public func resolveGridDropTarget<ID: Hashable>(at point: CGPoint, source: ID,
     }
 }
 
+/// The line segment a reorder INSERTION slot draws (t-mej6 G2): slot `index` ⇒
+/// the run-axis edge of the cell at `index` (its leading edge), or the trailing
+/// edge of the last cell for the end slot. A vertical (row-major) grid draws a
+/// vertical line beside the cell; a horizontal (column-major) grid a horizontal
+/// one. Zero/unmeasured frames yield nil (nothing to anchor to). Pure /
+/// testable; the view adds the caps + stroke.
+public func gridSlotSegment(index: Int, frames: [CGRect], horizontal: Bool,
+                            gap: CGFloat) -> (a: CGPoint, b: CGPoint)? {
+    guard !frames.isEmpty, index >= 0, index <= frames.count else { return nil }
+    let anchor = index < frames.count ? frames[index] : frames[frames.count - 1]
+    guard !anchor.isEmpty else { return nil }
+    let after = index == frames.count
+    let inset = gap / 2
+    if horizontal {
+        let y = after ? anchor.maxY + inset : anchor.minY - inset
+        return (CGPoint(x: anchor.minX, y: y), CGPoint(x: anchor.maxX, y: y))
+    }
+    let x = after ? anchor.maxX + inset : anchor.minX - inset
+    return (CGPoint(x: x, y: anchor.minY), CGPoint(x: x, y: anchor.maxY))
+}
+
+/// The point a keyboard-aimed target anchors to (ghost park + aim geometry):
+/// `.onto` ⇒ the cell's centre, `.at` ⇒ the slot segment's midpoint. Nil when
+/// the target's cell is unmeasured. Pure / testable.
+public func gridTargetAnchor<ID: Hashable>(_ target: GridDropTarget<ID>,
+                                           ids: [ID], frames: [CGRect],
+                                           horizontal: Bool, gap: CGFloat) -> CGPoint? {
+    switch target.placement {
+    case .onto(let id):
+        guard let i = ids.firstIndex(of: id), frames.indices.contains(i),
+              !frames[i].isEmpty else { return nil }
+        return CGPoint(x: frames[i].midX, y: frames[i].midY)
+    case .at(let index):
+        guard let seg = gridSlotSegment(index: index, frames: frames,
+                                        horizontal: horizontal, gap: gap)
+        else { return nil }
+        return CGPoint(x: (seg.a.x + seg.b.x) / 2, y: (seg.a.y + seg.b.y) / 2)
+    }
+}
+
 /// The ordered, validated keyboard/candidate targets for `source` + `mode`, in
 /// row-major visual order (slots interleave before their cell; the end slot
-/// closes a reorder list). The kit's SwiftUI grid does not yet bind a keyboard
-/// lift itself — this is the pure aim list a host (or a future kit binding)
-/// cycles through.
+/// closes a reorder list). The kit's own keyboard lift (t-mej6 G3) and any
+/// host-driven binding both cycle this same list.
 public func gridDragCandidates<ID: Hashable>(source: ID, ids: [ID], mode: GridDragMode,
                                              validate: (GridDragContext<ID>, GridDropTarget<ID>) -> Bool)
     -> [GridDropTarget<ID>] {
