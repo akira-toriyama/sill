@@ -122,6 +122,15 @@ struct RowPointer: ViewModifier {
     }
 }
 
+/// Attach a hover tooltip only when the row vends one (`ThemedListRow.helpText`)
+/// — `.help("")` still registers an empty tip, so absence must be structural.
+struct OptionalHelp: ViewModifier {
+    let text: String?
+    @ViewBuilder func body(content: Content) -> some View {
+        if let text { content.help(text) } else { content }
+    }
+}
+
 /// Attach a drag gesture only when the row is a live drag source (so non-draggable rows
 /// keep their plain tap/hover handling untouched).
 struct OptionalDrag<G: Gesture>: ViewModifier {

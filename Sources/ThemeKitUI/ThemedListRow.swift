@@ -118,11 +118,33 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
             .background(rowBackground)
             .overlay(alignment: .bottom) { bottomRule }
             .overlay(outlineRing)
-            .opacity(dimmed ? 0.4 : 1)     // lifted drag source / chunk member dims
+            // One veil, two voices: the transient drag lift and the host's
+            // standing `isDimmed` (parked rows) share the fade — same weight,
+            // so the two never disagree about what "faded" looks like.
+            .opacity((dimmed || item.isDimmed) ? 0.4 : 1)
             .overlay { dropOverlay }       // drop affordance at full opacity, above the dim
             .modifier(RowAX(vends: style.vendsRowAXElements && item.asRow.isSelectable,
                             flattens: style.flattensRowAXChildren,
                             label: axLabel))
+            .modifier(OptionalHelp(text: helpText))
+    }
+
+    /// The full text a hover tooltip restores under `style.showsTitleTooltips`
+    /// — the read-the-whole-title affordance that replaced the retired
+    /// horizontal content scroll. Everything the row truncates joins in:
+    /// the title line plus the secondary (row) or the sub-line (header).
+    /// Internal so the rule is testable without hovering (@testable).
+    var helpText: String? {
+        guard style.showsTitleTooltips else { return nil }
+        let parts: [String]
+        switch item.kind {
+        case .separator: return nil
+        case let .sectionHeader(subtitle, _): parts = [item.primary, subtitle ?? ""]
+        case .row: parts = [item.primary, item.secondary ?? ""]
+        }
+        let joined = parts.filter { !$0.isEmpty }
+        guard !joined.isEmpty else { return nil }
+        return joined.joined(separator: " — ")
     }
 
     /// The label VoiceOver reads for an actionable row (opt-in via `vendsRowAXElements`,
@@ -201,6 +223,10 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
                 if isCollapsibleHeader {
                     disclosureCaret
                     Color.clear.frame(width: metrics.disclosureGap)
+                }
+                if item.image != nil {
+                    headerGlyph(hasSubtitle: subtitle != nil)
+                    Color.clear.frame(width: metrics.gapImageToText)
                 }
                 headerContent(subtitle: subtitle)
                 Spacer(minLength: 0)
@@ -352,6 +378,29 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
             // still ENDS in the right orientation — the state is conveyed, the
             // travel between the two states is not.
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isCollapsed)
+    }
+
+    /// A section header's KIND glyph (facet: funnel = matched / tray =
+    /// holding), drawn from the same `ListItem.image` seam the `.row` branch
+    /// reads — the header branch used to drop the image on the floor, so a
+    /// host declaring a header glyph got silence (the design doc's §4.3 gap).
+    /// Templates tint to the header's own title ink (emphasis included);
+    /// nothing reserves a column — a glyphless header is untouched.
+    @ViewBuilder private func headerGlyph(hasSubtitle: Bool) -> some View {
+        if let image = item.image {
+            let side = image.isTemplate ? metrics.iconGlyph : metrics.imageBox
+            if image.isTemplate {
+                let ink: NSColor = item.isEmphasized ? palette.primary
+                    : (hasSubtitle ? palette.foreground : palette.muted)
+                Image(nsImage: image).renderingMode(.template).resizable().scaledToFit()
+                    .frame(width: side, height: side)
+                    .foregroundColor(Color(nsColor: ink))
+            } else {
+                Image(nsImage: image).renderingMode(.original).interpolation(.high)
+                    .resizable().scaledToFit()
+                    .frame(width: side, height: side)
+            }
+        }
     }
 
     // MARK: leading image (template tint via .template render == AppKit .sourceAtop; colour favicon as-is)
