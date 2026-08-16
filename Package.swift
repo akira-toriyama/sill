@@ -85,8 +85,14 @@ let package = Package(
         // `AsyncSVGView.swift:37` adds `SwiftUIMacros` for `@Entry`. Dependabot
         // re-proposes it weekly (the `swift` group is `patterns: ["*"]`); this
         // paragraph is the standing verdict, so re-measure rather than re-derive.
+        // And the proposal is not hypothetical: #181 (2026-08-16) rewrote this
+        // very pin to 0.29.0 and merged on a green CI — CI builds with full
+        // Xcode, so the macro plugins resolve there and the breakage lands
+        // ONLY on the CLT-only local gate this pin exists for. A SwiftDraw
+        // bump PR is unreviewable by CI alone; close it unless a CLT shell
+        // has compiled that exact version.
         .package(url: "https://github.com/swhitty/SwiftDraw.git",
-                 .upToNextMinor(from: "0.29.0")),
+                 .upToNextMinor(from: "0.24.0")),
         // swiftlang/, NOT apple/ — the repo moved and `apple/` is the stale
         // redirect. SwiftPM derives the package identity from the URL, so a
         // consumer that pulls both (glance does) hits "Conflicting identity for
