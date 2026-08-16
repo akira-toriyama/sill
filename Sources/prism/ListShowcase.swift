@@ -124,6 +124,23 @@ private func makeStyle(_ configure: (inout ThemedListStyle) -> Void) -> ThemedLi
     ]
 }
 
+// Two glyph-marked section kinds (facet: funnel = matched / tray = holding) —
+// the emphasized one shows the glyph riding the title ink into the accent.
+@MainActor private func glyphHeaderItems() -> [ThemeKitUI.ListItem<String>] {
+    [
+        ThemeKitUI.ListItem(id: "m", image: glyph("funnel", 14), primary: "Matched",
+                            kind: .sectionHeader(subtitle: "2 windows")).emphasized(),
+        ThemeKitUI.ListItem(id: "m1", image: glyph("compass", 18), primary: "Safari",
+                            secondary: "GitHub — pull requests"),
+        ThemeKitUI.ListItem(id: "m2", image: glyph("hammer", 18), primary: "Xcode",
+                            secondary: "ThemedListRow.swift"),
+        ThemeKitUI.ListItem(id: "h", image: glyph("tray", 14), primary: "Holding",
+                            kind: .sectionHeader(subtitle: "1 window")),
+        ThemeKitUI.ListItem(id: "h1", image: glyph("note", 18), primary: "Notes",
+                            secondary: "memo.md"),
+    ]
+}
+
 // Badges whose labels are longer than any pill should be: the cap
 // (`ListMetrics.badgeMaxText`) truncates the LABEL so the row's title keeps its
 // text budget. Before the cap the cluster — which is `.fixedSize()` and never
@@ -403,6 +420,36 @@ struct MockList: View, ShowcaseBench {
                                    palette: p,
                                    preview: ListPreview(selection: ["r2"], dragSource: "r2"))
                     .frame(width: 300, height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+                Spacer(minLength: 0)
+            }
+
+            // t-q6ay display seams: a STANDING dim that keeps the row selected and
+            // interactive (isDimmed — facet's hidden windows; isDisabled would take
+            // click/hover/selection/AX down with the ink), and the header KIND
+            // glyph read from the same `ListItem.image` seam the rows use
+            // (facet: funnel = matched / tray = holding; the header branch used
+            // to drop the image on the floor).
+            HStack(alignment: .top, spacing: 20) {
+                cell("dimmed · parked rows fade but keep selection + interactivity") {
+                    ThemedListView(items: reorderItems().map { ["r2", "r4"].contains($0.id) ? $0.dimmed() : $0 },
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true },
+                                   palette: p,
+                                   preview: ListPreview(selection: ["r2"]))
+                    .frame(width: 300, height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: p.border), lineWidth: 1))
+                }
+
+                cell("header glyph · the KIND mark joins the header (emphasized = accent)") {
+                    ThemedListView(items: glyphHeaderItems(),
+                                   style: makeStyle { $0.selectionMode = .single; $0.showsDividers = true },
+                                   palette: p)
+                    .frame(width: 300, height: 188)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8)
                         .stroke(Color(nsColor: p.border), lineWidth: 1))
