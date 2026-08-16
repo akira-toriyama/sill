@@ -139,6 +139,39 @@ struct MockThumbnailGrid: View {
                 .draggable(.dropOnto)
                 .preview(GridPreview(focused: false).dragging(source: "c0", over: "c4"))
                 .frame(height: 160)
+
+            Text("frozen · reorder pose — c1 lifted, insertion line at slot 3 (t-mej6 G2)")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
+
+            // The reorder freeze seam (t-mej6): the `.at` insertion line (2pt
+            // primary + end caps — the list insertionLine's grid twin) in a
+            // deterministic static pose. Also the live keyboard path: click a
+            // cell, Space lifts, arrows aim, Return commits.
+            ThemedThumbnailGridView(loadedItems,
+                                    selection: .constant([]),
+                                    layout: .fixed(columns: 3),
+                                    aspectRatio: 1, palette: p)
+                .draggable(.reorderAt)
+                .preview(GridPreview(focused: false).dragging(source: "c1", at: 3))
+                .frame(height: 160)
+
+            Text("fitsViewport · 6 cells · 3 cols · 16:10 in a 150pt box — no scroll, rows shrink to fit (G1)")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(Color(nsColor: p.muted))
+
+            // Fit-to-viewport (t-mej6 G1): the overlay-grid sizing rule — every
+            // cell visible, height binds, aspect preserved, block centred.
+            // Also exercises G4/G5 live: single click activates, arrows wrap.
+            ThemedThumbnailGridView(loadedItems,
+                                    selection: .constant([]),
+                                    layout: .fixed(columns: 3),
+                                    aspectRatio: 1.6, palette: p,
+                                    onActivate: { lastActivated = $0; prismLog("fit activated \($0)") })
+                .fitsViewport()
+                .activatesOnClick()
+                .wrapsCursor()
+                .frame(height: 150)
         }
     }
 

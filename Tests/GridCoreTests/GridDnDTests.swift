@@ -166,3 +166,129 @@ final class GridDnDTests: XCTestCase {
                         .at(index: 1), .onto(id: "b")])
     }
 }
+
+// t-mej6 — the pure geometry behind the kit's own keyboard lift (G3), the
+// reorder insertion line (G2), and fit-to-viewport sizing (G1).
+final class GridSeamTests: XCTestCase {
+
+    // The same 3×2 / 100pt / 10pt-gap fixture as GridDnDTests.
+    private let ids = ["a", "b", "c", "d", "e", "f"]
+    private var frames: [CGRect] {
+        (0..<6).map { CGRect(x: CGFloat($0 % 3) * 110, y: CGFloat($0 / 3) * 110,
+                             width: 100, height: 100) }
+    }
+
+    // MARK: gridFittedCellSize (G1)
+
+    func testFitWidthBound() {
+        // 4 cols × 1 row in 430×1000: width binds — 4×100 + 3×10 = 430.
+        let s = gridFittedCellSize(available: CGSize(width: 430, height: 1000),
+                                   count: 4, columns: 4, gap: 10, aspectRatio: 1)
+        XCTAssertEqual(s, CGSize(width: 100, height: 100))
+    }
+
+    func testFitHeightBoundShrinksPreservingAspect() {
+        // 2 rows of 16:10 cells in 430×150: width would give h = 410/3/1.6 ≈
+        // 85.4, but the rows only allow (150-10)/2 = 70 — height binds.
+        let s = gridFittedCellSize(available: CGSize(width: 430, height: 150),
+                                   count: 6, columns: 3, gap: 10, aspectRatio: 1.6)
+        XCTAssertEqual(s.height, 70)
+        XCTAssertEqual(s.width, 70 * 1.6, accuracy: 0.001)
+    }
+
+    func testFitNilAspectIsSquare() {
+        let s = gridFittedCellSize(available: CGSize(width: 210, height: 1000),
+                                   count: 2, columns: 2, gap: 10, aspectRatio: nil)
+        XCTAssertEqual(s, CGSize(width: 100, height: 100))
+    }
+
+    func testFitRaggedLastRowCountsAsFullRow() {
+        // 5 cells / 3 cols ⇒ 2 rows — same as 6 cells.
+        let five = gridFittedCellSize(available: CGSize(width: 430, height: 200),
+                                      count: 5, columns: 3, gap: 10, aspectRatio: 1)
+        let six = gridFittedCellSize(available: CGSize(width: 430, height: 200),
+                                     count: 6, columns: 3, gap: 10, aspectRatio: 1)
+        XCTAssertEqual(five, six)
+    }
+
+    // MARK: gridAimIndex (G3)
+
+    private var centres: [CGPoint] { frames.map { CGPoint(x: $0.midX, y: $0.midY) } }
+
+    func testAimRightPicksRowNeighbour() {
+        XCTAssertEqual(gridAimIndex(from: 0, dx: 1, dy: 0, points: centres), 1)
+    }
+
+    func testAimDownPicksColumnNeighbour() {
+        XCTAssertEqual(gridAimIndex(from: 1, dx: 0, dy: 1, points: centres), 4)
+    }
+
+    func testAimAtEdgeStaysPut() {
+        XCTAssertEqual(gridAimIndex(from: 2, dx: 1, dy: 0, points: centres), 2)
+        XCTAssertEqual(gridAimIndex(from: 0, dx: 0, dy: -1, points: centres), 0)
+    }
+
+    func testAimSkipsGapsToNearestInDirection() {
+        // Remove the direct right neighbour (b): from a, right lands on c.
+        let pts = [centres[0], centres[2], centres[3], centres[4], centres[5]]
+        XCTAssertEqual(gridAimIndex(from: 0, dx: 1, dy: 0, points: pts), 1)   // c
+    }
+
+    func testAimIgnoresDiagonal() {
+        // From a with only e (diagonal) present besides d: down must pick d,
+        // never the diagonal e... and RIGHT must not pick d/e either — no
+        // horizontal candidate exists, so it stays put.
+        let pts = [centres[0], centres[3], centres[4]]
+        XCTAssertEqual(gridAimIndex(from: 0, dx: 0, dy: 1, points: pts), 1)   // d
+        XCTAssertEqual(gridAimIndex(from: 0, dx: 1, dy: 0, points: pts), 0)
+    }
+
+    // MARK: gridSlotSegment (G2)
+
+    func testSlotBeforeCellIsLeadingEdge() {
+        let seg = gridSlotSegment(index: 1, frames: frames, horizontal: false, gap: 10)
+        XCTAssertEqual(seg?.a, CGPoint(x: 105, y: 0))
+        XCTAssertEqual(seg?.b, CGPoint(x: 105, y: 100))
+    }
+
+    func testEndSlotIsTrailingEdgeOfLastCell() {
+        let seg = gridSlotSegment(index: 6, frames: frames, horizontal: false, gap: 10)
+        XCTAssertEqual(seg?.a, CGPoint(x: 325, y: 110))
+        XCTAssertEqual(seg?.b, CGPoint(x: 325, y: 210))
+    }
+
+    func testHorizontalGridDrawsHorizontalLine() {
+        let seg = gridSlotSegment(index: 1, frames: frames, horizontal: true, gap: 10)
+        XCTAssertEqual(seg?.a, CGPoint(x: 110, y: -5))
+        XCTAssertEqual(seg?.b, CGPoint(x: 210, y: -5))
+    }
+
+    func testSlotOnUnmeasuredFrameIsNil() {
+        var f = frames; f[1] = .zero
+        XCTAssertNil(gridSlotSegment(index: 1, frames: f, horizontal: false, gap: 10))
+        XCTAssertNil(gridSlotSegment(index: 0, frames: [], horizontal: false, gap: 10))
+        XCTAssertNil(gridSlotSegment(index: 9, frames: f, horizontal: false, gap: 10))
+    }
+
+    // MARK: gridTargetAnchor (G3 ghost park)
+
+    func testAnchorOntoIsCellCentre() {
+        let t = GridDropTarget(placement: GridDropPlacement.onto(id: "e"))
+        XCTAssertEqual(gridTargetAnchor(t, ids: ids, frames: frames,
+                                        horizontal: false, gap: 10),
+                       CGPoint(x: 160, y: 160))
+    }
+
+    func testAnchorAtIsSlotMidpoint() {
+        let t = GridDropTarget<String>(placement: .at(index: 1))
+        XCTAssertEqual(gridTargetAnchor(t, ids: ids, frames: frames,
+                                        horizontal: false, gap: 10),
+                       CGPoint(x: 105, y: 50))
+    }
+
+    func testAnchorUnmeasuredIsNil() {
+        var f = frames; f[4] = .zero
+        let t = GridDropTarget(placement: GridDropPlacement.onto(id: "e"))
+        XCTAssertNil(gridTargetAnchor(t, ids: ids, frames: f, horizontal: false, gap: 10))
+    }
+}
