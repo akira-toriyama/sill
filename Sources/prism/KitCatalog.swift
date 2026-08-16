@@ -750,6 +750,7 @@ ThemedMenuTriggerView(palette: resolve(themeSpec), title: "Actions", items: item
                  "DnD: .draggable(_ mode: GridDragMode = .dropOnto) opts a grid into pointer drag (.dropOnto onto-a-cell / .reorderAt row-major insertion slots / .both by in-cell fraction); .dropTargetValidator((GridDragContext,GridDropTarget)->Bool) pre-validates every placement (rejected ⇒ no affordance, no commit); .onGridDrop((GridDragContext,GridDropTarget)->Void) receives the committed drop — the MEANING (swap/move/reorder) is the consumer's",
                  "capture seams: .preview(GridPreview(hovered:cursor:focused:)) freezes the interactive chrome, .dragging(source:over:) freezes the mid-drag onto pose (source dim + ghost + target ring), .dragging(source:at:) freezes the mid-reorder pose (source dim + ghost + insertion line), .previewShimmerPhase(0…1) parks the loading sweep — a static bench shot shows hover/cursor-ring/shimmer/drag deterministically (selection freezes via .constant)",
                  ".fitsViewport(_:) / .activatesOnClick(_:) / .wrapsCursor(_:) — behaviour opt-ins (t-mej6): fit-to-viewport sizing (gridFittedCellSize, no ScrollView, centred block), single-click activation, edge-wrapping cursor",
+                 ".takesKeyboardFocus(_:) — false opts the grid OUT of keyboard focus entirely (no focus-on-click, no system focus ring, dormant key bindings) for a host-driven keyboard; the ThemedListStyle.takesKeyboardFocus twin",
              ],
         variants: [
                  "layout: fixed(columns:) / adaptive(minCellWidth:)",

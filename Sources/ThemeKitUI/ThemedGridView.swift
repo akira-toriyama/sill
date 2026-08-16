@@ -122,6 +122,17 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     private var wrapsCursorFlag = false
     private var clickActivates = false
     private var fitsViewportFlag = false
+    private var keyboardFocusable = true
+
+    /// A copy that does NOT take keyboard focus — the grid twin of
+    /// `ThemedListStyle.takesKeyboardFocus`, for a HOST-DRIVEN keyboard
+    /// (facet's overlay grid): no focus-on-click, no system focus ring, and
+    /// the kit's own key bindings (`onKeyPress` / `onMoveCommand`) stay
+    /// dormant because focus never lands on the grid. Pointer interaction
+    /// (hover, taps, the cell drag) is unaffected.
+    public func takesKeyboardFocus(_ on: Bool = true) -> Self {
+        var c = self; c.keyboardFocusable = on; return c
+    }
 
     /// A copy whose arrow-key cursor WRAPS at the grid's edges (t-mej6 G5) —
     /// last column → first, last row → first (the ragged last row snaps to the
@@ -231,7 +242,7 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
     public var body: some View {
         GeometryReader { geo in
             gridContainer(geo)
-            .focusable()
+            .focusable(keyboardFocusable)
             .focused($isFocused)
             .onKeyPress(.return) {
                 if keyboardDragging { commitKeyboardDrag(); return .handled }
