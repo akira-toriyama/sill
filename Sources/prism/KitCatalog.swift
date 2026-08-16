@@ -472,6 +472,7 @@ ThemedDividerView(
                  "glow: AnimatedBorderGlow — .none (flat) / .bloom (default, two-stop neon halo scaled by the breathing width; the effect rim only)",
                  "flashToken: Int — bump to roll a focus/WS-switch blink burst (rolled internally on the view's own clock so the epoch matches)",
                  "previewFrozen: Bool + previewPhase: CGFloat — hold a fixed-phase frame for deterministic capture",
+                 "cyclesColors: Bool (var, default true) — false rests a NON-cycles effect on its steady hue instead of looping its flash palette (colour cycling as an explicit opt-in, facet's `[border]` contract); rainbow still rotates",
              ],
         variants: [
                  "mode: static primary stroke (no effect / effects off) vs live effect rim (effect + effects on)",
