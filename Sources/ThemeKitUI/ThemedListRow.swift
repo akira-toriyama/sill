@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import Palette          // TypeRole — the fixed type scale `rowFont` bumps the weight on
 import PaletteKit
 import ThemeKit
 import ListCore
@@ -65,8 +66,22 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
     /// and a disabled row shared a surface. `tertiary` means the third
     /// EMPHASIS tier, which is a different concept from unavailable.
     private var primaryColor: Color {
-        onAccent ? Color(nsColor: palette.onPrimary(1))
-                 : Color(nsColor: item.isDisabled ? palette.disabledInk : palette.foreground)
+        if onAccent { return Color(nsColor: palette.onPrimary(1)) }
+        if item.isDisabled { return Color(nsColor: palette.disabledInk) }
+        // `isEmphasized` = "this is the active one" → the accent, the same word
+        // every other surface uses for active. Loses to `onAccent`/disabled,
+        // which are states of this row rather than statements about it.
+        return Color(nsColor: item.isEmphasized ? palette.primary : palette.foreground)
+    }
+
+    /// This row's font for a type role, one weight notch up when the row is
+    /// emphasized. The SIZE always comes from the fixed scale (emphasis must not
+    /// reflow a row), so an emphasized row keeps its laid-out height; only the
+    /// weight moves. Unemphasized it resolves byte-identically to
+    /// `palette.uiFont(role)`.
+    private func rowFont(_ role: TypeRole) -> Font {
+        let weight: NSFont.Weight = item.isEmphasized ? .semibold : role.token.weight.nsWeight
+        return Font(palette.uiFont(CGFloat(role.token.pt), weight) as CTFont)
     }
     /// A row that draws a selection/highlight WASH has to re-check its
     /// secondary line against the wash, not against the background: `muted` on
@@ -128,8 +143,38 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
         case .betweenBelow:  insertionLine(.bottom)
         case .sectionBarAbove: sectionBar(.top)
         case .sectionBarBelow: sectionBar(.bottom)
+        case .bandTop:       dropBand(top: true, bottom: false)
+        case .bandBody:      dropBand(top: false, bottom: false)
+        case .bandBottom:    dropBand(top: false, bottom: true)
+        case .bandSolo:      dropBand(top: true, bottom: true)
         case .none:          EmptyView()
         }
+    }
+
+    /// One row's slice of a host-declared drop BAND (`ThemedListView.dropBand`):
+    /// the destination AREA a coarse-granularity drop really lands in, rather
+    /// than a 2pt line promising a placement between two specific rows. Fill +
+    /// side edges on every slice; the end slices close the outline.
+    ///
+    /// 0.28 is the band's own fill weight (a drop affordance, not a pointer
+    /// state) — deliberately heavier than the `.onto` ring's 0.12 wash, because
+    /// this reads as a REGION at a glance rather than as a highlighted row.
+    @ViewBuilder private func dropBand(top: Bool, bottom: Bool) -> some View {
+        let accent = Color(nsColor: palette.primary)
+        ZStack {
+            Rectangle().fill(accent.opacity(0.28))
+            VStack(spacing: 0) {
+                if top { Rectangle().fill(accent).frame(height: 2) }
+                Spacer(minLength: 0)
+                if bottom { Rectangle().fill(accent).frame(height: 2) }
+            }
+            HStack(spacing: 0) {
+                Rectangle().fill(accent).frame(width: 2)
+                Spacer(minLength: 0)
+                Rectangle().fill(accent).frame(width: 2)
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     @ViewBuilder private func insertionLine(_ edge: Alignment) -> some View {
@@ -217,6 +262,9 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
             Text(badge.text)
                 .font(Font(palette.uiFont(.badge) as CTFont))
                 .foregroundColor(ink)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: metrics.badgeMaxText, alignment: .leading)
         }
         .padding(.horizontal, metrics.badgeHPad)
         .frame(height: metrics.badgeHeight)
@@ -331,7 +379,7 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
     @ViewBuilder private var textStack: some View {
         VStack(alignment: .leading, spacing: metrics.lineGap) {
             Text(item.primary)
-                .font(Font(palette.uiFont(.body) as CTFont))
+                .font(rowFont(TypeRole.body))
                 .foregroundColor(primaryColor)
                 .lineLimit(1)
             if let secondary = item.secondary {
@@ -347,8 +395,8 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
         if let subtitle {
             VStack(alignment: .leading, spacing: metrics.lineGap) {
                 Text(item.primary)
-                    .font(Font(palette.uiFont(.sectionTitle) as CTFont))
-                    .foregroundColor(Color(nsColor: palette.foreground))
+                    .font(rowFont(TypeRole.sectionTitle))
+                    .foregroundColor(Color(nsColor: item.isEmphasized ? palette.primary : palette.foreground))
                     .lineLimit(1)
                 Text(subtitle)
                     .font(Font(palette.uiFont(.caption) as CTFont))
@@ -357,9 +405,9 @@ struct ThemedListRow<ID: Hashable & Sendable>: View {
             }
         } else {
             Text(item.primary.uppercased())
-                .font(Font(palette.uiFont(.sectionHeader) as CTFont))
+                .font(rowFont(TypeRole.sectionHeader))
                 .tracking(0.5)
-                .foregroundColor(Color(nsColor: palette.muted))
+                .foregroundColor(Color(nsColor: item.isEmphasized ? palette.primary : palette.muted))
                 .lineLimit(1)
         }
     }

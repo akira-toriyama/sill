@@ -85,6 +85,13 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     /// and the keyboard paths before a placement becomes a target. Set via
     /// `dropTargetValidator(_:)`; the default accepts every placement.
     var dropValidate: (ListCore.DragContext<ID>, ListCore.DropTarget<ID>) -> Bool = { _, _ in true }
+    /// What travels with a lifted row. `nil` ⇒ the kit's rule (a section header
+    /// carries its section, every other row travels alone). Set via
+    /// `dragChunk(_:)`.
+    var chunkProvider: ((ID) -> [ID])?
+    /// The rows a resolved drop would actually affect, painted as a BAND.
+    /// `nil` ⇒ no band (the line/ring affordances only). Set via `dropBand(_:)`.
+    var bandProvider: ((ListCore.DropTarget<ID>) -> [ID])?
 
     public init(items: [ListItem<ID>],
                 selection: Binding<Set<ID>> = .constant([]),
@@ -130,6 +137,38 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     public func dropTargetValidator(_ validate: @escaping (ListCore.DragContext<ID>, ListCore.DropTarget<ID>) -> Bool) -> Self {
         var copy = self
         copy.dropValidate = validate
+        return copy
+    }
+
+    /// A copy whose lifts carry the ids `members` returns for the lifted row —
+    /// the host's grouping seam, consulted by BOTH the pointer and the keyboard
+    /// path. The default is the kit's rule: a section header carries its whole
+    /// section (`ListCore.chunkMemberIDs`), any other row travels alone.
+    ///
+    /// Returning `[]` for a header lifts that header ALONE, which is the only
+    /// way to aim a header at another ROW (`.onto`) — a chunk is forced to
+    /// `.reorderBetween` by `resolveDropTarget`, so a host whose header drag
+    /// means "trade these two sections' contents" (facet's workspace swap)
+    /// could not express it at all. (A copy-method rather than an init label:
+    /// the API differ reads a changed label set as a removal.)
+    public func dragChunk(_ members: @escaping (ID) -> [ID]) -> Self {
+        var copy = self
+        copy.chunkProvider = members
+        return copy
+    }
+
+    /// A copy that paints the rows `members` returns as a filled, outlined BAND
+    /// while a drop is aimed at `target` — for a list whose commit is coarser
+    /// than a row (facet drops a window into a WORKSPACE, never between two
+    /// specific rows). Without it such a list can only draw a 2pt insertion
+    /// line, which promises a row-level placement the commit will not honour,
+    /// and shrinks "which section am I dropping into" from an area to a line.
+    ///
+    /// The band replaces the line/ring for its member rows; rows outside it
+    /// draw nothing. Returning `[]` falls back to the normal affordance.
+    public func dropBand(_ members: @escaping (ListCore.DropTarget<ID>) -> [ID]) -> Self {
+        var copy = self
+        copy.bandProvider = members
         return copy
     }
 
@@ -225,7 +264,8 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         return result
     }
 
-    @ViewBuilder private func rowView(_ item: ListItem<ID>, parity: [ID: Bool], opaque: Bool, dividers: [ID: CGFloat]) -> some View {
+    @ViewBuilder private func rowView(_ item: ListItem<ID>, parity: [ID: Bool], opaque: Bool,
+                                      dividers: [ID: CGFloat], band: DropBand? = nil) -> some View {
         ThemedListRow(item: item, metrics: metrics, style: style, palette: palette,
                       isSelected: effectiveSelection.contains(item.id),
                       isHighlighted: effectiveHighlight == item.id,
@@ -235,7 +275,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                       dividerInset: dividers[item.id],
                       isCollapsed: headerIsCollapsed(item),
                       dimmed: dimmedIDs.contains(item.id),
-                      drop: rowDrop(item.id))
+                      drop: rowDrop(item.id, band: band))
             .reportRowGeom(item.id)
             .reportRowRect(item.id)
             .contentShape(Rectangle())
@@ -317,12 +357,13 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         let opaque = surfaceIsOpaque
         let dividers = dividerMap
         let sections = groupedSections
+        let band = dropBand
         ScrollView(scrollAxes) {
             LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                 ForEach(Array(sections.enumerated()), id: \.offset) { _, sec in
                     if let header = sec.header {
                         Section {
-                            ForEach(sec.rows, id: \.id) { rowView($0, parity: parity, opaque: opaque, dividers: dividers) }
+                            ForEach(sec.rows, id: \.id) { rowView($0, parity: parity, opaque: opaque, dividers: dividers, band: band) }
                         } header: {
                             // Explicit scroll-target identity: a Section header is not a
                             // ForEach child, so without this `.id` the keyboard follow's
@@ -330,11 +371,11 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
                             // no-ops (facet's tree — every row a header — never scrolled;
                             // an Int-keyed list masks the gap by colliding with the outer
                             // ForEach's `\.offset` identity).
-                            rowView(header, parity: parity, opaque: opaque, dividers: dividers)
+                            rowView(header, parity: parity, opaque: opaque, dividers: dividers, band: band)
                                 .id(header.id)
                         }
                     } else {
-                        ForEach(sec.rows, id: \.id) { rowView($0, parity: parity, opaque: opaque, dividers: dividers) }
+                        ForEach(sec.rows, id: \.id) { rowView($0, parity: parity, opaque: opaque, dividers: dividers, band: band) }
                     }
                 }
             }
@@ -482,9 +523,8 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
             .onChanged { value in
                 guard isDragSource(item) else { return }
                 if dragState == nil {
-                    var chunk: [ID] = []
-                    if case .sectionHeader = item.kind { chunk = chunkMemberIDs(forHeader: item.id, rows: visible.map(\.asRow)) }
-                    dragState = DragInfo(source: item.id, chunkIDs: chunk, target: nil, location: value.location)
+                    dragState = DragInfo(source: item.id, chunkIDs: chunkIDs(for: item.id),
+                                         target: nil, location: value.location)
                 }
                 var ds = dragState!
                 // Lean into the sideways motion, the way a held card does. Smoothed
@@ -637,9 +677,16 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     }
 
     /// The ids a keyboard lift of `h` carries (the section chunk, or none).
-    package func kbChunk(for h: ID) -> [ID] {
-        guard let item = visible.first(where: { $0.id == h }), case .sectionHeader = item.kind else { return [] }
-        return chunkMemberIDs(forHeader: h, rows: visible.map(\.asRow))
+    package func kbChunk(for h: ID) -> [ID] { chunkIDs(for: h) }
+
+    /// What a lift of `id` carries — the host's `dragChunk(_:)` provider when
+    /// set, else the kit's rule (`chunkMemberIDs`: a header carries its section,
+    /// every other row returns []). ONE rule for the pointer and the keyboard:
+    /// the two used to compute it separately, which is how a header could lift
+    /// under one path and not the other.
+    package func chunkIDs(for id: ID) -> [ID] {
+        if let chunkProvider { return chunkProvider(id) }
+        return chunkMemberIDs(forHeader: id, rows: visible.map(\.asRow))
     }
 
     /// The ordered keyboard-drag aim a lift of `h` cycles through.
@@ -663,8 +710,34 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
 
     private func cancelDrag() { dragState = nil; dragAim = []; dragAimIndex = 0 }
 
-    private func rowDrop(_ id: ID) -> RowDrop? {
+    /// The band a drop paints, resolved ONCE per render (the body hands the same
+    /// value to every row): the member set plus its first/last row in VISIBLE
+    /// order. Visible order — not the host array's order — decides which row
+    /// draws the top edge and which the bottom.
+    package struct DropBand {
+        package var members: Set<ID>
+        package var first: ID?
+        package var last: ID?
+    }
+
+    package var dropBand: DropBand? {
+        guard let target = effDropTarget, let bandProvider else { return nil }
+        let members = Set(bandProvider(target))
+        guard !members.isEmpty else { return nil }
+        let ordered = visible.map(\.id).filter { members.contains($0) }
+        guard !ordered.isEmpty else { return nil }
+        return DropBand(members: members, first: ordered.first, last: ordered.last)
+    }
+
+    package func rowDrop(_ id: ID, band: DropBand? = nil) -> RowDrop? {
         guard let target = effDropTarget else { return nil }
+        // A band OWNS the affordance for its rows: the line/ring would otherwise
+        // draw a second, finer promise on top of the area the drop really hits.
+        if let band {
+            guard band.members.contains(id) else { return nil }
+            if band.first == id { return band.last == id ? .bandSolo : .bandTop }
+            return band.last == id ? .bandBottom : .bandBody
+        }
         let isChunk = !effDragChunk.isEmpty
         switch target.placement {
         case let .onto(tid):

@@ -40,12 +40,20 @@ let themedListViewportSpace = "themedList.viewport"
 /// The drop affordance a single row draws (relative to ITSELF — no cross-row geometry).
 /// `between*Above` sits at the row's top edge (the gap before it); `*Below` at its bottom
 /// (the end gap after the last row).
-enum RowDrop: Equatable {
+package enum RowDrop: Equatable {
     case onto                       // rounded ring + faint fill on the target row
     case betweenAbove               // thin insertion line + dot at this row's top
     case betweenBelow               // …at the bottom (end gap)
     case sectionBarAbove            // coarse full-bleed chunk bar at the top
     case sectionBarBelow            // …at the bottom
+    // The BAND (host-declared via `dropBand(_:)`): the rows a coarse-granularity
+    // drop actually affects, painted as one filled + outlined area. Split by
+    // position so the outline closes at the ends and the middle stays open —
+    // one row's overlay can't know its neighbours.
+    case bandTop                    // fill + top/leading/trailing edge
+    case bandBody                   // fill + leading/trailing edge
+    case bandBottom                 // fill + bottom/leading/trailing edge
+    case bandSolo                   // fill + the whole outline (a one-row band)
 }
 
 extension View {

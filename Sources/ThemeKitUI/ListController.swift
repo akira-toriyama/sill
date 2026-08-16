@@ -171,7 +171,11 @@ public final class ListController<ID: Hashable & Sendable> {
     }
 
     private func badgeWidth(_ b: Badge, palette: ResolvedPalette, m: ListMetrics) -> CGFloat {
-        var w = ceil((b.text as NSString).size(withAttributes: [.font: palette.uiFont(.badge)]).width) + m.badgeHPad * 2
+        // Same `badgeMaxText` cap the drawn label truncates at (ThemedListRow's
+        // badgeView) — a measurer that ignored it would hand the text budget a
+        // width the pill never occupies.
+        let text = ceil((b.text as NSString).size(withAttributes: [.font: palette.uiFont(.badge)]).width)
+        var w = min(text, m.badgeMaxText) + m.badgeHPad * 2
         if b.symbol != nil { w += m.badgeSymbolPt + 3 }
         return w
     }

@@ -85,6 +85,13 @@ public struct ListMetrics {
     public let leadingInset, trailingInset, imageBox, iconGlyph, gapImageToText: CGFloat
     public let twoLineTop, lineGap, accentBar, roundedHInset: CGFloat
     public let badgeHeight, badgeHPad, badgeSymbolPt, badgeGap: CGFloat
+    /// Cap on a badge's TEXT width; past it the label truncates (tail) instead
+    /// of pushing the row's title out. The cluster is `.fixedSize()` — it never
+    /// compresses, the text budget yields — so without a cap one long mark name
+    /// eats the whole primary line, and a host that wants readable words is
+    /// forced to drop the words. Measured by `ListController.badgeWidth` under
+    /// the same cap, so layout and draw agree.
+    public let badgeMaxText: CGFloat
     public let chevronPt, shortcutHeight, shortcutHPad, clusterGap, budgetMargin: CGFloat
     public let separatorBand, indentStep, disclosurePt, disclosureGap: CGFloat
 
@@ -102,7 +109,7 @@ public struct ListMetrics {
                 singleRow: 30, twoLineRow: 46, header1: 28, header2: 40,
                 leadingInset: 12, trailingInset: 12, imageBox: 24, iconGlyph: 18, gapImageToText: 8,
                 twoLineTop: 8, lineGap: 2, accentBar: 3, roundedHInset: 3,
-                badgeHeight: 16, badgeHPad: 6, badgeSymbolPt: 11, badgeGap: 4,
+                badgeHeight: 16, badgeHPad: 6, badgeSymbolPt: 11, badgeGap: 4, badgeMaxText: 96,
                 chevronPt: 11, shortcutHeight: 16, shortcutHPad: 5, clusterGap: 6, budgetMargin: 8,
                 separatorBand: 9, indentStep: 16, disclosurePt: 11, disclosureGap: 5)
         case .compact:
@@ -110,7 +117,7 @@ public struct ListMetrics {
                 singleRow: 26, twoLineRow: 40, header1: 24, header2: 40,   // header2 NOT shrunk in compact
                 leadingInset: 10, trailingInset: 10, imageBox: 20, iconGlyph: 16, gapImageToText: 6,
                 twoLineTop: 6, lineGap: 2, accentBar: 3, roundedHInset: 3,
-                badgeHeight: 14, badgeHPad: 6, badgeSymbolPt: 11, badgeGap: 4,
+                badgeHeight: 14, badgeHPad: 6, badgeSymbolPt: 11, badgeGap: 4, badgeMaxText: 88,
                 chevronPt: 10, shortcutHeight: 14, shortcutHPad: 5, clusterGap: 6, budgetMargin: 8,
                 separatorBand: 7, indentStep: 14, disclosurePt: 10, disclosureGap: 5)
         }
