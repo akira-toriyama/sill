@@ -86,7 +86,7 @@ let package = Package(
         // re-proposes it weekly (the `swift` group is `patterns: ["*"]`); this
         // paragraph is the standing verdict, so re-measure rather than re-derive.
         .package(url: "https://github.com/swhitty/SwiftDraw.git",
-                 .upToNextMinor(from: "0.24.0")),
+                 .upToNextMinor(from: "0.29.0")),
         // swiftlang/, NOT apple/ — the repo moved and `apple/` is the stale
         // redirect. SwiftPM derives the package identity from the URL, so a
         // consumer that pulls both (glance does) hits "Conflicting identity for
