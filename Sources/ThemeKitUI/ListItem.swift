@@ -88,6 +88,23 @@ public struct ListItem<ID: Hashable & Sendable> {
         var c = self; c.isEmphasized = on; return c
     }
 
+    /// This row reads FADED — present but parked (facet's hidden windows).
+    /// `isDisabled` cannot spell it: that flag is the first thing
+    /// `tapOutcome` consults, so it takes the row's click, hover, selection,
+    /// drag and AX element down with the ink. A dimmed row keeps ALL of those
+    /// — only its content opacity drops (the same veil a lifted drag source
+    /// wears). Like `isEmphasized` it is a statement ABOUT the row, not a row
+    /// state: it never enters the pure `asRow` projection, and it is
+    /// deliberately NOT an `init` parameter (the API differ reads a changed
+    /// label list as the old initialiser being removed — measured 2026-08-12).
+    public var isDimmed: Bool = false
+
+    /// A copy that reads faded (see ``isDimmed``). Same API-differ-safe
+    /// copy-method shape as `emphasized(_:)`.
+    public func dimmed(_ on: Bool = true) -> ListItem {
+        var c = self; c.isDimmed = on; return c
+    }
+
     /// The pure shadow the cores see — no NSImage crosses into `ListCore`.
     public var asRow: ListRow<ID> {
         let rowKind: RowKind

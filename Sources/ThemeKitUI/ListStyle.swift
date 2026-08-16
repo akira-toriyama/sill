@@ -58,6 +58,11 @@ public struct ThemedListStyle {
     /// app is ACTIVE — over a non-activating panel at rest this is a no-op,
     /// the same OS limit the AppKit predecessor accepted.
     public var showsPointerAffordances: Bool = false
+    /// Hover tooltips carrying each row's FULL text (title + secondary/sub-line)
+    /// — the read-the-whole-title affordance for a list whose long titles
+    /// truncate and whose horizontal content scroll is off (facet retired it:
+    /// the two-axis ScrollView centres short content). Off (default): no tips.
+    public var showsTitleTooltips: Bool = false
     public var horizontalContentScroll: Bool = false
     public var reservesLeadingImageColumn: Bool = true
     public var wrapsHighlight: Bool = false
