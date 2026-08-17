@@ -142,7 +142,8 @@ Pure SwiftUI (modeled on `ThemedPillView`): `palette` is a stored property; role
 | body / heading / list / code text | `foreground` |
 | link | `primary` (underline + `.tint(primary)`) |
 | inline-code bg / code-block bg / table-header bg | `surface(.inset)` (= ink `.subtle`, PR #91) |
-| blockquote left bar | `primary`; blockquote body text | `tertiary` |
+| blockquote left bar | `primary` |
+| blockquote body text | `tertiary` |
 | table border / cell hairline / hr / h1·h2 rule | `border` |
 
 ### `MarkdownStyle` (typography only — colors come from the palette)
