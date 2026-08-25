@@ -68,6 +68,9 @@ public struct AnimatedBorderView<S: Shape>: View {
     /// is rolled INTERNALLY from the effect's flash palette on the view's OWN clock,
     /// so its epoch matches the sample epoch (a host-supplied `FlashState` rolled in
     /// `CACurrentMediaTime` would mismatch the reference-date Timeline clock).
+    /// A view BORN with a non-zero token rolls the burst at entrance — hosts set
+    /// up config and flash in the same turn, so the first bump can predate the
+    /// view. `0` means "never flashed": no entrance blink.
     public var flashToken: Int
     /// Hold the live cycle at a FIXED phase WITHOUT a running clock — previews /
     /// screenshots (a moving border captures non-deterministically).
@@ -106,6 +109,15 @@ public struct AnimatedBorderView<S: Shape>: View {
         self.flashToken = flashToken
         self.previewFrozen = previewFrozen
         self.previewPhase = previewPhase
+        // A host may bump its token in the same turn it CREATES the view (facet
+        // applies config + flashBorder together), so the view can be BORN with
+        // a non-zero token (t-e2bn). Pre-roll that entrance burst as the state's
+        // INITIAL value, epoch 0 = birth — an `onChange(initial:)` roll at
+        // attach is dropped (measured: the `@State` write lands before storage
+        // installs). 0 is the "never flashed" rest state: no entrance blink.
+        if flashToken != 0, let fx = effect, effectsEnabled, !fx.flash.isEmpty {
+            _flash = State(initialValue: rollFlash(fx.flash, now: 0))
+        }
     }
 
     /// Birth time — READ only inside the render closure so the live clock is
@@ -127,6 +139,8 @@ public struct AnimatedBorderView<S: Shape>: View {
     private var maxBreath: CGFloat { max(lineWidth, breathTo ?? lineWidth * 2.5) }
 
     public var body: some View {
+        // Change-only — the ENTRANCE burst (born with a non-zero token) is
+        // pre-rolled in `init` as the state's initial value.
         content.onChange(of: flashToken) { rollFlashBurst() }
     }
 
