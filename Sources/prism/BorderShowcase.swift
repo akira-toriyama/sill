@@ -40,8 +40,21 @@ struct MockBorder: View {
                 cell("effect · off (master)") {
                     AnimatedBorderView(palette: p, effect: demo, effectsEnabled: false)
                 }
+                Spacer(minLength: 0)
+            }
+            // A second row — five 150 pt cells overflow the card and the last
+            // one clips (the #189 in-cell-visibility lesson).
+            HStack(spacing: 16) {
                 cell("effect · steady colour") {
                     steadyColorBorder
+                }
+                cell("entrance flash · frozen") {
+                    // BORN with a non-zero token (t-e2bn) — frozen 0.1 s in, so
+                    // the entrance blink (random flash-palette colour, +1.5 pt
+                    // width) stays visible in a static capture.
+                    AnimatedBorderView(palette: p, effect: demo, effectsEnabled: true,
+                                       flashToken: 1,
+                                       previewFrozen: true, previewPhase: 0.02)
                 }
                 Spacer(minLength: 0)
             }
