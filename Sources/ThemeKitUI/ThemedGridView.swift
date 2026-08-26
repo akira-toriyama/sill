@@ -291,12 +291,38 @@ where Data: RandomAccessCollection, ID: Hashable, Cell: View {
             .overlay { dragGhostLayer }
             .overlay { slotLineLayer }
         if fitsViewportFlag {
+            // EXPLICIT block size, never `.fixedSize()` (t-1cbr): under
+            // fixedSize + centred max-frame, the content's ideal-size change
+            // when the fit lands (and any structural cell re-identify, e.g.
+            // `.onHover`'s hover region) strands descendants'
+            // `GeometryReader.frame(in:)` at the PRE-fit placement — pixels
+            // re-centre, geometry doesn't, and a host resolving drops against
+            // frames its cells report in an OUTER space aims one row off
+            // (multi-row grids only; a one-row fit block self-cancels). The
+            // kit's own inner-space `cellFrames` are relative and stay
+            // consistent either way.
             content
-                .fixedSize()
+                .frame(width: fittedBlockSize?.width, height: fittedBlockSize?.height)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else {
             ScrollView(axis == .vertical ? .vertical : .horizontal) { content }
         }
+    }
+
+    /// The fit block's TOTAL size (tracks + gaps + padding), nil before the
+    /// first `recomputeLayout`. Sizing the block EXPLICITLY (instead of
+    /// `.fixedSize()`) keeps the placement pass deterministic.
+    private var fittedBlockSize: CGSize? {
+        guard let fs = fittedSize else { return nil }
+        let tracks = CGFloat(resolvedColumns)
+        let count = ids.count
+        let lanes = CGFloat(Swift.max((Swift.max(count, 1) + resolvedColumns - 1) / resolvedColumns, 1))
+        let trackSpan = axis == .vertical ? fs.width : fs.height
+        let laneSpan = axis == .vertical ? fs.height : fs.width
+        let cross = tracks * trackSpan + (tracks - 1) * gap + pad * 2
+        let main = lanes * laneSpan + (lanes - 1) * gap + pad * 2
+        return axis == .vertical ? CGSize(width: cross, height: main)
+                                 : CGSize(width: main, height: cross)
     }
 
     @ViewBuilder
