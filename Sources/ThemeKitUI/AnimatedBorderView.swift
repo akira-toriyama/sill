@@ -70,7 +70,9 @@ public struct AnimatedBorderView<S: Shape>: View {
     /// `CACurrentMediaTime` would mismatch the reference-date Timeline clock).
     /// A view BORN with a non-zero token rolls the burst at entrance — hosts set
     /// up config and flash in the same turn, so the first bump can predate the
-    /// view. `0` means "never flashed": no entrance blink.
+    /// view. The entrance burst is anchored at ATTACH (not struct init), so a
+    /// cold summon that spends longer than the burst before its first frame
+    /// still shows it. `0` means "never flashed": no entrance blink.
     public var flashToken: Int
     /// Hold the live cycle at a FIXED phase WITHOUT a running clock — previews /
     /// screenshots (a moving border captures non-deterministically).
@@ -112,9 +114,13 @@ public struct AnimatedBorderView<S: Shape>: View {
         // A host may bump its token in the same turn it CREATES the view (facet
         // applies config + flashBorder together), so the view can be BORN with
         // a non-zero token (t-e2bn). Pre-roll that entrance burst as the state's
-        // INITIAL value, epoch 0 = birth — an `onChange(initial:)` roll at
-        // attach is dropped (measured: the `@State` write lands before storage
-        // installs). 0 is the "never flashed" rest state: no entrance blink.
+        // INITIAL value at epoch 0 — an `onChange(initial:)` roll at attach is
+        // dropped (measured: the `@State` write lands before storage installs).
+        // Epoch 0 is the CLOCK ORIGIN, which `onAppear` re-anchors to attach:
+        // anchoring it at struct init expires the ~167 ms burst invisibly when
+        // a cold summon spends longer than that between init and the first
+        // composited frame (t-5hx8 — the old BorderFX was frame-counted and
+        // immune). 0 is the "never flashed" rest state: no entrance blink.
         if flashToken != 0, let fx = effect, effectsEnabled, !fx.flash.isEmpty {
             _flash = State(initialValue: rollFlash(fx.flash, now: 0))
         }
@@ -141,7 +147,28 @@ public struct AnimatedBorderView<S: Shape>: View {
     public var body: some View {
         // Change-only — the ENTRANCE burst (born with a non-zero token) is
         // pre-rolled in `init` as the state's initial value.
-        content.onChange(of: flashToken) { rollFlashBurst() }
+        content
+            .onAppear {
+                // Re-anchor the clock at attach: a cold summon can spend longer
+                // than the whole burst between struct init and the first
+                // composited frame, silently expiring the epoch-0 entrance
+                // pre-roll (t-5hx8). The cycle is phase-offset invariant, so
+                // shifting `start` only moves the flash window. The hop is
+                // load-bearing: `onAppear` fires synchronously INSIDE the
+                // attach, where a direct `@State` write is dropped exactly like
+                // the `onChange(initial:)` roll (measured in the CLT dry-run of
+                // AnimatedBorderEntranceFlashTests) — the re-anchor must land
+                // on the next main-actor turn, right where the first frame can
+                // composite. A stale POST-birth burst (`startedAt > 0`) must
+                // not ride the reset into a zombie replay on re-attach — drop
+                // it; the entrance pre-roll at 0 replays, matching the
+                // imperative old BorderFX summon flash.
+                Task { @MainActor in
+                    start = Date()
+                    if let f = flash, f.startedAt > 0 { flash = nil }
+                }
+            }
+            .onChange(of: flashToken) { rollFlashBurst() }
     }
 
     @ViewBuilder

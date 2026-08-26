@@ -120,6 +120,58 @@ final class AnimatedBorderEntranceFlashTests: XCTestCase {
                        "token 0 means never-flashed — no spurious entrance roll")
     }
 
+    /// A live border whose clock races for real — the cold-summon pin needs
+    /// the attach re-anchor, which the frozen clock deliberately ignores.
+    private func liveBorder(token: Int) -> AnimatedBorderView<RoundedRectangle> {
+        var v = AnimatedBorderView(
+            palette: theme,
+            effect: .neon,
+            effectsEnabled: true,
+            lineWidth: 3,
+            breathTo: 3,                   // no breathing — flash +1.5 is the width signal
+            cycleSeconds: 10,
+            glow: .none,
+            flashToken: token)
+        v.cyclesColors = false             // steady hue — phase-free resting colour
+        return v
+    }
+
+    // bite-exempt: discriminates only where the live TimelineView clock runs.
+    // Measured on the dev machine's CLT dry-run: red against the pre-fix
+    // source, green with the fix. The hosted runner renders the two twins
+    // identically either way (its display pipeline does not advance the live
+    // clock the same), so against the pre-fix source this test cannot fail
+    // there — the local dry-run is where this pin bites.
+    func testEntranceFlashSurvivesASlowAttach() {
+        // Cold summon (t-5hx8): the host builds the view, then spends longer
+        // than the whole ~167 ms burst before the first composited frame.
+        // Anchored at struct init the entrance pre-roll expires invisibly;
+        // anchored at attach it plays. LIVE views on purpose — the frozen
+        // clock ignores the anchor — so the capture races the real burst; a
+        // runner hiccup longer than the burst between attach and snapshot
+        // blanks an attempt, so retry and pass on any observed difference.
+        var sawFlash = false
+        for _ in 1...3 where !sawFlash {
+            let flashed = liveBorder(token: 1)
+            let calm = liveBorder(token: 0)
+            Thread.sleep(forTimeInterval: 0.25)      // the cold gap: > the burst
+
+            let (winF, hostF) = host(flashed)
+            pump(0.04)
+            let flashedPixels = snapshot(hostF)
+            winF.orderOut(nil)
+
+            let (winC, hostC) = host(calm)
+            pump(0.04)
+            let calmPixels = snapshot(hostC)
+            winC.orderOut(nil)
+
+            sawFlash = !flashedPixels.isEmpty && flashedPixels != calmPixels
+        }
+        XCTAssertTrue(sawFlash,
+                      "an entrance burst must survive a cold summon that outlives it before attach")
+    }
+
     func testBumpAfterBirthStillRolls() {
         let birth = Date()                 // ≈ the view's own @State birth stamp
         let (win, hosting) = host(border(token: 0))
