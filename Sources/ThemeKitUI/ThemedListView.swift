@@ -62,8 +62,10 @@ public struct ListPreview<ID: Hashable & Sendable> {
 
 /// The pointer shape a row vends under `style.showsPointerAffordances`.
 /// A package decision type (rather than SwiftUI's `PointerStyle` directly) so
-/// the kind-to-shape rule is testable without a pointer.
-package enum ListPointerAffordance { case link, grab }
+/// the kind-to-shape rule is testable without a pointer. `link` = the click
+/// finger (rows AND headers — one hover shape for every actionable row);
+/// `grabbing` = the closed hand held for the whole live pointer lift.
+package enum ListPointerAffordance { case link, grabbing }
 
 public struct ThemedListView<ID: Hashable & Sendable>: View {
     let items: [ListItem<ID>]
@@ -440,6 +442,13 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         // ThemedListScrollIndicatorTests, because this is exactly the shipped
         // regression. The themed replacement is `scrollIndicatorLayer` below.
         .scrollIndicators(.never)
+        // Container-level twin of the per-row `RowPointer`: during a live
+        // pointer lift the closed hand must survive the gaps BETWEEN rows
+        // (separator slots, the blank tail) — the rows' own modifiers can't
+        // cover ground they don't occupy.
+        .modifier(RowPointer(kind: pointerDragActive
+                                && style.showsPointerAffordances
+                                ? .grabbing : nil))
         .scrollPosition($scrollPos)
         .onScrollGeometryChange(for: ScrollGeom.self) { g in
             ScrollGeom(offset: g.contentOffset, content: g.contentSize, container: g.containerSize)
@@ -563,16 +572,34 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     }
     private func geom(_ id: ID) -> RowGeom? { geomMap[AnyHashable(id)] }
 
-    /// The pointer affordance `item` vends — nil is the system arrow. Rows are
-    /// click targets (link); a draggable header is a chunk drag-handle (grab,
-    /// the reorder grip's cursor twin — facet's old tree used the same pair);
-    /// disabled rows and separators vend nothing.
+    /// The pointer affordance `item` vends — nil is the system arrow. Whether a
+    /// live POINTER lift is running (keyboard lifts move no pointer, so they
+    /// don't count).
+    package var pointerDragActive: Bool {
+        dragState.map { !$0.isKeyboard } ?? false
+    }
+
     package func pointerAffordance(for item: ListItem<ID>) -> ListPointerAffordance? {
-        guard style.showsPointerAffordances, !item.isDisabled else { return nil }
+        Self.pointerAffordance(for: item, style: style,
+                               dragActive: pointerDragActive)
+    }
+
+    /// The pointer-affordance decision table, static so it is testable without
+    /// a live view. Rows and headers are both click targets (link — one hover
+    /// shape for every actionable row; the header's old `grabIdle` "grip's
+    /// cursor twin" was retired for it, t-1y9q). During a live pointer lift
+    /// EVERYTHING — separators and disabled rows included — vends the held
+    /// closed hand: the pointer crosses arbitrary rows mid-drag, and any
+    /// nil gap would flicker the cursor back to the arrow.
+    package static func pointerAffordance(
+        for item: ListItem<ID>, style: ThemedListStyle, dragActive: Bool
+    ) -> ListPointerAffordance? {
+        guard style.showsPointerAffordances else { return nil }
+        if dragActive { return .grabbing }
+        guard !item.isDisabled else { return nil }
         switch item.kind {
         case .separator: return nil
-        case .sectionHeader: return style.draggable ? .grab : .link
-        case .row: return .link
+        case .sectionHeader, .row: return .link
         }
     }
 

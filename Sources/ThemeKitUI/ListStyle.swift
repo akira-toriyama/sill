@@ -50,13 +50,15 @@ public struct ThemedListStyle {
     /// predecessor drew on every window row. A row already drawing a
     /// selection/highlight fill keeps that fill — this never paints over one.
     public var showsHoverFill: Bool = false
-    /// Vend pointer-shape affordances: an enabled row shows the link
-    /// (pointing-hand) pointer, and a section header shows the open-hand grab
-    /// pointer when `draggable` (headers are chunk drag-handles — the grip's
-    /// cursor twin). Off (default): the system arrow everywhere, the
-    /// menu/combo reading. Note macOS only honours a pointer style while the
-    /// app is ACTIVE — over a non-activating panel at rest this is a no-op,
-    /// the same OS limit the AppKit predecessor accepted.
+    /// Vend pointer-shape affordances: every enabled row AND section header
+    /// shows the link (pointing-hand) pointer — one hover shape for every
+    /// actionable row (the header's old draggable-only open-hand grab was
+    /// retired, t-1y9q) — and a live pointer lift holds the closed hand
+    /// (`.grabActive`) across the whole list until the drop. Off (default):
+    /// the system arrow everywhere, the menu/combo reading. Note macOS only
+    /// honours a pointer style while the app is ACTIVE — over a
+    /// non-activating panel at rest this is a no-op, the same OS limit the
+    /// AppKit predecessor accepted.
     public var showsPointerAffordances: Bool = false
     /// Hover tooltips carrying each row's FULL text (title + secondary/sub-line)
     /// — the read-the-whole-title affordance for a list whose long titles

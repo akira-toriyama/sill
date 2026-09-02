@@ -100,9 +100,30 @@ final class ThemedListHoverRestoreTests: XCTestCase {
 
         style.draggable = true
         let draggable = ThemedListView<String>(items: rows(), style: style, palette: theme)
-        XCTAssertEqual(draggable.pointerAffordance(for: item("H")), .grab,
-                       "a draggable header is the chunk drag-handle — the grip's cursor twin")
+        XCTAssertEqual(draggable.pointerAffordance(for: item("H")), .link,
+                       "a draggable header hovers as a click target too — one shape for every actionable row (t-1y9q retired the header grab)")
         XCTAssertEqual(draggable.pointerAffordance(for: item("a")), .link)
+    }
+
+    /// t-1y9q: a live POINTER lift holds the closed hand over EVERYTHING —
+    /// rows, headers, separators, disabled rows — because the pointer crosses
+    /// arbitrary rows mid-drag and any nil gap flickers the arrow back.
+    func testPointerAffordanceHeldDuringPointerDrag() {
+        var style = ThemedListStyle()
+        style.showsPointerAffordances = true
+        style.draggable = true
+        for name in ["a", "H", "sep", "off"] {
+            XCTAssertEqual(
+                ThemedListView<String>.pointerAffordance(
+                    for: item(name), style: style, dragActive: true),
+                .grabbing,
+                "\(name) must vend the held closed hand during a live lift")
+        }
+        // The gate outranks the drag: affordances off = arrow even mid-lift.
+        var off = style
+        off.showsPointerAffordances = false
+        XCTAssertNil(ThemedListView<String>.pointerAffordance(
+            for: item("a"), style: off, dragActive: true))
     }
 
     // MARK: 1 — showsHoverFill (render)
