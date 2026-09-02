@@ -108,7 +108,7 @@ struct StandaloneRowInteraction: ViewModifier {
 
 /// Vend the pointer shape a row's affordance calls for (`ListPointerAffordance`,
 /// decided by `ThemedListView.pointerAffordance(for:)`); `nil` leaves the system
-/// arrow. `grabbing` (`.grabActive`, the closed hand) rides BOTH the rows and
+/// arrow. `grab` (`.grabActive`, the closed hand) rides BOTH the rows and
 /// the list container during a live lift — the container catches the gaps
 /// between rows, the rows out-specify the container (innermost pointer style
 /// wins), and together the hand never flickers mid-drag. macOS honours a
@@ -120,7 +120,7 @@ struct RowPointer: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         switch kind {
         case .link:     content.pointerStyle(.link)
-        case .grabbing: content.pointerStyle(.grabActive)
+        case .grab: content.pointerStyle(.grabActive)
         case nil:       content
         }
     }

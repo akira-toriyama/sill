@@ -116,7 +116,7 @@ final class ThemedListHoverRestoreTests: XCTestCase {
             XCTAssertEqual(
                 ThemedListView<String>.pointerAffordance(
                     for: item(name), style: style, dragActive: true),
-                .grabbing,
+                .grab,
                 "\(name) must vend the held closed hand during a live lift")
         }
         // The gate outranks the drag: affordances off = arrow even mid-lift.

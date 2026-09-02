@@ -64,8 +64,8 @@ public struct ListPreview<ID: Hashable & Sendable> {
 /// A package decision type (rather than SwiftUI's `PointerStyle` directly) so
 /// the kind-to-shape rule is testable without a pointer. `link` = the click
 /// finger (rows AND headers — one hover shape for every actionable row);
-/// `grabbing` = the closed hand held for the whole live pointer lift.
-package enum ListPointerAffordance { case link, grabbing }
+/// `grab` = the closed hand held for the whole live pointer lift.
+package enum ListPointerAffordance { case link, grab }
 
 public struct ThemedListView<ID: Hashable & Sendable>: View {
     let items: [ListItem<ID>]
@@ -448,7 +448,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         // cover ground they don't occupy.
         .modifier(RowPointer(kind: pointerDragActive
                                 && style.showsPointerAffordances
-                                ? .grabbing : nil))
+                                ? .grab : nil))
         .scrollPosition($scrollPos)
         .onScrollGeometryChange(for: ScrollGeom.self) { g in
             ScrollGeom(offset: g.contentOffset, content: g.contentSize, container: g.containerSize)
@@ -595,7 +595,7 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         for item: ListItem<ID>, style: ThemedListStyle, dragActive: Bool
     ) -> ListPointerAffordance? {
         guard style.showsPointerAffordances else { return nil }
-        if dragActive { return .grabbing }
+        if dragActive { return .grab }
         guard !item.isDisabled else { return nil }
         switch item.kind {
         case .separator: return nil
