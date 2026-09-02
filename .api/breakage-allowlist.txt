@@ -8,7 +8,11 @@
 # rationale: (required marker — api-guard.sh refuses to run without it, so an
 # allow-list can never silently become a rubber stamp.) Every entry below must
 # carry its own `# why:` line directly above it.
-#
-# Empty today. That is the correct starting state: sill has removed nothing that
-# consumers cannot see.
+
+# why: ListPointerAffordance is `package`-scoped — no consumer outside the sill
+# package can name it, so renaming its case is invisible beyond this repo. The
+# digester reports package symbols alongside public ones; the rename (t-1y9q,
+# .grab → .grabbing when the closed hand became a held drag state) is a
+# consumer-invisible internal decision-type change.
+enumelement ListPointerAffordance\.grab has been renamed to enumelement grabbing
 
