@@ -674,6 +674,8 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
     /// Live lift follows the pointer. A frozen `preview` has no pointer, so the card
     /// parks just below the row it lifted — the pose a real lift settles into.
     private func ghostCentre(in size: CGSize) -> CGPoint? {
+        // x is clamped at the placement site (`dragGhostLayer`), where the card's
+        // width is known — the raw pointer x returned here may sit anywhere.
         if let ds = dragState { return ds.location }
         guard preview != nil, let src = ghostAnchor, let top = metricRowTop(src),
               let first = ghostItems.first
@@ -710,9 +712,12 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
         if !ghostItems.isEmpty {
             GeometryReader { proxy in
                 if let centre = ghostCentre(in: proxy.size) {
-                    ghostCard(width: max(120, proxy.size.width - 24))
+                    let width = max(120, proxy.size.width - 24)
+                    ghostCard(width: width)
                         .rotationEffect(.degrees(Double(dragState?.tilt ?? 0)))
-                        .position(centre)
+                        .position(CGPoint(x: ghostClampedX(centre.x, ghostWidth: width,
+                                                           contentWidth: proxy.size.width),
+                                          y: centre.y))
                         .allowsHitTesting(false)
                         .transition(.opacity)
                 }
@@ -891,4 +896,15 @@ public struct ThemedListView<ID: Hashable & Sendable>: View {
             Color.clear
         }
     }
+}
+
+/// Clamp the drag ghost's centre x so the card stays inside the list — the
+/// ghost is an in-bounds overlay clipped by the scroll viewport, so a raw
+/// pointer x (the pointer usually grabs a row's left half) would shear the
+/// card off at the edge. A card wider than the content pins to centre
+/// (the lower bound wins). Pure; `package` for the unit test.
+package func ghostClampedX(_ x: CGFloat, ghostWidth: CGFloat,
+                           contentWidth: CGFloat) -> CGFloat {
+    let half = ghostWidth / 2
+    return min(max(x, half), max(half, contentWidth - half))
 }
