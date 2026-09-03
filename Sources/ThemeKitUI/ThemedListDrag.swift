@@ -115,14 +115,19 @@ struct StandaloneRowInteraction: ViewModifier {
 /// pointer style only while the app is ACTIVE — over a non-activating panel at
 /// rest this is a no-op, the OS limit the AppKit predecessor accepted (its
 /// `NSCursor.set()` was the same silent no-op there).
+///
+/// INVARIANT — `body` must stay BRANCH-FREE (`pointerStyle(_:)` takes an
+/// Optional; map `kind` into it). A `@ViewBuilder` branch over `kind` puts the
+/// wrapped subtree inside `_ConditionalContent`, so the very first drag tick
+/// (`dragState` set → the container call-site's kind flips nil → `.grab`)
+/// re-identifies everything under it — including the row holding the live
+/// `DragGesture`, whose `.onEnded` (the only pointer-path `dragState = nil`)
+/// then never fires: the lift stays grabbed forever (t-1y9q regression).
+/// `RowPointerIdentityTests` pins this at the mechanism level.
 struct RowPointer: ViewModifier {
     let kind: ListPointerAffordance?
-    @ViewBuilder func body(content: Content) -> some View {
-        switch kind {
-        case .link:     content.pointerStyle(.link)
-        case .grab: content.pointerStyle(.grabActive)
-        case nil:       content
-        }
+    func body(content: Content) -> some View {
+        content.pointerStyle(kind.map { $0 == .link ? .link : .grabActive })
     }
 }
 
