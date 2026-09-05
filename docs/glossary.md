@@ -48,7 +48,7 @@ layout. The words below distinguish the units that share that version.
 
 **module** — a directory under `Sources/<Name>/` compiled as one SwiftPM target.
 Names are bare nouns with **no `Sill` prefix** (`Palette`, not `SillPalette`).
-Fifteen exist; thirteen are shipped, `TestSupport` is test-only and `prism` is an
+Sixteen exist; fourteen are shipped, `TestSupport` is test-only and `prism` is an
 executable. Distinguish from **product** — the `.library(name:…)` entry a
 consumer actually writes in its `Package.swift`. The two happen to be 1:1 today,
 but they are different things to the API surface: `scripts/api-guard.sh` diffs
@@ -57,8 +57,8 @@ breaks a consumer even when every symbol in it survives. `Package.swift`,
 *products*.
 
 **pure module** — a module that imports nothing platform-specific, so a consumer
-that links only it links **zero AppKit**: `Palette`, `CLIKit`, `ConfigSchema`,
-`ListCore`, `GridCore`, `Motion`, `Gesture`, `PixelArt`. Distinguish from
+that links only it links **zero AppKit**: `Palette`, `CLIKit`, `LogKit`,
+`ConfigSchema`, `ListCore`, `GridCore`, `Motion`, `Gesture`, `PixelArt`. Distinguish from
 **AppKit module** — `PaletteKit`, `Effects`, `ThemeKit` (and the SwiftUI fronts
 `ThemeKitUI`, `MarkdownKitUI`, which are `@MainActor` and reach AppKit on the
 floors). The split is enforced by the **dependency graph, not a flag or a
@@ -89,8 +89,8 @@ widget. A module name is deliberately **not** its primary public type — module
 Module.Module collision. `Sources/ThemeKitUI/`, *ThemedButtonView*.
 
 **atom** — a pure module small enough to have no internal layering, shipped under
-the one sill tag alongside the rest: `Palette`, `CLIKit`, `ConfigSchema`,
-`Gesture`, `PixelArt`. The word marks intent, not size: an atom takes no
+the one sill tag alongside the rest: `Palette`, `CLIKit`, `LogKit`,
+`ConfigSchema`, `Gesture`, `PixelArt`. The word marks intent, not size: an atom takes no
 dependency it could avoid. `Sources/CLIKit/CLIKit.swift`, *header*.
 
 **mechanism-only** — the boundary sill draws for shared code: sill supplies the
