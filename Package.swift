@@ -41,6 +41,7 @@ let package = Package(
         .library(name: "Motion", targets: ["Motion"]),
         .library(name: "ConfigSchema", targets: ["ConfigSchema"]),
         .library(name: "CLIKit", targets: ["CLIKit"]),
+        .library(name: "LogKit", targets: ["LogKit"]),
         .library(name: "Gesture", targets: ["Gesture"]),
         .library(name: "ListCore", targets: ["ListCore"]),
         .library(name: "GridCore", targets: ["GridCore"]),
@@ -109,6 +110,14 @@ let package = Package(
         // Palette: zero AppKit, zero Palette. Mechanism only — the
         // app supplies the verb arity table; CLIKit owns no vocabulary.
         .target(name: "CLIKit"),
+
+        // Pure, AppKit-free two-level LOGGER — the `/tmp/<app>.log` +
+        // `<APP>_DEBUG` shape six apps carried as byte-similar copies
+        // (facet / wand / perch / chord / halo / glance), lifted once. A
+        // pure atom alongside CLIKit: zero AppKit, zero Palette. Mechanism
+        // only — the app names itself and decides what to log; extra
+        // channels (wand's validate mirror, chord's watch file) stay app-side.
+        .target(name: "LogKit"),
 
         // Pure, Sendable, AppKit-free GESTURE RECOGNITION — wand's mouse-
         // stroke recogniser, generalised. Turns timestamped points into a
@@ -240,6 +249,7 @@ let package = Package(
                     dependencies: ["ConfigSchema",
                                    .product(name: "Toml", package: "swift-toml-edit")]),
         .testTarget(name: "CLIKitTests", dependencies: ["CLIKit"]),
+        .testTarget(name: "LogKitTests", dependencies: ["LogKit"]),
         .testTarget(name: "GestureTests", dependencies: ["Gesture"]),
         .testTarget(name: "ListCoreTests", dependencies: ["ListCore"]),
         .testTarget(name: "GridCoreTests", dependencies: ["GridCore"]),

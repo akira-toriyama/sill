@@ -62,6 +62,7 @@ tests passed while the body rows rendered blank, caught only in prism). So still
 | `Effects` | `EffectSpec` · animated themes — color-only dynamic atom | AppKit (animator) |
 | `ConfigSchema` | one `Spec<Root>` decodes config.toml + emits its JSON Schema | pure |
 | `CLIKit` | arity-driven argv tokenizer | pure |
+| `LogKit` | `Log(app:)` — the family's `/tmp/<app>.log` + `<APP>_DEBUG` two-level logger, one appending handle per process | pure |
 | `ListCore` | Foundation-only pure logic behind the stateful list widgets (rows · selection · collapse · DnD geometry); List/ComboBox/Menu wrap it | pure |
 | `GridCore` | Foundation-only pure grid math (adaptive column count) behind `ThemedGridView` (#17e) | pure |
 | `Motion` | easing curves — pure `Easing` `f(t)→value`, sampled per frame by the app | pure |
